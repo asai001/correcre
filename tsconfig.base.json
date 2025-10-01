@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", // TypeScriptが生成物をどのJS仕様として解釈するか
+    "module": "ESNext", // モジュール解決の前提
+    "moduleResolution": "Bundler", // 依存解決をバンドラ前提に最適化
+    "strict": true, // 厳格型チェックをON
+    "skipLibCheck": true, // node_modules内の型チェックをスキップしてビルド高速化。実務でほぼ常時ON
+    "resolveJsonModule": true,
+    "lib": ["dom", "dom.iterable", "esnext"], // そのプロジェクトが想定する実行環境の型定義セット
+    "noEmit": true, // tscで出力ファイルを生成しない（型チェック専用）
+    "incremental": true, // 差分型チェックで高速化
+
+    "baseUrl": ".",
+    "paths": {
+      "@correcre/validation/*": ["packages/validation/src/*"],
+      "@correcre/types/*": ["packages/types/src/*"],
+      "@correcre/adapters/*": ["packages/adapters/src/*"],
+      "@correcre/theme/*": ["packages/theme/src/*"],
+      "@admin/*": ["apps/admin/src/*"],
+      "@employee/*": ["apps/employee/src/*"]
+    },
+
+    "esModuleInterop": true, // CJS ↔ ESM の相互運用を許可。Nextの要件でもあり基本ON。
+    "isolatedModules": true // 各ファイルを独立にトランスパイルできるよう制約。Nextの要件でON。
+  }
+}

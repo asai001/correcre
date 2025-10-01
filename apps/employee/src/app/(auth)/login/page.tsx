@@ -1,0 +1,13 @@
+import Image from "next/image";
+import LoginForm from "apps/employee/src/components/auth/LoginForm";
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen flex-col items-center bg-gradient-to-br from-blue-200  via-teal-50 to-blue-200">
+      <Image className="mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
+      <div className="mt-16 w-[400px]">
+        <LoginForm></LoginForm>
+      </div>
+    </div>
+  );
+}
