@@ -1,4 +1,4 @@
-import Philosophy from "@employee/components/dashboard/philosophy";
+import Philosophy from "@employee/components/dashboard/Philosophy";
 
 export default function DashboardPage() {
   return (
