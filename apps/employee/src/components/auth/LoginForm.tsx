@@ -1,12 +1,18 @@
+// @TODO 一旦問答無用で遷移
+// required をつぶしている
+"use client";
+
 import Link from "next/link";
 
 import { Button, TextField, Checkbox } from "@mui/material";
+
+import { authenticate } from "@employee/app/lib/actions/authenticate";
 
 export default function LoginForm() {
   return (
     <div className="bg-white/70 w-full pt-15 rounded">
       <div className="w-4/5 mx-auto">
-        <form action="">
+        <form action={authenticate}>
           <div className="">
             <span className="text-neutral-600">ID または メールアドレス</span>
             <TextField
@@ -15,7 +21,7 @@ export default function LoginForm() {
               type="text"
               name="username"
               autoComplete="username"
-              required
+              // required
               variant="outlined"
               size="small"
             />
@@ -29,7 +35,7 @@ export default function LoginForm() {
               type="password"
               name="password"
               autoComplete="current-password"
-              required
+              // required
               variant="outlined"
               size="small"
             />
