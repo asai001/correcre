@@ -7,11 +7,11 @@ type ScoreTileProps = {
   value: number | string;
   unit?: string;
   color?: string; // "blue" | "#2563EB" など
-  className: string;
+  className?: string;
 };
 export default function ScoreTile({ icon, label, value, unit, color, className }: ScoreTileProps) {
   return (
-    <BaseTile className={`flex flex-col items-center gap-2 ${className}`}>
+    <BaseTile className={`flex flex-col items-center gap-0.5 lg:gap-2 ${className}`}>
       <Image src={icon} alt="" className="w-10 h-10 lg:w-14 lg:h-14" width={60} height={60} />
       <div className="font-bold text-lg lg:text-2xl">{label}</div>
       <div className="font-bold text-3xl lg:text-4xl" style={color ? { color } : undefined}>

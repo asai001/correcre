@@ -1,6 +1,5 @@
 import Philosophy from "@employee/components/dashboard/Philosophy";
 import User from "@employee/components/dashboard/User";
-import DispCard from "@employee/components/dashboard/DispCard";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
 
 export default function DashboardPage() {
@@ -12,10 +11,32 @@ export default function DashboardPage() {
       <div>
         <User />
       </div>
-      <div className="flex gap-4 overflow-x-auto sm:grid sm:grid-cols-3">
-        <ScoreTile className="min-w-[250px]" icon="/trophy.svg" label="今月の達成割合" value={70} unit="パーセント" color="#2563EB" />
-        <ScoreTile className="min-w-[250px]" icon="/coin.svg" label="現在の保有ポイント" value={2450} unit="ポイント" color="#D97706" />
-        <ScoreTile className="min-w-[250px]" icon="/calendar.svg" label="先月の獲得ポイント" value={380} unit="ポイント" color="#059669" />
+      {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
+      <div className="flex gap-4 overflow-x-auto md:grid md:grid-cols-3">
+        <ScoreTile
+          className="min-w-[220px] md:min-w-0"
+          icon="/trophy.svg"
+          label="今月の達成割合"
+          value={70}
+          unit="パーセント"
+          color="#2563EB"
+        />
+        <ScoreTile
+          className="min-w-[220px] md:min-w-0"
+          icon="/coin.svg"
+          label="現在の保有ポイント"
+          value={2450}
+          unit="ポイント"
+          color="#D97706"
+        />
+        <ScoreTile
+          className="min-w-[220px] md:min-w-0"
+          icon="/calendar.svg"
+          label="先月の獲得ポイント"
+          value={380}
+          unit="ポイント"
+          color="#059669"
+        />
       </div>
     </div>
   );
