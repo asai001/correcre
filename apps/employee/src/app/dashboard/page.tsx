@@ -1,10 +1,11 @@
 import Philosophy from "@employee/components/dashboard/Philosophy";
 import User from "@employee/components/dashboard/User";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
+import MissionReport from "@employee/components/dashboard/MissionReport";
 
 export default function DashboardPage() {
   return (
-    <div className="container mx-auto px-6">
+    <div className="container mb-10 mx-auto px-6">
       <div className="pt-5">
         <Philosophy />
       </div>
@@ -37,6 +38,9 @@ export default function DashboardPage() {
           unit="ポイント"
           color="#059669"
         />
+      </div>
+      <div>
+        <MissionReport />
       </div>
     </div>
   );
