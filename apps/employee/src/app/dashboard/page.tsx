@@ -12,7 +12,7 @@ export default function DashboardPage() {
         <User />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="flex gap-4 overflow-x-auto md:grid md:grid-cols-3">
+      <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
         <ScoreTile
           className="min-w-[220px] md:min-w-0"
           icon="/trophy.svg"
