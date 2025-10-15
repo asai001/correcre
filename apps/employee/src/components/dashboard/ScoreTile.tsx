@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { BaseTile } from "./BaseTile";
+import BaseTile from "@employee/components/dashboard/BaseTile";
 
 type ScoreTileProps = {
   icon: string;
