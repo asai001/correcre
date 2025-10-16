@@ -5,7 +5,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col items-center bg-gradient-to-br from-blue-200  via-teal-50 to-blue-200">
       <Image className="mt-12 lg:mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
-      <div className="mt-12 w-[400px]">
+      <div className="mt-12 w-9/10 max-w-[400px]">
         <LoginForm></LoginForm>
       </div>
       <Image
