@@ -1,10 +1,26 @@
 import User from "@admin/components/dashboard/User";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
+import AveragePointsTrendChart from "@admin/components/dashboard/AveragePointsTrendChart";
 
-import { faUsers, faChartLine, faCog } from "@fortawesome/free-solid-svg-icons";
+import { faUsers, faChartLine, faCog, faChartBar } from "@fortawesome/free-solid-svg-icons";
+
+/** 先月終端の過去12ヶ月ラベルを生成（SSR側） */
+function makeLabels(): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  const end = new Date(now.getFullYear(), now.getMonth(), 1);
+  end.setMonth(end.getMonth() - 1);
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
 
 export default function DashboardPage() {
+  const labels = makeLabels();
+  const data = [250, 320, 280, 450, 380, 520, 480, 390, 420, 350, 290, 480]; // 将来的にデータベースからとってくる
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="mt-5">
@@ -27,7 +43,7 @@ export default function DashboardPage() {
         />
         <MenuTile
           className="min-w-[220px] md:min-w-0"
-          icon={faChartLine}
+          icon={faChartBar}
           iconColor="#2563EB"
           menuName="分析・レポート"
           desc="実績分析・傾向把握・レポート出力・交換履歴"
@@ -39,6 +55,9 @@ export default function DashboardPage() {
           menuName="システム設定"
           desc="基本設定・権限管理・バックアップ"
         />
+      </div>
+      <div className="mt-5">
+        <AveragePointsTrendChart className="min-w-[220px] md:min-w-0" icon={faChartLine} iconColor="#2563EB" labels={labels} data={data} />
       </div>
     </div>
   );
