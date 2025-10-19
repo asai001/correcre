@@ -1,7 +1,7 @@
 import User from "@admin/components/dashboard/User";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
-import AveragePointsTrendChart from "@admin/components/dashboard/AveragePointsTrendChart";
+import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
 
 import { faUsers, faChartLine, faCog, faChartBar } from "@fortawesome/free-solid-svg-icons";
 
@@ -57,7 +57,7 @@ export default function DashboardPage() {
         />
       </div>
       <div className="mt-5">
-        <AveragePointsTrendChart className="min-w-[220px] md:min-w-0" icon={faChartLine} iconColor="#2563EB" labels={labels} data={data} />
+        <AvgPointsTrendChart className="min-w-[220px] md:min-w-0" icon={faChartLine} iconColor="#2563EB" labels={labels} data={data} />
       </div>
     </div>
   );

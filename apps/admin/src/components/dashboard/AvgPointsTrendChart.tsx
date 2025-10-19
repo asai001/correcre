@@ -8,7 +8,7 @@ import { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import Chart from "chart.js/auto";
 import type { Chart as ChartType } from "chart.js";
 
-type AchieveGraphProps = {
+type AvgPointsTrendChartProps = {
   icon: IconDefinition;
   iconColor?: string; // "blue" | "#2563EB" など
   labels: string[];
@@ -16,7 +16,7 @@ type AchieveGraphProps = {
   className?: string;
 };
 
-export default function AveragePointsTrendChart({ icon, iconColor = "#2563EB", labels, data, className }: AchieveGraphProps) {
+export default function AvgPointsTrendChart({ icon, iconColor = "#2563EB", labels, data, className }: AvgPointsTrendChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<ChartType<"line", number[], string> | null>(null); // 描画に間接的にかかわるのみのため、値の更新で再レンダしたくないから useRef で定義
 
