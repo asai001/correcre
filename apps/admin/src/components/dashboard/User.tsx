@@ -3,7 +3,7 @@ import { faUserShield } from "@fortawesome/free-solid-svg-icons";
 
 export default function User() {
   return (
-    <div className="flex justify-between items-center bg-white rounded-2xl shadow-lg p-6 mb-8">
+    <div className="flex justify-between items-center bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center gap-2 lg:gap-5">
         <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
           <FontAwesomeIcon icon={faUserShield} className="text-xl text-white" />

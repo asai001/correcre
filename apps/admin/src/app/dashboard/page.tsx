@@ -2,6 +2,7 @@ import User from "@admin/components/dashboard/User";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
+import AvgItemCompletionChart from "@admin/components/dashboard/AvgItemCompletionChart";
 
 import { faUsers, faChartLine, faCog, faChartBar } from "@fortawesome/free-solid-svg-icons";
 
@@ -18,12 +19,18 @@ function makeLabels(): string[] {
   return out;
 }
 
+function fetchLabel(): string[] {
+  return ["挨拶活動", "健康推進活動", "自己研鑽・成長", "効率化・改善提案", "地域活動"];
+}
+
 export default function DashboardPage() {
-  const labels = makeLabels();
-  const data = [250, 320, 280, 450, 380, 520, 480, 390, 420, 350, 290, 480]; // 将来的にデータベースからとってくる
+  const avgPointsTrendlabels = makeLabels();
+  const avgPointsTrendData = [250, 320, 280, 450, 380, 520, 480, 390, 420, 350, 290, 480]; // 将来的にデータベースからとってくる
+  const avgItemCompletionlabels = fetchLabel();
+  const avgItemCompletionData = [98, 90, 85, 80, 100]; // 将来的にデータベースからとってくる
   return (
     <div className="container mb-10 mx-auto px-6">
-      <div className="mt-5">
+      <div className="my-5">
         <User />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
@@ -56,8 +63,21 @@ export default function DashboardPage() {
           desc="基本設定・権限管理・バックアップ"
         />
       </div>
-      <div className="mt-5">
-        <AvgPointsTrendChart className="min-w-[220px] md:min-w-0" icon={faChartLine} iconColor="#2563EB" labels={labels} data={data} />
+      <div className="grid lg:grid-cols-2 mt-5">
+        <AvgPointsTrendChart
+          className="min-w-[220px] md:min-w-0"
+          icon={faChartLine}
+          iconColor="#2563EB"
+          labels={avgPointsTrendlabels}
+          data={avgPointsTrendData}
+        />
+        <AvgItemCompletionChart
+          className="min-w-[220px] md:min-w-0"
+          icon={faChartLine}
+          iconColor="#2563EB"
+          labels={avgItemCompletionlabels}
+          data={avgItemCompletionData}
+        />
       </div>
     </div>
   );
