@@ -19,7 +19,7 @@ export default function MenuTile({ icon, iconColor = "#2563EB", menuName, desc, 
         className={`flex flex-col items-start h-full gap-0.5 lg:gap-2 transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-lg ${className}`}
       >
         <div className="flex items-center mb-4">
-          <FontAwesomeIcon icon={icon} className="text-xl mr-3" style={{ color: iconColor }} />
+          <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
           <div className="text-lg lg:text-2xl font-bold">{menuName}</div>
         </div>
         <p className="text-sm opacity-90">{desc}</p>

@@ -4,7 +4,8 @@ import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
 import AvgItemCompletionChart from "@admin/components/dashboard/AvgItemCompletionChart";
 
-import { faUsers, faChartLine, faCog, faChartBar } from "@fortawesome/free-solid-svg-icons";
+import { faUsers, faChartLine, faCog, faChartBar, faTable } from "@fortawesome/free-solid-svg-icons";
+import MissionListTable from "@admin/components/dashboard/MissionListTable";
 
 /** 先月終端の過去12ヶ月ラベルを生成（SSR側） */
 function makeLabels(): string[] {
@@ -67,17 +68,18 @@ export default function DashboardPage() {
         <AvgPointsTrendChart
           className="min-w-[220px] md:min-w-0"
           icon={faChartLine}
-          iconColor="#2563EB"
           labels={avgPointsTrendlabels}
           data={avgPointsTrendData}
         />
         <AvgItemCompletionChart
           className="min-w-[220px] md:min-w-0"
           icon={faChartLine}
-          iconColor="#2563EB"
           labels={avgItemCompletionlabels}
           data={avgItemCompletionData}
         />
+      </div>
+      <div className="mt-5">
+        <MissionListTable icon={faTable} />
       </div>
     </div>
   );
