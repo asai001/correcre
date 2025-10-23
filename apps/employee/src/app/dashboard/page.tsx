@@ -27,10 +27,10 @@ export default function DashboardPage() {
 
   return (
     <div className="container mb-10 mx-auto px-6">
-      <div className="pt-5">
+      <div className="mt-5">
         <Philosophy />
       </div>
-      <div>
+      <div className="mt-5">
         <User />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
@@ -60,10 +60,10 @@ export default function DashboardPage() {
           color="#059669"
         />
       </div>
-      <div>
+      <div className="mt-5">
         <MissionReport />
       </div>
-      <div>
+      <div className="mt-5">
         <MonthlyPointsHistoryChart icon={faChartLine} labels={monthlyPointsHistoryLabels} data={monthlyPointsHistoryData} />
       </div>
     </div>
