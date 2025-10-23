@@ -41,28 +41,22 @@ export default function DashboardPage() {
         <ScoreTile className="min-w-[220px] md:min-w-0" label="今月交換ポイント" value={15200} unit="ポイント" color="#059669" />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
+      <div className="-mx-6 px-6 gap-2 md:gap-4 py-4 grid grid-cols-2 md:grid-cols-3">
         <MenuTile
-          className="min-w-[220px] md:min-w-0"
+          className="md:min-w-0"
           icon={faUsers}
           iconColor="#000000"
           menuName="従業員管理"
           desc="従業員情報の登録・編集・削除・ポイント付与管理"
         />
         <MenuTile
-          className="min-w-[220px] md:min-w-0"
+          className="md:min-w-0"
           icon={faChartBar}
           iconColor="#2563EB"
           menuName="分析・レポート"
           desc="実績分析・傾向把握・レポート出力・交換履歴"
         />
-        <MenuTile
-          className="min-w-[220px] md:min-w-0"
-          icon={faCog}
-          iconColor="#6B7280"
-          menuName="システム設定"
-          desc="基本設定・権限管理・バックアップ"
-        />
+        <MenuTile className="md:min-w-0" icon={faCog} iconColor="#6B7280" menuName="システム設定" desc="基本設定・権限管理・バックアップ" />
       </div>
       <div className="grid lg:grid-cols-2 mt-5 gap-4">
         <AvgPointsTrendChart
