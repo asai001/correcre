@@ -10,16 +10,24 @@ import Paper from "@mui/material/Paper";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
-function createData(name: string, itemName: string, inputContent: string) {
-  return { name, calories: itemName, fat: inputContent };
+function createData(date: string, name: string, itemName: string, progress: string, inputContent: string) {
+  return { date, name, itemName, progress, inputContent };
 }
 
 const rows = [
-  createData("田中 太郎", "挨拶運動", ["参加申告：始業前・昼・退勤時に実施（計3回）"].join("\n")),
-  createData("山田 太郎", "健康推進活動", ["実施内容：ウォーキング平均 8,200 歩/日（雨天はストレッチ）"].join("\n")),
+  createData("2025-10-25 11:00:00", "田中 太郎", "挨拶運動", "5/20", ["参加申告：始業前・昼・退勤時に実施（計3回）"].join("\n")),
   createData(
+    "2025-10-25 11:00:00",
+    "山田 太郎",
+    "健康推進活動",
+    "5/20",
+    ["実施内容：ウォーキング平均 8,200 歩/日（雨天はストレッチ）"].join("\n")
+  ),
+  createData(
+    "2025-10-25 11:00:00",
     "斎藤 太郎",
     "自己研鑽・成長",
+    "5/20",
     [
       "参考資料名：『リーダブルコード』",
       "学習内容：関数命名・早期return・コメント指針",
@@ -27,22 +35,24 @@ const rows = [
     ].join("\n")
   ),
   createData(
+    "2025-10-25 11:00:00",
     "加藤 太郎",
     "効率化・改善提案",
+    "5/20",
     ["提案内容：勤怠集計の自動化（GAS）", "期待される効果：集計工数 月30分→5分、入力ミス削減"].join("\n")
   ),
   createData(
+    "2025-10-25 11:00:00",
     "藤田 花子",
     "地域活動",
-    ["日時：2025-09-21 10:00–12:00", "参加活動：駅前〜公園の清掃", "感想：地域の方から感謝の言葉を頂いた"].join("\n")
+    "5/20",
+    ["日時：2025-09-21 10:00-12:00", "参加活動：駅前〜公園の清掃", "感想：地域の方から感謝の言葉を頂いた"].join("\n")
   ),
 ];
 
 type MissionListTableProps = {
   icon: IconDefinition;
   iconColor?: string; // "blue" | "#2563EB" など
-  //   labels: string[];
-  //   data: number[];
   className?: string;
 };
 
@@ -51,7 +61,7 @@ export default function MissionListTable({ icon, iconColor = "#2563EB", classNam
     <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
       <div className="flex items-center mb-4">
         <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
-        <div className="text-lg lg:text-2xl font-bold">ミッション一覧</div>
+        <div className="text-lg lg:text-2xl font-bold">直近の報告内容</div>
       </div>
 
       <TableContainer
@@ -72,13 +82,16 @@ export default function MissionListTable({ icon, iconColor = "#2563EB", classNam
           {/* 列幅の指示：1,2列は最小・3列目が残り全部 */}
           <colgroup>
             <col style={{ width: "1%" }} /> {/* 従業員名 */}
+            <col style={{ width: "1%" }} /> {/* 従業員名 */}
             <col style={{ width: "1%" }} /> {/* 項目名 */}
             <col /> {/* 入力内容（残りをすべて） */}
           </colgroup>
           <TableHead>
             <TableRow>
+              <TableCell>日時</TableCell>
               <TableCell>従業員名</TableCell>
               <TableCell align="right">項目名</TableCell>
+              <TableCell align="right">進捗</TableCell>
               <TableCell align="right">入力内容</TableCell>
             </TableRow>
           </TableHead>
@@ -86,10 +99,16 @@ export default function MissionListTable({ icon, iconColor = "#2563EB", classNam
             {rows.map((row) => (
               <TableRow key={row.name} sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                 <TableCell sx={{ whiteSpace: "nowrap" }} component="th" scope="row">
+                  {row.date}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }} component="th" scope="row">
                   {row.name}
                 </TableCell>
                 <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
-                  {row.calories}
+                  {row.itemName}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
+                  {row.progress}
                 </TableCell>
                 <TableCell
                   sx={{
@@ -99,7 +118,7 @@ export default function MissionListTable({ icon, iconColor = "#2563EB", classNam
                   }}
                   align="right"
                 >
-                  {row.fat}
+                  {row.inputContent}
                 </TableCell>
               </TableRow>
             ))}
