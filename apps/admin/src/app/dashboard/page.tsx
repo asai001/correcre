@@ -26,9 +26,9 @@ function fetchLabel(): string[] {
 
 export default function DashboardPage() {
   const avgPointsTrendlabels = makeLabels();
-  const avgPointsTrendData = [250, 320, 280, 450, 380, 520, 480, 390, 420, 350, 290, 480]; // 将来的にデータベースからとってくる
+  const avgPointsTrendData = [50, 64, 56, 90, 76, 88, 92, 78, 84, 80, 82, 97]; // 将来的にデータベースからとってくる
   const avgItemCompletionlabels = fetchLabel();
-  const avgItemCompletionData = [98, 90, 85, 80, 100]; // 将来的にデータベースからとってくる
+  const avgItemCompletionData = [70, 80, 85, 80, 70]; // 将来的にデータベースからとってくる
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="my-5">
@@ -64,7 +64,7 @@ export default function DashboardPage() {
           desc="基本設定・権限管理・バックアップ"
         />
       </div>
-      <div className="grid lg:grid-cols-2 mt-5">
+      <div className="grid lg:grid-cols-2 mt-5 gap-4">
         <AvgPointsTrendChart
           className="min-w-[220px] md:min-w-0"
           icon={faChartLine}

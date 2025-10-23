@@ -47,6 +47,7 @@ export default function AvgItemCompletionChart({ icon, iconColor = "#2563EB", la
         scales: {
           y: {
             beginAtZero: true,
+            max: 100,
             grid: {
               color: "rgba(0,0,0,0.1)",
             },

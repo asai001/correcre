@@ -50,6 +50,7 @@ export default function AvgPointsTrendChart({ icon, iconColor = "#2563EB", label
         scales: {
           y: {
             beginAtZero: true,
+            max: 100,
             grid: {
               color: "rgba(0,0,0,0.05)",
             },
