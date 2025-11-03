@@ -3,8 +3,9 @@ import User from "@employee/components/dashboard/User";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
 import MissionReport from "@employee/components/dashboard/MissionReport";
 import MonthlyPointsHistoryChart from "@employee/components/dashboard/MonthlyPointsHistoryChart";
+import ExchangeHistoryTable from "@employee/components/dashboard/ExchangeHistoryTable";
 
-import { faChartLine } from "@fortawesome/free-solid-svg-icons";
+import { faChartLine, faReceipt } from "@fortawesome/free-solid-svg-icons";
 
 /** 先月終端の過去24ヶ月ラベルを生成（SSR側） */
 function makeLabels(): string[] {
@@ -65,6 +66,9 @@ export default function DashboardPage() {
       </div>
       <div className="mt-5">
         <MonthlyPointsHistoryChart icon={faChartLine} labels={monthlyPointsHistoryLabels} data={monthlyPointsHistoryData} />
+      </div>
+      <div className="mt-5">
+        <ExchangeHistoryTable icon={faReceipt} iconColor="#48bb78" />
       </div>
     </div>
   );
