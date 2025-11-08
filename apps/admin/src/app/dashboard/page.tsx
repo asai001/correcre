@@ -36,12 +36,12 @@ export default function DashboardPage() {
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
       <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
-        <ScoreTile className="min-w-[220px] md:min-w-0" label="総従業員数" value={18} unit="名" color="#2563EB" />
         <ScoreTile className="min-w-[220px] md:min-w-0" label="先月総獲得ポイント" value={38450} unit="ポイント" color="#D97706" />
         <ScoreTile className="min-w-[220px] md:min-w-0" label="今月交換ポイント" value={15200} unit="ポイント" color="#059669" />
+        <ScoreTile className="min-w-[220px] md:min-w-0" label="企業保有ポイント" value={1000} unit="ポイント" color="#2563EB" />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="-mx-6 px-6 gap-2 md:gap-4 py-4 grid grid-cols-2 md:grid-cols-3">
+      <div className="-mx-6 px-6 gap-2 md:gap-4 py-4 grid grid-cols-1 md:grid-cols-3">
         <MenuTile
           className="md:min-w-0"
           icon={faUsers}
