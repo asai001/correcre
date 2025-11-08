@@ -16,6 +16,8 @@
       "@correcre/types/*": ["packages/types/src/*"],
       "@correcre/adapters/*": ["packages/adapters/src/*"],
       "@correcre/theme/*": ["packages/theme/src/*"],
+      "@correcre/lib": ["packages/lib/src/index.ts"],
+      "@correcre/lib/*": ["packages/lib/src/*"],
       "@admin/*": ["apps/admin/src/*"],
       "@employee/*": ["apps/employee/src/*"]
     },

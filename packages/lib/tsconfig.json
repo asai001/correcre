@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve", // NextがJSX変換を担当する前提の基本設定。アプリ側に置くのが直感的。
+    "plugins": [
+      {
+        "name": "next" // Next専用のTSプラグイン。Nextアプリでのみ必要なので各アプリ側へ。
+      }
+    ],
+    "allowJs": true
+  },
+  "include": [
+    // 型チェックの対象ファイル。
+    "src",
+    ".next/types/**/*.ts" // .next/types はそのアプリ固有の生成物なので、共通ではなく各アプリに記述。
+  ],
+  "exclude": ["node_modules"] // 型チェックの対象外ファイル
+}
