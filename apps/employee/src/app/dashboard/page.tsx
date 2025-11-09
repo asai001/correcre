@@ -1,7 +1,7 @@
 import Philosophy from "@employee/components/dashboard/Philosophy";
 import User from "@employee/components/dashboard/User";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
-import MissionReport from "@employee/components/dashboard/MissionReport";
+import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistoryChart from "@employee/components/dashboard/MonthlyPointsHistoryChart";
 import ExchangeHistoryTable from "@employee/components/dashboard/ExchangeHistoryTable";
 

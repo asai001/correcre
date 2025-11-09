@@ -60,6 +60,29 @@ export function toYYYYMMDD(date: Date, timezone: string = "Asia/Tokyo"): string 
 }
 
 /**
+ * 現在時刻を YYYY-MM-DD HH:mm 表記にフォーマットされた文字列で返す
+ *
+ * @param timezone
+ * @returns
+ */
+export function nowYYYYMMDDHHmm(timezone: string = "Asia/Tokyo"): string {
+  const { year, month, day, hour, minute } = getParts(new Date(), timezone);
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+/**
+ * 任意の時刻を YYYY-MM-DD HH:mm 表記にフォーマットされた文字列で返す
+ *
+ * @param date
+ * @param timezone
+ * @returns
+ */
+export function toYYYYMMDDHHmm(date: Date, timezone: string = "Asia/Tokyo"): string {
+  const { year, month, day, hour, minute } = getParts(date, timezone);
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+/**
  * 現在時刻を YYYY-MM-DD HH:mm:ss 表記にフォーマットされた文字列で返す
  *
  * @param timezone
@@ -67,7 +90,7 @@ export function toYYYYMMDD(date: Date, timezone: string = "Asia/Tokyo"): string 
  */
 export function nowYYYYMMDDHHmmss(timezone: string = "Asia/Tokyo"): string {
   const { year, month, day, hour, minute, second } = getParts(new Date(), timezone);
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
 
 /**
@@ -79,5 +102,5 @@ export function nowYYYYMMDDHHmmss(timezone: string = "Asia/Tokyo"): string {
  */
 export function toYYYYMMDDHHmmss(date: Date, timezone: string = "Asia/Tokyo"): string {
   const { year, month, day, hour, minute, second } = getParts(date, timezone);
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
