@@ -7,7 +7,7 @@ import type { FormConfig, FieldConfig, SubmitPayload } from "../model/types";
 import { fetchMissionFormConfig } from "../api/client";
 import { toYYYYMMDD, toYYYYMMDDHHmm } from "@correcre/lib";
 
-type Props = {
+type MissionReportDialogProps = {
   /** ダイアログの開閉制御（アンマウントはせず open で出し入れ推奨） */
   open: boolean;
   /** キャンセル/送信成功時のクローズハンドラ（親で open=false にする） */
@@ -69,7 +69,14 @@ const clearAllMissionReportDrafts = () => {
   keys.forEach((k) => localStorage.removeItem(k));
 };
 
-export default function MissionReportDialog({ open, onClose, onSubmit, companyId, missionId, loader = fetchMissionFormConfig }: Props) {
+export default function MissionReportDialog({
+  open,
+  onClose,
+  onSubmit,
+  companyId,
+  missionId,
+  loader = fetchMissionFormConfig,
+}: MissionReportDialogProps) {
   /* ---------------- 状態 ---------------- */
 
   /** ミッションのフォーム設定（null: 未ロード or 未設定） */
