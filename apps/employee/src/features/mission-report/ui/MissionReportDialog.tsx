@@ -4,7 +4,7 @@ import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog"; 
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Stack, Typography, Box } from "@mui/material";
 import type { FormConfig, FieldConfig, SubmitPayload } from "../model/types";
-import { FORM_CONFIGS } from "../model/form-configs.mock";
+import { fetchMissionFormConfig } from "../api/client";
 import { toYYYYMMDD, toYYYYMMDDHHmm } from "@correcre/lib";
 
 type Props = {
@@ -69,7 +69,7 @@ const clearAllMissionReportDrafts = () => {
   keys.forEach((k) => localStorage.removeItem(k));
 };
 
-export default function MissionReportDialog({ open, onClose, onSubmit, companyId, missionId, loader }: Props) {
+export default function MissionReportDialog({ open, onClose, onSubmit, companyId, missionId, loader = fetchMissionFormConfig }: Props) {
   /* ---------------- 状態 ---------------- */
 
   /** ミッションのフォーム設定（null: 未ロード or 未設定） */
@@ -158,15 +158,8 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     setLoading(true);
 
     (async () => {
-      // loader が無い場合はローカルの FORM_CONFIGS を検索
-      const load =
-        loader ??
-        (async (cid: string, mid: string) => {
-          return FORM_CONFIGS.find((c) => c.companyId === cid && c.missionId === mid && c.isPublished) ?? null;
-        });
-
       try {
-        const cfg = await load(companyId, missionId);
+        const cfg = await loader(companyId, missionId);
         // 成否に関わらず結果をキャッシュ（null もキャッシュ）
         cacheRef.current.set(configCacheKey, cfg);
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import MissionReportDialog from "./MissionReportDialog";
-import { fetchMissionPlan, fetchMissionProgress } from "../api/client";
+import { fetchMissionFormConfig, fetchMissionPlan, fetchMissionProgress } from "../api/client";
 import type { MissionPlan, MissionProgress, SubmitPayload } from "../model/types";
 import { nowYYYYMM } from "@correcre/lib";
 
@@ -73,6 +73,7 @@ export default function MissionReport() {
         missionId={selectedMissionId ?? undefined}
         onClose={handleClose}
         onSubmit={handleSubmit}
+        loader={fetchMissionFormConfig}
       />
     </section>
   );
