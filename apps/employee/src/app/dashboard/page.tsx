@@ -1,4 +1,4 @@
-import Philosophy from "@employee/components/dashboard/Philosophy";
+import Philosophy from "@employee/features/philosophy/ui/Philosophy";
 import User from "@employee/components/dashboard/User";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
 import { MissionReport } from "@employee/features/mission-report";
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="mt-5">
-        <Philosophy />
+        <Philosophy companyId="" missionId="" />
       </div>
       <div className="mt-5">
         <User />
