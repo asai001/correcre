@@ -1,4 +1,4 @@
-import Philosophy from "@employee/features/philosophy/ui/Philosophy";
+import Philosophy from "@employee/features/philosophy";
 import User from "@employee/components/dashboard/User";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
 import { MissionReport } from "@employee/features/mission-report";
