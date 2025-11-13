@@ -19,7 +19,7 @@ export default function Philosophy({ companyId, missionId }: PhilosophyProp) {
 
     (async () => {
       try {
-        const res = await fetchPhilosophy(companyId, missionId, { signal: ac.signal });
+        const res = await fetchPhilosophy(companyId, missionId);
         setData(res);
       } catch {
         if (!ac.signal.aborted) {

@@ -69,14 +69,7 @@ const clearAllMissionReportDrafts = () => {
   keys.forEach((k) => localStorage.removeItem(k));
 };
 
-export default function MissionReportDialog({
-  open,
-  onClose,
-  onSubmit,
-  companyId,
-  missionId,
-  loader = fetchMissionFormConfig,
-}: MissionReportDialogProps) {
+export default function MissionReportDialog({ open, onClose, onSubmit, companyId, missionId }: MissionReportDialogProps) {
   /* ---------------- 状態 ---------------- */
 
   /** ミッションのフォーム設定（null: 未ロード or 未設定） */
@@ -95,9 +88,7 @@ export default function MissionReportDialog({
   const [successMessage, setSuccessMessage] = useState<React.ReactNode>("");
 
   /** 設定キャッシュ：親がアンマウントするまで Map を維持（open の度に再通信させない） */
-  const cacheRef = useRef(new Map<string, FormConfig | null>());
-  /** リクエスト連番：最後の読み込みだけを反映するためのレース対策 */
-  const requestSeqRef = useRef(0);
+  const cacheRef = useRef(new Map<string, FormConfig>());
 
   /** 下書き保存用のキー（missionId が未確定なら一切保存/復元しない） */
   const storageKey = useMemo(() => `missionReport:${companyId}:${missionId}`, [companyId, missionId]);
@@ -160,36 +151,38 @@ export default function MissionReportDialog({
       return;
     }
 
-    let mounted = true;
-    const mySeq = ++requestSeqRef.current;
+    const ac = new AbortController();
     setLoading(true);
 
     (async () => {
       try {
-        const cfg = await loader(companyId, missionId);
-        // 成否に関わらず結果をキャッシュ（null もキャッシュ）
-        cacheRef.current.set(configCacheKey, cfg);
+        const cfg = await fetchMissionFormConfig(companyId, missionId);
 
-        // まだ mounted かつ「自分が最後の要求」だけ反映
-        if (mounted && mySeq === requestSeqRef.current) {
-          setConfig(cfg);
-          setLoading(false);
+        if (ac.signal.aborted) {
+          return;
         }
+
+        if (cfg !== null) {
+          cacheRef.current.set(configCacheKey, cfg);
+        }
+
+        setConfig(cfg);
       } catch {
-        // 失敗も null としてキャッシュ（次回以降も無駄なコールを避ける）
-        cacheRef.current.set(configCacheKey, null);
-        if (mounted && mySeq === requestSeqRef.current) {
-          setConfig(null);
+        if (ac.signal.aborted) {
+          return;
+        }
+        // エラーのとき、キャッシュには何も書かない
+        setConfig(null); // 画面上は「フォーム未設定 or エラー」扱い
+      } finally {
+        if (!ac.signal.aborted) {
           setLoading(false);
         }
       }
     })();
 
-    // アンマウント時にフラグを折る（ステート更新の安全ガード）
-    return () => {
-      mounted = false;
-    };
-  }, [open, companyId, missionId, loader, configCacheKey]);
+    // cleanup：依存が変わったタイミングで古いリクエストを無効化
+    return () => ac.abort();
+  }, [open, companyId, missionId, configCacheKey]);
 
   /* ----------------------------------------------------------------
    * フォーム初期化（config の変化に追従）
