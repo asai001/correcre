@@ -1,5 +1,5 @@
 import Philosophy from "@employee/features/philosophy";
-import User from "@employee/components/dashboard/User";
+import User from "@employee/features/user";
 import ScoreTile from "@employee/components/dashboard/ScoreTile";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistoryChart from "@employee/components/dashboard/MonthlyPointsHistoryChart";
@@ -32,7 +32,7 @@ export default function DashboardPage() {
         <Philosophy companyId="" missionId="" />
       </div>
       <div className="mt-5">
-        <User />
+        <User companyId="" userId="" />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
       <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
