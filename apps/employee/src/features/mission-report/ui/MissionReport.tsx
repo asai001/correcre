@@ -10,9 +10,12 @@ import { nowYYYYMM } from "@correcre/lib";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTasks } from "@fortawesome/free-solid-svg-icons";
 
-export default function MissionReport() {
-  const companyId = "em-inc"; // ← 後で SSO/JWT から取得
-  const userId = "user-001"; // ← 後で実ユーザーIDに
+type MissionReportProps = {
+  companyId: string;
+  userId: string;
+};
+
+export default function MissionReport({ companyId, userId }: MissionReportProps) {
   const yearMonth = nowYYYYMM();
 
   const [missionPlan, setMissionPlan] = useState<MissionPlan | null>(null);
