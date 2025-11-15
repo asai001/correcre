@@ -104,3 +104,36 @@ export function toYYYYMMDDHHmmss(date: Date, timezone: string = "Asia/Tokyo"): s
   const { year, month, day, hour, minute, second } = getParts(date, timezone);
   return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 }
+
+/**
+ * YYYY-MM 形式かチェックする
+ *
+ * @param value
+ * @returns
+ */
+export function isValidYYYYMM(value: string | undefined | null): value is string {
+  if (!value) {
+    return false;
+  }
+
+  // 数字のみかチェック
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const yearStr = value.slice(0, 4);
+  const monthStr = value.slice(5, 7);
+
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+
+  if (year < 1900 || year > 2100) {
+    return false;
+  }
+
+  if (month < 1 || month > 12) {
+    return false;
+  }
+
+  return true;
+}

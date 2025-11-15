@@ -1,9 +1,11 @@
 import Philosophy from "@employee/features/philosophy";
 import User from "@employee/features/user";
-import ScoreTile from "@employee/components/dashboard/ScoreTile";
+import DashboardSummary from "@employee/features/dashboard-summary";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistoryChart from "@employee/components/dashboard/MonthlyPointsHistoryChart";
 import ExchangeHistoryTable from "@employee/components/dashboard/ExchangeHistoryTable";
+
+import { toYYYYMM } from "@correcre/lib";
 
 import { faChartLine, faReceipt } from "@fortawesome/free-solid-svg-icons";
 
@@ -32,34 +34,10 @@ export default function DashboardPage() {
         <Philosophy companyId="" missionId="" />
       </div>
       <div className="mt-5">
-        <User companyId="" userId="" />
+        <User companyId="em-inc" userId="faireug" />
       </div>
-      {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
-        <ScoreTile
-          className="min-w-[220px] md:min-w-0"
-          icon="/trophy.svg"
-          label="今月の達成割合"
-          value={70}
-          unit="パーセント"
-          color="#2563EB"
-        />
-        <ScoreTile
-          className="min-w-[220px] md:min-w-0"
-          icon="/coin.svg"
-          label="現在の保有ポイント"
-          value={2450}
-          unit="ポイント"
-          color="#D97706"
-        />
-        <ScoreTile
-          className="min-w-[220px] md:min-w-0"
-          icon="/calendar.svg"
-          label="先月の獲得ポイント"
-          value={380}
-          unit="ポイント"
-          color="#059669"
-        />
+      <div className="mt-5">
+        <DashboardSummary companyId="em" userId="u-001" targetYearMonth={toYYYYMM(new Date())} />
       </div>
       <div className="mt-5">
         <MissionReport />

@@ -48,6 +48,9 @@
 **/*.tsbuildinfo
 **/next-env.d.ts
 
+# employee
+apps/employee/mock/dynamodb.json
+
 #################
 #      CDK      #
 #################

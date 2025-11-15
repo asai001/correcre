@@ -1,0 +1,348 @@
+{
+  "User": [
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "name": "田中 太郎",
+      "department": "営業部",
+      "joinedAt": "2022-04-01",
+      "currentPointBalance": 2450,
+      "currentMonthCompletionRate": 70
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "name": "佐藤 花子",
+      "department": "総務部",
+      "joinedAt": "2023-01-15",
+      "currentPointBalance": 1200,
+      "currentMonthCompletionRate": 55
+    },
+    {
+      "companyId": "em",
+      "userId": "u-003",
+      "name": "鈴木 次郎",
+      "department": "製造部",
+      "joinedAt": "2021-10-01",
+      "currentPointBalance": 3100,
+      "currentMonthCompletionRate": 82
+    },
+    {
+      "companyId": "em",
+      "userId": "u-004",
+      "name": "山田 三佳",
+      "department": "人事部",
+      "joinedAt": "2024-02-01",
+      "currentPointBalance": 800,
+      "currentMonthCompletionRate": 40
+    }
+  ],
+  "UserMonthlyStats": [
+    {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2024-11",
+      "earnedPoints": 320,
+      "usedPoints": 100,
+      "completionRate": 65,
+      "missionCompletedCount": 13,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2024-12",
+      "earnedPoints": 380,
+      "usedPoints": 80,
+      "completionRate": 70,
+      "missionCompletedCount": 14,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2025-01",
+      "earnedPoints": 420,
+      "usedPoints": 150,
+      "completionRate": 75,
+      "missionCompletedCount": 15,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2024-11",
+      "earnedPoints": 180,
+      "usedPoints": 0,
+      "completionRate": 50,
+      "missionCompletedCount": 10,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2024-12",
+      "earnedPoints": 210,
+      "usedPoints": 50,
+      "completionRate": 55,
+      "missionCompletedCount": 11,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2025-01",
+      "earnedPoints": 260,
+      "usedPoints": 90,
+      "completionRate": 60,
+      "missionCompletedCount": 12,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2024-11",
+      "earnedPoints": 500,
+      "usedPoints": 120,
+      "completionRate": 80,
+      "missionCompletedCount": 16,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2024-12",
+      "earnedPoints": 540,
+      "usedPoints": 200,
+      "completionRate": 82,
+      "missionCompletedCount": 18,
+      "missionTargetCount": 22
+    },
+    {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2025-01",
+      "earnedPoints": 480,
+      "usedPoints": 160,
+      "completionRate": 78,
+      "missionCompletedCount": 17,
+      "missionTargetCount": 22
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2024-11",
+      "earnedPoints": 90,
+      "usedPoints": 0,
+      "completionRate": 30,
+      "missionCompletedCount": 6,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2024-12",
+      "earnedPoints": 140,
+      "usedPoints": 20,
+      "completionRate": 40,
+      "missionCompletedCount": 8,
+      "missionTargetCount": 20
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2025-01",
+      "earnedPoints": 160,
+      "usedPoints": 40,
+      "completionRate": 45,
+      "missionCompletedCount": 9,
+      "missionTargetCount": 20
+    }
+  ],
+  "PointTransaction": [
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "transactionId": "pt-20241201-001",
+      "occurredAt": "2024-12-01T10:15:00+09:00",
+      "type": "EARN",
+      "points": 50,
+      "reasonType": "MISSION",
+      "missionId": "m-001",
+      "note": "朝礼で理念カード共有"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "transactionId": "pt-20241203-001",
+      "occurredAt": "2024-12-03T16:40:00+09:00",
+      "type": "EARN",
+      "points": 80,
+      "reasonType": "MISSION",
+      "missionId": "m-002",
+      "note": "改善提案の提出"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "transactionId": "pt-20241205-001",
+      "occurredAt": "2024-12-05T12:10:00+09:00",
+      "type": "USE",
+      "points": 100,
+      "reasonType": "EXCHANGE",
+      "exchangeId": "ex-20241205-001",
+      "note": "QUOカード 1000円分と交換"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "transactionId": "pt-20241210-001",
+      "occurredAt": "2024-12-10T09:05:00+09:00",
+      "type": "EARN",
+      "points": 40,
+      "reasonType": "MISSION",
+      "missionId": "m-003",
+      "note": "整理整頓ミッション"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "transactionId": "pt-20241215-001",
+      "occurredAt": "2024-12-15T17:25:00+09:00",
+      "type": "EARN",
+      "points": 60,
+      "reasonType": "MISSION",
+      "missionId": "m-001",
+      "note": "チーム会議での理念共有"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "transactionId": "pt-20241202-001",
+      "occurredAt": "2024-12-02T11:20:00+09:00",
+      "type": "EARN",
+      "points": 30,
+      "reasonType": "MISSION",
+      "missionId": "m-003",
+      "note": "5S活動レポート提出"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "transactionId": "pt-20241204-001",
+      "occurredAt": "2024-12-04T15:00:00+09:00",
+      "type": "EARN",
+      "points": 60,
+      "reasonType": "MISSION",
+      "missionId": "m-001",
+      "note": "朝礼で理念カード共有"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "transactionId": "pt-20241209-001",
+      "occurredAt": "2024-12-09T10:45:00+09:00",
+      "type": "USE",
+      "points": 50,
+      "reasonType": "EXCHANGE",
+      "exchangeId": "ex-20241209-001",
+      "note": "カフェチケットと交換"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-003",
+      "transactionId": "pt-20241201-002",
+      "occurredAt": "2024-12-01T08:55:00+09:00",
+      "type": "EARN",
+      "points": 70,
+      "reasonType": "MISSION",
+      "missionId": "m-004",
+      "note": "安全パトロール報告"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-003",
+      "transactionId": "pt-20241206-001",
+      "occurredAt": "2024-12-06T14:30:00+09:00",
+      "type": "EARN",
+      "points": 100,
+      "reasonType": "MISSION",
+      "missionId": "m-002",
+      "note": "大口クレーム未然防止の提案"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-003",
+      "transactionId": "pt-20241212-001",
+      "occurredAt": "2024-12-12T18:10:00+09:00",
+      "type": "USE",
+      "points": 120,
+      "reasonType": "EXCHANGE",
+      "exchangeId": "ex-20241212-001",
+      "note": "家電カタログギフト一部利用"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-004",
+      "transactionId": "pt-20241203-002",
+      "occurredAt": "2024-12-03T13:05:00+09:00",
+      "type": "EARN",
+      "points": 40,
+      "reasonType": "MISSION",
+      "missionId": "m-001",
+      "note": "朝礼で理念カード共有"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-004",
+      "transactionId": "pt-20241207-001",
+      "occurredAt": "2024-12-07T09:50:00+09:00",
+      "type": "EARN",
+      "points": 50,
+      "reasonType": "MISSION",
+      "missionId": "m-003",
+      "note": "職場の整理整頓レポート"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-004",
+      "transactionId": "pt-20241220-001",
+      "occurredAt": "2024-12-20T16:10:00+09:00",
+      "type": "USE",
+      "points": 30,
+      "reasonType": "EXCHANGE",
+      "exchangeId": "ex-20241220-001",
+      "note": "お菓子セットと交換"
+    }
+  ],
+  "Mission": [
+    {
+      "companyId": "em",
+      "missionId": "m-001",
+      "title": "朝礼で理念カードを読み上げる",
+      "description": "毎朝の朝礼で、企業理念カードを一枚選び、内容を共有する。",
+      "category": "理念共有",
+      "pointPerAction": 40,
+      "monthlyTargetCount": 10,
+      "isActive": true
+    },
+    {
+      "companyId": "em",
+      "missionId": "m-002",
+      "title": "改善提案を出す",
+      "description": "業務改善に繋がるアイデアを1件以上提案する。",
+      "category": "改善提案",
+      "pointPerAction": 80,
+      "monthlyTargetCount": 4,
+      "isActive": true
+    },
+    {
+      "companyId": "em",
+      "missionId": "m-003",
+      "title": "5S・整理整頓活動",
+      "description": "職場の整理整頓や5S活動を実施し、写真付きで報告する。",
+      "category": "職場環境",
+      "pointPerAction": 50,
+      "monthlyTargetCount": 6,
+      "isActive": true
+    },
+    {
+      "companyId": "em",
+      "missionId": "m-004",
+      "title": "安全パトロール",
+      "description": "安全点検を実施し、ヒヤリハットの有無を報告する。",
+      "category": "安全",
+      "pointPerAction": 70,
+      "monthlyTargetCount": 4,
+      "isActive": true
+    }
+  ]
+}
