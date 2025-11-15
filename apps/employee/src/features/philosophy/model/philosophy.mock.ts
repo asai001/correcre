@@ -1,7 +1,7 @@
 import type { PhilosophyPayload } from "../model/types";
 
 export const PHILOSOPHY: PhilosophyPayload = {
-  companyId: "em-inc",
+  companyId: "em",
   corporatePhilosophy: "そうぞうの力で未来を描く 想像力と創造力で可能性を切り拓き続ける",
   purpose: "中小企業の魅力を引き出し国力を上げる",
   mission: "",

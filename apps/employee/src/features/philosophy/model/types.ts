@@ -1,6 +1,6 @@
 export type Philosophy = {
-  corporatePhilosophy: string;
-  purpose: string;
+  corporatePhilosophy?: string;
+  purpose?: string;
 };
 
 export type ValueItem = {

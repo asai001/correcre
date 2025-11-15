@@ -22,6 +22,9 @@ function makeLabels(): string[] {
   return out;
 }
 
+const companyId = "em";
+const userId = "u-001";
+
 export default function DashboardPage() {
   const monthlyPointsHistoryLabels = makeLabels();
   const monthlyPointsHistoryData = [
@@ -31,16 +34,16 @@ export default function DashboardPage() {
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="mt-5">
-        <Philosophy companyId="" missionId="" />
+        <Philosophy companyId={companyId} />
       </div>
       <div className="mt-5">
-        <User companyId="em-inc" userId="faireug" />
+        <User companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
-        <DashboardSummary companyId="em" userId="u-001" targetYearMonth={toYYYYMM(new Date())} />
+        <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={toYYYYMM(new Date())} />
       </div>
       <div className="mt-5">
-        <MissionReport />
+        <MissionReport companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
         <MonthlyPointsHistoryChart icon={faChartLine} labels={monthlyPointsHistoryLabels} data={monthlyPointsHistoryData} />

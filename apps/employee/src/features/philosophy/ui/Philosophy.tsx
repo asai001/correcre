@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from "react";
 
-import type { PhilosophyPayload } from "../model/types";
+import type { Philosophy } from "../model/types";
 import { fetchPhilosophy } from "../api/client";
 
 type PhilosophyProp = {
   companyId: string;
-  missionId: string;
 };
 
-export default function Philosophy({ companyId, missionId }: PhilosophyProp) {
-  const [data, setData] = useState<PhilosophyPayload | null>(null);
+export default function Philosophy({ companyId }: PhilosophyProp) {
+  const [data, setData] = useState<Philosophy | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -19,7 +18,7 @@ export default function Philosophy({ companyId, missionId }: PhilosophyProp) {
 
     (async () => {
       try {
-        const res = await fetchPhilosophy(companyId, missionId);
+        const res = await fetchPhilosophy(companyId);
         setData(res);
       } catch {
         if (!ac.signal.aborted) {
@@ -29,7 +28,7 @@ export default function Philosophy({ companyId, missionId }: PhilosophyProp) {
     })();
 
     return () => ac.abort();
-  }, [companyId, missionId]);
+  }, [companyId]);
 
   if (error) {
     // @TODO 将来的にログをどこかに送信する
