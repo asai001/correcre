@@ -1,37 +1,24 @@
+// 「取得済みのデータをどう表示するか」だけ知っている層
 "use client";
+import { usePhilosophyForDashboard } from "../hooks/usePhilosophyForDashboard";
+import PhilosophyInfo from "./PhilosophyInfo";
 
-import { useState, useEffect } from "react";
-
-import type { Philosophy } from "../model/types";
-import { fetchPhilosophy } from "../api/client";
-
-type PhilosophyProp = {
+type PhilosophyProps = {
   companyId: string;
+  userId: string;
 };
 
-export default function Philosophy({ companyId }: PhilosophyProp) {
-  const [data, setData] = useState<Philosophy | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function Philosophy({ companyId }: PhilosophyProps) {
+  // 本コンポーネントが再レンダされたら都度実行される（useEffect フックの中身は依存配列次第で走る）
+  const { data, loading, error } = usePhilosophyForDashboard(companyId);
 
-  useEffect(() => {
-    const ac = new AbortController();
-
-    (async () => {
-      try {
-        const res = await fetchPhilosophy(companyId);
-        setData(res);
-      } catch {
-        if (!ac.signal.aborted) {
-          setError("データの取得に失敗しました。時間をおいて再度お試しください。");
-        }
-      }
-    })();
-
-    return () => ac.abort();
-  }, [companyId]);
+  if (loading) {
+    // とりあえず null。のちにスケルトンに差し替えやすい
+    return null;
+  }
 
   if (error) {
-    // @TODO 将来的にログをどこかに送信する
+    // 将来的に別コンポーネントにしても良い
     return null;
   }
 
@@ -39,21 +26,5 @@ export default function Philosophy({ companyId }: PhilosophyProp) {
     return null;
   }
 
-  return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4 lg:space-y-6">
-      {data.corporatePhilosophy && (
-        <div className="flex flex-col justify-center items-center text-center">
-          <div className="text-md lg:text-lg text-gray-600">経営理念</div>
-          <div className="text-md font-bold text-gray-800 lg:text-xl mt-1">{data.corporatePhilosophy}</div>
-        </div>
-      )}
-
-      {data.purpose && (
-        <div className="flex flex-col justify-center items-center text-center">
-          <div className="text-md lg:text-lg text-gray-600">PURPOSE</div>
-          <div className="text-md font-bold text-gray-800 lg:text-xl mt-1">{data.purpose}</div>
-        </div>
-      )}
-    </div>
-  );
+  return <PhilosophyInfo philosophy={data} />;
 }
