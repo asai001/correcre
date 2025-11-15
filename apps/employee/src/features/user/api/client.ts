@@ -1,11 +1,20 @@
-// 「どうやって サーバーからデータを取るか」だけ知っている層
-import type { User } from "../model/types";
-import { MOCK_USER_FOR_DASHBOARD } from "../model/user.mock";
+import { UserForDashboard } from "./../model/types";
 
-// 将来は companyId / userId から SDK で DynamoDB を叩く想定
-export async function fetchCurrentUserForDashboard(companyId: string, userId: string): Promise<User | null> {
-  console.log("fetchCurrentUserForDashboard", { companyId, userId });
+export async function fetchCurrentUserForDashboard(companyId: string, userId: string): Promise<UserForDashboard | null> {
+  const params = new URLSearchParams({ companyId, userId }).toString();
 
-  await new Promise((r) => setTimeout(r, 20)); // モックの通信待ち
-  return MOCK_USER_FOR_DASHBOARD;
+  const res = await fetch(`/api/user?${params}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    // ここで 404/500 を見て適宜ハンドリング
+    console.error("fetchPhilosophy error", res.status, await res.text());
+    throw new Error("理念情報の取得に失敗しました");
+  }
+
+  const data = (await res.json()) as UserForDashboard | null;
+
+  return data;
 }
