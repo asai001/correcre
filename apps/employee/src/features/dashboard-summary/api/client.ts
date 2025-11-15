@@ -17,8 +17,6 @@ export async function fetchDashboardSummary(companyId: string, userId: string, t
     cache: "no-store",
   });
 
-  console.log("res", res);
-
   if (!res.ok) {
     // ここで 404/500 を見て適宜ハンドリング
     console.error("fetchDashboardSummary error", res.status, await res.text());
