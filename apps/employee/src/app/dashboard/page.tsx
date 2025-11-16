@@ -23,7 +23,7 @@ function makeLabels(): string[] {
 }
 
 const companyId = "em";
-const userId = "u-001";
+const userId = "u-002";
 
 export default function DashboardPage() {
   const monthlyPointsHistoryLabels = makeLabels();

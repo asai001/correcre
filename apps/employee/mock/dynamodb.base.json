@@ -70,6 +70,15 @@
       "missionTargetCount": 20
     },
     {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2025-10",
+      "earnedPoints": 420,
+      "usedPoints": 150,
+      "completionRate": 75,
+      "missionCompletedCount": 15,
+      "missionTargetCount": 20
+    },
+    {
       "companyUserKey": "em#u-002",
       "yearMonth": "2024-11",
       "earnedPoints": 180,
@@ -310,43 +319,177 @@
   "Mission": [
     {
       "companyId": "em",
-      "missionId": "m-001",
-      "title": "朝礼で理念カードを読み上げる",
-      "description": "毎朝の朝礼で、企業理念カードを一枚選び、内容を共有する。",
-      "category": "理念共有",
-      "pointPerAction": 40,
-      "monthlyTargetCount": 10,
-      "isActive": true
+      "missionId": "greetings",
+      "version": 1,
+      "enabled": true,
+      "title": "挨拶運動",
+      "description": "朝礼に参加する",
+      "category": "挨拶運動",
+      "monthlyCount": 20,
+      "score": 1,
+      "order": 10,
+      "fields": [
+        {
+          "id": "note",
+          "label": "参加申告",
+          "type": "textarea",
+          "rows": 2,
+          "placeholder": "参加申告を入力してください"
+        },
+        {
+          "id": "greeting_type",
+          "label": "参加申告選択",
+          "type": "select",
+          "selectValueType": "string",
+          "options": [
+            { "label": "おはよう", "value": "おはよう" },
+            { "label": "こんにちは", "value": "こんにちは" },
+            { "label": "こんばんは", "value": "こんばんは" }
+          ],
+          "placeholder": "参加申告を選択してください"
+        },
+        {
+          "id": "date",
+          "label": "実施日",
+          "type": "date",
+          "required": true
+        }
+      ]
     },
     {
       "companyId": "em",
-      "missionId": "m-002",
-      "title": "改善提案を出す",
-      "description": "業務改善に繋がるアイデアを1件以上提案する。",
+      "missionId": "health",
+      "version": 1,
+      "enabled": true,
+      "title": "健康推進活動",
+      "description": "健康維持向上のための活動",
+      "category": "健康",
+      "monthlyCount": 20,
+      "score": 1,
+      "order": 20,
+      "fields": [
+        {
+          "id": "activity_detail",
+          "label": "活動内容",
+          "type": "textarea",
+          "rows": 3,
+          "required": true,
+          "placeholder": "実施した活動内容を入力してください"
+        },
+        {
+          "id": "performed_at",
+          "label": "実施日時",
+          "type": "datetime-local",
+          "required": true
+        }
+      ]
+    },
+    {
+      "companyId": "em",
+      "missionId": "growth",
+      "version": 1,
+      "enabled": true,
+      "title": "自己研鑽・成長",
+      "description": "新しいスキルや知識を習得する",
       "category": "改善提案",
-      "pointPerAction": 80,
-      "monthlyTargetCount": 4,
-      "isActive": true
+      "monthlyCount": 4,
+      "score": 5,
+      "order": 30,
+      "fields": [
+        {
+          "id": "reference_title",
+          "label": "参考資料名",
+          "type": "textarea",
+          "rows": 2,
+          "required": true,
+          "placeholder": "参考資料名を入力してください"
+        },
+        {
+          "id": "learning_content",
+          "label": "学習内容",
+          "type": "textarea",
+          "rows": 3,
+          "required": true,
+          "placeholder": "学習内容を入力してください"
+        },
+        {
+          "id": "application_plan",
+          "label": "どう活かすか",
+          "type": "textarea",
+          "rows": 3,
+          "placeholder": "どう活かすかを入力してください"
+        },
+        {
+          "id": "performed_at",
+          "label": "実施日時",
+          "type": "datetime-local",
+          "required": true
+        }
+      ]
     },
     {
       "companyId": "em",
-      "missionId": "m-003",
-      "title": "5S・整理整頓活動",
-      "description": "職場の整理整頓や5S活動を実施し、写真付きで報告する。",
-      "category": "職場環境",
-      "pointPerAction": 50,
-      "monthlyTargetCount": 6,
-      "isActive": true
+      "missionId": "improve",
+      "version": 2,
+      "enabled": true,
+      "title": "効率化・改善提案",
+      "description": "業務プロセスの改善案を提案",
+      "category": "改善提案",
+      "monthlyCount": 4,
+      "score": 5,
+      "order": 40,
+      "fields": [
+        {
+          "id": "proposal_detail",
+          "label": "提案内容",
+          "type": "textarea",
+          "rows": 3,
+          "required": true,
+          "placeholder": "提案内容を入力してください"
+        },
+        {
+          "id": "expected_effect",
+          "label": "期待される効果",
+          "type": "textarea",
+          "rows": 3,
+          "required": true,
+          "placeholder": "効果を入力してください"
+        },
+        {
+          "id": "performed_at",
+          "label": "実施日時",
+          "type": "datetime-local",
+          "required": true
+        }
+      ]
     },
     {
       "companyId": "em",
-      "missionId": "m-004",
-      "title": "安全パトロール",
-      "description": "安全点検を実施し、ヒヤリハットの有無を報告する。",
-      "category": "安全",
-      "pointPerAction": 70,
-      "monthlyTargetCount": 4,
-      "isActive": true
+      "missionId": "community",
+      "version": 1,
+      "enabled": true,
+      "title": "地域活動",
+      "description": "地域のイベントへの参加",
+      "category": "地域貢献",
+      "monthlyCount": 1,
+      "score": 20,
+      "order": 50,
+      "fields": [
+        {
+          "id": "activity_detail",
+          "label": "活動内容",
+          "type": "textarea",
+          "rows": 3,
+          "required": true,
+          "placeholder": "参加したイベントや内容を入力してください"
+        },
+        {
+          "id": "performed_at",
+          "label": "実施日時",
+          "type": "datetime-local",
+          "required": true
+        }
+      ]
     }
   ],
   "Philosophy": [

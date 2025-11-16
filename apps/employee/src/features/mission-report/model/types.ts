@@ -1,5 +1,19 @@
 export type FieldType = "text" | "textarea" | "number" | "datetime-local" | "date" | "select" | "url";
 
+export type Mission = {
+  companyId: string;
+  missionId: string;
+  version: number;
+  enabled: boolean;
+  title: string;
+  description: string;
+  category: string;
+  monthlyCount: number;
+  score: number;
+  order: number;
+  fields: FieldConfig[];
+};
+
 export type FieldConfig = {
   id: string;
   label: string;
@@ -15,39 +29,15 @@ export type FieldConfig = {
   defaultValue?: any;
 };
 
-export type FormConfig = {
+export type MissionReport = {
   companyId: string;
+  userId: string;
+  reportId: string;
   missionId: string;
-  version: number;
-  title: string;
-  fields: FieldConfig[];
-  points: number;
-  isPublished: boolean;
-};
-
-export type SubmitPayload = {
-  missionId: string;
-  values: Record<string, any>;
-  points: number;
-};
-
-// ミッションカードの外観＆基本情報（会社ごとに可変）
-export type MissionCardConfig = {
-  missionId: string; // 例: "greeting" / "selfStudy" など
-  title: string; // カード見出し
-  desc: string; // 概要テキスト
-  maxScore: number; // 月の最大スコア
-  order?: number; // 表示順（小さいほど先）
-  enabled?: boolean; // false なら非表示
-};
-
-// 会社ごとのミッション一覧（公開版）
-// 1社につき複数ミッション
-export type MissionPlan = {
-  companyId: string;
-  version: number;
-  isPublished: boolean;
-  items: MissionCardConfig[];
+  reportedAt: string;
+  status: "APPROVED" | "PENDING";
+  pointGranted: number;
+  comment: string;
 };
 
 // ユーザーの進捗（current/total は会社×ミッションで変わる前提）
@@ -58,4 +48,23 @@ export type MissionProgress = {
   missionId: string;
   current: number;
   updatedAt: string;
+};
+
+export type SubmitPayload = {
+  companyId: string;
+  missionId: string;
+  values: Record<string, any>;
+  score: number;
+};
+
+export type FormConfig = {
+  companyId: string;
+  missionId: string;
+  version: number;
+  title: string;
+  fields: FieldConfig[];
+  points: number;
+  monthlyCount: number;
+  order: number;
+  enabled: boolean;
 };

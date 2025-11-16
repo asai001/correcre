@@ -59,7 +59,10 @@ async function getMissionReports(companyId: string, userId: string, targetYearMo
   }
 
   const Items = data.MissionReports;
-  return Items.filter((i) => i.companyId === companyId && i.userId === userId && targetYearMonth === toYYYYMM(new Date(i.reportedAt)));
+  return Items.filter(
+    (i) =>
+      i.companyId === companyId && i.userId === userId && i.status === "APPROVED" && targetYearMonth === toYYYYMM(new Date(i.reportedAt))
+  );
 }
 
 /**
@@ -87,7 +90,8 @@ export const getDashboardSummaryFromDynamoMock = async (
     getMonthlyStats(companyId, userId, lastYearMonth),
   ]);
 
-  const thisMonthCompletionRate = missionReports ? Math.min((missionReports.length / 100) * 100, 100) : 0; // 現状、報告件数 = 達成割合みたいな感じになっている
+  const totalScore = missionReports?.reduce((acc, cur) => acc + cur.scoreGranted, 0);
+  const thisMonthCompletionRate = totalScore ? (totalScore / 100) * 100 : 0; // 現状、報告件数 = 達成割合みたいな感じになっている
 
   return {
     thisMonthCompletionRate,

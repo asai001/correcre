@@ -1,4 +1,3 @@
-// scripts/gen-dynamodb-mock.ts
 import fs from "node:fs";
 import path from "node:path";
 
@@ -57,13 +56,28 @@ function main() {
 
   const missionReports = [];
 
+  // ★ user + missionId + yyyymm ごとの件数カウンタ
+  //    key: `${companyId}:${userId}:${missionId}:${yyyymm}`
+  const perUserMissionMonthCount = new Map();
+
+  function getUserMissionMonthCount(companyId, userId, missionId, ym) {
+    const key = `${companyId}:${userId}:${missionId}:${ym}`;
+    return perUserMissionMonthCount.get(key) ?? 0;
+  }
+
+  function incUserMissionMonth(companyId, userId, missionId, ym) {
+    const key = `${companyId}:${userId}:${missionId}:${ym}`;
+    const current = perUserMissionMonthCount.get(key) ?? 0;
+    perUserMissionMonthCount.set(key, current + 1);
+  }
+
   for (const user of users) {
     for (const ym of yearMonths) {
       const [yStr, mStr] = ym.split("-");
       const year = Number(yStr);
       const month = Number(mStr); // 1-12
 
-      // 1ヶ月あたり 70〜95件
+      // 1ヶ月あたり 70〜95件（※実際には monthlyCount の合計次第でこれ未満になることもある）
       const count = randInt(70, 95);
 
       const lastDayOfMonth = getLastDayOfMonth(year, month);
@@ -73,7 +87,31 @@ function main() {
       const maxDay = isCurrentMonth ? CURRENT_DATE.getDate() : lastDayOfMonth;
 
       for (let i = 1; i <= count; i++) {
-        const mission = pickRandom(missions);
+        let mission = null;
+
+        // ★ 同じ user + missionId + 月 の件数が monthlyCount 未満のものを探す
+        //    無限ループ防止のため、試行は最大 20 回くらいに制限
+        for (let trial = 0; trial < 20; trial++) {
+          const candidate = pickRandom(missions);
+
+          const missionId = candidate.missionId;
+          // Mission 側に monthlyCount（または monthlyCount）を持たせている前提
+          const monthlyLimit = candidate.monthlyCount ?? candidate.monthlyCount ?? Infinity;
+
+          const currentCount = getUserMissionMonthCount(user.companyId, user.userId, missionId, ym);
+
+          if (currentCount < monthlyLimit) {
+            mission = candidate;
+            break;
+          }
+        }
+
+        // すべてのミッションが上限に達しているなどで選べなかった場合、
+        // これ以上このユーザー・この月にレポートを追加できないのでループを抜ける
+        if (!mission) {
+          break;
+        }
+
         const day = randInt(1, maxDay);
         const hour = randInt(8, 19); // 8:00〜19:59 のどこか
         const minute = randInt(0, 59);
@@ -85,6 +123,7 @@ function main() {
         const approved = Math.random() < 0.8;
         const status = approved ? "APPROVED" : "PENDING";
         const pointGranted = approved ? mission.pointPerAction : 0;
+        const scoreGranted = mission.score;
 
         const reportId = `mr-${year}${mStr}${String(day).padStart(2, "0")}` + `-${user.userId}-${String(i).padStart(3, "0")}`;
 
@@ -96,8 +135,12 @@ function main() {
           reportedAt,
           status,
           pointGranted,
+          scoreGranted,
           comment: `自動生成レポート (${mission.missionId})`,
         });
+
+        // ★ カウンタ更新（user + missionId + 月）
+        incUserMissionMonth(user.companyId, user.userId, mission.missionId, ym);
       }
     }
   }

@@ -12,6 +12,8 @@ type Props = {
 export default function DashboardSummary({ companyId, userId, targetYearMonth }: Props) {
   const { summary, loading, error } = useDashboardSummary(companyId, userId, targetYearMonth);
 
+  console.log("summary", summary);
+
   if (loading) {
     // 将来スケルトンに差し替え
     return null;
@@ -32,7 +34,7 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
         className="min-w-[220px] md:min-w-0"
         icon="/trophy.svg"
         label="今月の達成割合"
-        value={summary.thisMonthCompletionRate}
+        value={summary?.thisMonthCompletionRate ?? "-"}
         unit="パーセント"
         color="#2563EB"
       />
