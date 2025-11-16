@@ -1,9 +1,10 @@
 "use client";
 
-import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog"; // 相対パスは配置に応じて調整
-
+import type { FormEvent } from "react";
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Stack, Typography, Box } from "@mui/material";
-import type { Mission, SubmitPayload } from "../model/types";
+
+import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog";
+import type { Mission, SubmitPayload, FieldConfig } from "../model/types";
 import { useMissionReportDialog } from "../hooks/useMissionReportDialog";
 
 type MissionReportDialogProps = {
@@ -28,6 +29,70 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     onSubmit,
     onClose,
   });
+
+  const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); // 自動でページリロードされないようにする
+
+    const form = event.currentTarget;
+
+    // ネイティブバリデーションを発火（エラーがあればブラウザの吹き出しが出る）
+    if (!form.reportValidity()) {
+      return;
+    }
+
+    // ここまで来たら全項目 OK なので、既存の送信ロジックを呼ぶ
+    await handleSubmit();
+  };
+
+  const renderField = (field: FieldConfig) => {
+    const isTextarea = field.type === "textarea";
+    const isSelect = field.type === "select";
+    const isDateLike = field.type === "date" || field.type === "datetime-local";
+    const placeholder = field.placeholder; // そのまま使う（undefined なら渡さない）
+
+    const commonProps = {
+      label: field.label,
+      fullWidth: true,
+      margin: "normal" as const,
+      required: field.required ?? false,
+      value: (values[field.id] ?? "") as string,
+      onChange: handleChange(field),
+      // textarea / select 以外は type に field.type をそのまま使う
+      ...(isTextarea || isSelect ? {} : { type: field.type }),
+      // placeholder は select 以外にそのまま
+      ...(isSelect ? {} : placeholder ? { placeholder } : {}),
+      // ★ date / datetime-local のときだけラベルを強制 shrink
+      ...(isDateLike
+        ? {
+            slotProps: {
+              inputLabel: { shrink: true },
+            },
+          }
+        : {}),
+    };
+
+    if (isTextarea) {
+      return <TextField key={field.id} {...commonProps} multiline rows={field.rows ?? 3} />;
+    }
+
+    if (isSelect) {
+      return (
+        <TextField key={field.id} {...commonProps} select>
+          <MenuItem value="">
+            <em>選択してください</em>
+          </MenuItem>
+          {(field.options ?? []).map((opt) => (
+            <MenuItem key={opt.label} value={opt.value}>
+              {opt.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    }
+
+    // 通常の input 系 (text, number, date, datetime-local など) はそのまま field.type を使う
+    return <TextField key={field.id} {...commonProps} />;
+  };
 
   return (
     <>
@@ -54,143 +119,11 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
             </DialogActions>
           </>
         ) : (
-          <>
+          <Box component="form" onSubmit={handleFormSubmit}>
             <DialogTitle>{missionConfig.title}</DialogTitle>
             <DialogContent>
               <Stack spacing={2} sx={{ mt: 1 }}>
-                {/* 動的フィールド群：type ごとにレンダリング */}
-                {missionConfig.fields.map((f) => {
-                  if (f.type === "select") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        // id を合わせることで label for の Issue を回避できる（MUIは自動採番だが安全のため）
-                        id={f.id}
-                        select
-                        label={f.label}
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        required={f.required}
-                        fullWidth
-                      >
-                        {(f.options ?? []).map((opt) => (
-                          <MenuItem key={opt.label} value={opt.value}>
-                            {opt.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    );
-                  }
-
-                  if (f.type === "text") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        id={f.id}
-                        label={f.label}
-                        type="text"
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        placeholder={f.placeholder}
-                        fullWidth
-                        required={f.required}
-                      />
-                    );
-                  }
-
-                  if (f.type === "textarea") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        id={f.id}
-                        label={f.label}
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        placeholder={f.placeholder}
-                        fullWidth
-                        multiline
-                        minRows={f.rows ?? 3}
-                        required={f.required}
-                      />
-                    );
-                  }
-
-                  if (f.type === "number") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        id={f.id}
-                        label={f.label}
-                        type="number"
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        placeholder={f.placeholder}
-                        fullWidth
-                        required={f.required}
-                      />
-                    );
-                  }
-
-                  if (f.type === "datetime-local" || f.type === "date") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        id={f.id}
-                        label={f.label}
-                        type={f.type}
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        placeholder={f.placeholder}
-                        required={f.required}
-                        fullWidth
-                        slotProps={{
-                          input: {
-                            sx: {
-                              // モバイル/タブレットのみ余白、PC(lg+)は0
-                              py: { xs: 1.25, sm: 1.25, md: 1.25, lg: 0, xl: 0 },
-                              px: { xs: 1, sm: 1, md: 1, lg: 0, xl: 0 },
-                              // datetime-local の右側アイコン対策も同様に
-                              pr: { xs: 1.5, sm: 1.5, md: 1.5, lg: 0, xl: 0 },
-                            },
-                          },
-                          // ラベルが値と重ならないよう常に縮小
-                          inputLabel: { shrink: true },
-                        }}
-                      />
-                    );
-                  }
-
-                  if (f.type === "url") {
-                    return (
-                      <TextField
-                        key={f.id}
-                        id={f.id}
-                        label={f.label}
-                        type="url"
-                        value={values[f.id] ?? ""}
-                        onChange={handleChange(f)}
-                        placeholder={f.placeholder}
-                        fullWidth
-                        required={f.required}
-                      />
-                    );
-                  }
-
-                  // 既定：text として扱う
-                  return (
-                    <TextField
-                      key={f.id}
-                      id={f.id}
-                      label={f.label}
-                      type="text"
-                      value={values[f.id] ?? ""}
-                      onChange={handleChange(f)}
-                      placeholder={f.placeholder}
-                      fullWidth
-                      required={f.required}
-                    />
-                  );
-                })}
+                {missionConfig.fields.map((f) => renderField(f))}
 
                 {/* Points 表示（左右に振り分け、丸角の背景で視認性UP） */}
                 <Box
@@ -222,11 +155,11 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
               <Button onClick={onClose} disabled={submitting}>
                 キャンセル
               </Button>
-              <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
+              <Button type="submit" variant="contained" disabled={submitting}>
                 報告する
               </Button>
             </DialogActions>
-          </>
+          </Box>
         )}
       </Dialog>
 

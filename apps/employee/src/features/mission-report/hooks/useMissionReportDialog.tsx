@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { FieldConfig, Mission, SubmitPayload } from "../model/types";
+import { nowYYYYMMDD, nowYYYYMMDDHHmm } from "@correcre/lib";
 
 type Args = {
   companyId: string;
@@ -35,7 +36,7 @@ const clearAllMissionReportDrafts = () => {
 };
 
 export function useMissionReportDialog({ companyId, missionId, missionConfig, onSubmit, onClose }: Args) {
-  const [values, setValues] = useState<FormValues>({});
+  // const [values, setValues] = useState<FormValues>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -43,29 +44,52 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
 
   const draftKey = makeDraftKey(companyId, missionId);
 
-  // 下書き読み込み
-  useEffect(() => {
-    if (!draftKey) {
-      return;
-    }
-    try {
-      const raw = localStorage.getItem(draftKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as FormValues;
-        setValues(parsed);
-      }
-    } catch (e) {
-      console.error("failed to load mission report draft", e);
-    }
-  }, [draftKey]);
+  const [values, setValues] = useState<FormValues>(() => {
+    let base: FormValues = {};
 
-  // 下書き保存
+    // ① まず localStorage から下書きがあれば読む
+    if (typeof window !== "undefined" && draftKey) {
+      try {
+        const raw = window.localStorage.getItem(draftKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as FormValues;
+          if (parsed && typeof parsed === "object") {
+            base = parsed;
+          }
+        }
+      } catch (e) {
+        console.error("failed to load mission report draft", e);
+      }
+    }
+
+    // ② date / datetime-local だけ、値がなければ現在時刻を入れる
+    for (const field of missionConfig.fields) {
+      const v = base[field.id];
+
+      if (field.type === "date") {
+        if (v == null || v === "") {
+          base[field.id] = nowYYYYMMDD();
+        }
+      } else if (field.type === "datetime-local") {
+        if (v == null || v === "") {
+          base[field.id] = nowYYYYMMDDHHmm();
+        }
+      }
+      // それ以外の type は何もしない（空のまま）
+    }
+
+    return base;
+  });
+
   useEffect(() => {
     if (!draftKey) {
       return;
     }
+    if (typeof window === "undefined") {
+      return;
+    }
     try {
-      localStorage.setItem(draftKey, JSON.stringify(values));
+      window.localStorage.setItem(draftKey, JSON.stringify(values));
     } catch (e) {
       console.error("failed to save mission report draft", e);
     }

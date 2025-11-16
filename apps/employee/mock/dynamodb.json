@@ -333,6 +333,7 @@
           "id": "note",
           "label": "参加申告",
           "type": "textarea",
+          "required": true,
           "rows": 2,
           "placeholder": "参加申告を入力してください"
         },
