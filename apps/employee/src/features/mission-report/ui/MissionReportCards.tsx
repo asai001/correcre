@@ -88,8 +88,6 @@ function MissionCard({ title, description, monthlyCount, doneCount, done, progre
         </div>
 
         <p className="mt-1 text-sm text-gray-500 line-clamp-2">{description}</p>
-
-        {hasTarget && <p className="mt-1 text-xs text-gray-400">月 {target} 回</p>}
       </div>
 
       <button
