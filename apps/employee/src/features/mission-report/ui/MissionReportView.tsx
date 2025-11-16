@@ -12,7 +12,6 @@ type MissionReportViewProps = {
   orderedMissionItems: Mission[];
   missionReports: MissionReport[];
   companyId: string;
-  userId: string;
   handleOpen: (missionId: string) => void;
   handleClose: () => void;
   handleSubmit: (payload: SubmitPayload) => void | Promise<void>;
@@ -24,7 +23,6 @@ export default function MissionReportView({
   orderedMissionItems,
   missionReports,
   companyId,
-  userId,
   handleOpen,
   handleClose,
   handleSubmit,

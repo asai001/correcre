@@ -33,7 +33,6 @@ export default function MissionReport({ companyId, userId }: MissionReportProps)
       orderedMissionItems={orderedMissionItems}
       missionReports={missionReports}
       companyId={companyId}
-      userId={userId}
       handleOpen={handleOpen}
       handleClose={handleClose}
       handleSubmit={handleSubmit}

@@ -5,7 +5,6 @@ import PhilosophyInfo from "./PhilosophyInfo";
 
 type PhilosophyProps = {
   companyId: string;
-  userId: string;
 };
 
 export default function Philosophy({ companyId }: PhilosophyProps) {

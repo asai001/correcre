@@ -61,7 +61,6 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
                 {/* 動的フィールド群：type ごとにレンダリング */}
                 {missionConfig.fields.map((f) => {
                   if (f.type === "select") {
-                    const svt = f.selectValueType;
                     return (
                       <TextField
                         key={f.id}
