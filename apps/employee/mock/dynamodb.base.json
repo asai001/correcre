@@ -41,6 +41,40 @@
       "currentMonthCompletionRate": 40
     }
   ],
+  "ExchangeHistory": [
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "exchangeId": "ex-20251025-0001",
+      "exchangedAt": "2025-10-25T10:00:00+09:00",
+      "merchandiseName": "幾重 プレミアム シャンプー＆トリートメント 500ml セット",
+      "usedPoint": 1600
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "exchangeId": "ex-20251025-0002",
+      "exchangedAt": "2025-10-25T11:30:00+09:00",
+      "merchandiseName": "ダイヤモンドライス 5kg",
+      "usedPoint": 3000
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "exchangeId": "ex-20251025-0003",
+      "exchangedAt": "2025-10-25T12:00:00+09:00",
+      "merchandiseName": "秀吉のごほうび「生」くりーむぱん　6個入り",
+      "usedPoint": 830
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "exchangeId": "ex-20251020-0001",
+      "exchangedAt": "2025-10-20T09:00:00+09:00",
+      "merchandiseName": "QUOカード 1,000円分",
+      "usedPoint": 1000
+    }
+  ],
   "UserMonthlyStats": [
     {
       "companyUserKey": "em#u-001",

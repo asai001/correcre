@@ -3,7 +3,7 @@ import User from "@employee/features/user";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistoryChart from "@employee/components/dashboard/MonthlyPointsHistoryChart";
-import ExchangeHistoryTable from "@employee/components/dashboard/ExchangeHistoryTable";
+import ExchangeHistory from "@employee/features/exchange-history/";
 
 import { toYYYYMM } from "@correcre/lib";
 
@@ -49,7 +49,7 @@ export default function DashboardPage() {
         <MonthlyPointsHistoryChart icon={faChartLine} labels={monthlyPointsHistoryLabels} data={monthlyPointsHistoryData} />
       </div>
       <div className="mt-5">
-        <ExchangeHistoryTable icon={faReceipt} iconColor="#48bb78" />
+        <ExchangeHistory icon={faReceipt} iconColor="#48bb78" companyId={companyId} userId={userId} />
       </div>
     </div>
   );
