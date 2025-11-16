@@ -17,7 +17,7 @@ export default function MissionReportCards({ missions, missionReports, onClickMi
   const reportsCountByMissionId = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of missionReports) {
-      const key = (r as any).missionId as string | undefined;
+      const key = r.missionId;
       if (!key) continue;
       map.set(key, (map.get(key) ?? 0) + 1);
     }

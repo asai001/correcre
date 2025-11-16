@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import type { FieldConfig, Mission, SubmitPayload } from "../model/types";
 import { nowYYYYMMDD, nowYYYYMMDDHHmm } from "@correcre/lib";
 
@@ -35,12 +35,12 @@ const clearAllMissionReportDrafts = () => {
   keys.forEach((k) => localStorage.removeItem(k));
 };
 
-export function useMissionReportDialog({ companyId, missionId, missionConfig, onSubmit, onClose }: Args) {
+export function useMissionReportDialog({ companyId, missionId, missionConfig, onSubmit }: Args) {
   // const [values, setValues] = useState<FormValues>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState<ReactNode | null>(null);
 
   const draftKey = makeDraftKey(companyId, missionId);
 
@@ -128,10 +128,14 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
       await onSubmit(payload);
 
       clearAllMissionReportDrafts();
-      setSuccessMessage(`「${missionConfig.title}」の報告を受け付けました。ありがとうございました。`);
+      setSuccessMessage(
+        <>
+          <strong>「{missionConfig.title}」</strong>
+          の報告を受け付けました。ありがとうございました。
+        </>
+      );
       setSuccessOpen(true);
       setValues({});
-      onClose();
     } catch (e) {
       console.error(e);
       setError("送信に失敗しました。時間をおいて再度お試しください。");

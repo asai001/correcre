@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem, Stack, Typography, Box } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box } from "@mui/material";
 
 import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog";
 import type { Mission, SubmitPayload, FieldConfig } from "../model/types";
@@ -45,53 +45,58 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
   };
 
   const renderField = (field: FieldConfig) => {
-    const isTextarea = field.type === "textarea";
-    const isSelect = field.type === "select";
-    const isDateLike = field.type === "date" || field.type === "datetime-local";
-    const placeholder = field.placeholder; // そのまま使う（undefined なら渡さない）
+    const value = values[field.id] ?? "";
 
+    // 共通 props
     const commonProps = {
-      label: field.label,
       fullWidth: true,
       margin: "normal" as const,
-      required: field.required ?? false,
-      value: (values[field.id] ?? "") as string,
-      onChange: handleChange(field),
-      // textarea / select 以外は type に field.type をそのまま使う
-      ...(isTextarea || isSelect ? {} : { type: field.type }),
-      // placeholder は select 以外にそのまま
-      ...(isSelect ? {} : placeholder ? { placeholder } : {}),
-      // ★ date / datetime-local のときだけラベルを強制 shrink
-      ...(isDateLike
-        ? {
-            slotProps: {
-              inputLabel: { shrink: true },
-            },
-          }
-        : {}),
+      id: field.id,
+      name: field.id,
+      label: field.label,
+      required: field.required,
     };
 
-    if (isTextarea) {
-      return <TextField key={field.id} {...commonProps} multiline rows={field.rows ?? 3} />;
-    }
+    // === textarea / select は今のままでOK ===
 
-    if (isSelect) {
+    if (field.type === "number") {
       return (
-        <TextField key={field.id} {...commonProps} select>
-          <MenuItem value="">
-            <em>選択してください</em>
-          </MenuItem>
-          {(field.options ?? []).map((opt) => (
-            <MenuItem key={opt.label} value={opt.value}>
-              {opt.label}
-            </MenuItem>
-          ))}
-        </TextField>
+        <TextField
+          key={field.id}
+          {...commonProps}
+          type="number"
+          value={value}
+          onChange={handleChange(field)}
+          slotProps={{
+            input: {
+              inputProps: {
+                min: field.min,
+                max: field.max,
+                step: field.step,
+              },
+            },
+          }}
+        />
       );
     }
 
-    // 通常の input 系 (text, number, date, datetime-local など) はそのまま field.type を使う
-    return <TextField key={field.id} {...commonProps} />;
+    if (field.type === "date" || field.type === "datetime-local") {
+      return (
+        <TextField
+          key={field.id}
+          {...commonProps}
+          type={field.type}
+          value={value}
+          onChange={handleChange(field)}
+          slotProps={{
+            inputLabel: { shrink: true },
+          }}
+        />
+      );
+    }
+
+    // 他のタイプ（text など）
+    return <TextField key={field.id} {...commonProps} value={value} onChange={handleChange(field)} />;
   };
 
   return (
@@ -165,7 +170,10 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
 
       <SuccessDialog
         open={successOpen}
-        onClose={() => setSuccessOpen(false)}
+        onClose={() => {
+          setSuccessOpen(false);
+          onClose();
+        }}
         title="送信完了"
         message={successMessage}
         autoCloseMs={0} // 自動クローズしないなら 0/未指定。自動で閉じたければ 1500 など
