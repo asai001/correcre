@@ -24,6 +24,13 @@ function enumerateYearMonths(startYm, endYm) {
   return out;
 }
 
+/** Date → "YYYY-MM" */
+function toYearMonth(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
 function randInt(min, max) {
   // min <= n <= max
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -48,9 +55,16 @@ function main() {
   const users = base.User;
   const missions = base.Mission;
 
-  const START_YM = "2024-11";
-  const END_YM = "2025-11";
-  const CURRENT_DATE = new Date("2025-11-15T00:00:00+09:00");
+  // ★ 実行時の現在日時
+  const CURRENT_DATE = new Date();
+
+  // ★ CURRENT_DATE が属する月を END_YM に
+  const endDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 1);
+  const END_YM = toYearMonth(endDate);
+
+  // ★ そこから 12 ヶ月前の月を START_YM に（合計 13 ヶ月分）
+  const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 12, 1);
+  const START_YM = toYearMonth(startDate);
 
   const yearMonths = enumerateYearMonths(START_YM, END_YM);
 
@@ -145,14 +159,49 @@ function main() {
     }
   }
 
+  // ---- UserMonthlyStats の自動生成 ----
+  const userMonthlyStats = [];
+  const lastMonthDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth() - 1, 1);
+
+  for (const user of users) {
+    const monthsCount = randInt(10, 30); // ★ 1ユーザーあたり 10〜30件
+
+    // lastMonthDate から monthsCount-1 ヶ月さかのぼった月を開始月にする
+    const firstDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth() - (monthsCount - 1), 1);
+
+    const startYm = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, "0")}`;
+    const endYm = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+    const yms = enumerateYearMonths(startYm, endYm); // 両端含む YYYY-MM の配列
+
+    for (const ym of yms) {
+      const earnedPoints = randInt(300, 600); // ★ 300〜600
+
+      const missionTargetCount = 20;
+      const completionRate = randInt(60, 100);
+      const missionCompletedCount = Math.round((missionTargetCount * completionRate) / 100);
+      const usedPoints = randInt(0, Math.min(earnedPoints, 200));
+
+      userMonthlyStats.push({
+        companyUserKey: `${user.companyId}#${user.userId}`,
+        yearMonth: ym,
+        earnedPoints,
+        usedPoints,
+        completionRate,
+        missionCompletedCount,
+        missionTargetCount,
+      });
+    }
+  }
+
   const output = {
     ...base,
     MissionReports: missionReports,
+    UserMonthlyStats: userMonthlyStats,
   };
 
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
-
-  console.log(`Generated ${missionReports.length} MissionReports to ${outPath}`);
+  console.log(`Generated ${missionReports.length} MissionReports and ${userMonthlyStats.length} UserMonthlyStats to ${outPath}`);
 }
 
 main();
