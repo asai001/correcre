@@ -14,12 +14,11 @@ export type ColumnDef<T> = {
 export type TableProps<T> = {
   columns: ColumnDef<T>[];
   rows: T[];
-  className?: string;
 };
 
-export function Table<T>({ columns, rows, className }: TableProps<T>) {
+export function Table<T>({ columns, rows }: TableProps<T>) {
   return (
-    <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
+    <>
       <TableContainer
         component={Paper}
         sx={{
@@ -59,6 +58,6 @@ export function Table<T>({ columns, rows, className }: TableProps<T>) {
           </TableBody>
         </MuiTable>
       </TableContainer>
-    </div>
+    </>
   );
 }

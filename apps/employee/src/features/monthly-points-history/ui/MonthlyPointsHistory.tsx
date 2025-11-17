@@ -32,6 +32,5 @@ export default function MonthlyPointsHistory({ icon, iconColor = "#2563EB", clas
   }
 
   // loading 中でもとりあえず Chart 自体は出しておく（必要ならローディング表示を足す）
-  //   return <MonthlyPointsHistoryChart icon={icon} iconColor={iconColor} labels={labels} data={data} className={className} />;
   return <MonthlyPointsHistoryView icon={icon} iconColor={iconColor} className={className} labels={labels} values={data} />;
 }

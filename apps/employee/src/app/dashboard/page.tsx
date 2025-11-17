@@ -7,7 +7,7 @@ import ExchangeHistory from "@employee/features/exchange-history/";
 
 import { toYYYYMM } from "@correcre/lib";
 
-import { faChartLine, faReceipt } from "@fortawesome/free-solid-svg-icons";
+import { faTasks, faChartLine, faReceipt } from "@fortawesome/free-solid-svg-icons";
 
 const companyId = "em";
 const userId = "u-001";
@@ -25,7 +25,7 @@ export default function DashboardPage() {
         <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={toYYYYMM(new Date())} />
       </div>
       <div className="mt-5">
-        <MissionReport companyId={companyId} userId={userId} />
+        <MissionReport icon={faTasks} companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
         <MonthlyPointsHistory icon={faChartLine} companyId={companyId} userId={userId} />

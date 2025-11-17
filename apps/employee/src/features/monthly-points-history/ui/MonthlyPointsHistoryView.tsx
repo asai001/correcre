@@ -1,4 +1,6 @@
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
 import { useMemo } from "react";
 import Chart from "@employee/components/Chart";
 import { ChartConfiguration } from "chart.js";
@@ -60,5 +62,14 @@ export default function MonthlyPointsHistoryView({ icon, iconColor = "#2563EB", 
   }, [labels, values]);
 
   // ローディング中も骨格としては Chart を出しておいてOK
-  return <Chart icon={icon} iconColor={iconColor} title="過去24ヶ月の実績" className={className} height={400} config={config} />;
+  return (
+    <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
+      <div className="flex items-center mb-4">
+        <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
+        <div className="text-lg lg:text-2xl font-bold">過去24ヶ月の実績</div>
+      </div>
+
+      <Chart className={className} height={400} config={config} />
+    </div>
+  );
 }

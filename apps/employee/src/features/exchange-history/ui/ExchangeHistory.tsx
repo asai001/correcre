@@ -47,7 +47,7 @@ export default function ExchangeHistory({ icon, iconColor = "#2563EB", className
   ];
 
   return (
-    <div className={className}>
+    <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
       <div className="flex items-center mb-4">
         <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
         <div className="text-lg lg:text-2xl font-bold">直近の交換履歴</div>

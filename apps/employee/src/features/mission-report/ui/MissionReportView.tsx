@@ -1,5 +1,6 @@
-// apps/employee/src/features/mission-report/ui/MissionReportView.tsx
 "use client";
+
+import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 import MissionReportCards from "./MissionReportCards";
 import MissionReportDialog from "./MissionReportDialog";
@@ -7,6 +8,8 @@ import MissionReportDialog from "./MissionReportDialog";
 import type { Mission, MissionReport, SubmitPayload } from "../model/types";
 
 type MissionReportViewProps = {
+  icon: IconDefinition;
+  iconColor?: string;
   open: boolean;
   selectedMissionId: string | null;
   orderedMissionItems: Mission[];
@@ -18,6 +21,8 @@ type MissionReportViewProps = {
 };
 
 export default function MissionReportView({
+  icon,
+  iconColor,
   open,
   selectedMissionId,
   orderedMissionItems,
@@ -33,7 +38,13 @@ export default function MissionReportView({
   return (
     <>
       {/* カード描画は専用コンポーネントに丸投げ */}
-      <MissionReportCards missions={orderedMissionItems} missionReports={missionReports} onClickMission={handleOpen} />
+      <MissionReportCards
+        icon={icon}
+        iconColor={iconColor}
+        missions={orderedMissionItems}
+        missionReports={missionReports}
+        onClickMission={handleOpen}
+      />
 
       {/* ダイアログ描画は MissionReportDialog に丸投げ */}
       {selectedMission && (

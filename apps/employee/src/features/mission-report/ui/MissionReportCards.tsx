@@ -1,18 +1,26 @@
-// apps/employee/src/features/mission-report/ui/MissionReportCards.tsx
 "use client";
+
+import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 import { useMemo } from "react";
 import type { Mission, MissionReport } from "../model/types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTasks } from "@fortawesome/free-solid-svg-icons";
 
 type MissionReportCardsProps = {
+  icon: IconDefinition;
+  iconColor?: string;
   missions: Mission[];
   missionReports: MissionReport[];
   onClickMission: (missionId: string) => void;
 };
 
-export default function MissionReportCards({ missions, missionReports, onClickMission }: MissionReportCardsProps) {
+export default function MissionReportCards({
+  icon,
+  iconColor = "#2563EB",
+  missions,
+  missionReports,
+  onClickMission,
+}: MissionReportCardsProps) {
   // missionId ごとの「今月何回報告したか」を集計
   const reportsCountByMissionId = useMemo(() => {
     const map = new Map<string, number>();
@@ -27,8 +35,8 @@ export default function MissionReportCards({ missions, missionReports, onClickMi
   return (
     <section className="bg-white rounded-2xl shadow-lg p-5">
       <div className="flex items-center gap-2 mb-4">
-        <FontAwesomeIcon icon={faTasks} className="h-5 text-gray-700" />
-        <h2 className="text-base font-bold text-gray-800">ミッション報告</h2>
+        <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
+        <div className="text-lg lg:text-2xl font-bold">ミッション報告</div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -76,7 +84,7 @@ function MissionCard({ title, description, monthlyCount, doneCount, done, progre
   const hasTarget = target > 0;
 
   return (
-    <div className="relative bg-white rounded-2xl shadow-lg p-5 flex flex-col justify-between min-w-0">
+    <div className="relative bg-white rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.10)] p-5 flex flex-col justify-between min-w-0">
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <div className="text-base font-semibold text-gray-800 truncate">{title}</div>
