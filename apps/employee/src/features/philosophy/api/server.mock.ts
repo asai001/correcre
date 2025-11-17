@@ -1,5 +1,5 @@
 import { Philosophy } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 
 /**
  * 理念情報を取得

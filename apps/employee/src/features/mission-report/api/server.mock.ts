@@ -1,5 +1,5 @@
 import { Mission, MissionReport } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 import { nowYYYYMM, toYYYYMM } from "@correcre/lib";
 
 /**

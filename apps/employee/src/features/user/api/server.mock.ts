@@ -1,9 +1,9 @@
 import { UserForDashboard } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 import { toYYYYMMDDHHmmss } from "@correcre/lib";
 
 /**
- * 理念情報を取得
+ * ユーザー情報を取得
  *
  * @param companyId
  * @returns
@@ -20,7 +20,7 @@ async function getUser(companyId: string, userId: string) {
 }
 
 /**
- * ダッシュボードに表示する理念情報を返す
+ * ダッシュボードに表示するユーザー情報を返す
  *
  * @param companyId
  * @returns

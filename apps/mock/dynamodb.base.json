@@ -1,4 +1,18 @@
 {
+  "Company": [
+    {
+      "companyId": "em",
+      "name": "em株式会社",
+      "status": "ACTIVE",
+      "plan": "STANDARD",
+      "perEmployeeMonthlyFee": 3000,
+      "companyPointBalance": 15200,
+      "totalEmployees": 18,
+      "activeEmployees": 18,
+      "createdAt": "2025-10-25T10:00:00+09:00",
+      "updatedAt": "2025-10-25T10:00:00+09:00"
+    }
+  ],
   "User": [
     {
       "companyId": "em",
@@ -8,7 +22,8 @@
       "joinedAt": "2022-04-01",
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 2450,
-      "currentMonthCompletionRate": 70
+      "currentMonthCompletionRate": 70,
+      "roles": ["EMPLOYEE"]
     },
     {
       "companyId": "em",
@@ -18,7 +33,8 @@
       "joinedAt": "2023-01-15",
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 1200,
-      "currentMonthCompletionRate": 55
+      "currentMonthCompletionRate": 55,
+      "roles": ["EMPLOYEE"]
     },
     {
       "companyId": "em",
@@ -28,7 +44,8 @@
       "joinedAt": "2021-10-01",
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 3100,
-      "currentMonthCompletionRate": 82
+      "currentMonthCompletionRate": 82,
+      "roles": ["EMPLOYEE", "ADMIN"]
     },
     {
       "companyId": "em",
@@ -37,8 +54,9 @@
       "department": "人事部",
       "joinedAt": "2024-02-01",
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
-      "currentPointBalance": 800,
-      "currentMonthCompletionRate": 40
+      "currentPointBalance": 0,
+      "currentMonthCompletionRate": 0,
+      "roles": ["ADMIN"]
     }
   ],
   "ExchangeHistory": [

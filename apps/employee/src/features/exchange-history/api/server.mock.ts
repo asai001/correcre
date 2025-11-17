@@ -1,5 +1,5 @@
 import type { ExchangeHistory } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 
 /**
  * DynamoDB 上の 1 件分のイメージ

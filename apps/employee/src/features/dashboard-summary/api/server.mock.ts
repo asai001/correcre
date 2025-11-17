@@ -1,5 +1,5 @@
 import { DashboardSummary } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 
 import { isValidYYYYMM, toYYYYMM } from "@correcre/lib";
 

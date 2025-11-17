@@ -1,6 +1,6 @@
-import { UserForDashboard } from "./../model/types";
+import { AdminUserHeader } from "./../model/types";
 
-export async function fetchCurrentUserForDashboard(companyId: string, userId: string): Promise<UserForDashboard | null> {
+export async function fetchCurrentUser(companyId: string, userId: string): Promise<AdminUserHeader | null> {
   const params = new URLSearchParams({ companyId, userId }).toString();
 
   const res = await fetch(`/api/user?${params}`, {
@@ -14,7 +14,7 @@ export async function fetchCurrentUserForDashboard(companyId: string, userId: st
     throw new Error("ユーザー情報の取得に失敗しました");
   }
 
-  const data = (await res.json()) as UserForDashboard | null;
+  const data = (await res.json()) as AdminUserHeader | null;
 
   return data;
 }

@@ -1,5 +1,5 @@
 import type { UserMonthlyStatsRecord } from "../model/types";
-import data from "../../../../mock/dynamodb.json";
+import data from "../../../../../mock/dynamodb.json";
 import { toYYYYMM } from "@correcre/lib";
 
 /** YYYY-MM を monthOffset だけずらす（-1 → 前月など） */

@@ -1,11 +1,14 @@
-import User from "@admin/components/dashboard/User";
+import User from "@admin/features/user";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
 import AvgItemCompletionChart from "@admin/components/dashboard/AvgItemCompletionChart";
 
-import { faUsers, faChartLine, faCog, faChartBar, faTable } from "@fortawesome/free-solid-svg-icons";
+import { faUsers, faChartLine, faCog, faChartBar, faTable, faUserShield } from "@fortawesome/free-solid-svg-icons";
 import MissionListTable from "@admin/components/dashboard/MissionListTable";
+
+const companyId = "em";
+const userId = "u-004";
 
 /** 先月終端の過去12ヶ月ラベルを生成（SSR側） */
 function makeLabels(): string[] {
@@ -32,7 +35,7 @@ export default function DashboardPage() {
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="my-5">
-        <User />
+        <User icon={faUserShield} iconColor={"#fff"} companyId={companyId} userId={userId} />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
       <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
