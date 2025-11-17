@@ -13,6 +13,7 @@
     "baseUrl": ".",
     "paths": {
       "@correcre/validation/*": ["packages/validation/src/*"],
+      "@correcre/types": ["packages/types/src/index.ts"],
       "@correcre/types/*": ["packages/types/src/*"],
       "@correcre/adapters/*": ["packages/adapters/src/*"],
       "@correcre/theme/*": ["packages/theme/src/*"],
