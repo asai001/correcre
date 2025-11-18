@@ -1,5 +1,5 @@
 import Philosophy from "@employee/features/philosophy";
-import User from "@employee/features/login-info";
+import LoginInfo from "@employee/features/login-info";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";
@@ -19,7 +19,7 @@ export default function DashboardPage() {
         <Philosophy companyId={companyId} />
       </div>
       <div className="mt-5">
-        <User companyId={companyId} userId={userId} />
+        <LoginInfo companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
         <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={toYYYYMM(new Date())} />

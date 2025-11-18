@@ -1,4 +1,4 @@
-import User from "@admin/features/user";
+import LoginInfo from "@admin/features/login-info";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="my-5">
-        <User icon={faUserShield} iconColor={"#fff"} companyId={companyId} userId={userId} />
+        <LoginInfo icon={faUserShield} iconColor={"#fff"} companyId={companyId} userId={userId} />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
       <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
