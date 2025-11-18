@@ -2,8 +2,8 @@
 "use client";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
-import { useUser } from "../hooks/useUser";
-import UserView from "./UserView";
+import { useLoginInfo } from "../hooks/useUser";
+import LoginInfoView from "./LoginInfoView";
 
 type UserProps = {
   icon: IconDefinition;
@@ -12,9 +12,9 @@ type UserProps = {
   userId: string;
 };
 
-export default function User({ icon, iconColor = "#2563EB", companyId, userId }: UserProps) {
+export default function LoginInfo({ icon, iconColor = "#2563EB", companyId, userId }: UserProps) {
   // 本コンポーネントが再レンダされたら都度実行される（useEffect フックの中身は依存配列次第で走る）
-  const { data, loading, error } = useUser(companyId, userId);
+  const { data, loading, error } = useLoginInfo(companyId, userId);
 
   if (loading) {
     // とりあえず null。のちにスケルトンに差し替えやすい
@@ -30,5 +30,5 @@ export default function User({ icon, iconColor = "#2563EB", companyId, userId }:
     return null;
   }
 
-  return <UserView icon={icon} iconColor={iconColor} data={data} />;
+  return <LoginInfoView icon={icon} iconColor={iconColor} data={data} />;
 }

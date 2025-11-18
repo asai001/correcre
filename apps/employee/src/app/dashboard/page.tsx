@@ -1,5 +1,5 @@
 import Philosophy from "@employee/features/philosophy";
-import User from "@employee/features/user";
+import User from "@employee/features/login-info";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";

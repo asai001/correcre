@@ -1,4 +1,4 @@
-import { AdminUserHeader } from "../model/types";
+import { LoginInfo } from "../model/types";
 import data from "../../../../../mock/dynamodb.json";
 import { Company } from "@correcre/types";
 
@@ -36,7 +36,7 @@ async function getCompany(companyId: string): Promise<Company | null> {
  * @param companyId
  * @returns
  */
-export const getUserFromDynamoMock = async (companyId: string, userId: string): Promise<AdminUserHeader | null> => {
+export const getLoginInfoFromDynamoMock = async (companyId: string, userId: string): Promise<LoginInfo | null> => {
   const user = await getUser(companyId, userId);
   const company = await getCompany(companyId);
 

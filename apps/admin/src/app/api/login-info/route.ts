@@ -1,4 +1,4 @@
-import { getUserFromDynamoMock } from "@admin/features/user/api/server.mock";
+import { getLoginInfoFromDynamoMock } from "@admin/features/login-info/api/server.mock";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await getUserFromDynamoMock(companyId, userId);
+    const summary = await getLoginInfoFromDynamoMock(companyId, userId);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/user error", err);

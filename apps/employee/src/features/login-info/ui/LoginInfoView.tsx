@@ -1,12 +1,12 @@
 import Image from "next/image";
-import type { UserForDashboard } from "../model/types";
+import type { LoginInfo } from "../model/types";
 
-type UserInfoProps = {
-  user: UserForDashboard;
+type LoginInfoViewProps = {
+  data: LoginInfo;
 };
 
-export default function UserInfo({ user }: UserInfoProps) {
-  const { displayName, departmentName, lastLoginAt } = user;
+export default function LoginInfoView({ data }: LoginInfoViewProps) {
+  const { displayName, departmentName, lastLoginAt } = data;
 
   return (
     <div className="flex justify-between items-center bg-white rounded-2xl shadow-lg p-6">

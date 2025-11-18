@@ -1,4 +1,4 @@
-import { UserForDashboard } from "../model/types";
+import { LoginInfo } from "../model/types";
 import data from "../../../../../mock/dynamodb.json";
 import { toYYYYMMDDHHmmss } from "@correcre/lib";
 
@@ -25,7 +25,7 @@ async function getUser(companyId: string, userId: string) {
  * @param companyId
  * @returns
  */
-export const getUserFromDynamoMock = async (companyId: string, userId: string): Promise<UserForDashboard | null> => {
+export const getLoginInfoFromDynamoMock = async (companyId: string, userId: string): Promise<LoginInfo | null> => {
   const res = await getUser(companyId, userId);
 
   if (!res) {

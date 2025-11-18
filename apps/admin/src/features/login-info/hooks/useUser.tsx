@@ -2,28 +2,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { UserForDashboard } from "../model/types";
-import { fetchCurrentUserForDashboard } from "../api/client";
+import type { LoginInfo } from "../model/types";
+import { fetchLoginInfo } from "../api/client";
 
-type UseCurrentUserForDashboardOptions = {
+type UseLoginInfoForDashboardOptions = {
   /** 初期ロードを抑制したい場合などに使う */
   enabled?: boolean;
 };
 
-type UseCurrentUserForDashboardResult = {
-  user: UserForDashboard | null;
+type UseLoginInfoForDashboardResult = {
+  data: LoginInfo | null;
   loading: boolean;
   error: string | null;
 };
 
-export function useCurrentUserForDashboard(
+export function useLoginInfo(
   companyId: string | undefined,
   userId: string | undefined,
-  options?: UseCurrentUserForDashboardOptions
-): UseCurrentUserForDashboardResult {
+  options?: UseLoginInfoForDashboardOptions
+): UseLoginInfoForDashboardResult {
   const { enabled = true } = options ?? {};
 
-  const [user, setUser] = useState<UserForDashboard | null>(null);
+  const [data, setData] = useState<LoginInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,13 +40,13 @@ export function useCurrentUserForDashboard(
       setError(null);
 
       try {
-        const res = await fetchCurrentUserForDashboard(companyId, userId);
+        const res = await fetchLoginInfo(companyId, userId);
 
         if (ac.signal.aborted) {
           return;
         }
 
-        setUser(res);
+        setData(res);
       } catch (err) {
         if (ac.signal.aborted) {
           return;
@@ -65,5 +65,5 @@ export function useCurrentUserForDashboard(
     };
   }, [companyId, userId, enabled]);
 
-  return { user, loading, error };
+  return { data, loading, error };
 }

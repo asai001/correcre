@@ -1,16 +1,16 @@
 // 「取得済みのデータをどう表示するか」だけ知っている層
 "use client";
-import { useCurrentUserForDashboard } from "../hooks/useCurrentUserForDashboard";
-import UserInfo from "./UserInfo";
+import { useLoginInfo } from "../hooks/useLoginInfo";
+import LoginInfoView from "./LoginInfoView";
 
-type UserProps = {
+type LoginInfoProps = {
   companyId: string;
   userId: string;
 };
 
-export default function User({ companyId, userId }: UserProps) {
+export default function LoginInfo({ companyId, userId }: LoginInfoProps) {
   // 本コンポーネントが再レンダされたら都度実行される（useEffect フックの中身は依存配列次第で走る）
-  const { user, loading, error } = useCurrentUserForDashboard(companyId, userId);
+  const { data, loading, error } = useLoginInfo(companyId, userId);
 
   if (loading) {
     // とりあえず null。のちにスケルトンに差し替えやすい
@@ -22,9 +22,9 @@ export default function User({ companyId, userId }: UserProps) {
     return null;
   }
 
-  if (!user) {
+  if (!data) {
     return null;
   }
 
-  return <UserInfo user={user} />;
+  return <LoginInfoView data={data} />;
 }

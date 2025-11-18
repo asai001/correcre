@@ -1,6 +1,6 @@
-import { UserForDashboard } from "./../model/types";
+import { LoginInfo } from "./../model/types";
 
-export async function fetchCurrentUserForDashboard(companyId: string, userId: string): Promise<UserForDashboard | null> {
+export async function fetchLoginInfo(companyId: string, userId: string): Promise<LoginInfo | null> {
   const params = new URLSearchParams({ companyId, userId }).toString();
 
   const res = await fetch(`/api/user?${params}`, {
@@ -10,11 +10,11 @@ export async function fetchCurrentUserForDashboard(companyId: string, userId: st
 
   if (!res.ok) {
     // ここで 404/500 を見て適宜ハンドリング
-    console.error("fetchCurrentUser error", res.status, await res.text());
+    console.error("fetchLoginInfo error", res.status, await res.text());
     throw new Error("ユーザー情報の取得に失敗しました");
   }
 
-  const data = (await res.json()) as UserForDashboard | null;
+  const data = (await res.json()) as LoginInfo | null;
 
   return data;
 }

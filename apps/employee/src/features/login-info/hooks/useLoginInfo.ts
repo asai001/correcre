@@ -2,28 +2,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AdminUserHeader } from "../model/types";
-import { fetchCurrentUser } from "../api/client";
+import type { LoginInfo } from "../model/types";
+import { fetchLoginInfoForDashboard } from "../api/client";
 
-type UseCurrentUserForDashboardOptions = {
+type UseLoginInfoOptions = {
   /** 初期ロードを抑制したい場合などに使う */
   enabled?: boolean;
 };
 
-type UseCurrentUserForDashboardResult = {
-  data: AdminUserHeader | null;
+type UseLoginInfoResult = {
+  data: LoginInfo | null;
   loading: boolean;
   error: string | null;
 };
 
-export function useUser(
-  companyId: string | undefined,
-  userId: string | undefined,
-  options?: UseCurrentUserForDashboardOptions
-): UseCurrentUserForDashboardResult {
+export function useLoginInfo(companyId: string | undefined, userId: string | undefined, options?: UseLoginInfoOptions): UseLoginInfoResult {
   const { enabled = true } = options ?? {};
 
-  const [data, setData] = useState<AdminUserHeader | null>(null);
+  const [data, setData] = useState<LoginInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +36,7 @@ export function useUser(
       setError(null);
 
       try {
-        const res = await fetchCurrentUser(companyId, userId);
+        const res = await fetchLoginInfoForDashboard(companyId, userId);
 
         if (ac.signal.aborted) {
           return;

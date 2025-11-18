@@ -1,5 +1,5 @@
 // ダッシュボードのカード用の軽い型
-export type AdminUserHeader = {
+export type LoginInfo = {
   name: string;
   activeEmployees?: number;
 };
