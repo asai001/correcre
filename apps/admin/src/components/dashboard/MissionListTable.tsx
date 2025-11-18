@@ -81,18 +81,17 @@ export default function MissionListTable({ icon, iconColor = "#2563EB", classNam
         >
           {/* 列幅の指示：1,2列は最小・3列目が残り全部 */}
           <colgroup>
-            <col style={{ width: "1%" }} /> {/* 従業員名 */}
-            <col style={{ width: "1%" }} /> {/* 従業員名 */}
-            <col style={{ width: "1%" }} /> {/* 項目名 */}
-            <col /> {/* 入力内容（残りをすべて） */}
+            <col style={{ width: "1%" }} />
+            <col style={{ width: "1%" }} />
+            <col style={{ width: "1%" }} />
+            <col />
           </colgroup>
           <TableHead>
             <TableRow>
               <TableCell>日時</TableCell>
               <TableCell>従業員名</TableCell>
               <TableCell align="right">項目名</TableCell>
-              <TableCell align="right">進捗</TableCell>
-              <TableCell align="right">入力内容</TableCell>
+              <TableCell align="right">進捗</TableCell>S<TableCell align="right">入力内容</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

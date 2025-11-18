@@ -3,7 +3,7 @@ import { LoginInfo } from "../model/types";
 export async function fetchLoginInfoForDashboard(companyId: string, userId: string): Promise<LoginInfo | null> {
   const params = new URLSearchParams({ companyId, userId }).toString();
 
-  const res = await fetch(`/api/user?${params}`, {
+  const res = await fetch(`/api/login-info?${params}`, {
     method: "GET",
     cache: "no-store",
   });
