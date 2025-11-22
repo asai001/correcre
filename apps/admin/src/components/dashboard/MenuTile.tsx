@@ -4,17 +4,19 @@ import BaseTile from "@admin/components/dashboard/BaseTile";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { UrlObject } from "url";
 
 type MenuTileProps = {
+  link: UrlObject | __next_route_internal_types__.RouteImpl<string>;
   menuName: string;
   desc: number | string;
   icon: IconDefinition;
   iconColor?: string; // "blue" | "#2563EB" など
   className?: string;
 };
-export default function MenuTile({ icon, iconColor = "#2563EB", menuName, desc, className }: MenuTileProps) {
+export default function MenuTile({ link, icon, iconColor = "#2563EB", menuName, desc, className }: MenuTileProps) {
   return (
-    <Link href={"#"} className="block h-full">
+    <Link href={link} className="block h-full">
       <BaseTile
         className={`flex flex-col items-start h-full gap-0.5 lg:gap-2 transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-lg ${className}`}
       >

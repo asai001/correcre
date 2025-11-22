@@ -1,10 +1,10 @@
 import LoginInfo from "@admin/features/login-info";
-import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
 import AvgItemCompletionChart from "@admin/components/dashboard/AvgItemCompletionChart";
 import DashboardSummary from "@admin/features/dashboard-summary";
+import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
 
-import { faUsers, faChartLine, faCog, faChartBar, faTable, faUserShield } from "@fortawesome/free-solid-svg-icons";
+import { faChartLine, faTable, faUserShield } from "@fortawesome/free-solid-svg-icons";
 import MissionListTable from "@admin/components/dashboard/MissionListTable";
 
 const companyId = "em";
@@ -42,22 +42,8 @@ export default function DashboardPage() {
         <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={targetYearMonth} />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="-mx-6 px-6 gap-2 md:gap-4 py-4 grid grid-cols-1 md:grid-cols-3">
-        <MenuTile
-          className="md:min-w-0"
-          icon={faUsers}
-          iconColor="#000000"
-          menuName="従業員管理"
-          desc="従業員情報の登録・編集・削除・ポイント付与管理"
-        />
-        <MenuTile
-          className="md:min-w-0"
-          icon={faChartBar}
-          iconColor="#2563EB"
-          menuName="分析・レポート"
-          desc="実績分析・傾向把握・レポート出力・交換履歴"
-        />
-        <MenuTile className="md:min-w-0" icon={faCog} iconColor="#6B7280" menuName="システム設定" desc="基本設定・権限管理・バックアップ" />
+      <div className="mt-5">
+        <DashboardMenuTile />
       </div>
       <div className="grid lg:grid-cols-2 mt-5 gap-4">
         <AvgPointsTrendChart
