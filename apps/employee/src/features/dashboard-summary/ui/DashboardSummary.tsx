@@ -35,7 +35,8 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
         icon={faTrophy}
-        iconColor={"#000"}
+        iconColor={"#2563EB"}
+        iconBgColor={"#dbeafe"}
         label="今月の達成割合"
         value={summary?.thisMonthCompletionRate ?? "-"}
         unit="パーセント"
@@ -44,7 +45,8 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
         icon={faCoins}
-        iconColor={"#000"}
+        iconColor={"#D97706"}
+        iconBgColor={"#fef3c7"}
         label="現在の保有ポイント"
         value={summary.currentPointBalance}
         unit="ポイント"
@@ -53,7 +55,8 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
         icon={faCalendarCheck}
-        iconColor={"#000"}
+        iconColor={"#059669"}
+        iconBgColor={"#d1fae5"}
         label="先月の獲得ポイント"
         value={summary.lastMonthEarnedPoints}
         unit="ポイント"
