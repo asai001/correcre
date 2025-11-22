@@ -159,6 +159,69 @@ function main() {
     }
   }
 
+  // ---- ExchangeHistory の自動生成 ----
+  const exchangeHistory = [];
+
+  // 商品リスト（金銭価値のある商品は除外、1ポイント=5円換算）
+  const merchandiseList = [
+    { name: "幾重 プレミアム シャンプー＆トリートメント 500ml セット", points: 320 }, // 1600円相当
+    { name: "ダイヤモンドライス 5kg", points: 600 }, // 3000円相当
+    { name: "秀吉のごほうび「生」くりーむぱん　6個入り", points: 166 }, // 830円相当
+    { name: "お菓子セット", points: 60 }, // 300円相当
+    { name: "家電カタログギフト", points: 240 }, // 1200円相当
+    { name: "高級タオルセット", points: 400 }, // 2000円相当
+    { name: "入浴剤ギフトセット", points: 100 }, // 500円相当
+    { name: "コーヒーギフトセット", points: 200 }, // 1000円相当
+  ];
+
+  // 過去24ヶ月分のExchangeHistoryを生成
+  const exchangeStartDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth() - 23, 1);
+  const exchangeStartYm = toYearMonth(exchangeStartDate);
+  const exchangeEndYm = END_YM;
+  const exchangeYearMonths = enumerateYearMonths(exchangeStartYm, exchangeEndYm);
+
+  let exchangeCounter = 1; // exchangeId用のカウンター
+
+  for (const user of users) {
+    for (const ym of exchangeYearMonths) {
+      const [yStr, mStr] = ym.split("-");
+      const year = Number(yStr);
+      const month = Number(mStr); // 1-12
+
+      // 1ヶ月あたり 0〜2件のランダムな件数
+      const exchangeCount = randInt(0, 2);
+
+      const lastDayOfMonth = getLastDayOfMonth(year, month);
+
+      // 現在月の場合は現在日付まで
+      const isCurrentMonth = year === CURRENT_DATE.getFullYear() && month === CURRENT_DATE.getMonth() + 1;
+      const maxDay = isCurrentMonth ? CURRENT_DATE.getDate() : lastDayOfMonth;
+
+      for (let i = 0; i < exchangeCount; i++) {
+        const day = randInt(1, maxDay);
+        const hour = randInt(9, 18); // 9:00〜18:59
+        const minute = randInt(0, 59);
+
+        const dt = new Date(year, month - 1, day, hour, minute);
+        const exchangedAt = dt.toISOString().replace(".000Z", "+09:00");
+
+        const merchandise = pickRandom(merchandiseList);
+
+        const exchangeId = `ex-${year}${mStr}${String(day).padStart(2, "0")}-${String(exchangeCounter).padStart(4, "0")}`;
+        exchangeCounter++;
+
+        exchangeHistory.push({
+          companyId: user.companyId,
+          userId: user.userId,
+          exchangeId,
+          exchangedAt,
+          merchandiseName: merchandise.name,
+          usedPoint: merchandise.points,
+        });
+      }
+    }
+  }
+
   // ---- UserMonthlyStats の自動生成 ----
   const userMonthlyStats = [];
   const lastMonthDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth() - 1, 1);
@@ -198,10 +261,11 @@ function main() {
     ...base,
     MissionReports: missionReports,
     UserMonthlyStats: userMonthlyStats,
+    ExchangeHistory: exchangeHistory,
   };
 
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
-  console.log(`Generated ${missionReports.length} MissionReports and ${userMonthlyStats.length} UserMonthlyStats to ${outPath}`);
+  console.log(`Generated ${missionReports.length} MissionReports, ${userMonthlyStats.length} UserMonthlyStats, and ${exchangeHistory.length} ExchangeHistory to ${outPath}`);
 }
 
 main();

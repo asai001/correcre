@@ -10,7 +10,7 @@ import { toYYYYMM } from "@correcre/lib";
 import { faTasks, faChartLine, faReceipt } from "@fortawesome/free-solid-svg-icons";
 
 const companyId = "em";
-const userId = "u-001";
+const userId = "u-002";
 
 export default function DashboardPage() {
   return (

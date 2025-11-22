@@ -60,3 +60,5 @@ infra/.cdk.staging
 infra/cdk.out
 
 **/*.zip
+
+.claude

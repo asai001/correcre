@@ -91,6 +91,14 @@
       "exchangedAt": "2025-10-20T09:00:00+09:00",
       "merchandiseName": "QUOカード 1,000円分",
       "usedPoint": 1000
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "exchangeId": "ex-20251020-0001",
+      "exchangedAt": "2025-11-20T09:00:00+09:00",
+      "merchandiseName": "QUOカード 1,000円分",
+      "usedPoint": 200
     }
   ],
   "UserMonthlyStats": [

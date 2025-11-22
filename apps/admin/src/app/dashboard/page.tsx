@@ -1,14 +1,15 @@
 import LoginInfo from "@admin/features/login-info";
-import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import MenuTile from "@admin/components/dashboard/MenuTile";
 import AvgPointsTrendChart from "@admin/components/dashboard/AvgPointsTrendChart";
 import AvgItemCompletionChart from "@admin/components/dashboard/AvgItemCompletionChart";
+import DashboardSummary from "@admin/features/dashboard-summary";
 
 import { faUsers, faChartLine, faCog, faChartBar, faTable, faUserShield } from "@fortawesome/free-solid-svg-icons";
 import MissionListTable from "@admin/components/dashboard/MissionListTable";
 
 const companyId = "em";
 const userId = "u-004";
+const targetYearMonth = "2025-11";
 
 /** 先月終端の過去12ヶ月ラベルを生成（SSR側） */
 function makeLabels(): string[] {
@@ -37,11 +38,8 @@ export default function DashboardPage() {
       <div className="my-5">
         <LoginInfo icon={faUserShield} iconColor={"#fff"} companyId={companyId} userId={userId} />
       </div>
-      {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
-      <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
-        <ScoreTile className="min-w-[220px] md:min-w-0" label="先月総獲得ポイント" value={38450} unit="ポイント" color="#D97706" />
-        <ScoreTile className="min-w-[220px] md:min-w-0" label="今月交換ポイント" value={15200} unit="ポイント" color="#059669" />
-        <ScoreTile className="min-w-[220px] md:min-w-0" label="企業保有ポイント" value={1000} unit="ポイント" color="#2563EB" />
+      <div className="mt-5">
+        <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={targetYearMonth} />
       </div>
       {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
       <div className="-mx-6 px-6 gap-2 md:gap-4 py-4 grid grid-cols-1 md:grid-cols-3">

@@ -1,9 +1,7 @@
 "use client";
 
-import ScoreTile from "@employee/components/dashboard/ScoreTile";
+import ScoreTile from "@admin/components/dashboard/ScoreTile";
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
-
-import { faTrophy, faCoins, faCalendarCheck } from "@fortawesome/free-solid-svg-icons";
 
 type Props = {
   companyId: string;
@@ -34,28 +32,22 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
     <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
-        icon={faTrophy}
-        iconColor={"#000"}
-        label="今月の達成割合"
-        value={summary?.thisMonthCompletionRate ?? "-"}
-        unit="パーセント"
+        label="先月総獲得ポイント"
+        value={summary.lastMonthEarnedPoints}
+        unit="ポイント"
         color="#2563EB"
       />
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
-        icon={faCoins}
-        iconColor={"#000"}
-        label="現在の保有ポイント"
-        value={summary.currentPointBalance}
+        label="今月交換ポイント"
+        value={summary.thisMonthExchangePoints}
         unit="ポイント"
         color="#D97706"
       />
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
-        icon={faCalendarCheck}
-        iconColor={"#000"}
-        label="先月の獲得ポイント"
-        value={summary.lastMonthEarnedPoints}
+        label="企業保有ポイント"
+        value={summary.currentCompanyPointBalance}
         unit="ポイント"
         color="#059669"
       />
