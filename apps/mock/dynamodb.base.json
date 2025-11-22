@@ -107,117 +107,121 @@
       "yearMonth": "2024-11",
       "earnedPoints": 320,
       "usedPoints": 100,
-      "completionRate": 65,
-      "missionCompletedCount": 13,
-      "missionTargetCount": 20
+      "earnedScore": 65,
+      "completionRate": 0.65,
+      "missionCompletedCount": 13
     },
     {
       "companyUserKey": "em#u-001",
       "yearMonth": "2024-12",
       "earnedPoints": 380,
       "usedPoints": 80,
-      "completionRate": 70,
-      "missionCompletedCount": 14,
-      "missionTargetCount": 20
+      "earnedScore": 70,
+      "completionRate": 0.7,
+      "missionCompletedCount": 14
     },
     {
       "companyUserKey": "em#u-001",
       "yearMonth": "2025-01",
       "earnedPoints": 420,
       "usedPoints": 150,
-      "completionRate": 75,
-      "missionCompletedCount": 15,
-      "missionTargetCount": 20
+      "earnedScore": 75,
+      "completionRate": 0.75,
+      "missionCompletedCount": 15
     },
+
     {
       "companyUserKey": "em#u-001",
       "yearMonth": "2025-10",
       "earnedPoints": 420,
       "usedPoints": 150,
-      "completionRate": 75,
-      "missionCompletedCount": 15,
-      "missionTargetCount": 20
+      "earnedScore": 75,
+      "completionRate": 0.75,
+      "missionCompletedCount": 15
     },
+
     {
       "companyUserKey": "em#u-002",
       "yearMonth": "2024-11",
       "earnedPoints": 180,
       "usedPoints": 0,
-      "completionRate": 50,
-      "missionCompletedCount": 10,
-      "missionTargetCount": 20
+      "earnedScore": 50,
+      "completionRate": 0.5,
+      "missionCompletedCount": 10
     },
     {
       "companyUserKey": "em#u-002",
       "yearMonth": "2024-12",
       "earnedPoints": 210,
       "usedPoints": 50,
-      "completionRate": 55,
-      "missionCompletedCount": 11,
-      "missionTargetCount": 20
+      "earnedScore": 55,
+      "completionRate": 0.55,
+      "missionCompletedCount": 11
     },
     {
       "companyUserKey": "em#u-002",
       "yearMonth": "2025-01",
       "earnedPoints": 260,
       "usedPoints": 90,
-      "completionRate": 60,
-      "missionCompletedCount": 12,
-      "missionTargetCount": 20
+      "earnedScore": 60,
+      "completionRate": 0.6,
+      "missionCompletedCount": 12
     },
+
     {
       "companyUserKey": "em#u-003",
       "yearMonth": "2024-11",
       "earnedPoints": 500,
       "usedPoints": 120,
-      "completionRate": 80,
-      "missionCompletedCount": 16,
-      "missionTargetCount": 20
+      "earnedScore": 80,
+      "completionRate": 0.8,
+      "missionCompletedCount": 16
     },
     {
       "companyUserKey": "em#u-003",
       "yearMonth": "2024-12",
       "earnedPoints": 540,
       "usedPoints": 200,
-      "completionRate": 82,
-      "missionCompletedCount": 18,
-      "missionTargetCount": 22
+      "earnedScore": 82,
+      "completionRate": 0.82,
+      "missionCompletedCount": 18
     },
     {
       "companyUserKey": "em#u-003",
       "yearMonth": "2025-01",
       "earnedPoints": 480,
       "usedPoints": 160,
-      "completionRate": 78,
-      "missionCompletedCount": 17,
-      "missionTargetCount": 22
+      "earnedScore": 78,
+      "completionRate": 0.78,
+      "missionCompletedCount": 17
     },
+
     {
       "companyUserKey": "em#u-004",
       "yearMonth": "2024-11",
       "earnedPoints": 90,
       "usedPoints": 0,
-      "completionRate": 30,
-      "missionCompletedCount": 6,
-      "missionTargetCount": 20
+      "earnedScore": 30,
+      "completionRate": 0.3,
+      "missionCompletedCount": 6
     },
     {
       "companyUserKey": "em#u-004",
       "yearMonth": "2024-12",
       "earnedPoints": 140,
       "usedPoints": 20,
-      "completionRate": 40,
-      "missionCompletedCount": 8,
-      "missionTargetCount": 20
+      "earnedScore": 40,
+      "completionRate": 0.4,
+      "missionCompletedCount": 8
     },
     {
       "companyUserKey": "em#u-004",
       "yearMonth": "2025-01",
       "earnedPoints": 160,
       "usedPoints": 40,
-      "completionRate": 45,
-      "missionCompletedCount": 9,
-      "missionTargetCount": 20
+      "earnedScore": 45,
+      "completionRate": 0.45,
+      "missionCompletedCount": 9
     }
   ],
   "PointTransaction": [

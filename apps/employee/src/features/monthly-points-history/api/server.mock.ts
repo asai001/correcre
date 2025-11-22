@@ -42,7 +42,7 @@ function getMonthlyStatsBetweenTargetMonth(companyId: string, userId: string, st
 
 /**
  * ユーザーの「過去 N ヶ月の月間獲得ポイント推移」を返す
- * endYm が指定されない場合は「現在日付の属する月」を終端として扱う
+ * endYm が指定されない場合は「現在日付の属する月の前の月」を終端として扱う
  */
 export async function getMonthlyPointsHistoryFromDynamoMock(
   companyId: string,
@@ -50,23 +50,10 @@ export async function getMonthlyPointsHistoryFromDynamoMock(
   months = 24,
   endYm?: string
 ): Promise<UserMonthlyStatsRecord[] | null> {
-  const endYearMonth = endYm ?? toYYYYMM(new Date());
+  const endYearMonth = endYm ?? shiftYearMonth(toYYYYMM(new Date()), -1);
   const startYearMonth = shiftYearMonth(endYearMonth, -(months - 1));
 
   const res = getMonthlyStatsBetweenTargetMonth(companyId, userId, startYearMonth, endYearMonth);
-
-  //   const out: MonthlyPointsHistoryItem[] = [];
-
-  //   // 古い月 ⇒ 新しい月の順になるよう、(months - 1) ヶ月前から順番に埋める
-  //   for (let i = months - 1; i >= 0; i -= 1) {
-  //     const ym = shiftYearMonth(endYearMonth, -i);
-  //     const stats = getMonthlyStats(companyId, userId, ym);
-
-  //     out.push({
-  //       yearMonth: ym,
-  //       earnedPoints: stats?.earnedPoints ?? 0,
-  //     });
-  //   }
 
   return res;
 }

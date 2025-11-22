@@ -239,20 +239,20 @@ function main() {
 
     for (const ym of yms) {
       const earnedPoints = randInt(300, 600); // ★ 300〜600
+      const earnedScore = randInt(80, 100);
 
-      const missionTargetCount = 20;
-      const completionRate = randInt(60, 100);
-      const missionCompletedCount = Math.round((missionTargetCount * completionRate) / 100);
-      const usedPoints = randInt(0, Math.min(earnedPoints, 200));
+      const completionRate = earnedScore;
+      const missionCompletedCount = randInt(35, 50);
+      const usedPoints = randInt(0, 300);
 
       userMonthlyStats.push({
         companyUserKey: `${user.companyId}#${user.userId}`,
         yearMonth: ym,
         earnedPoints,
+        earnedScore,
         usedPoints,
         completionRate,
         missionCompletedCount,
-        missionTargetCount,
       });
     }
   }
@@ -265,7 +265,9 @@ function main() {
   };
 
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
-  console.log(`Generated ${missionReports.length} MissionReports, ${userMonthlyStats.length} UserMonthlyStats, and ${exchangeHistory.length} ExchangeHistory to ${outPath}`);
+  console.log(
+    `Generated ${missionReports.length} MissionReports, ${userMonthlyStats.length} UserMonthlyStats, and ${exchangeHistory.length} ExchangeHistory to ${outPath}`
+  );
 }
 
 main();
