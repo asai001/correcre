@@ -26,7 +26,7 @@ export type Company = {
 
   // 従業員数（集計キャッシュ）
   totalEmployees?: number; // 全従業員数
-  activeEmployees?: number; // 現在アクティブな従業員数
+  activeEmployees: number; // 現在アクティブな従業員数
 
   // 設定・表示
   pointExpirationMonths?: number; // nヶ月後に失効 等

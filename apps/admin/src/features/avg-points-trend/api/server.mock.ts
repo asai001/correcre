@@ -11,7 +11,7 @@ function shiftYearMonth(baseYm: string, monthOffset: number): string {
   return toYYYYMM(d); // YYYY-MM 形式で返す
 }
 
-function getMonthlyStatsBetweenTargetMonth(companyId: string, startYearMonth: string, endYearMonth: string) {
+async function getMonthlyStatsBetweenTargetMonth(companyId: string, startYearMonth: string, endYearMonth: string) {
   const Items = data.UserMonthlyStats;
 
   if (!Items) {
@@ -37,7 +37,7 @@ export async function getAvgPointsTrendFromDynamoMock(
   const endYearMonth = endYm ?? shiftYearMonth(toYYYYMM(new Date()), -1);
   const startYearMonth = shiftYearMonth(endYearMonth, -(safeMonths - 1));
 
-  const stats = getMonthlyStatsBetweenTargetMonth(companyId, startYearMonth, endYearMonth);
+  const stats = await getMonthlyStatsBetweenTargetMonth(companyId, startYearMonth, endYearMonth);
   if (!stats) {
     return null;
   }
