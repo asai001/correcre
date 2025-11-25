@@ -34,12 +34,37 @@ export async function getRecentReportsFromDynamoMock(companyId: string, limit: n
     const user = users.find((u) => u.companyId === report.companyId && u.userId === report.userId);
     const mission = missions.find((m) => m.companyId === report.companyId && m.missionId === report.missionId);
 
+    // fieldValuesを整形して表示用の文字列に変換
+    let inputContent = "";
+    if (report.fieldValues && mission?.fields) {
+      // 【修正意図】
+      // Object.values()を使うと、キーの順序が保証されず、ラベルなしで値だけが表示されてしまう問題があった。
+      // Missionのfields定義に基づいて、正しい順序でラベル付きの形式で表示するように改善。
+      // これにより、「参考資料名：〜」「学習内容：〜」のように、各フィールドが何を示すのか明確になる。
+      inputContent = mission.fields
+        .map((field) => {
+          const value = report.fieldValues?.[field.id];
+          // 値が存在しない場合はスキップ
+          if (value === undefined || value === null || value === "") {
+            return null;
+          }
+          // ラベル付きで表示（例: "参考資料名: リーダブルコード"）
+          return `${field.label}: ${value}`;
+        })
+        .filter(Boolean) // null/undefinedを除外
+        .join("\n");
+    } else if (report.comment) {
+      // 後方互換性: fieldValuesがない場合はcommentを使用
+      // @TODO 本番実装時は不要な考慮
+      inputContent = report.comment;
+    }
+
     return {
       date: report.reportedAt,
       name: user?.name || "不明",
       itemName: mission?.title || "不明",
       progress: `${report.scoreGranted || 0}/${mission?.monthlyCount || 0}`,
-      inputContent: report.comment || "",
+      inputContent,
     };
   });
 

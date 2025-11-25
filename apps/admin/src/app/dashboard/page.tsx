@@ -3,7 +3,7 @@ import AvgItemCompletion from "@admin/features/avg-item-completion";
 import DashboardSummary from "@admin/features/dashboard-summary";
 import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
 import AvgPointsTrend from "@admin/features/avg-points-trend";
-// import RecentReports from "@admin/features/recent-reports";
+import RecentReports from "@admin/features/recent-reports";
 
 import { faUserShield } from "@fortawesome/free-solid-svg-icons";
 
@@ -28,9 +28,9 @@ export default function DashboardPage() {
         <AvgPointsTrend companyId={companyId} />
         <AvgItemCompletion className="min-w-[220px] md:min-w-0" companyId={companyId} />
       </div>
-      {/* <div className="mt-5">
+      <div className="mt-5">
         <RecentReports companyId={companyId} />
-      </div> */}
+      </div>
     </div>
   );
 }

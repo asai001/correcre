@@ -23,9 +23,7 @@
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 2450,
       "currentMonthCompletionRate": 70,
-      "roles": [
-        "EMPLOYEE"
-      ]
+      "roles": ["EMPLOYEE"]
     },
     {
       "companyId": "em",
@@ -36,9 +34,7 @@
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 1200,
       "currentMonthCompletionRate": 55,
-      "roles": [
-        "EMPLOYEE"
-      ]
+      "roles": ["EMPLOYEE"]
     },
     {
       "companyId": "em",
@@ -49,10 +45,7 @@
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 3100,
       "currentMonthCompletionRate": 82,
-      "roles": [
-        "EMPLOYEE",
-        "ADMIN"
-      ]
+      "roles": ["EMPLOYEE", "ADMIN"]
     },
     {
       "companyId": "em",
@@ -63,9 +56,18 @@
       "lastLoginAt": "2025-10-25T10:00:00+09:00",
       "currentPointBalance": 0,
       "currentMonthCompletionRate": 0,
-      "roles": [
-        "ADMIN"
-      ]
+      "roles": ["ADMIN"]
+    },
+    {
+      "companyId": "em",
+      "userId": "u-005",
+      "name": "藤田 花子",
+      "department": "営業部",
+      "joinedAt": "2023-06-01",
+      "lastLoginAt": "2025-10-25T10:00:00+09:00",
+      "currentPointBalance": 1800,
+      "currentMonthCompletionRate": 75,
+      "roles": ["EMPLOYEE"]
     }
   ],
   "ExchangeHistory": [
@@ -2084,54 +2086,83 @@
   "MissionReports": [
     {
       "companyId": "em",
-      "userId": "u-001",
-      "reportId": "mr-20241125-u-001-001",
-      "missionId": "greetings",
-      "reportedAt": "2024-11-25T07:04:00+09:00",
+      "userId": "u-005",
+      "reportId": "mr-20251025-u-005-001",
+      "missionId": "community",
+      "missionVersion": 1,
+      "reportedAt": "2025-11-25T11:00:00+09:00",
       "status": "APPROVED",
-      "scoreGranted": 1,
-      "comment": "自動生成レポート (greetings)"
+      "scoreGranted": 20,
+      "fieldValues": {
+        "activity_detail": "駅前〜公園の清掃",
+        "performed_at": "2025-09-21 11:00:00"
+      },
+      "createdAt": "2025-10-25T11:00:00+09:00",
+      "updatedAt": "2025-10-25T11:00:00+09:00"
     },
     {
       "companyId": "em",
-      "userId": "u-001",
-      "reportId": "mr-20241120-u-001-002",
-      "missionId": "greetings",
-      "reportedAt": "2024-11-20T07:01:00+09:00",
-      "status": "APPROVED",
-      "scoreGranted": 1,
-      "comment": "自動生成レポート (greetings)"
-    },
-    {
-      "companyId": "em",
-      "userId": "u-001",
-      "reportId": "mr-20241125-u-001-003",
-      "missionId": "growth",
-      "reportedAt": "2024-11-25T03:06:00+09:00",
-      "status": "PENDING",
-      "pointGranted": 0,
-      "scoreGranted": 5,
-      "comment": "自動生成レポート (growth)"
-    },
-    {
-      "companyId": "em",
-      "userId": "u-001",
-      "reportId": "mr-20241129-u-001-004",
-      "missionId": "greetings",
-      "reportedAt": "2024-11-29T02:40:00+09:00",
-      "status": "APPROVED",
-      "scoreGranted": 1,
-      "comment": "自動生成レポート (greetings)"
-    },
-    {
-      "companyId": "em",
-      "userId": "u-001",
-      "reportId": "mr-20241118-u-001-005",
+      "userId": "u-004",
+      "reportId": "mr-20251025-u-004-001",
       "missionId": "improve",
-      "reportedAt": "2024-11-18T05:18:00+09:00",
+      "missionVersion": 2,
+      "reportedAt": "2025-11-25T11:00:00+09:00",
       "status": "APPROVED",
       "scoreGranted": 5,
-      "comment": "自動生成レポート (improve)"
+      "fieldValues": {
+        "proposal_detail": "勤怠集計の自動化（GAS）",
+        "expected_effect": "集計工数 月30分→5分、入力ミス削減"
+      },
+      "createdAt": "2025-10-25T11:00:00+09:00",
+      "updatedAt": "2025-10-25T11:00:00+09:00"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-003",
+      "reportId": "mr-20251025-u-003-001",
+      "missionId": "growth",
+      "missionVersion": 1,
+      "reportedAt": "2025-11-25T11:00:00+09:00",
+      "status": "APPROVED",
+      "scoreGranted": 5,
+      "fieldValues": {
+        "reference_title": "『リーダブルコード』",
+        "learning_content": "関数命名・早期return・コメント指針",
+        "application_plan": "PRテンプレにチェック項目を追加"
+      },
+      "createdAt": "2025-10-25T11:00:00+09:00",
+      "updatedAt": "2025-10-25T11:00:00+09:00"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "reportId": "mr-20251025-u-002-001",
+      "missionId": "health",
+      "missionVersion": 1,
+      "reportedAt": "2025-11-25T11:00:00+09:00",
+      "status": "APPROVED",
+      "scoreGranted": 1,
+      "fieldValues": {
+        "activity_detail": "ウォーキング平均 8,200 歩/日（雨天はストレッチ）"
+      },
+      "createdAt": "2025-10-25T11:00:00+09:00",
+      "updatedAt": "2025-10-25T11:00:00+09:00"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-001",
+      "reportId": "mr-20251025-u-001-001",
+      "missionId": "greetings",
+      "missionVersion": 1,
+      "reportedAt": "2025-11-25T11:00:00+09:00",
+      "status": "APPROVED",
+      "scoreGranted": 1,
+      "fieldValues": {
+        "note": "始業前・昼・退勤時に実施（計3回）",
+        "date": "2025-10-25"
+      },
+      "createdAt": "2025-10-25T11:00:00+09:00",
+      "updatedAt": "2025-10-25T11:00:00+09:00"
     },
     {
       "companyId": "em",

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
-import { Table, type ColumnDef } from "@employee/components/Table";
+import Table from "@employee/components/Table";
+import type { ColumnDef } from "@employee/components/Table";
 import type { ExchangeHistory } from "../model/types";
 import { fetchExchangeHistory } from "../api/client";
 

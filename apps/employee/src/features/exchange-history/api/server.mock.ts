@@ -17,6 +17,7 @@ type ExchangeHistoryRecord = {
  * 指定ユーザーの交換履歴（生データ）を取得
  */
 async function getExchangeHistoryRaw(companyId: string, userId: string): Promise<ExchangeHistoryRecord[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const items = (data as any).ExchangeHistory as ExchangeHistoryRecord[] | undefined;
 
   if (!items) {
