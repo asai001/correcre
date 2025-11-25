@@ -89,7 +89,7 @@ function MissionCard({ title, description, monthlyCount, doneCount, done, progre
         <div className="flex items-baseline justify-between gap-2">
           <div className="text-base font-semibold text-gray-800 truncate">{title}</div>
           {hasTarget && (
-            <span className={`text-xs font-semibold whitespace-nowrap ${progressTextClass}`}>
+            <span className={`text-sm font-semibold whitespace-nowrap ${progressTextClass}`}>
               ({doneCount}/{target})
             </span>
           )}
