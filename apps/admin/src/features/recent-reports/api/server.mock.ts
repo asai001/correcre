@@ -59,11 +59,26 @@ export async function getRecentReportsFromDynamoMock(companyId: string, limit: n
       inputContent = report.comment;
     }
 
+    // 【修正意図】進捗の正しい計算
+    // 以前は report.scoreGranted（1回の報告で獲得したスコア）を使用していたが、
+    // これは誤解を招く表示だった（例: "1/20" = 1ポイント獲得 / 月間目標20回）。
+    // 正しくは、「その月にそのユーザーが同じミッションで何回報告したか」をカウントすべき。
+    // 例: "5/20" = 月間目標20回のうち、5回報告済み
+    const reportYearMonth = report.reportedAt.slice(0, 7); // "2025-10" の形式
+    const reportCount = missionReports.filter(
+      (r) =>
+        r.companyId === report.companyId &&
+        r.userId === report.userId &&
+        r.missionId === report.missionId &&
+        r.reportedAt.startsWith(reportYearMonth) && // 同じ月
+        r.status === "APPROVED" // 承認済みのみカウント
+    ).length;
+
     return {
       date: report.reportedAt,
       name: user?.name || "不明",
       itemName: mission?.title || "不明",
-      progress: `${report.scoreGranted || 0}/${mission?.monthlyCount || 0}`,
+      progress: `${reportCount}/${mission?.monthlyCount || 0}`,
       inputContent,
     };
   });
