@@ -5,8 +5,6 @@ import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
 import AvgPointsTrend from "@admin/features/avg-points-trend";
 import RecentReports from "@admin/features/recent-reports";
 
-import { faUserShield } from "@fortawesome/free-solid-svg-icons";
-
 const companyId = "em";
 const userId = "u-004";
 const targetYearMonth = "2025-11";
@@ -15,7 +13,7 @@ export default function DashboardPage() {
   return (
     <div className="container mb-10 mx-auto px-6">
       <div className="my-5">
-        <LoginInfo icon={faUserShield} iconColor={"#fff"} companyId={companyId} userId={userId} />
+        <LoginInfo companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
         <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={targetYearMonth} />
