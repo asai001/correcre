@@ -12,13 +12,14 @@ function shiftYearMonth(baseYm: string, monthOffset: number): string {
   return toYYYYMM(d); // ここは YYYY-MM 形式を返す前提
 }
 
-async function getMissionReportOfCompany(companyId: string, targetYearMonth: string) {
+async function getUserMonthlyStatsOfCompany(companyId: string, targetYearMonth: string) {
   if (!isValidYYYYMM(targetYearMonth)) {
     return null;
   }
 
-  const Items = data.MissionReports;
-  return Items.filter((i) => i.companyId === companyId && i.status === "APPROVED" && targetYearMonth === toYYYYMM(new Date(i.reportedAt)));
+  const Items = data.UserMonthlyStats;
+  // companyUserKey は "companyId#userId" の形式
+  return Items.filter((i) => i.companyUserKey.startsWith(`${companyId}#`) && i.yearMonth === targetYearMonth);
 }
 
 async function getExchangeHistoryOfCompany(companyId: string, targetYearMonth: string) {
@@ -54,16 +55,23 @@ export const getDashboardSummaryFromDynamoMock = async (
 
   const lastYearMonth = shiftYearMonth(targetYearMonth, -1);
 
-  const [missionReports, exchangeHistory, company] = await Promise.all([
-    getMissionReportOfCompany(companyId, lastYearMonth),
+  const [userMonthlyStats, exchangeHistory, company] = await Promise.all([
+    getUserMonthlyStatsOfCompany(companyId, lastYearMonth),
     getExchangeHistoryOfCompany(companyId, targetYearMonth),
     getCompany(companyId),
   ]);
 
-  const pointPerScore = (company?.perEmployeeMonthlyFee ?? 0) / 100 / 5; // 一点あたりのポイント
-  const lastMonthEarnedScore = missionReports?.reduce((acc, cur) => acc + cur.scoreGranted, 0) ?? 0; // 総獲得スコア（点）
-  const lastMonthEarnedPoints = lastMonthEarnedScore * pointPerScore; // 点 ⇔ スコア 変換
-  const thisMonthExchangePoints = exchangeHistory?.reduce((acc, cur) => acc + cur.usedPoint, 0) ?? 0;
+  // 【修正意図】先月総獲得ポイントの正しい計算
+  // 以前は MissionReports から scoreGranted を集計し、perEmployeeMonthlyFee で計算していた。
+  // これだと、月額費用が変わると過去のポイントまで変わってしまう問題があった。
+  //
+  // 正しくは、UserMonthlyStats の earnedPoints を集計すべき。
+  // なぜなら：
+  // 1. ポイントは報告時に確定した値として UserMonthlyStats.earnedPoints に記録されている
+  // 2. 月額費用が変更されても、過去のポイントは変わらない（確定値）
+  // 3. ポイントは1ポイント=5円で固定、変換レートのみが月額費用で決まる
+  const lastMonthEarnedPoints = userMonthlyStats?.reduce((acc: number, cur) => acc + (cur.earnedPoints ?? 0), 0) ?? 0;
+  const thisMonthExchangePoints = exchangeHistory?.reduce((acc: number, cur) => acc + cur.usedPoint, 0) ?? 0;
 
   return {
     lastMonthEarnedPoints,
