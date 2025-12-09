@@ -34,7 +34,9 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh !bg-gray-50`}>
         {/* <ThemeProvider theme={theme}>{children}</ThemeProvider> */}
         {/* {children} */}
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="container mb-10 mx-auto px-6">{children}</div>
+        </Providers>
       </body>
     </html>
   );

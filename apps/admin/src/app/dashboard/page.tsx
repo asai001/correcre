@@ -11,7 +11,7 @@ const targetYearMonth = "2025-11";
 
 export default function DashboardPage() {
   return (
-    <div className="container mb-10 mx-auto px-6">
+    <>
       <div className="my-5">
         <LoginInfo companyId={companyId} userId={userId} />
       </div>
@@ -29,6 +29,6 @@ export default function DashboardPage() {
       <div className="mt-5">
         <RecentReports companyId={companyId} />
       </div>
-    </div>
+    </>
   );
 }
