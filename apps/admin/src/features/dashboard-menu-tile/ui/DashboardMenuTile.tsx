@@ -16,7 +16,7 @@ export default function DashboardMenuTile() {
         desc="従業員情報の登録・編集・削除・ポイント付与管理"
       />
       <MenuTile
-        link={"#"}
+        link={"/analysis-report"}
         className="md:min-w-0"
         icon={faChartBar}
         iconColor="#2563EB"
