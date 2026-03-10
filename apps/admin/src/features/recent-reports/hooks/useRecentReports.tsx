@@ -5,10 +5,9 @@ import type { RecentReport } from "../model/types";
 import { fetchRecentReports } from "../api/client";
 
 type UseRecentReportsOptions = {
-  /** 初期ロードを抑制したい場合などに使う */
   enabled?: boolean;
-  /** 取得する件数 */
   limit?: number;
+  userId?: string;
 };
 
 type UseRecentReportsResult = {
@@ -18,15 +17,17 @@ type UseRecentReportsResult = {
 };
 
 export function useRecentReports(companyId: string | undefined, options?: UseRecentReportsOptions): UseRecentReportsResult {
-  const { enabled = true, limit = 5 } = options ?? {};
+  const { enabled = true, limit = 5, userId } = options ?? {};
 
   const [reports, setReports] = useState<RecentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // companyId がまだ分からないとき or 明示的に無効化されているとき
     if (!enabled || !companyId) {
+      setReports([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -37,7 +38,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
       setError(null);
 
       try {
-        const data = await fetchRecentReports(companyId, limit);
+        const data = await fetchRecentReports(companyId, limit, userId);
 
         if (ac.signal.aborted) {
           return;
@@ -60,7 +61,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
     return () => {
       ac.abort();
     };
-  }, [companyId, enabled, limit]);
+  }, [companyId, enabled, limit, userId]);
 
   return { reports, loading, error };
 }

@@ -1,15 +1,16 @@
 import type { RecentReport } from "../model/types";
 
-/**
- * ダッシュボード用の「直近の報告内容」を取得
- */
-export async function fetchRecentReports(companyId: string, limit: number = 5): Promise<RecentReport[]> {
+export async function fetchRecentReports(companyId: string, limit: number = 5, userId?: string): Promise<RecentReport[]> {
   const params = new URLSearchParams({
     companyId,
     limit: String(limit),
-  }).toString();
+  });
 
-  const res = await fetch(`/api/recent-reports?${params}`, {
+  if (userId) {
+    params.set("userId", userId);
+  }
+
+  const res = await fetch(`/api/recent-reports?${params.toString()}`, {
     method: "GET",
     cache: "no-store",
   });

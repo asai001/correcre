@@ -14,7 +14,11 @@ type UserData = {
 /**
  * 企業の「直近の報告内容」を取得
  */
-export async function getRecentReportsFromDynamoMock(companyId: string, limit: number = 5): Promise<RecentReport[]> {
+export async function getRecentReportsFromDynamoMock(
+  companyId: string,
+  limit: number = 5,
+  userId?: string
+): Promise<RecentReport[]> {
   const missionReports = data.MissionReports as MissionReport[];
   const users = data.User as UserData[];
   const missions = data.Mission as Mission[];
@@ -25,7 +29,7 @@ export async function getRecentReportsFromDynamoMock(companyId: string, limit: n
 
   // companyIdでフィルタリングし、reportedAtで降順ソート（新しい順）
   const filteredReports = missionReports
-    .filter((r) => r.companyId === companyId)
+    .filter((r) => r.companyId === companyId && (!userId || r.userId === userId))
     .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
     .slice(0, limit);
 

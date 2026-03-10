@@ -5,6 +5,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const companyId = searchParams.get("companyId");
   const limitStr = searchParams.get("limit");
+  const userId = searchParams.get("userId") ?? undefined;
 
   if (!companyId) {
     return NextResponse.json({ error: "companyId は必須です" }, { status: 400 });
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
   const limit = limitStr ? parseInt(limitStr, 10) : 5;
 
   try {
-    const reports = await getRecentReportsFromDynamoMock(companyId, limit);
+    const reports = await getRecentReportsFromDynamoMock(companyId, limit, userId);
     return NextResponse.json(reports);
   } catch (err) {
     console.error("GET /api/recent-reports error", err);

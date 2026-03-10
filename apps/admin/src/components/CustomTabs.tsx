@@ -71,7 +71,7 @@ export default function CustomTabs({ tabs, defaultIndex = 0 }: CustomTabsProps) 
       </Box>
       {tabs.map((tab, index) => (
         <div key={index} role="tabpanel" hidden={value !== index} id={`tabpanel-${index}`} aria-labelledby={`tab-${index}`}>
-          {value === index && <Box sx={{ p: 3 }}>{tab.content}</Box>}
+          {value === index && <Box>{tab.content}</Box>}
         </div>
       ))}
     </div>

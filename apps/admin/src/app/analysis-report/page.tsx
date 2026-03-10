@@ -1,4 +1,5 @@
 import CustomTabs from "@admin/components/CustomTabs";
+import { IndividualAnalysis } from "@admin/features/individual-analysis";
 
 export default function Page() {
   return (
@@ -6,7 +7,7 @@ export default function Page() {
       <CustomTabs
         tabs={[
           { label: "全体分析", content: <div>全体分析の内容</div> },
-          { label: "個別分析", content: <div>準備中...</div> },
+          { label: "個別分析", content: <IndividualAnalysis /> },
         ]}
       />
     </div>

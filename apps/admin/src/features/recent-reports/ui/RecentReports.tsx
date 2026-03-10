@@ -8,20 +8,30 @@ type Props = {
   className?: string;
   companyId: string;
   limit?: number;
+  userId?: string;
+  showEmployeeName?: boolean;
 };
 
-export default function RecentReports({ className, companyId, limit = 5 }: Props) {
-  const { reports, loading, error } = useRecentReports(companyId, { limit });
+export default function RecentReports({
+  className,
+  companyId,
+  limit = 5,
+  userId,
+  showEmployeeName = true,
+}: Props) {
+  const { reports, loading, error } = useRecentReports(companyId, { limit, userId });
 
-  if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
+  if (loading || error) {
     return null;
   }
 
-  if (error) {
-    // 将来的に別コンポーネントにしても良い
-    return null;
-  }
-
-  return <RecentReportsView icon={faTable} iconColor="#2563EB" className={className} reports={reports} />;
+  return (
+    <RecentReportsView
+      icon={faTable}
+      iconColor="#2563EB"
+      className={className}
+      reports={reports}
+      showEmployeeName={showEmployeeName}
+    />
+  );
 }

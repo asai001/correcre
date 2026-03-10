@@ -12,38 +12,57 @@ type RecentReportsViewProps = {
   iconColor?: string;
   className?: string;
   reports: RecentReport[];
+  showEmployeeName?: boolean;
 };
 
-const columns: ColumnDef<RecentReport>[] = [
-  {
-    id: "date",
-    label: "日時",
-    width: "15%",
-    render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "), // 将来的に toYYYYMMDD などに
-  },
-  {
-    id: "name",
-    label: "従業員名",
-    width: "10%",
-  },
-  {
-    id: "itemName",
-    label: "項目名",
-    width: "15%",
-  },
-  {
-    id: "progress",
-    label: "進捗",
-    width: "10%",
-  },
-  {
-    id: "inputContent",
-    label: "入力内容",
-    align: "left",
-  },
-];
+function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
+  const columns: ColumnDef<RecentReport>[] = [
+    {
+      id: "date",
+      label: "日時",
+      width: showEmployeeName ? "15%" : "18%",
+      render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
+    },
+  ];
 
-export default function RecentReportsView({ icon, iconColor = "#2563EB", className, reports }: RecentReportsViewProps) {
+  if (showEmployeeName) {
+    columns.push({
+      id: "name",
+      label: "従業員名",
+      width: "10%",
+    });
+  }
+
+  columns.push(
+    {
+      id: "itemName",
+      label: "項目名",
+      width: showEmployeeName ? "15%" : "18%",
+    },
+    {
+      id: "progress",
+      label: "進捗",
+      width: "10%",
+    },
+    {
+      id: "inputContent",
+      label: "入力内容",
+      align: "left",
+    }
+  );
+
+  return columns;
+}
+
+export default function RecentReportsView({
+  icon,
+  iconColor = "#2563EB",
+  className,
+  reports,
+  showEmployeeName = true,
+}: RecentReportsViewProps) {
+  const columns = React.useMemo(() => getColumns(showEmployeeName), [showEmployeeName]);
+
   return (
     <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
       <div className="flex items-center mb-4">
