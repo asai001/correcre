@@ -69,7 +69,7 @@ export default function PointExchangeHistoryCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const resolvedRowsPerPageOptions = useMemo(
-    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25]),
+    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25, 50]),
     [rowsPerPageOptions]
   );
   const defaultRowsPerPage = useMemo(() => {

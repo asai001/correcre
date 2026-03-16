@@ -13,17 +13,21 @@ export type ColumnDef<T> = {
 export type TableProps<T> = {
   columns: ColumnDef<T>[];
   rows: T[];
+  footer?: React.ReactNode;
 };
 
-export default function Table<T>({ columns, rows }: TableProps<T>) {
+export default function Table<T>({ columns, rows, footer }: TableProps<T>) {
   return (
-    <>
+    <Paper
+      sx={{
+        border: "1px solid",
+        borderColor: "grey.200",
+        borderRadius: 2,
+        overflow: "hidden",
+      }}
+    >
       <TableContainer
-        component={Paper}
         sx={{
-          border: "1px solid",
-          borderColor: "grey.200",
-          borderRadius: 2,
           overflow: "auto",
         }}
       >
@@ -61,6 +65,7 @@ export default function Table<T>({ columns, rows }: TableProps<T>) {
           </TableBody>
         </MuiTable>
       </TableContainer>
-    </>
+      {footer}
+    </Paper>
   );
 }

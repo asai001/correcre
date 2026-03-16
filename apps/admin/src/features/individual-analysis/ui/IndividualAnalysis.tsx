@@ -42,14 +42,14 @@ export default function IndividualAnalysis() {
   );
   const reportTablePagination = useMemo(
     () => ({
-      rowsPerPageOptions: [10, 25, 50],
-      initialRowsPerPage: 10,
+      rowsPerPageOptions: [5, 10, 25, 50],
+      initialRowsPerPage: 5,
     }),
     []
   );
   const exchangeHistoryPagination = useMemo(
     () => ({
-      rowsPerPageOptions: [5, 10, 25],
+      rowsPerPageOptions: [5, 10, 25, 50],
       initialRowsPerPage: 5,
     }),
     []

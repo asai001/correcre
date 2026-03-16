@@ -30,8 +30,8 @@ function formatLocalDate(date: Date) {
 export default function OverallAnalysis() {
   const exchangeHistoryPagination = useMemo(
     () => ({
-      rowsPerPageOptions: [10, 25, 50],
-      initialRowsPerPage: 10,
+      rowsPerPageOptions: [5, 10, 25, 50],
+      initialRowsPerPage: 5,
     }),
     []
   );

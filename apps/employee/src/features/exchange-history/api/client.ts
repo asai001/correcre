@@ -1,14 +1,21 @@
 import type { ExchangeHistory } from "../model/types";
 
-/**
- * ダッシュボード用の直近の交換履歴を取得
- */
-export async function fetchExchangeHistory(companyId: string, userId: string, limit = 10): Promise<ExchangeHistory[]> {
-  const params = new URLSearchParams({ companyId, userId, limit: String(limit) }).toString();
+export async function fetchExchangeHistory(
+  companyId: string,
+  userId: string,
+  limit?: number,
+  signal?: AbortSignal
+): Promise<ExchangeHistory[]> {
+  const params = new URLSearchParams({ companyId, userId });
 
-  const res = await fetch(`/api/exchange-history?${params}`, {
+  if (typeof limit === "number") {
+    params.set("limit", String(limit));
+  }
+
+  const res = await fetch(`/api/exchange-history?${params.toString()}`, {
     method: "GET",
     cache: "no-store",
+    signal,
   });
 
   if (!res.ok) {

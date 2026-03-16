@@ -60,12 +60,12 @@ export default function OverallPointExchangeHistoryTable({
 }: OverallPointExchangeHistoryTableProps) {
   const columns = useMemo(() => getColumns(), []);
   const resolvedRowsPerPageOptions = useMemo(
-    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [10, 25, 50]),
+    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25, 50]),
     [rowsPerPageOptions]
   );
   const defaultRowsPerPage = useMemo(() => {
-    const candidate = initialRowsPerPage ?? resolvedRowsPerPageOptions[0] ?? 10;
-    return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 10);
+    const candidate = initialRowsPerPage ?? 5;
+    return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 5);
   }, [initialRowsPerPage, resolvedRowsPerPageOptions]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);

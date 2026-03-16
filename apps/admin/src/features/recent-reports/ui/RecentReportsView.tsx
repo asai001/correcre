@@ -70,16 +70,18 @@ export default function RecentReportsView({
   const columns = React.useMemo(() => getColumns(showEmployeeName), [showEmployeeName]);
   const hasPagination = Boolean(pagination);
   const rowsPerPageOptions = React.useMemo(
-    () => (pagination?.rowsPerPageOptions?.length ? pagination.rowsPerPageOptions : [10, 25, 50]),
+    () => (pagination?.rowsPerPageOptions?.length ? pagination.rowsPerPageOptions : [5, 10, 25, 50]),
     [pagination?.rowsPerPageOptions]
   );
   const initialRowsPerPage = React.useMemo(() => {
     if (!hasPagination) {
-      return rowsPerPageOptions[0] ?? 10;
+      return rowsPerPageOptions.includes(5) ? 5 : (rowsPerPageOptions[0] ?? 5);
     }
 
     const requestedValue = pagination?.initialRowsPerPage;
-    return requestedValue && rowsPerPageOptions.includes(requestedValue) ? requestedValue : (rowsPerPageOptions[0] ?? 10);
+    return requestedValue && rowsPerPageOptions.includes(requestedValue)
+      ? requestedValue
+      : (rowsPerPageOptions.includes(5) ? 5 : (rowsPerPageOptions[0] ?? 5));
   }, [hasPagination, pagination, rowsPerPageOptions]);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(initialRowsPerPage);

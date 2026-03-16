@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MonthlyPointsHistoryItem } from "../model/types";
 import { fetchMonthlyPointsHistory } from "../api/client";
+import type { MonthlyPointsHistoryItem } from "../model/types";
 
 type UseMonthlyPointsHistoryOptions = {
-  /** 初期ロードを抑制したい場合などに使う */
   enabled?: boolean;
 };
 
@@ -23,13 +22,11 @@ export function useMonthlyPointsHistory(
   options?: UseMonthlyPointsHistoryOptions
 ): UseMonthlyPointsHistoryResult {
   const { enabled = true } = options ?? {};
-
   const [items, setItems] = useState<MonthlyPointsHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // companyId / userId がまだ分からないとき or 明示的に無効化されているとき
     if (!enabled || !companyId || !userId) {
       return;
     }
@@ -42,7 +39,6 @@ export function useMonthlyPointsHistory(
 
       try {
         const data = await fetchMonthlyPointsHistory(companyId, userId, months);
-
         if (ac.signal.aborted) {
           return;
         }
@@ -53,7 +49,8 @@ export function useMonthlyPointsHistory(
         if (ac.signal.aborted) {
           return;
         }
-        setError("月次ポイント履歴の取得に失敗しました");
+
+        setError("月次点数履歴の取得に失敗しました");
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false);
@@ -66,8 +63,8 @@ export function useMonthlyPointsHistory(
     };
   }, [companyId, userId, months, enabled]);
 
-  const labels = items.map((i) => i.yearMonth);
-  const data = items.map((i) => i.earnedPoints);
+  const labels = items.map((item) => item.yearMonth);
+  const data = items.map((item) => item.earnedScore);
 
   return { labels, data, loading, error };
 }
