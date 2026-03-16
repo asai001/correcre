@@ -33,16 +33,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "companyId and userId are required" }, { status: 400 });
   }
 
-  const parsedLimit = limitStr ? Number.parseInt(limitStr, 10) : 3;
-  const limit = Number.isNaN(parsedLimit) ? 3 : parsedLimit;
+  const parsedLimit = limitStr ? Number.parseInt(limitStr, 10) : undefined;
+  const limit = typeof parsedLimit === "number" && Number.isFinite(parsedLimit) ? parsedLimit : undefined;
 
   try {
-    const items = ((data as { ExchangeHistory?: ExchangeHistoryRecord[] }).ExchangeHistory ?? [])
+    const sortedItems = ((data as { ExchangeHistory?: ExchangeHistoryRecord[] }).ExchangeHistory ?? [])
       .filter(
         (item) => item.companyId === companyId && item.userId === userId && isWithinDateRange(item.exchangedAt, startDate, endDate)
       )
-      .sort((a, b) => (a.exchangedAt < b.exchangedAt ? 1 : -1))
-      .slice(0, limit)
+      .sort((a, b) => (a.exchangedAt < b.exchangedAt ? 1 : -1));
+
+    const items = (typeof limit === "number" ? sortedItems.slice(0, limit) : sortedItems)
       .map<ExchangeHistoryResponse>((item) => ({
         date: item.exchangedAt.slice(0, 10).replaceAll("-", "/"),
         merchandiseName: item.merchandiseName,

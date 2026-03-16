@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { TablePagination } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
 
 type PointExchangeHistoryItem = {
   date: string;
@@ -14,6 +15,9 @@ type PointExchangeHistoryCardProps = {
   startDate: string;
   endDate: string;
   limit?: number;
+  fetchAll?: boolean;
+  rowsPerPageOptions?: number[];
+  initialRowsPerPage?: number;
 };
 
 async function fetchPointExchangeHistory(
@@ -21,7 +25,7 @@ async function fetchPointExchangeHistory(
   userId: string,
   startDate: string,
   endDate: string,
-  limit: number,
+  limit: number | undefined,
   signal: AbortSignal
 ): Promise<PointExchangeHistoryItem[]> {
   const params = new URLSearchParams({
@@ -29,8 +33,11 @@ async function fetchPointExchangeHistory(
     userId,
     startDate,
     endDate,
-    limit: String(limit),
   });
+
+  if (typeof limit === "number") {
+    params.set("limit", String(limit));
+  }
 
   const res = await fetch(`/api/exchange-history?${params.toString()}`, {
     method: "GET",
@@ -54,10 +61,23 @@ export default function PointExchangeHistoryCard({
   startDate,
   endDate,
   limit = 3,
+  fetchAll = false,
+  rowsPerPageOptions,
+  initialRowsPerPage,
 }: PointExchangeHistoryCardProps) {
   const [items, setItems] = useState<PointExchangeHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const resolvedRowsPerPageOptions = useMemo(
+    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25]),
+    [rowsPerPageOptions]
+  );
+  const defaultRowsPerPage = useMemo(() => {
+    const candidate = initialRowsPerPage ?? resolvedRowsPerPageOptions[0] ?? 5;
+    return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 5);
+  }, [initialRowsPerPage, resolvedRowsPerPageOptions]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);
 
   useEffect(() => {
     if (!companyId || !userId || !startDate || !endDate) {
@@ -74,7 +94,14 @@ export default function PointExchangeHistoryCard({
       setError(null);
 
       try {
-        const data = await fetchPointExchangeHistory(companyId, userId, startDate, endDate, limit, ac.signal);
+        const data = await fetchPointExchangeHistory(
+          companyId,
+          userId,
+          startDate,
+          endDate,
+          fetchAll ? undefined : limit,
+          ac.signal
+        );
 
         if (ac.signal.aborted) {
           return;
@@ -98,7 +125,20 @@ export default function PointExchangeHistoryCard({
     return () => {
       ac.abort();
     };
-  }, [companyId, userId, startDate, endDate, limit]);
+  }, [companyId, userId, startDate, endDate, limit, fetchAll]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [items]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(items.length / rowsPerPage) - 1);
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [items.length, page, rowsPerPage]);
+
+  const displayedItems = items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <section className="min-h-[320px] rounded-2xl bg-white p-6 shadow-lg">
@@ -116,25 +156,46 @@ export default function PointExchangeHistoryCard({
         )}
 
         {!loading && !error && items.length > 0 && (
-          <div className="space-y-4">
-            {items.map((item, index) => (
-              <div
-                key={`${item.date}-${item.merchandiseName}-${index}`}
-                className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-base font-semibold text-slate-900">{item.merchandiseName}</p>
-                    <p className="mt-1 text-sm text-slate-500">{item.date}</p>
-                  </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="space-y-4 p-4">
+              {displayedItems.map((item, index) => (
+                <div
+                  key={`${item.date}-${item.merchandiseName}-${page}-${index}`}
+                  className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-slate-900">{item.merchandiseName}</p>
+                      <p className="mt-1 text-sm text-slate-500">{item.date}</p>
+                    </div>
 
-                  <div className="shrink-0 sm:text-right">
-                    <p className="text-lg font-semibold text-red-500">-{item.usedPoint.toLocaleString()}pt</p>
-                    <p className="mt-1 text-sm font-medium text-emerald-500">{"\u4ea4\u63db\u6e08\u307f"}</p>
+                    <div className="shrink-0 sm:text-right">
+                      <p className="text-lg font-semibold text-red-500">-{item.usedPoint.toLocaleString()}pt</p>
+                      <p className="mt-1 text-sm font-medium text-emerald-500">{"\u4ea4\u63db\u6e08\u307f"}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            <TablePagination
+              component="div"
+              count={items.length}
+              page={page}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={resolvedRowsPerPageOptions}
+              labelRowsPerPage={"表示件数"}
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count}`}
+              sx={{
+                borderTop: "1px solid",
+                borderColor: "rgb(226 232 240)",
+              }}
+            />
           </div>
         )}
       </div>

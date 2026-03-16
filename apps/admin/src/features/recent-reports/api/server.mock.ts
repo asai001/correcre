@@ -21,7 +21,7 @@ function toYearMonth(dateTime: string) {
 
 export async function getRecentReportsFromDynamoMock(
   companyId: string,
-  limit: number = 5,
+  limit?: number,
   userId?: string,
   startDate?: string,
   endDate?: string
@@ -34,15 +34,16 @@ export async function getRecentReportsFromDynamoMock(
     throw new Error("Data not found");
   }
 
-  const filteredReports = missionReports
+  const sortedReports = missionReports
     .filter(
       (report) =>
         report.companyId === companyId &&
         (!userId || report.userId === userId) &&
         isWithinDateRange(report.reportedAt, startDate, endDate)
     )
-    .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
-    .slice(0, limit);
+    .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
+
+  const filteredReports = typeof limit === "number" ? sortedReports.slice(0, limit) : sortedReports;
 
   const progressByReportId = new Map<string, number>();
   const approvedReportsInRange = missionReports

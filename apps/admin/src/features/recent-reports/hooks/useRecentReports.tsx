@@ -7,6 +7,7 @@ import { fetchRecentReports } from "../api/client";
 type UseRecentReportsOptions = {
   enabled?: boolean;
   limit?: number;
+  fetchAll?: boolean;
   userId?: string;
   startDate?: string;
   endDate?: string;
@@ -19,7 +20,7 @@ type UseRecentReportsResult = {
 };
 
 export function useRecentReports(companyId: string | undefined, options?: UseRecentReportsOptions): UseRecentReportsResult {
-  const { enabled = true, limit = 5, userId, startDate, endDate } = options ?? {};
+  const { enabled = true, limit = 5, fetchAll = false, userId, startDate, endDate } = options ?? {};
 
   const [reports, setReports] = useState<RecentReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
       setError(null);
 
       try {
-        const data = await fetchRecentReports(companyId, limit, userId, startDate, endDate, ac.signal);
+        const data = await fetchRecentReports(companyId, fetchAll ? undefined : limit, userId, startDate, endDate, ac.signal);
 
         if (ac.signal.aborted) {
           return;
@@ -64,7 +65,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
     return () => {
       ac.abort();
     };
-  }, [companyId, enabled, limit, userId, startDate, endDate]);
+  }, [companyId, enabled, fetchAll, limit, userId, startDate, endDate]);
 
   return { reports, loading, error };
 }

@@ -13,7 +13,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "companyId is required" }, { status: 400 });
   }
 
-  const limit = limitStr ? parseInt(limitStr, 10) : 5;
+  const parsedLimit = limitStr ? parseInt(limitStr, 10) : undefined;
+  const limit = typeof parsedLimit === "number" && Number.isFinite(parsedLimit) ? parsedLimit : undefined;
 
   try {
     const reports = await getRecentReportsFromDynamoMock(companyId, limit, userId, startDate, endDate);

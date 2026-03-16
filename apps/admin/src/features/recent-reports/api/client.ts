@@ -2,7 +2,7 @@ import type { RecentReport } from "../model/types";
 
 export async function fetchRecentReports(
   companyId: string,
-  limit: number = 5,
+  limit?: number,
   userId?: string,
   startDate?: string,
   endDate?: string,
@@ -10,8 +10,11 @@ export async function fetchRecentReports(
 ): Promise<RecentReport[]> {
   const params = new URLSearchParams({
     companyId,
-    limit: String(limit),
   });
+
+  if (typeof limit === "number") {
+    params.set("limit", String(limit));
+  }
 
   if (userId) {
     params.set("userId", userId);

@@ -40,6 +40,20 @@ export default function IndividualAnalysis() {
     ],
     []
   );
+  const reportTablePagination = useMemo(
+    () => ({
+      rowsPerPageOptions: [10, 25, 50],
+      initialRowsPerPage: 10,
+    }),
+    []
+  );
+  const exchangeHistoryPagination = useMemo(
+    () => ({
+      rowsPerPageOptions: [5, 10, 25],
+      initialRowsPerPage: 5,
+    }),
+    []
+  );
 
   const [selectedUserId, setSelectedUserId] = useState(employees[0]?.userId ?? "");
   const [selectedStartDate, setSelectedStartDate] = useState(() =>
@@ -112,11 +126,16 @@ export default function IndividualAnalysis() {
           userId={selectedUserId}
           startDate={selectedStartDate}
           endDate={selectedEndDate}
+          fetchAll
+          rowsPerPageOptions={exchangeHistoryPagination.rowsPerPageOptions}
+          initialRowsPerPage={exchangeHistoryPagination.initialRowsPerPage}
         />
       </div>
 
       <RecentReports
         companyId={companyId}
+        fetchAll
+        pagination={reportTablePagination}
         userId={selectedUserId}
         startDate={selectedStartDate}
         endDate={selectedEndDate}
