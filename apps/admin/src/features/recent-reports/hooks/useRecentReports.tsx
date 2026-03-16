@@ -8,6 +8,8 @@ type UseRecentReportsOptions = {
   enabled?: boolean;
   limit?: number;
   userId?: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 type UseRecentReportsResult = {
@@ -17,7 +19,7 @@ type UseRecentReportsResult = {
 };
 
 export function useRecentReports(companyId: string | undefined, options?: UseRecentReportsOptions): UseRecentReportsResult {
-  const { enabled = true, limit = 5, userId } = options ?? {};
+  const { enabled = true, limit = 5, userId, startDate, endDate } = options ?? {};
 
   const [reports, setReports] = useState<RecentReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
       setError(null);
 
       try {
-        const data = await fetchRecentReports(companyId, limit, userId);
+        const data = await fetchRecentReports(companyId, limit, userId, startDate, endDate, ac.signal);
 
         if (ac.signal.aborted) {
           return;
@@ -46,11 +48,12 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
 
         setReports(data);
       } catch (err) {
-        console.error(err);
-        if (ac.signal.aborted) {
+        if (ac.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
           return;
         }
-        setError("直近の報告内容の取得に失敗しました");
+
+        console.error(err);
+        setError("\u5831\u544a\u5185\u5bb9\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false);
@@ -61,7 +64,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
     return () => {
       ac.abort();
     };
-  }, [companyId, enabled, limit, userId]);
+  }, [companyId, enabled, limit, userId, startDate, endDate]);
 
   return { reports, loading, error };
 }

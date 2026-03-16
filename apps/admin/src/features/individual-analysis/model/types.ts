@@ -2,7 +2,8 @@
 
 export type AnalysisFilter = {
   userId: string;
-  yearMonth: string; // YYYY-MM 形式
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
 };
 
 export type EmployeeOption = {
@@ -11,7 +12,28 @@ export type EmployeeOption = {
   department: string;
 };
 
-export type MonthOption = {
-  value: string; // YYYY-MM
-  label: string; // YYYY年MM月
+export type AnalysisMissionItem = {
+  name: string;
+  percentage: number;
+};
+
+export type AnalysisRadarItem = {
+  category: string;
+  achievement: number;
+};
+
+export type AnalysisTrendItem = {
+  month: string;
+  points: number;
+};
+
+export type IndividualAnalysisSummary = {
+  earnedPoints: number;
+  achievementScore: number;
+  achievementRate: number;
+  averageScore: number;
+  radarData: AnalysisRadarItem[];
+  trendData: AnalysisTrendItem[];
+  goodMissions: AnalysisMissionItem[];
+  improvementMissions: AnalysisMissionItem[];
 };

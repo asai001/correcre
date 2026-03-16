@@ -1,9 +1,8 @@
 "use client";
 
 import { Radar } from "react-chartjs-2";
-import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from "chart.js";
+import { Chart as ChartJS, Filler, Legend, LineElement, PointElement, RadialLinearScale, Tooltip } from "chart.js";
 
-// Chart.js の必要なコンポーネントを登録
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 type RadarDataPoint = {
@@ -17,11 +16,11 @@ type MonthlyAchievementRadarProps = {
 
 export default function MonthlyAchievementRadar({ data }: MonthlyAchievementRadarProps) {
   const chartData = {
-    labels: data.map((d) => d.category),
+    labels: data.map((item) => item.category),
     datasets: [
       {
-        label: "達成割合（%）",
-        data: data.map((d) => d.achievement),
+        label: "\u9054\u6210\u7387\uff08\u0025\uff09",
+        data: data.map((item) => item.achievement),
         backgroundColor: "rgba(59, 130, 246, 0.2)",
         borderColor: "rgba(59, 130, 246, 1)",
         borderWidth: 2,
@@ -53,8 +52,8 @@ export default function MonthlyAchievementRadar({ data }: MonthlyAchievementRada
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm">
-      <h3 className="text-lg font-bold mb-4">月次達成割合（レーダーチャート）</h3>
+    <div className="rounded-lg bg-white p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-bold">{"\u9054\u6210\u5272\u5408\uff08\u30ec\u30fc\u30c0\u30fc\u30c1\u30e3\u30fc\u30c8\uff09"}</h3>
       <div style={{ height: "400px" }}>
         <Radar data={chartData} options={options} />
       </div>

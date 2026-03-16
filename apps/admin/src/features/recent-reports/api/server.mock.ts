@@ -1,8 +1,7 @@
 import data from "../../../../../mock/dynamodb.json";
-import { MissionReport, Mission } from "@correcre/types";
+import { Mission, MissionReport } from "@correcre/types";
 import type { RecentReport } from "../model/types";
 
-// dynamodb.jsonのUserデータの型
 type UserData = {
   companyId: string;
   userId: string;
@@ -11,13 +10,21 @@ type UserData = {
   roles: string[];
 };
 
-/**
- * 企業の「直近の報告内容」を取得
- */
+function isWithinDateRange(dateTime: string, startDate?: string, endDate?: string) {
+  const date = dateTime.slice(0, 10);
+  return (!startDate || date >= startDate) && (!endDate || date <= endDate);
+}
+
+function toYearMonth(dateTime: string) {
+  return dateTime.slice(0, 7);
+}
+
 export async function getRecentReportsFromDynamoMock(
   companyId: string,
   limit: number = 5,
-  userId?: string
+  userId?: string,
+  startDate?: string,
+  endDate?: string
 ): Promise<RecentReport[]> {
   const missionReports = data.MissionReports as MissionReport[];
   const users = data.User as UserData[];
@@ -27,65 +34,73 @@ export async function getRecentReportsFromDynamoMock(
     throw new Error("Data not found");
   }
 
-  // companyIdでフィルタリングし、reportedAtで降順ソート（新しい順）
   const filteredReports = missionReports
-    .filter((r) => r.companyId === companyId && (!userId || r.userId === userId))
+    .filter(
+      (report) =>
+        report.companyId === companyId &&
+        (!userId || report.userId === userId) &&
+        isWithinDateRange(report.reportedAt, startDate, endDate)
+    )
     .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
     .slice(0, limit);
 
-  // ユーザー名とミッション名を結合
-  const result: RecentReport[] = filteredReports.map((report) => {
-    const user = users.find((u) => u.companyId === report.companyId && u.userId === report.userId);
-    const mission = missions.find((m) => m.companyId === report.companyId && m.missionId === report.missionId);
+  const progressByReportId = new Map<string, number>();
+  const approvedReportsInRange = missionReports
+    .filter(
+      (report) =>
+        report.companyId === companyId &&
+        (!userId || report.userId === userId) &&
+        report.status === "APPROVED" &&
+        isWithinDateRange(report.reportedAt, startDate, endDate)
+    )
+    .sort((a, b) => {
+      const timeDiff = new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime();
 
-    // fieldValuesを整形して表示用の文字列に変換
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+
+      return a.reportId.localeCompare(b.reportId);
+    });
+
+  const progressCounters = new Map<string, number>();
+  for (const report of approvedReportsInRange) {
+    const progressKey = `${report.companyId}:${report.userId}:${report.missionId}:${toYearMonth(report.reportedAt)}`;
+    const nextCount = (progressCounters.get(progressKey) ?? 0) + 1;
+
+    progressCounters.set(progressKey, nextCount);
+    progressByReportId.set(report.reportId, nextCount);
+  }
+
+  return filteredReports.map((report) => {
+    const user = users.find((item) => item.companyId === report.companyId && item.userId === report.userId);
+    const mission = missions.find((item) => item.companyId === report.companyId && item.missionId === report.missionId);
+
     let inputContent = "";
     if (report.fieldValues && mission?.fields) {
-      // 【修正意図】
-      // Object.values()を使うと、キーの順序が保証されず、ラベルなしで値だけが表示されてしまう問題があった。
-      // Missionのfields定義に基づいて、正しい順序でラベル付きの形式で表示するように改善。
-      // これにより、「参考資料名：〜」「学習内容：〜」のように、各フィールドが何を示すのか明確になる。
       inputContent = mission.fields
         .map((field) => {
           const value = report.fieldValues?.[field.id];
-          // 値が存在しない場合はスキップ
           if (value === undefined || value === null || value === "") {
             return null;
           }
-          // ラベル付きで表示（例: "参考資料名: リーダブルコード"）
+
           return `${field.label}: ${value}`;
         })
-        .filter(Boolean) // null/undefinedを除外
+        .filter(Boolean)
         .join("\n");
     } else if (report.comment) {
-      // 後方互換性: fieldValuesがない場合はcommentを使用
-      // @TODO 本番実装時は不要な考慮
       inputContent = report.comment;
     }
 
-    // 【修正意図】進捗の正しい計算
-    // 以前は report.scoreGranted（1回の報告で獲得したスコア）を使用していたが、
-    // これは誤解を招く表示だった（例: "1/20" = 1ポイント獲得 / 月間目標20回）。
-    // 正しくは、「その月にそのユーザーが同じミッションで何回報告したか」をカウントすべき。
-    // 例: "5/20" = 月間目標20回のうち、5回報告済み
-    const reportYearMonth = report.reportedAt.slice(0, 7); // "2025-10" の形式
-    const reportCount = missionReports.filter(
-      (r) =>
-        r.companyId === report.companyId &&
-        r.userId === report.userId &&
-        r.missionId === report.missionId &&
-        r.reportedAt.startsWith(reportYearMonth) && // 同じ月
-        r.status === "APPROVED" // 承認済みのみカウント
-    ).length;
+    const progressCount = progressByReportId.get(report.reportId) ?? 0;
 
     return {
       date: report.reportedAt,
-      name: user?.name || "不明",
-      itemName: mission?.title || "不明",
-      progress: `${reportCount}/${mission?.monthlyCount || 0}`,
+      name: user?.name || "-",
+      itemName: mission?.title || "-",
+      progress: `${progressCount}/${mission?.monthlyCount || 0}`,
       inputContent,
     };
   });
-
-  return result;
 }

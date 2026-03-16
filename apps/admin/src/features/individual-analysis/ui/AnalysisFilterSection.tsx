@@ -1,44 +1,42 @@
 "use client";
 
-import { FormControl, InputLabel, Select, MenuItem, SelectChangeEvent } from "@mui/material";
-import { EmployeeOption, MonthOption } from "../model/types";
+import { FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, TextField } from "@mui/material";
+import { EmployeeOption } from "../model/types";
 
 type AnalysisFilterSectionProps = {
   employees: EmployeeOption[];
-  months: MonthOption[];
   selectedUserId: string;
-  selectedYearMonth: string;
+  selectedStartDate: string;
+  selectedEndDate: string;
   onUserChange: (userId: string) => void;
-  onMonthChange: (yearMonth: string) => void;
+  onStartDateChange: (date: string) => void;
+  onEndDateChange: (date: string) => void;
 };
 
 export default function AnalysisFilterSection({
   employees,
-  months,
   selectedUserId,
-  selectedYearMonth,
+  selectedStartDate,
+  selectedEndDate,
   onUserChange,
-  onMonthChange,
+  onStartDateChange,
+  onEndDateChange,
 }: AnalysisFilterSectionProps) {
   const handleUserChange = (event: SelectChangeEvent) => {
     onUserChange(event.target.value);
   };
 
-  const handleMonthChange = (event: SelectChangeEvent) => {
-    onMonthChange(event.target.value);
-  };
-
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-      <h3 className="text-lg font-bold mb-4">従業員選択</h3>
-      <div className="flex flex-col md:flex-row gap-6">
-        <FormControl sx={{ width: { xs: "100%", md: "50%" } }}>
-          <InputLabel id="employee-select-label">従業員を選択</InputLabel>
+    <div className="mb-6 rounded-lg bg-white p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-bold">{"\u793e\u54e1\u9078\u629e"}</h3>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <FormControl sx={{ width: "100%" }}>
+          <InputLabel id="employee-select-label">{"\u793e\u54e1\u3092\u9078\u629e"}</InputLabel>
           <Select
             labelId="employee-select-label"
             id="employee-select"
             value={selectedUserId}
-            label="従業員を選択"
+            label={"\u793e\u54e1\u3092\u9078\u629e"}
             onChange={handleUserChange}
           >
             {employees.map((emp) => (
@@ -48,22 +46,24 @@ export default function AnalysisFilterSection({
             ))}
           </Select>
         </FormControl>
-        <FormControl sx={{ width: { xs: "100%", md: "50%" } }}>
-          <InputLabel id="month-select-label">分析月を選択</InputLabel>
-          <Select
-            labelId="month-select-label"
-            id="month-select"
-            value={selectedYearMonth}
-            label="分析月を選択"
-            onChange={handleMonthChange}
-          >
-            {months.map((month) => (
-              <MenuItem key={month.value} value={month.value}>
-                {month.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <TextField
+          label={"\u958b\u59cb\u65e5"}
+          type="date"
+          value={selectedStartDate}
+          onChange={(event) => onStartDateChange(event.target.value)}
+          fullWidth
+          slotProps={{ inputLabel: { shrink: true } }}
+          inputProps={{ max: selectedEndDate || undefined }}
+        />
+        <TextField
+          label={"\u7d42\u4e86\u65e5"}
+          type="date"
+          value={selectedEndDate}
+          onChange={(event) => onEndDateChange(event.target.value)}
+          fullWidth
+          slotProps={{ inputLabel: { shrink: true } }}
+          inputProps={{ min: selectedStartDate || undefined }}
+        />
       </div>
     </div>
   );

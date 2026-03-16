@@ -1,11 +1,9 @@
 import * as React from "react";
-
-import Table, { ColumnDef } from "@admin/components/Table";
-
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/free-solid-svg-icons";
-import type { RecentReport } from "../model/types";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
+import Table, { ColumnDef } from "@admin/components/Table";
+import type { RecentReport } from "../model/types";
 
 type RecentReportsViewProps = {
   icon: IconDefinition;
@@ -19,7 +17,7 @@ function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
   const columns: ColumnDef<RecentReport>[] = [
     {
       id: "date",
-      label: "日時",
+      label: "\u65e5\u4ed8",
       width: showEmployeeName ? "15%" : "18%",
       render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
     },
@@ -28,7 +26,7 @@ function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
   if (showEmployeeName) {
     columns.push({
       id: "name",
-      label: "従業員名",
+      label: "\u793e\u54e1\u540d",
       width: "10%",
     });
   }
@@ -36,17 +34,17 @@ function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
   columns.push(
     {
       id: "itemName",
-      label: "項目名",
+      label: "\u9805\u76ee\u540d",
       width: showEmployeeName ? "15%" : "18%",
     },
     {
       id: "progress",
-      label: "進捗",
+      label: "\u9032\u6357",
       width: "10%",
     },
     {
       id: "inputContent",
-      label: "入力内容",
+      label: "\u5165\u529b\u5185\u5bb9",
       align: "left",
     }
   );
@@ -64,10 +62,10 @@ export default function RecentReportsView({
   const columns = React.useMemo(() => getColumns(showEmployeeName), [showEmployeeName]);
 
   return (
-    <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
-      <div className="flex items-center mb-4">
-        <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
-        <div className="text-lg lg:text-2xl font-bold">直近の報告内容</div>
+    <div className={`mb-8 rounded-2xl bg-white p-6 shadow-lg ${className ?? ""}`}>
+      <div className="mb-4 flex items-center">
+        <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
+        <div className="text-lg font-bold lg:text-2xl">{"\u5831\u544a\u5185\u5bb9"}</div>
       </div>
 
       <Table columns={columns} rows={reports} />

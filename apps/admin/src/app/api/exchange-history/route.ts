@@ -16,14 +16,21 @@ type ExchangeHistoryResponse = {
   usedPoint: number;
 };
 
+function isWithinDateRange(dateTime: string, startDate?: string, endDate?: string) {
+  const date = dateTime.slice(0, 10);
+  return (!startDate || date >= startDate) && (!endDate || date <= endDate);
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const companyId = searchParams.get("companyId");
   const userId = searchParams.get("userId");
   const limitStr = searchParams.get("limit");
+  const startDate = searchParams.get("startDate") ?? undefined;
+  const endDate = searchParams.get("endDate") ?? undefined;
 
   if (!companyId || !userId) {
-    return NextResponse.json({ error: "companyId と userId は必須です" }, { status: 400 });
+    return NextResponse.json({ error: "companyId and userId are required" }, { status: 400 });
   }
 
   const parsedLimit = limitStr ? Number.parseInt(limitStr, 10) : 3;
@@ -31,7 +38,9 @@ export async function GET(req: Request) {
 
   try {
     const items = ((data as { ExchangeHistory?: ExchangeHistoryRecord[] }).ExchangeHistory ?? [])
-      .filter((item) => item.companyId === companyId && item.userId === userId)
+      .filter(
+        (item) => item.companyId === companyId && item.userId === userId && isWithinDateRange(item.exchangedAt, startDate, endDate)
+      )
       .sort((a, b) => (a.exchangedAt < b.exchangedAt ? 1 : -1))
       .slice(0, limit)
       .map<ExchangeHistoryResponse>((item) => ({
