@@ -41,6 +41,7 @@ type MerchandiseFormValues = {
   contactPersonName: string;
   contactPersonPhone: string;
   bankTransferAccount: string;
+  paymentCycle: string;
   publishDate: string;
   heading: string;
   merchandiseName: string;
@@ -66,6 +67,7 @@ function getInitialFormValues(): MerchandiseFormValues {
     contactPersonName: "",
     contactPersonPhone: "",
     bankTransferAccount: "",
+    paymentCycle: "",
     publishDate: localDate,
     heading: "",
     merchandiseName: "",
@@ -121,11 +123,14 @@ export default function RegisterMerchandisePage() {
   const [formValues, setFormValues] = useState<MerchandiseFormValues>(getInitialFormValues);
   const [cardImagePreviewUrl, setCardImagePreviewUrl] = useState<string | null>(null);
   const [detailImagePreviewUrl, setDetailImagePreviewUrl] = useState<string | null>(null);
+  const [cardImageFile, setCardImageFile] = useState<File | null>(null);
+  const [detailImageFile, setDetailImageFile] = useState<File | null>(null);
   const [cardImageName, setCardImageName] = useState("");
   const [detailImageName, setDetailImageName] = useState("");
   const [cardFileInputKey, setCardFileInputKey] = useState(0);
   const [detailFileInputKey, setDetailFileInputKey] = useState(0);
   const [notice, setNotice] = useState<FormNotice | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -166,6 +171,7 @@ export default function RegisterMerchandisePage() {
 
     if (!file) {
       if (target === "card") {
+        setCardImageFile(null);
         setCardImageName("");
         setCardImagePreviewUrl((prev) => {
           if (prev) {
@@ -174,6 +180,7 @@ export default function RegisterMerchandisePage() {
           return null;
         });
       } else {
+        setDetailImageFile(null);
         setDetailImageName("");
         setDetailImagePreviewUrl((prev) => {
           if (prev) {
@@ -188,6 +195,7 @@ export default function RegisterMerchandisePage() {
     const nextUrl = URL.createObjectURL(file);
 
     if (target === "card") {
+      setCardImageFile(file);
       setCardImageName(file.name);
       setCardImagePreviewUrl((prev) => {
         if (prev) {
@@ -196,6 +204,7 @@ export default function RegisterMerchandisePage() {
         return nextUrl;
       });
     } else {
+      setDetailImageFile(file);
       setDetailImageName(file.name);
       setDetailImagePreviewUrl((prev) => {
         if (prev) {
@@ -208,6 +217,8 @@ export default function RegisterMerchandisePage() {
 
   const handleReset = () => {
     setFormValues(getInitialFormValues());
+    setCardImageFile(null);
+    setDetailImageFile(null);
     setCardImageName("");
     setDetailImageName("");
     setNotice(null);
@@ -227,7 +238,7 @@ export default function RegisterMerchandisePage() {
     });
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const form = event.currentTarget;
@@ -241,10 +252,60 @@ export default function RegisterMerchandisePage() {
       return;
     }
 
-    setNotice({
-      severity: "success",
-      message: `「${formValues.merchandiseName || "商品・サービス名"} | ${formValues.companyName || "御社名"}」を保存しました。API 連携前のため、現在は画面上の確認のみです。`,
+    const payload = new FormData();
+    payload.append("partnerEmail", formValues.partnerEmail);
+    payload.append("companyName", formValues.companyName);
+    payload.append("companyLocation", formValues.companyLocation);
+    payload.append("storeAddressMode", formValues.storeAddressMode);
+    payload.append("storeAddressOther", formValues.storeAddressOther);
+    payload.append("customerInquiryContact", formValues.customerInquiryContact);
+    payload.append("contactPersonName", formValues.contactPersonName);
+    payload.append("contactPersonPhone", formValues.contactPersonPhone);
+    payload.append("bankTransferAccount", formValues.bankTransferAccount);
+    payload.append("paymentCycle", formValues.paymentCycle);
+    payload.append("heading", formValues.heading);
+    payload.append("merchandiseName", formValues.merchandiseName);
+    payload.append("serviceDescription", formValues.serviceDescription);
+    payload.append("price", formValues.price);
+    payload.append("serviceArea", formValues.serviceArea);
+    payload.append("genre", formValues.genre);
+    payload.append("genreOther", formValues.genreOther);
+    formValues.deliveryMethods.forEach((deliveryMethod) => {
+      payload.append("deliveryMethods", deliveryMethod);
     });
+    if (cardImageFile) {
+      payload.append("cardImage", cardImageFile);
+    }
+    if (detailImageFile) {
+      payload.append("detailImage", detailImageFile);
+    }
+
+    setIsSubmitting(true);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/register-merchandise", {
+        method: "POST",
+        body: payload,
+      });
+      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(result?.error || "スプレッドシート登録に失敗しました。");
+      }
+
+      setNotice({
+        severity: "success",
+        message: "提携企業情報と商品・サービス情報をスプレッドシートへ登録しました。",
+      });
+    } catch (error) {
+      setNotice({
+        severity: "error",
+        message: error instanceof Error ? error.message : "スプレッドシート登録に失敗しました。",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const headingPreview = formValues.heading || "見出し";
@@ -277,16 +338,26 @@ export default function RegisterMerchandisePage() {
             <Typography variant="h4" className="mt-2 text-2xl font-bold sm:text-4xl">
               商品・サービス登録
             </Typography>
-            <Typography variant="body1" className="mt-3 max-w-3xl leading-7 text-white/80">
+            <Typography variant="body1" className="mt-3 leading-7 text-white/80">
               商品交換ページと詳細ページの両方で使う情報をまとめて入力できます。画像、価格、提供方法、対応エリアまでこの画面で整えてください。
             </Typography>
           </div>
 
           <div className="grid gap-6 bg-[linear-gradient(180deg,#f8fbfc_0%,#f3f6f8_100%)] p-4 sm:p-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
-            <Box component="form" onSubmit={handleSubmit} onReset={handleReset} className="space-y-6">
-              {notice && <Alert severity={notice.severity}>{notice.message}</Alert>}
+            <div className="space-y-4">
+              <Typography variant="body2" className="text-sm leading-6 text-slate-600 sm:hidden">
+                画面下部でプレビューの確認ができます。
+              </Typography>
+              <Box
+                id="register-merchandise-form"
+                component="form"
+                onSubmit={handleSubmit}
+                onReset={handleReset}
+                className="space-y-6"
+              >
+                {notice && <Alert severity={notice.severity}>{notice.message}</Alert>}
 
-              <FormSection title="提携企業情報" description="提携企業の連絡先と掲載元情報を入力します。">
+                <FormSection title="提携企業情報" description="提携企業の連絡先と掲載元情報を入力します。">
                 <div className="grid gap-5 md:grid-cols-2">
                   <TextField
                     label="メールアドレス"
@@ -372,17 +443,29 @@ export default function RegisterMerchandisePage() {
                     placeholder="090-1234-5678"
                   />
                 </div>
-                <TextField
-                  label="お振込み先"
-                  value={formValues.bankTransferAccount}
-                  onChange={handleFieldChange("bankTransferAccount")}
-                  required
-                  fullWidth
-                  multiline
-                  minRows={3}
-                  className="mt-5"
-                  placeholder="銀行名、支店名、口座種別、口座番号、口座名義"
-                />
+                <div className="mt-6 grid gap-5">
+                  <TextField
+                    label="お振込み先"
+                    value={formValues.bankTransferAccount}
+                    onChange={handleFieldChange("bankTransferAccount")}
+                    fullWidth
+                    multiline
+                    minRows={3}
+                    placeholder="銀行名、支店名、口座種別、口座番号、口座名義"
+                  />
+                  <div className="grid gap-2">
+                    <TextField
+                      label="入金サイクル"
+                      value={formValues.paymentCycle}
+                      onChange={handleFieldChange("paymentCycle")}
+                      fullWidth
+                      placeholder="例：20日締め翌月15日払い"
+                    />
+                    <Typography variant="body2" className="text-slate-500">
+                      ※ベースは月末締め翌月末払いです。それ以外をご希望の場合のみ入力してください。
+                    </Typography>
+                  </div>
+                </div>
               </FormSection>
 
               <FormSection title="商品・サービス情報" description="商品・サービスの見出し、内容、価格、提供方法などを入力します。">
@@ -519,17 +602,9 @@ export default function RegisterMerchandisePage() {
                     </div>
                   </div>
                 </div>
-              </FormSection>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <Button type="reset" variant="outlined" color="inherit" className="!rounded-full !px-6 !py-3">
-                  入力をリセット
-                </Button>
-                <Button type="submit" variant="contained" className="!rounded-full !px-7 !py-3">
-                  商品情報を登録
-                </Button>
-              </div>
-            </Box>
+                </FormSection>
+              </Box>
+            </div>
 
             <div className="xl:sticky xl:top-6 xl:self-start">
               <Stack spacing={3}>
@@ -644,6 +719,28 @@ export default function RegisterMerchandisePage() {
                   </div>
                 </Paper>
               </Stack>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end xl:col-start-1">
+              <Button
+                type="reset"
+                form="register-merchandise-form"
+                variant="outlined"
+                color="inherit"
+                disabled={isSubmitting}
+                className="!rounded-full !px-6 !py-3"
+              >
+                入力をリセット
+              </Button>
+              <Button
+                type="submit"
+                form="register-merchandise-form"
+                variant="contained"
+                disabled={isSubmitting}
+                className="!rounded-full !px-7 !py-3"
+              >
+                {isSubmitting ? "登録中..." : "商品情報を登録"}
+              </Button>
             </div>
           </div>
         </Paper>
