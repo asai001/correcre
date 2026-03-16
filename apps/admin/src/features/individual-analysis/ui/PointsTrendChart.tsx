@@ -79,7 +79,7 @@ export default function PointsTrendChart({ data }: PointsTrendChartProps) {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-bold">{"\u7372\u5f97\u30dd\u30a4\u30f3\u30c8\u63a8\u79fb"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">{"\u7372\u5f97\u30dd\u30a4\u30f3\u30c8\u63a8\u79fb"}</h3>
       <div style={{ height: "400px" }}>
         <Line data={chartData} options={options} />
       </div>

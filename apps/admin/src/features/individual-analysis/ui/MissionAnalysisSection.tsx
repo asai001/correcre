@@ -8,12 +8,17 @@ type MissionItem = {
 type MissionAnalysisSectionProps = {
   goodMissions: MissionItem[];
   improvementMissions: MissionItem[];
+  className?: string;
 };
 
-export default function MissionAnalysisSection({ goodMissions, improvementMissions }: MissionAnalysisSectionProps) {
+export default function MissionAnalysisSection({
+  goodMissions,
+  improvementMissions,
+  className,
+}: MissionAnalysisSectionProps) {
   return (
-    <div className="rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-bold">{"\u9805\u76ee\u5206\u6790"}</h3>
+    <div className={`rounded-lg bg-white p-6 shadow-sm ${className ?? ""}`}>
+      <h3 className="mb-4 text-2xl font-bold">{"\u9805\u76ee\u5206\u6790"}</h3>
       <div className="space-y-6">
         <div>
           <h4 className="mb-3 text-base font-bold" style={{ color: "#10b981" }}>

@@ -9,7 +9,7 @@ type StatCardProps = {
 function StatCard({ label, value, color }: StatCardProps) {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg bg-white p-6 shadow-sm">
-      <p className="mb-2 text-sm text-gray-600">{label}</p>
+      <p className="mb-2 text-xl font-bold text-gray-600">{label}</p>
       <p className="text-3xl font-bold" style={{ color }}>
         {value}
       </p>

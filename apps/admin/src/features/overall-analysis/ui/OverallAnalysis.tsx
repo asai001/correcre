@@ -1,0 +1,95 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import MissionAnalysisSection from "@admin/features/individual-analysis/ui/MissionAnalysisSection";
+import OverallAchievementChart from "./OverallAchievementChart";
+import OverallAnalysisFilterSection from "./OverallAnalysisFilterSection";
+import OverallAnalysisStatsCards from "./OverallAnalysisStatsCards";
+import OverallPointExchangeHistoryTable from "./OverallPointExchangeHistoryTable";
+import OverallScoreTrendChart from "./OverallScoreTrendChart";
+import { useOverallAnalysisSummary } from "../hooks/useOverallAnalysisSummary";
+import type { OverallAnalysisSummary } from "../model/types";
+
+const companyId = "em";
+
+const emptySummary: OverallAnalysisSummary = {
+  averageScore: 0,
+  totalEarnedPoints: 0,
+  companyPointBalance: 0,
+  trendData: [],
+  achievementData: [],
+  goodMissions: [],
+  improvementMissions: [],
+  exchangeHistory: [],
+};
+
+function formatLocalDate(date: Date) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+export default function OverallAnalysis() {
+  const exchangeHistoryPagination = useMemo(
+    () => ({
+      rowsPerPageOptions: [10, 25, 50],
+      initialRowsPerPage: 10,
+    }),
+    []
+  );
+  const [selectedStartDate, setSelectedStartDate] = useState(() =>
+    formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1))
+  );
+  const [selectedEndDate, setSelectedEndDate] = useState(() => formatLocalDate(new Date()));
+  const { summary, loading, error } = useOverallAnalysisSummary(companyId, selectedStartDate, selectedEndDate);
+  const currentSummary = summary ?? emptySummary;
+
+  const handleStartDateChange = (date: string) => {
+    setSelectedStartDate(date);
+
+    if (selectedEndDate && date && date > selectedEndDate) {
+      setSelectedEndDate(date);
+    }
+  };
+
+  const handleEndDateChange = (date: string) => {
+    setSelectedEndDate(date);
+
+    if (selectedStartDate && date && date < selectedStartDate) {
+      setSelectedStartDate(date);
+    }
+  };
+
+  return (
+    <div>
+      <OverallAnalysisFilterSection
+        selectedStartDate={selectedStartDate}
+        selectedEndDate={selectedEndDate}
+        onStartDateChange={handleStartDateChange}
+        onEndDateChange={handleEndDateChange}
+      />
+
+      {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+      {loading && <div className="mb-4 text-sm text-slate-500">全体分析データを読み込み中...</div>}
+
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <OverallAnalysisStatsCards
+          averageScore={currentSummary.averageScore}
+          totalEarnedPoints={currentSummary.totalEarnedPoints}
+          companyPointBalance={currentSummary.companyPointBalance}
+        />
+        <MissionAnalysisSection
+          goodMissions={currentSummary.goodMissions}
+          improvementMissions={currentSummary.improvementMissions}
+          className="h-full"
+        />
+        <OverallScoreTrendChart data={currentSummary.trendData} />
+        <OverallAchievementChart data={currentSummary.achievementData} />
+      </div>
+
+      <OverallPointExchangeHistoryTable
+        items={currentSummary.exchangeHistory}
+        rowsPerPageOptions={exchangeHistoryPagination.rowsPerPageOptions}
+        initialRowsPerPage={exchangeHistoryPagination.initialRowsPerPage}
+      />
+    </div>
+  );
+}

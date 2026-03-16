@@ -53,7 +53,7 @@ export default function MonthlyAchievementRadar({ data }: MonthlyAchievementRada
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-bold">{"\u9054\u6210\u5272\u5408\uff08\u30ec\u30fc\u30c0\u30fc\u30c1\u30e3\u30fc\u30c8\uff09"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">{"\u9054\u6210\u5272\u5408\uff08\u30ec\u30fc\u30c0\u30fc\u30c1\u30e3\u30fc\u30c8\uff09"}</h3>
       <div style={{ height: "400px" }}>
         <Radar data={chartData} options={options} />
       </div>

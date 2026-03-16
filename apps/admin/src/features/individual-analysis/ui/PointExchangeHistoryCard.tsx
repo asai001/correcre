@@ -142,7 +142,7 @@ export default function PointExchangeHistoryCard({
 
   return (
     <section className="min-h-[320px] rounded-2xl bg-white p-6 shadow-lg">
-      <h3 className="text-lg font-bold text-slate-900">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</h3>
+      <h3 className="text-2xl font-bold text-slate-900">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</h3>
 
       <div className="mt-8">
         {loading && <div className="text-sm text-slate-400">{"\u8aad\u307f\u8fbc\u307f\u4e2d\u002e\u002e\u002e"}</div>}

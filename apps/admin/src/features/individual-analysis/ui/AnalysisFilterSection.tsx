@@ -28,7 +28,7 @@ export default function AnalysisFilterSection({
 
   return (
     <div className="mb-6 rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-bold">{"\u793e\u54e1\u9078\u629e"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">{"\u793e\u54e1\u9078\u629e"}</h3>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <FormControl sx={{ width: "100%" }}>
           <InputLabel id="employee-select-label">{"\u793e\u54e1\u3092\u9078\u629e"}</InputLabel>
