@@ -70,19 +70,23 @@ export default function OverallAnalysis() {
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
       {loading && <div className="mb-4 text-sm text-slate-500">全体分析データを読み込み中...</div>}
 
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mb-6 space-y-6">
         <OverallAnalysisStatsCards
           averageScore={currentSummary.averageScore}
           totalEarnedPoints={currentSummary.totalEarnedPoints}
           companyPointBalance={currentSummary.companyPointBalance}
         />
-        <MissionAnalysisSection
-          goodMissions={currentSummary.goodMissions}
-          improvementMissions={currentSummary.improvementMissions}
-          className="h-full"
-        />
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <OverallAchievementChart data={currentSummary.achievementData} />
+          <MissionAnalysisSection
+            goodMissions={currentSummary.goodMissions}
+            improvementMissions={currentSummary.improvementMissions}
+            className="h-full"
+          />
+        </div>
+
         <OverallScoreTrendChart data={currentSummary.trendData} />
-        <OverallAchievementChart data={currentSummary.achievementData} />
       </div>
 
       <OverallPointExchangeHistoryTable

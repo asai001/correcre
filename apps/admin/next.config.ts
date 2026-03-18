@@ -1,8 +1,11 @@
 import { NextConfig } from "next";
 
+const isLocalProductionBuild =
+  process.env.NODE_ENV !== "development" && !process.env.CI && !process.env.VERCEL;
+
 const nextConfig: NextConfig = {
-  // Separate dev and build artifacts so `next build` does not clobber a running `next dev`.
-  distDir: process.env.NODE_ENV === "development" ? ".next" : ".next-build",
+  // Keep local `next build` output separate, but use the standard `.next` directory in CI/Vercel.
+  distDir: isLocalProductionBuild ? ".next-build" : ".next",
   typedRoutes: true,
   transpilePackages: ["@correcre/validation", "@correcre/types", "@correcre/adapters", "@correcre/theme", "@correcre/lib"],
 };

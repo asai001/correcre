@@ -19,36 +19,25 @@ function getColumns(): ColumnDef<OverallExchangeHistoryItem>[] {
     {
       id: "date",
       label: "\u65e5\u6642",
-      width: "20%",
+      width: "22%",
       render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
     },
     {
       id: "employeeName",
       label: "\u5f93\u696d\u54e1\u540d",
-      width: "16%",
+      width: "18%",
     },
     {
       id: "merchandiseName",
       label: "\u4ea4\u63db\u5546\u54c1",
-      width: "32%",
+      width: "40%",
     },
     {
       id: "usedPoint",
       label: "\u4f7f\u7528\u30dd\u30a4\u30f3\u30c8",
       align: "right",
-      width: "14%",
+      width: "20%",
       render: (row) => `${row.usedPoint.toLocaleString()}pt`,
-    },
-    {
-      id: "status",
-      label: "\u30b9\u30c6\u30fc\u30bf\u30b9",
-      align: "center",
-      width: "12%",
-      render: (row) => (
-        <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-          {row.status}
-        </span>
-      ),
     },
   ];
 }

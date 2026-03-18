@@ -35,12 +35,10 @@ export default function OverallAnalysisStatsCards({
   className,
 }: OverallAnalysisStatsCardsProps) {
   return (
-    <div className={`grid h-full grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 ${className ?? ""}`}>
-      <StatCard label="期間平均得点" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
+    <div className={`grid h-full grid-cols-1 gap-4 md:grid-cols-3 ${className ?? ""}`}>
+      <StatCard label="平均得点" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
       <StatCard label="総獲得ポイント" value={`${totalEarnedPoints.toLocaleString()}pt`} color="#8b5cf6" />
-      <div className="h-full sm:col-start-1 sm:row-start-2">
-        <StatCard label="企業保有ポイント" value={`${companyPointBalance.toLocaleString()}pt`} color="#f59e0b" />
-      </div>
+      <StatCard label="企業保有ポイント" value={`${companyPointBalance.toLocaleString()}pt`} color="#f59e0b" />
     </div>
   );
 }
