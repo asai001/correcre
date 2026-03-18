@@ -1,14 +1,10 @@
-import { createSign } from "node:crypto";
+import { normalizeEnvValue, refreshGoogleAccessToken, type GoogleOAuthConfig, getGoogleOAuthConfig } from "@employee/app/lib/google-oauth";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SHEETS_API_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 const GOOGLE_DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
-const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
-const GOOGLE_API_SCOPES = `${GOOGLE_SHEETS_SCOPE} ${GOOGLE_DRIVE_SCOPE}`;
 const DEFAULT_SPREADSHEET_ID = "1w3zImdrkcfotGOxXulGJpKIwaJuXYN7fX4-gAH2bYyE";
 const DEFAULT_PARTNER_SHEET_ID = 515487691;
 const DEFAULT_MERCHANDISE_SHEET_ID = 2026862223;
@@ -50,9 +46,7 @@ type RegisterMerchandiseSubmission = {
   detailImage: File | null;
 };
 
-type GoogleIntegrationConfig = {
-  clientEmail: string;
-  privateKey: string;
+type GoogleIntegrationConfig = GoogleOAuthConfig & {
   spreadsheetId: string;
   partnerSheetId: number;
   merchandiseSheetId: number;
@@ -60,12 +54,6 @@ type GoogleIntegrationConfig = {
   merchandiseSheetName?: string;
   cardImageFolderId: string;
   detailImageFolderId: string;
-};
-
-type GoogleTokenResponse = {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
 };
 
 type SpreadsheetMetadataResponse = {
@@ -172,27 +160,21 @@ function parseOptionalInteger(value: string | undefined, fallback: number, envNa
 }
 
 function getGoogleIntegrationConfig(): GoogleIntegrationConfig {
-  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL?.trim();
-  const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
-  const spreadsheetId = process.env.GOOGLE_PARTNER_SPREADSHEET_ID?.trim() || DEFAULT_SPREADSHEET_ID;
-  const partnerSheetName = process.env.GOOGLE_PARTNER_SHEET_NAME?.trim();
-  const merchandiseSheetName = process.env.GOOGLE_MERCHANDISE_SHEET_NAME?.trim();
+  const oauthConfig = getGoogleOAuthConfig();
+  const spreadsheetId = normalizeEnvValue(process.env.GOOGLE_SPREADSHEET_ID) || DEFAULT_SPREADSHEET_ID;
+  const partnerSheetName = normalizeEnvValue(process.env.GOOGLE_PARTNER_SHEET_NAME);
+  const merchandiseSheetName = normalizeEnvValue(process.env.GOOGLE_MERCHANDISE_SHEET_NAME);
   const partnerSheetId = parseOptionalInteger(process.env.GOOGLE_PARTNER_SHEET_ID, DEFAULT_PARTNER_SHEET_ID, "GOOGLE_PARTNER_SHEET_ID");
   const merchandiseSheetId = parseOptionalInteger(
     process.env.GOOGLE_MERCHANDISE_SHEET_ID,
     DEFAULT_MERCHANDISE_SHEET_ID,
     "GOOGLE_MERCHANDISE_SHEET_ID",
   );
-  const cardImageFolderId = process.env.GOOGLE_CARD_IMAGE_FOLDER_ID?.trim() || DEFAULT_CARD_IMAGE_FOLDER_ID;
-  const detailImageFolderId = process.env.GOOGLE_DETAIL_IMAGE_FOLDER_ID?.trim() || DEFAULT_DETAIL_IMAGE_FOLDER_ID;
-
-  if (!clientEmail || !privateKey) {
-    throw new Error("Google API configuration is incomplete");
-  }
+  const cardImageFolderId = normalizeEnvValue(process.env.GOOGLE_CARD_IMAGE_FOLDER_ID) || DEFAULT_CARD_IMAGE_FOLDER_ID;
+  const detailImageFolderId = normalizeEnvValue(process.env.GOOGLE_DETAIL_IMAGE_FOLDER_ID) || DEFAULT_DETAIL_IMAGE_FOLDER_ID;
 
   return {
-    clientEmail,
-    privateKey,
+    ...oauthConfig,
     spreadsheetId,
     partnerSheetId,
     merchandiseSheetId,
@@ -201,54 +183,6 @@ function getGoogleIntegrationConfig(): GoogleIntegrationConfig {
     cardImageFolderId,
     detailImageFolderId,
   };
-}
-
-function toBase64Url(value: string | Buffer): string {
-  return Buffer.from(value).toString("base64url");
-}
-
-function createServiceAccountJwt(clientEmail: string, privateKey: string): string {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const expiresAt = issuedAt + 3600;
-  const encodedHeader = toBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const encodedPayload = toBase64Url(
-    JSON.stringify({
-      iss: clientEmail,
-      scope: GOOGLE_API_SCOPES,
-      aud: GOOGLE_OAUTH_TOKEN_URL,
-      iat: issuedAt,
-      exp: expiresAt,
-    }),
-  );
-  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-  const signer = createSign("RSA-SHA256");
-
-  signer.update(unsignedToken);
-  signer.end();
-
-  return `${unsignedToken}.${signer.sign(privateKey).toString("base64url")}`;
-}
-
-async function getGoogleAccessToken(config: GoogleIntegrationConfig): Promise<string> {
-  const assertion = createServiceAccountJwt(config.clientEmail, config.privateKey);
-  const body = new URLSearchParams({
-    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-    assertion,
-  });
-  const response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-  const json = (await response.json()) as GoogleTokenResponse;
-
-  if (!response.ok || !json.access_token) {
-    throw new Error(json.error_description || json.error || "Failed to fetch Google access token");
-  }
-
-  return json.access_token;
 }
 
 async function fetchSpreadsheetMetadata(spreadsheetId: string, accessToken: string): Promise<SpreadsheetMetadataResponse> {
@@ -402,12 +336,7 @@ function buildDriveFileName(prefix: "card" | "detail", file: File, companyName: 
   ].join("_");
 }
 
-async function uploadFileToDrive(
-  accessToken: string,
-  folderId: string,
-  file: File,
-  fileName: string,
-): Promise<string> {
+async function uploadFileToDrive(accessToken: string, folderId: string, file: File, fileName: string): Promise<string> {
   const boundary = `correcre_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   const metadata = JSON.stringify({
     name: fileName,
@@ -420,17 +349,14 @@ async function uploadFileToDrive(
     }\r\n\r\n`,
   );
   const suffix = Buffer.from(`\r\n--${boundary}--`);
-  const response = await fetch(
-    `${GOOGLE_DRIVE_UPLOAD_URL}?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body: Buffer.concat([prefix, fileBuffer, suffix]),
+  const response = await fetch(`${GOOGLE_DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
     },
-  );
+    body: Buffer.concat([prefix, fileBuffer, suffix]),
+  });
   const json = (await response.json()) as GoogleDriveFileResponse;
 
   if (!response.ok || !json.id) {
@@ -444,7 +370,7 @@ export async function POST(req: Request) {
   try {
     const submission = await parseRequest(req);
     const config = getGoogleIntegrationConfig();
-    const accessToken = await getGoogleAccessToken(config);
+    const accessToken = await refreshGoogleAccessToken(config);
     const spreadsheetMetadata = await fetchSpreadsheetMetadata(config.spreadsheetId, accessToken);
     const partnerSheetName = config.partnerSheetName || findSheetNameById(spreadsheetMetadata, config.partnerSheetId);
     const merchandiseSheetName =
@@ -483,7 +409,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "internal_error";
-    const status = /required|invalid|Content-Type/.test(message) ? 400 : 500;
+    const status = /required|invalid|Content-Type|GOOGLE_OAUTH_REFRESH_TOKEN/.test(message) ? 400 : 500;
 
     console.error("POST /api/register-merchandise error", error);
 
