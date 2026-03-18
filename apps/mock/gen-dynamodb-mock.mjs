@@ -1,272 +1,467 @@
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-/** YYYY-MM → Date(year, monthIndex, 1) */
+const JST_OFFSET = "+09:00";
+const REPORT_MONTHS = 13;
+const EXCHANGE_MONTHS = 24;
+const TARGET_RATE_BASE = 85;
+const TARGET_RATE_SWING = 2;
+
+const EXTRA_USER_PROFILES = [
+  { userId: "u-005", name: "伊藤 健太", department: "営業部", joinedAt: "2023-06-01", roles: ["EMPLOYEE"] },
+  { userId: "u-006", name: "渡辺 美咲", department: "技術部", joinedAt: "2022-09-01", roles: ["EMPLOYEE"] },
+  { userId: "u-007", name: "中村 亮介", department: "総務部", joinedAt: "2021-12-01", roles: ["EMPLOYEE"] },
+  { userId: "u-008", name: "小林 彩乃", department: "人事部", joinedAt: "2024-01-15", roles: ["EMPLOYEE"] },
+  { userId: "u-009", name: "加藤 颯太", department: "製造部", joinedAt: "2022-05-01", roles: ["EMPLOYEE"] },
+  { userId: "u-010", name: "吉田 明日香", department: "営業部", joinedAt: "2023-08-01", roles: ["EMPLOYEE"] },
+  { userId: "u-011", name: "山本 翼", department: "技術部", joinedAt: "2021-11-01", roles: ["EMPLOYEE"] },
+  { userId: "u-012", name: "松本 里奈", department: "マーケティング部", joinedAt: "2022-07-01", roles: ["EMPLOYEE"] },
+  { userId: "u-013", name: "井上 海斗", department: "品質管理部", joinedAt: "2023-02-01", roles: ["EMPLOYEE"] },
+  { userId: "u-014", name: "木村 千尋", department: "営業部", joinedAt: "2024-04-01", roles: ["EMPLOYEE"] },
+  { userId: "u-015", name: "斎藤 恒一", department: "技術部", joinedAt: "2022-03-01", roles: ["EMPLOYEE"] },
+  { userId: "u-016", name: "清水 優奈", department: "総務部", joinedAt: "2023-10-01", roles: ["EMPLOYEE"] },
+  { userId: "u-017", name: "阿部 恒一", department: "製造部", joinedAt: "2021-06-01", roles: ["EMPLOYEE"] },
+  { userId: "u-018", name: "森 ひかり", department: "人事部", joinedAt: "2024-05-01", roles: ["EMPLOYEE"] },
+];
+
+const MERCHANDISE_LIST = [
+  { name: "ミネラルウォーター 500ml 24本セット", points: 320 },
+  { name: "お米 5kg", points: 600 },
+  { name: "有名店の焼き菓子 6個セット", points: 166 },
+  { name: "入浴剤セット", points: 60 },
+  { name: "カタログギフト", points: 240 },
+  { name: "高級タオルセット", points: 400 },
+  { name: "文房具セット", points: 100 },
+  { name: "コーヒーギフトセット", points: 200 },
+];
+
 function parseYearMonth(ym) {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(y, m - 1, 1);
+  const [year, month] = ym.split("-").map(Number);
+  return { year, month };
 }
 
-/** YYYY-MM 列挙（両端含む） */
 function enumerateYearMonths(startYm, endYm) {
   const out = [];
-  let d = parseYearMonth(startYm);
+  const start = parseYearMonth(startYm);
   const end = parseYearMonth(endYm);
 
-  while (d <= end) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    out.push(`${y}-${m}`);
+  let year = start.year;
+  let month = start.month;
 
-    d = new Date(y, d.getMonth() + 1, 1);
+  while (year < end.year || (year === end.year && month <= end.month)) {
+    out.push(`${year}-${String(month).padStart(2, "0")}`);
+    month += 1;
+
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
   }
 
   return out;
 }
 
-/** Date → "YYYY-MM" */
-function toYearMonth(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
+function shiftYearMonth(ym, offset) {
+  const { year, month } = parseYearMonth(ym);
+  const shifted = new Date(year, month - 1 + offset, 1);
+  return toYearMonth(shifted);
 }
 
-function randInt(min, max) {
-  // min <= n <= max
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function toYearMonth(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function pickRandom(arr) {
-  return arr[randInt(0, arr.length - 1)];
+function getLastDayOfMonth(year, month) {
+  return new Date(year, month, 0).getDate();
 }
 
-/** 指定年月の末日を返す */
-function getLastDayOfMonth(year, month1to12) {
-  return new Date(year, month1to12, 0).getDate();
+function parseDateOnly(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new Error(`Invalid MOCK_END_DATE: ${value}. Expected YYYY-MM-DD.`);
+  }
+
+  const [, yStr, mStr, dStr] = match;
+  const year = Number(yStr);
+  const month = Number(mStr);
+  const day = Number(dStr);
+  const lastDay = getLastDayOfMonth(year, month);
+
+  if (month < 1 || month > 12 || day < 1 || day > lastDay) {
+    throw new Error(`Invalid MOCK_END_DATE: ${value}.`);
+  }
+
+  return new Date(year, month - 1, day);
 }
 
-function main() {
-  const basePath = path.resolve("./dynamodb.base.json");
-  const outPath = path.resolve("./dynamodb.json");
+function hashString(value) {
+  let hash = 2166136261;
 
-  const raw = fs.readFileSync(basePath, "utf8");
-  const base = JSON.parse(raw);
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
 
-  const users = base.User;
-  const missions = base.Mission;
+  return hash >>> 0;
+}
 
-  // ★ 実行時の現在日時
-  const CURRENT_DATE = new Date();
+function randomFloat(key) {
+  return hashString(key) / 0xffffffff;
+}
 
-  // ★ CURRENT_DATE が属する月を END_YM に
-  const endDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth(), 1);
-  const END_YM = toYearMonth(endDate);
+function intFromKey(key, min, max) {
+  if (max <= min) {
+    return min;
+  }
 
-  // ★ そこから 12 ヶ月前の月を START_YM に（合計 13 ヶ月分）
-  const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 12, 1);
-  const START_YM = toYearMonth(startDate);
+  return min + (hashString(key) % (max - min + 1));
+}
 
-  const yearMonths = enumerateYearMonths(START_YM, END_YM);
+function sortByKey(values, keyPrefix) {
+  return [...values].sort((a, b) => {
+    const left = hashString(`${keyPrefix}:${a}`);
+    const right = hashString(`${keyPrefix}:${b}`);
 
+    if (left === right) {
+      return String(a).localeCompare(String(b));
+    }
+
+    return left - right;
+  });
+}
+
+function formatJstDateTime(year, month, day, hour, minute) {
+  return [
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+    `T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00${JST_OFFSET}`,
+  ].join("");
+}
+
+function buildUsers(baseUsers, targetCount, endDate) {
+  const users = [...baseUsers];
+
+  while (users.length < targetCount) {
+    const profile = EXTRA_USER_PROFILES[users.length - baseUsers.length];
+    if (!profile) {
+      throw new Error(`Not enough extra user profiles for targetCount=${targetCount}`);
+    }
+
+    users.push({
+      companyId: baseUsers[0]?.companyId ?? "em",
+      userId: profile.userId,
+      name: profile.name,
+      department: profile.department,
+      joinedAt: profile.joinedAt,
+      roles: profile.roles,
+    });
+  }
+
+  return users.slice(0, targetCount).map((user, index) => {
+    const loginDay = Math.max(1, endDate.getDate() - intFromKey(`${user.userId}:lastLoginDay`, 0, 4));
+    const loginHour = intFromKey(`${user.userId}:lastLoginHour`, 8, 19);
+    const loginMinute = intFromKey(`${user.userId}:lastLoginMinute`, 0, 59);
+
+    return {
+      companyId: user.companyId,
+      userId: user.userId,
+      name: user.name,
+      department: user.department ?? EXTRA_USER_PROFILES[index - baseUsers.length]?.department ?? "営業部",
+      joinedAt: user.joinedAt ?? EXTRA_USER_PROFILES[index - baseUsers.length]?.joinedAt ?? "2023-01-01",
+      lastLoginAt: formatJstDateTime(endDate.getFullYear(), endDate.getMonth() + 1, loginDay, loginHour, loginMinute),
+      currentPointBalance: 0,
+      currentMonthCompletionRate: 0,
+      roles: user.roles ?? ["EMPLOYEE"],
+    };
+  });
+}
+
+function allocateCounts(total, userCount, capPerUser, key) {
+  const counts = Array(userCount).fill(Math.floor(total / userCount));
+  const remainder = total - counts[0] * userCount;
+  const orderedIndexes = sortByKey(
+    Array.from({ length: userCount }, (_, index) => index),
+    `${key}:remainder`
+  );
+
+  for (let i = 0; i < remainder; i += 1) {
+    counts[orderedIndexes[i]] += 1;
+  }
+
+  for (const count of counts) {
+    if (count > capPerUser) {
+      throw new Error(`Allocation overflow for ${key}`);
+    }
+  }
+
+  return counts;
+}
+
+function buildMissionReports(users, missions, yearMonths, effectiveEndDate) {
   const missionReports = [];
+  const userIds = users.map((user) => user.userId);
 
-  // ★ user + missionId + yyyymm ごとの件数カウンタ
-  //    key: `${companyId}:${userId}:${missionId}:${yyyymm}`
-  const perUserMissionMonthCount = new Map();
+  for (const ym of yearMonths) {
+    const { year, month } = parseYearMonth(ym);
+    const lastDayOfMonth = getLastDayOfMonth(year, month);
+    const isEndMonth = ym === toYearMonth(effectiveEndDate);
+    const maxDay = isEndMonth ? Math.min(effectiveEndDate.getDate(), lastDayOfMonth) : lastDayOfMonth;
 
-  function getUserMissionMonthCount(companyId, userId, missionId, ym) {
-    const key = `${companyId}:${userId}:${missionId}:${ym}`;
-    return perUserMissionMonthCount.get(key) ?? 0;
-  }
+    for (const mission of missions) {
+      const monthlyTarget = mission.monthlyCount * users.length;
+      const rate = TARGET_RATE_BASE + intFromKey(`${ym}:${mission.missionId}:rate`, -TARGET_RATE_SWING, TARGET_RATE_SWING);
+      const approvedTotal = Math.round((monthlyTarget * rate) / 100);
+      const approvedCounts = allocateCounts(approvedTotal, users.length, mission.monthlyCount, `${ym}:${mission.missionId}:approved`);
 
-  function incUserMissionMonth(companyId, userId, missionId, ym) {
-    const key = `${companyId}:${userId}:${missionId}:${ym}`;
-    const current = perUserMissionMonthCount.get(key) ?? 0;
-    perUserMissionMonthCount.set(key, current + 1);
-  }
+      for (const [index, userId] of userIds.entries()) {
+        const approvedCount = approvedCounts[index];
+        const spareCapacity = mission.monthlyCount - approvedCount;
+        const pendingCount =
+          spareCapacity > 0 && randomFloat(`${ym}:${mission.missionId}:${userId}:pendingChance`) < 0.28 ? 1 : 0;
+        const totalCount = approvedCount + pendingCount;
 
-  for (const user of users) {
-    for (const ym of yearMonths) {
-      const [yStr, mStr] = ym.split("-");
-      const year = Number(yStr);
-      const month = Number(mStr); // 1-12
+        for (let sequence = 0; sequence < totalCount; sequence += 1) {
+          const isApproved = sequence < approvedCount;
+          const baseKey = `${ym}:${mission.missionId}:${userId}:${sequence}`;
+          const day = ((hashString(`${baseKey}:day`) + sequence * 7) % maxDay) + 1;
+          const hour = intFromKey(`${baseKey}:hour`, 8, 19);
+          const minute = intFromKey(`${baseKey}:minute`, 0, 59);
 
-      // 1ヶ月あたり 70〜95件（※実際には monthlyCount の合計次第でこれ未満になることもある）
-      const count = randInt(70, 95);
-
-      const lastDayOfMonth = getLastDayOfMonth(year, month);
-
-      // 2025-11 の場合は「現在日付の 15 日まで」に制限
-      const isCurrentMonth = year === CURRENT_DATE.getFullYear() && month === CURRENT_DATE.getMonth() + 1;
-      const maxDay = isCurrentMonth ? CURRENT_DATE.getDate() : lastDayOfMonth;
-
-      for (let i = 1; i <= count; i++) {
-        let mission = null;
-
-        // ★ 同じ user + missionId + 月 の件数が monthlyCount 未満のものを探す
-        //    無限ループ防止のため、試行は最大 20 回くらいに制限
-        for (let trial = 0; trial < 20; trial++) {
-          const candidate = pickRandom(missions);
-
-          const missionId = candidate.missionId;
-          // Mission 側に monthlyCount（または monthlyCount）を持たせている前提
-          const monthlyLimit = candidate.monthlyCount ?? candidate.monthlyCount ?? Infinity;
-
-          const currentCount = getUserMissionMonthCount(user.companyId, user.userId, missionId, ym);
-
-          if (currentCount < monthlyLimit) {
-            mission = candidate;
-            break;
-          }
+          missionReports.push({
+            companyId: users[index].companyId,
+            userId,
+            reportId: `mr-${ym.replace("-", "")}-${mission.missionId}-${userId}-${String(sequence + 1).padStart(2, "0")}`,
+            missionId: mission.missionId,
+            reportedAt: formatJstDateTime(year, month, day, hour, minute),
+            status: isApproved ? "APPROVED" : "PENDING",
+            pointGranted: isApproved ? mission.score * 5 : 0,
+            scoreGranted: isApproved ? mission.score : 0,
+            comment: `自動生成レポート(${mission.missionId})`,
+          });
         }
-
-        // すべてのミッションが上限に達しているなどで選べなかった場合、
-        // これ以上このユーザー・この月にレポートを追加できないのでループを抜ける
-        if (!mission) {
-          break;
-        }
-
-        const day = randInt(1, maxDay);
-        const hour = randInt(8, 19); // 8:00〜19:59 のどこか
-        const minute = randInt(0, 59);
-
-        const dt = new Date(year, month - 1, day, hour, minute);
-        const reportedAt = dt.toISOString().replace(".000Z", "+09:00"); // ゆるっとJST風に
-
-        // 8割くらい APPROVED、残りPENDING
-        const approved = Math.random() < 0.8;
-        const status = approved ? "APPROVED" : "PENDING";
-        const pointGranted = approved ? mission.pointPerAction : 0;
-        const scoreGranted = mission.score;
-
-        const reportId = `mr-${year}${mStr}${String(day).padStart(2, "0")}` + `-${user.userId}-${String(i).padStart(3, "0")}`;
-
-        missionReports.push({
-          companyId: user.companyId,
-          userId: user.userId,
-          reportId,
-          missionId: mission.missionId,
-          reportedAt,
-          status,
-          pointGranted,
-          scoreGranted,
-          comment: `自動生成レポート (${mission.missionId})`,
-        });
-
-        // ★ カウンタ更新（user + missionId + 月）
-        incUserMissionMonth(user.companyId, user.userId, mission.missionId, ym);
       }
     }
   }
 
-  // ---- ExchangeHistory の自動生成 ----
-  const exchangeHistory = [];
+  return missionReports.sort((a, b) => {
+    const timeDiff = new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime();
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
 
-  // 商品リスト（金銭価値のある商品は除外、1ポイント=5円換算）
-  const merchandiseList = [
-    { name: "幾重 プレミアム シャンプー＆トリートメント 500ml セット", points: 320 }, // 1600円相当
-    { name: "ダイヤモンドライス 5kg", points: 600 }, // 3000円相当
-    { name: "秀吉のごほうび「生」くりーむぱん　6個入り", points: 166 }, // 830円相当
-    { name: "お菓子セット", points: 60 }, // 300円相当
-    { name: "家電カタログギフト", points: 240 }, // 1200円相当
-    { name: "高級タオルセット", points: 400 }, // 2000円相当
-    { name: "入浴剤ギフトセット", points: 100 }, // 500円相当
-    { name: "コーヒーギフトセット", points: 200 }, // 1000円相当
-  ];
+    return a.reportId.localeCompare(b.reportId);
+  });
+}
 
-  // 過去24ヶ月分のExchangeHistoryを生成
-  const exchangeStartDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth() - 23, 1);
-  const exchangeStartYm = toYearMonth(exchangeStartDate);
-  const exchangeEndYm = END_YM;
+function buildExchangeHistory(users, effectiveEndDate) {
+  const exchangeEndYm = toYearMonth(effectiveEndDate);
+  const exchangeStartYm = shiftYearMonth(exchangeEndYm, -(EXCHANGE_MONTHS - 1));
   const exchangeYearMonths = enumerateYearMonths(exchangeStartYm, exchangeEndYm);
+  const exchangeHistory = [];
+  let exchangeCounter = 1;
 
-  let exchangeCounter = 1; // exchangeId用のカウンター
+  for (const ym of exchangeYearMonths) {
+    const { year, month } = parseYearMonth(ym);
+    const lastDayOfMonth = getLastDayOfMonth(year, month);
+    const isEndMonth = ym === exchangeEndYm;
+    const maxDay = isEndMonth ? Math.min(effectiveEndDate.getDate(), lastDayOfMonth) : lastDayOfMonth;
 
-  for (const user of users) {
-    for (const ym of exchangeYearMonths) {
-      const [yStr, mStr] = ym.split("-");
-      const year = Number(yStr);
-      const month = Number(mStr); // 1-12
+    for (const [index, user] of users.entries()) {
+      const chance = randomFloat(`${ym}:${user.userId}:exchangeCount`);
+      let exchangeCount = chance < 0.52 ? 0 : 1;
+      if (chance > 0.92) {
+        exchangeCount = 2;
+      }
+      if (isEndMonth && index < 4) {
+        exchangeCount = Math.max(exchangeCount, 1);
+      }
 
-      // 1ヶ月あたり 0〜2件のランダムな件数
-      const exchangeCount = randInt(0, 2);
-
-      const lastDayOfMonth = getLastDayOfMonth(year, month);
-
-      // 現在月の場合は現在日付まで
-      const isCurrentMonth = year === CURRENT_DATE.getFullYear() && month === CURRENT_DATE.getMonth() + 1;
-      const maxDay = isCurrentMonth ? CURRENT_DATE.getDate() : lastDayOfMonth;
-
-      for (let i = 0; i < exchangeCount; i++) {
-        const day = randInt(1, maxDay);
-        const hour = randInt(9, 18); // 9:00〜18:59
-        const minute = randInt(0, 59);
-
-        const dt = new Date(year, month - 1, day, hour, minute);
-        const exchangedAt = dt.toISOString().replace(".000Z", "+09:00");
-
-        const merchandise = pickRandom(merchandiseList);
-
-        const exchangeId = `ex-${year}${mStr}${String(day).padStart(2, "0")}-${String(exchangeCounter).padStart(4, "0")}`;
-        exchangeCounter++;
+      for (let sequence = 0; sequence < exchangeCount; sequence += 1) {
+        const key = `${ym}:${user.userId}:exchange:${sequence}`;
+        const day = isEndMonth && sequence === 0 && index < 4 ? maxDay : ((hashString(`${key}:day`) + sequence * 5) % maxDay) + 1;
+        const hour = intFromKey(`${key}:hour`, 9, 18);
+        const minute = intFromKey(`${key}:minute`, 0, 59);
+        const merchandise = MERCHANDISE_LIST[intFromKey(`${key}:item`, 0, MERCHANDISE_LIST.length - 1)];
 
         exchangeHistory.push({
           companyId: user.companyId,
           userId: user.userId,
-          exchangeId,
-          exchangedAt,
+          exchangeId: `ex-${ym.replace("-", "")}${String(day).padStart(2, "0")}-${String(exchangeCounter).padStart(4, "0")}`,
+          exchangedAt: formatJstDateTime(year, month, day, hour, minute),
           merchandiseName: merchandise.name,
           usedPoint: merchandise.points,
         });
+
+        exchangeCounter += 1;
       }
     }
   }
 
-  // ---- UserMonthlyStats の自動生成 ----
+  return exchangeHistory.sort((a, b) => {
+    const timeDiff = new Date(a.exchangedAt).getTime() - new Date(b.exchangedAt).getTime();
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+
+    return a.exchangeId.localeCompare(b.exchangeId);
+  });
+}
+
+function buildUserMonthlyStats(users, missions, missionReports, exchangeHistory, statsYearMonths) {
+  const targetScorePerMonth = missions.reduce((sum, mission) => sum + mission.monthlyCount * mission.score, 0);
+  const approvedReportCountMap = new Map();
+  const approvedScoreMap = new Map();
+  const exchangePointsMap = new Map();
+
+  for (const report of missionReports) {
+    if (report.status !== "APPROVED") {
+      continue;
+    }
+
+    const yearMonth = report.reportedAt.slice(0, 7);
+    const key = `${report.companyId}#${report.userId}:${yearMonth}`;
+    approvedReportCountMap.set(key, (approvedReportCountMap.get(key) ?? 0) + 1);
+    approvedScoreMap.set(key, (approvedScoreMap.get(key) ?? 0) + (report.scoreGranted ?? 0));
+  }
+
+  for (const exchange of exchangeHistory) {
+    const yearMonth = exchange.exchangedAt.slice(0, 7);
+    const key = `${exchange.companyId}#${exchange.userId}:${yearMonth}`;
+    exchangePointsMap.set(key, (exchangePointsMap.get(key) ?? 0) + exchange.usedPoint);
+  }
+
   const userMonthlyStats = [];
-  const lastMonthDate = new Date(CURRENT_DATE.getFullYear(), CURRENT_DATE.getMonth() - 1, 1);
 
   for (const user of users) {
-    const monthsCount = randInt(10, 30); // ★ 1ユーザーあたり 10〜30件
-
-    // lastMonthDate から monthsCount-1 ヶ月さかのぼった月を開始月にする
-    const firstDate = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth() - (monthsCount - 1), 1);
-
-    const startYm = `${firstDate.getFullYear()}-${String(firstDate.getMonth() + 1).padStart(2, "0")}`;
-    const endYm = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, "0")}`;
-
-    const yms = enumerateYearMonths(startYm, endYm); // 両端含む YYYY-MM の配列
-
-    for (const ym of yms) {
-      const earnedPoints = randInt(300, 600); // ★ 300〜600
-      const earnedScore = randInt(80, 100);
-
-      const completionRate = earnedScore;
-      const missionCompletedCount = randInt(35, 50);
-      const usedPoints = randInt(0, 300);
+    for (const yearMonth of statsYearMonths) {
+      const statKey = `${user.companyId}#${user.userId}:${yearMonth}`;
+      const actualScore = approvedScoreMap.get(statKey) ?? 0;
+      const actualCount = approvedReportCountMap.get(statKey) ?? 0;
+      const usedPoints = exchangePointsMap.get(statKey) ?? 0;
+      const earnedScore = targetScorePerMonth === 0 ? 0 : Math.round((actualScore / targetScorePerMonth) * 100);
+      const earnedPoints = actualScore * 5 + intFromKey(`${user.userId}:${yearMonth}:earnedPointsBonus`, 12, 36);
 
       userMonthlyStats.push({
         companyUserKey: `${user.companyId}#${user.userId}`,
-        yearMonth: ym,
+        yearMonth,
         earnedPoints,
         earnedScore,
         usedPoints,
-        completionRate,
-        missionCompletedCount,
+        completionRate: earnedScore,
+        missionCompletedCount: actualCount,
       });
     }
   }
 
+  return userMonthlyStats.sort((a, b) => {
+    if (a.companyUserKey === b.companyUserKey) {
+      return a.yearMonth.localeCompare(b.yearMonth);
+    }
+
+    return a.companyUserKey.localeCompare(b.companyUserKey);
+  });
+}
+
+function enrichUsers(users, userMonthlyStats, effectiveEndDate) {
+  const statsEndYm = toYearMonth(effectiveEndDate);
+  const recentMonths = enumerateYearMonths(shiftYearMonth(statsEndYm, -2), statsEndYm);
+  const statsByUserAndMonth = new Map(
+    userMonthlyStats.map((stat) => [`${stat.companyUserKey}:${stat.yearMonth}`, stat])
+  );
+
+  return users.map((user) => {
+    const companyUserKey = `${user.companyId}#${user.userId}`;
+    const currentStat = statsByUserAndMonth.get(`${companyUserKey}:${statsEndYm}`);
+    const recentStats = recentMonths
+      .map((yearMonth) => statsByUserAndMonth.get(`${companyUserKey}:${yearMonth}`))
+      .filter(Boolean);
+
+    const earnedPoints = recentStats.reduce((sum, stat) => sum + stat.earnedPoints, 0);
+    const usedPoints = recentStats.reduce((sum, stat) => sum + stat.usedPoints, 0);
+    const baseBalance = intFromKey(`${user.userId}:baseBalance`, 280, 920);
+
+    return {
+      ...user,
+      currentPointBalance: Math.max(0, baseBalance + earnedPoints - usedPoints),
+      currentMonthCompletionRate: currentStat?.completionRate ?? 0,
+    };
+  });
+}
+
+function buildCompany(company, users, effectiveEndDate) {
+  const updatedAt = formatJstDateTime(
+    effectiveEndDate.getFullYear(),
+    effectiveEndDate.getMonth() + 1,
+    effectiveEndDate.getDate(),
+    18,
+    0
+  );
+
+  return {
+    ...company,
+    totalEmployees: users.length,
+    activeEmployees: users.length,
+    updatedAt,
+  };
+}
+
+function buildPhilosophy(philosophy, effectiveEndDate) {
+  if (!philosophy) {
+    return philosophy;
+  }
+
+  return {
+    ...philosophy,
+    updatedAt: formatJstDateTime(
+      effectiveEndDate.getFullYear(),
+      effectiveEndDate.getMonth() + 1,
+      effectiveEndDate.getDate(),
+      18,
+      0
+    ),
+  };
+}
+
+function main() {
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const basePath = path.join(scriptDir, "dynamodb.base.json");
+  const outPath = path.join(scriptDir, "dynamodb.json");
+
+  const raw = fs.readFileSync(basePath, "utf8");
+  const base = JSON.parse(raw);
+
+  const effectiveEndDate = process.env.MOCK_END_DATE ? parseDateOnly(process.env.MOCK_END_DATE) : new Date();
+  const endYm = toYearMonth(effectiveEndDate);
+  const startYm = shiftYearMonth(endYm, -(REPORT_MONTHS - 1));
+  const reportYearMonths = enumerateYearMonths(startYm, endYm);
+
+  const baseCompany = base.Company?.[0];
+  if (!baseCompany) {
+    throw new Error("Company base data is missing.");
+  }
+
+  const missions = (base.Mission ?? []).filter((mission) => mission.enabled);
+  const users = buildUsers(base.User ?? [], baseCompany.activeEmployees ?? 18, effectiveEndDate);
+  const missionReports = buildMissionReports(users, missions, reportYearMonths, effectiveEndDate);
+  const exchangeHistory = buildExchangeHistory(users, effectiveEndDate);
+  const userMonthlyStats = buildUserMonthlyStats(users, missions, missionReports, exchangeHistory, reportYearMonths);
+  const enrichedUsers = enrichUsers(users, userMonthlyStats, effectiveEndDate);
+  const company = buildCompany(baseCompany, enrichedUsers, effectiveEndDate);
+  const philosophy = buildPhilosophy(base.Philosophy?.[0], effectiveEndDate);
+
   const output = {
     ...base,
+    Company: [company],
+    User: enrichedUsers,
     MissionReports: missionReports,
     UserMonthlyStats: userMonthlyStats,
     ExchangeHistory: exchangeHistory,
+    Philosophy: philosophy ? [philosophy] : [],
   };
 
   fs.writeFileSync(outPath, JSON.stringify(output, null, 2), "utf8");
   console.log(
-    `Generated ${missionReports.length} MissionReports, ${userMonthlyStats.length} UserMonthlyStats, and ${exchangeHistory.length} ExchangeHistory to ${outPath}`
+    `Generated ${missionReports.length} MissionReports, ${userMonthlyStats.length} UserMonthlyStats, and ${exchangeHistory.length} ExchangeHistory to ${outPath} (end=${process.env.MOCK_END_DATE ?? "today"})`
   );
 }
 
