@@ -7,6 +7,9 @@ const REPORT_MONTHS = 13;
 const EXCHANGE_MONTHS = 24;
 const TARGET_RATE_BASE = 85;
 const TARGET_RATE_SWING = 2;
+const DASHBOARD_MODAL_TARGET_USER_ID = "u-002";
+const DASHBOARD_MODAL_OPEN_MISSION_IDS = new Set(["growth", "improve"]);
+const DASHBOARD_MODAL_APPROVED_COUNT = 3;
 
 const EXTRA_USER_PROFILES = [
   { userId: "u-005", name: "伊藤 健太", department: "営業部", joinedAt: "2023-06-01", roles: ["EMPLOYEE"] },
@@ -197,6 +200,14 @@ function allocateCounts(total, userCount, capPerUser, key) {
   return counts;
 }
 
+function resolveApprovedCountForDashboardDemo(isEndMonth, missionId, userId, approvedCount, monthlyCount) {
+  if (!isEndMonth || userId !== DASHBOARD_MODAL_TARGET_USER_ID || !DASHBOARD_MODAL_OPEN_MISSION_IDS.has(missionId)) {
+    return approvedCount;
+  }
+
+  return Math.min(DASHBOARD_MODAL_APPROVED_COUNT, monthlyCount);
+}
+
 function buildMissionReports(users, missions, yearMonths, effectiveEndDate) {
   const missionReports = [];
   const userIds = users.map((user) => user.userId);
@@ -214,7 +225,13 @@ function buildMissionReports(users, missions, yearMonths, effectiveEndDate) {
       const approvedCounts = allocateCounts(approvedTotal, users.length, mission.monthlyCount, `${ym}:${mission.missionId}:approved`);
 
       for (const [index, userId] of userIds.entries()) {
-        const approvedCount = approvedCounts[index];
+        const approvedCount = resolveApprovedCountForDashboardDemo(
+          isEndMonth,
+          mission.missionId,
+          userId,
+          approvedCounts[index],
+          mission.monthlyCount
+        );
         const spareCapacity = mission.monthlyCount - approvedCount;
         const pendingCount =
           spareCapacity > 0 && randomFloat(`${ym}:${mission.missionId}:${userId}:pendingChance`) < 0.28 ? 1 : 0;
