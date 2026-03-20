@@ -15,7 +15,7 @@ const companyId = "em";
 const emptySummary: OverallAnalysisSummary = {
   averageScore: 0,
   totalEarnedPoints: 0,
-  companyPointBalance: 0,
+  totalUsedPoints: 0,
   trendData: [],
   achievementData: [],
   goodMissions: [],
@@ -74,7 +74,7 @@ export default function OverallAnalysis() {
         <OverallAnalysisStatsCards
           averageScore={currentSummary.averageScore}
           totalEarnedPoints={currentSummary.totalEarnedPoints}
-          companyPointBalance={currentSummary.companyPointBalance}
+          totalUsedPoints={currentSummary.totalUsedPoints}
         />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">

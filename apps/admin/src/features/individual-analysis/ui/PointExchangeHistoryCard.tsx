@@ -69,12 +69,12 @@ export default function PointExchangeHistoryCard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const resolvedRowsPerPageOptions = useMemo(
-    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25, 50]),
+    () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [3, 5, 10, 25]),
     [rowsPerPageOptions]
   );
   const defaultRowsPerPage = useMemo(() => {
-    const candidate = initialRowsPerPage ?? resolvedRowsPerPageOptions[0] ?? 5;
-    return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 5);
+    const candidate = initialRowsPerPage ?? resolvedRowsPerPageOptions[0] ?? 3;
+    return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 3);
   }, [initialRowsPerPage, resolvedRowsPerPageOptions]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);

@@ -11,7 +11,6 @@ type CompanyRecord = {
   companyId: string;
   totalEmployees?: number;
   activeEmployees: number;
-  companyPointBalance: number;
 };
 
 type UserRecord = {
@@ -183,11 +182,11 @@ function clampDateRange(range: DateRange, availableRange: DateRange | null): Dat
   return { startDate, endDate };
 }
 
-function buildEmptySummary(company?: CompanyRecord | null): OverallAnalysisSummary {
+function buildEmptySummary(): OverallAnalysisSummary {
   return {
     averageScore: 0,
     totalEarnedPoints: 0,
-    companyPointBalance: company?.companyPointBalance ?? 0,
+    totalUsedPoints: 0,
     trendData: [],
     achievementData: [],
     goodMissions: [],
@@ -221,7 +220,7 @@ export async function getOverallAnalysisSummaryFromDynamoMock(
 
   if (!company) {
     return {
-      ...buildEmptySummary(null),
+      ...buildEmptySummary(),
       trendData: displayMonths.map((yearMonth) => ({
         month: formatYearMonth(yearMonth),
         averageScore: 0,
@@ -238,7 +237,7 @@ export async function getOverallAnalysisSummaryFromDynamoMock(
 
   if (!effectiveRange) {
     return {
-      ...buildEmptySummary(company),
+      ...buildEmptySummary(),
       trendData: displayMonths.map((yearMonth) => ({
         month: formatYearMonth(yearMonth),
         averageScore: 0,
@@ -336,7 +335,7 @@ export async function getOverallAnalysisSummaryFromDynamoMock(
   return {
     averageScore,
     totalEarnedPoints,
-    companyPointBalance: company.companyPointBalance,
+    totalUsedPoints: exchangeHistory.reduce((sum, item) => sum + item.usedPoint, 0),
     trendData,
     achievementData,
     goodMissions,

@@ -24,7 +24,7 @@ export type OverallExchangeHistoryItem = {
 export type OverallAnalysisSummary = {
   averageScore: number;
   totalEarnedPoints: number;
-  companyPointBalance: number;
+  totalUsedPoints: number;
   trendData: OverallAnalysisTrendItem[];
   achievementData: OverallAnalysisAchievementItem[];
   goodMissions: OverallAnalysisMissionItem[];

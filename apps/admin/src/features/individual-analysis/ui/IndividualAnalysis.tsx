@@ -49,8 +49,8 @@ export default function IndividualAnalysis() {
   );
   const exchangeHistoryPagination = useMemo(
     () => ({
-      rowsPerPageOptions: [5, 10, 25, 50],
-      initialRowsPerPage: 5,
+      rowsPerPageOptions: [3, 5, 10, 25],
+      initialRowsPerPage: 3,
     }),
     []
   );

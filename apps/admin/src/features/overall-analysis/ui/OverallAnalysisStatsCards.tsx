@@ -20,7 +20,7 @@ function StatCard({ label, value, color }: StatCardProps) {
 type OverallAnalysisStatsCardsProps = {
   averageScore: number;
   totalEarnedPoints: number;
-  companyPointBalance: number;
+  totalUsedPoints: number;
   className?: string;
 };
 
@@ -31,14 +31,14 @@ function formatMetric(value: number) {
 export default function OverallAnalysisStatsCards({
   averageScore,
   totalEarnedPoints,
-  companyPointBalance,
+  totalUsedPoints,
   className,
 }: OverallAnalysisStatsCardsProps) {
   return (
     <div className={`grid h-full grid-cols-1 gap-4 md:grid-cols-3 ${className ?? ""}`}>
-      <StatCard label="平均得点" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
+      <StatCard label="平均達成率" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
       <StatCard label="総獲得ポイント" value={`${totalEarnedPoints.toLocaleString()}pt`} color="#8b5cf6" />
-      <StatCard label="企業保有ポイント" value={`${companyPointBalance.toLocaleString()}pt`} color="#f59e0b" />
+      <StatCard label="使用済みポイント" value={`${totalUsedPoints.toLocaleString()}pt`} color="#f59e0b" />
     </div>
   );
 }
