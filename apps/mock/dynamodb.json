@@ -34,8 +34,8 @@
       "department": "総務部",
       "joinedAt": "2023-01-15",
       "lastLoginAt": "2026-03-17T14:32:00+09:00",
-      "currentPointBalance": 873,
-      "currentMonthCompletionRate": 84,
+      "currentPointBalance": 823,
+      "currentMonthCompletionRate": 74,
       "roles": [
         "EMPLOYEE"
       ]
@@ -2211,6 +2211,33 @@
       "missionCompletedCount": 42
     },
     {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2026-04",
+      "earnedPoints": 18,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2026-05",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-001",
+      "yearMonth": "2026-06",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-002",
       "yearMonth": "2025-03",
       "earnedPoints": 441,
@@ -2321,11 +2348,38 @@
     {
       "companyUserKey": "em#u-002",
       "yearMonth": "2026-03",
-      "earnedPoints": 443,
-      "earnedScore": 84,
+      "earnedPoints": 393,
+      "earnedScore": 74,
       "usedPoints": 60,
-      "completionRate": 84,
-      "missionCompletedCount": 41
+      "completionRate": 74,
+      "missionCompletedCount": 39
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2026-04",
+      "earnedPoints": 50,
+      "earnedScore": 5,
+      "usedPoints": 0,
+      "completionRate": 5,
+      "missionCompletedCount": 1
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2026-05",
+      "earnedPoints": 60,
+      "earnedScore": 5,
+      "usedPoints": 0,
+      "completionRate": 5,
+      "missionCompletedCount": 1
+    },
+    {
+      "companyUserKey": "em#u-002",
+      "yearMonth": "2026-06",
+      "earnedPoints": 48,
+      "earnedScore": 5,
+      "usedPoints": 0,
+      "completionRate": 5,
+      "missionCompletedCount": 1
     },
     {
       "companyUserKey": "em#u-003",
@@ -2445,6 +2499,33 @@
       "missionCompletedCount": 43
     },
     {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2026-04",
+      "earnedPoints": 17,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2026-05",
+      "earnedPoints": 32,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-003",
+      "yearMonth": "2026-06",
+      "earnedPoints": 18,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-004",
       "yearMonth": "2025-03",
       "earnedPoints": 444,
@@ -2560,6 +2641,33 @@
       "usedPoints": 600,
       "completionRate": 94,
       "missionCompletedCount": 43
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2026-04",
+      "earnedPoints": 32,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2026-05",
+      "earnedPoints": 29,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-004",
+      "yearMonth": "2026-06",
+      "earnedPoints": 30,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-005",
@@ -2679,6 +2787,33 @@
       "missionCompletedCount": 41
     },
     {
+      "companyUserKey": "em#u-005",
+      "yearMonth": "2026-04",
+      "earnedPoints": 24,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-005",
+      "yearMonth": "2026-05",
+      "earnedPoints": 25,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-005",
+      "yearMonth": "2026-06",
+      "earnedPoints": 20,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-006",
       "yearMonth": "2025-03",
       "earnedPoints": 462,
@@ -2794,6 +2929,33 @@
       "usedPoints": 0,
       "completionRate": 68,
       "missionCompletedCount": 40
+    },
+    {
+      "companyUserKey": "em#u-006",
+      "yearMonth": "2026-04",
+      "earnedPoints": 22,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-006",
+      "yearMonth": "2026-05",
+      "earnedPoints": 15,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-006",
+      "yearMonth": "2026-06",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-007",
@@ -2913,6 +3075,33 @@
       "missionCompletedCount": 42
     },
     {
+      "companyUserKey": "em#u-007",
+      "yearMonth": "2026-04",
+      "earnedPoints": 18,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-007",
+      "yearMonth": "2026-05",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-007",
+      "yearMonth": "2026-06",
+      "earnedPoints": 27,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-008",
       "yearMonth": "2025-03",
       "earnedPoints": 500,
@@ -3028,6 +3217,33 @@
       "usedPoints": 0,
       "completionRate": 88,
       "missionCompletedCount": 41
+    },
+    {
+      "companyUserKey": "em#u-008",
+      "yearMonth": "2026-04",
+      "earnedPoints": 20,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-008",
+      "yearMonth": "2026-05",
+      "earnedPoints": 17,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-008",
+      "yearMonth": "2026-06",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-009",
@@ -3147,6 +3363,33 @@
       "missionCompletedCount": 42
     },
     {
+      "companyUserKey": "em#u-009",
+      "yearMonth": "2026-04",
+      "earnedPoints": 18,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-009",
+      "yearMonth": "2026-05",
+      "earnedPoints": 31,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-009",
+      "yearMonth": "2026-06",
+      "earnedPoints": 25,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-010",
       "yearMonth": "2025-03",
       "earnedPoints": 355,
@@ -3262,6 +3505,33 @@
       "usedPoints": 320,
       "completionRate": 74,
       "missionCompletedCount": 42
+    },
+    {
+      "companyUserKey": "em#u-010",
+      "yearMonth": "2026-04",
+      "earnedPoints": 28,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-010",
+      "yearMonth": "2026-05",
+      "earnedPoints": 16,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-010",
+      "yearMonth": "2026-06",
+      "earnedPoints": 29,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-011",
@@ -3381,6 +3651,33 @@
       "missionCompletedCount": 41
     },
     {
+      "companyUserKey": "em#u-011",
+      "yearMonth": "2026-04",
+      "earnedPoints": 36,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-011",
+      "yearMonth": "2026-05",
+      "earnedPoints": 36,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-011",
+      "yearMonth": "2026-06",
+      "earnedPoints": 22,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-012",
       "yearMonth": "2025-03",
       "earnedPoints": 472,
@@ -3496,6 +3793,33 @@
       "usedPoints": 166,
       "completionRate": 84,
       "missionCompletedCount": 41
+    },
+    {
+      "companyUserKey": "em#u-012",
+      "yearMonth": "2026-04",
+      "earnedPoints": 22,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-012",
+      "yearMonth": "2026-05",
+      "earnedPoints": 21,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-012",
+      "yearMonth": "2026-06",
+      "earnedPoints": 20,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-013",
@@ -3615,6 +3939,33 @@
       "missionCompletedCount": 41
     },
     {
+      "companyUserKey": "em#u-013",
+      "yearMonth": "2026-04",
+      "earnedPoints": 24,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-013",
+      "yearMonth": "2026-05",
+      "earnedPoints": 21,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-013",
+      "yearMonth": "2026-06",
+      "earnedPoints": 34,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-014",
       "yearMonth": "2025-03",
       "earnedPoints": 459,
@@ -3730,6 +4081,33 @@
       "usedPoints": 0,
       "completionRate": 84,
       "missionCompletedCount": 41
+    },
+    {
+      "companyUserKey": "em#u-014",
+      "yearMonth": "2026-04",
+      "earnedPoints": 35,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-014",
+      "yearMonth": "2026-05",
+      "earnedPoints": 21,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-014",
+      "yearMonth": "2026-06",
+      "earnedPoints": 16,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-015",
@@ -3849,6 +4227,33 @@
       "missionCompletedCount": 41
     },
     {
+      "companyUserKey": "em#u-015",
+      "yearMonth": "2026-04",
+      "earnedPoints": 24,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-015",
+      "yearMonth": "2026-05",
+      "earnedPoints": 33,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-015",
+      "yearMonth": "2026-06",
+      "earnedPoints": 26,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-016",
       "yearMonth": "2025-03",
       "earnedPoints": 476,
@@ -3964,6 +4369,33 @@
       "usedPoints": 100,
       "completionRate": 84,
       "missionCompletedCount": 41
+    },
+    {
+      "companyUserKey": "em#u-016",
+      "yearMonth": "2026-04",
+      "earnedPoints": 36,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-016",
+      "yearMonth": "2026-05",
+      "earnedPoints": 36,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-016",
+      "yearMonth": "2026-06",
+      "earnedPoints": 28,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     },
     {
       "companyUserKey": "em#u-017",
@@ -4083,6 +4515,33 @@
       "missionCompletedCount": 41
     },
     {
+      "companyUserKey": "em#u-017",
+      "yearMonth": "2026-04",
+      "earnedPoints": 36,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-017",
+      "yearMonth": "2026-05",
+      "earnedPoints": 18,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-017",
+      "yearMonth": "2026-06",
+      "earnedPoints": 24,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
       "companyUserKey": "em#u-018",
       "yearMonth": "2025-03",
       "earnedPoints": 458,
@@ -4198,6 +4657,33 @@
       "usedPoints": 320,
       "completionRate": 84,
       "missionCompletedCount": 41
+    },
+    {
+      "companyUserKey": "em#u-018",
+      "yearMonth": "2026-04",
+      "earnedPoints": 32,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-018",
+      "yearMonth": "2026-05",
+      "earnedPoints": 20,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
+    },
+    {
+      "companyUserKey": "em#u-018",
+      "yearMonth": "2026-06",
+      "earnedPoints": 20,
+      "earnedScore": 0,
+      "usedPoints": 0,
+      "completionRate": 0,
+      "missionCompletedCount": 0
     }
   ],
   "PointTransaction": [
@@ -106092,17 +106578,6 @@
     },
     {
       "companyId": "em",
-      "userId": "u-002",
-      "reportId": "mr-202603-improve-u-002-02",
-      "missionId": "improve",
-      "reportedAt": "2026-03-02T14:44:00+09:00",
-      "status": "APPROVED",
-      "pointGranted": 25,
-      "scoreGranted": 5,
-      "comment": "自動生成レポート(improve)"
-    },
-    {
-      "companyId": "em",
       "userId": "u-007",
       "reportId": "mr-202603-health-u-007-14",
       "missionId": "health",
@@ -109304,6 +109779,17 @@
     },
     {
       "companyId": "em",
+      "userId": "u-002",
+      "reportId": "mr-202603-improve-u-002-01",
+      "missionId": "improve",
+      "reportedAt": "2026-03-10T11:33:00+09:00",
+      "status": "APPROVED",
+      "pointGranted": 25,
+      "scoreGranted": 5,
+      "comment": "閾ｪ蜍慕函謌舌Ξ繝昴・繝・(improve)"
+    },
+    {
+      "companyId": "em",
       "userId": "u-010",
       "reportId": "mr-202603-greetings-u-010-16",
       "missionId": "greetings",
@@ -110954,17 +111440,6 @@
     },
     {
       "companyId": "em",
-      "userId": "u-002",
-      "reportId": "mr-202603-improve-u-002-01",
-      "missionId": "improve",
-      "reportedAt": "2026-03-14T15:13:00+09:00",
-      "status": "APPROVED",
-      "pointGranted": 25,
-      "scoreGranted": 5,
-      "comment": "自動生成レポート(improve)"
-    },
-    {
-      "companyId": "em",
       "userId": "u-016",
       "reportId": "mr-202603-community-u-016-01",
       "missionId": "community",
@@ -112505,17 +112980,6 @@
     },
     {
       "companyId": "em",
-      "userId": "u-002",
-      "reportId": "mr-202603-improve-u-002-03",
-      "missionId": "improve",
-      "reportedAt": "2026-03-18T17:15:00+09:00",
-      "status": "APPROVED",
-      "pointGranted": 25,
-      "scoreGranted": 5,
-      "comment": "自動生成レポート(improve)"
-    },
-    {
-      "companyId": "em",
       "userId": "u-014",
       "reportId": "mr-202603-health-u-014-11",
       "missionId": "health",
@@ -113613,6 +114077,39 @@
       "pointGranted": 5,
       "scoreGranted": 1,
       "comment": "自動生成レポート(health)"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "reportId": "mr-202604-improve-u-002-01",
+      "missionId": "improve",
+      "reportedAt": "2026-04-23T12:22:00+09:00",
+      "status": "APPROVED",
+      "pointGranted": 25,
+      "scoreGranted": 5,
+      "comment": "閾ｪ蜍慕函謌舌Ξ繝昴・繝・(improve)"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "reportId": "mr-202605-improve-u-002-01",
+      "missionId": "improve",
+      "reportedAt": "2026-05-28T13:19:00+09:00",
+      "status": "APPROVED",
+      "pointGranted": 25,
+      "scoreGranted": 5,
+      "comment": "閾ｪ蜍慕函謌舌Ξ繝昴・繝・(improve)"
+    },
+    {
+      "companyId": "em",
+      "userId": "u-002",
+      "reportId": "mr-202606-improve-u-002-01",
+      "missionId": "improve",
+      "reportedAt": "2026-06-17T14:48:00+09:00",
+      "status": "APPROVED",
+      "pointGranted": 25,
+      "scoreGranted": 5,
+      "comment": "閾ｪ蜍慕函謌舌Ξ繝昴・繝・(improve)"
     }
   ]
 }

@@ -10,6 +10,12 @@ const TARGET_RATE_SWING = 2;
 const DASHBOARD_MODAL_TARGET_USER_ID = "u-002";
 const DASHBOARD_MODAL_OPEN_MISSION_IDS = new Set(["growth", "improve"]);
 const DASHBOARD_MODAL_APPROVED_COUNT = 3;
+const MISSION_REPORT_COUNT_OVERRIDES = [
+  { userId: "u-002", missionId: "improve", yearMonth: "2026-03", approvedCount: 1, pendingCount: 0 },
+  { userId: "u-002", missionId: "improve", yearMonth: "2026-04", approvedCount: 1, pendingCount: 0 },
+  { userId: "u-002", missionId: "improve", yearMonth: "2026-05", approvedCount: 1, pendingCount: 0 },
+  { userId: "u-002", missionId: "improve", yearMonth: "2026-06", approvedCount: 1, pendingCount: 0 },
+];
 
 const EXTRA_USER_PROFILES = [
   { userId: "u-005", name: "伊藤 健太", department: "営業部", joinedAt: "2023-06-01", roles: ["EMPLOYEE"] },
@@ -208,6 +214,74 @@ function resolveApprovedCountForDashboardDemo(isEndMonth, missionId, userId, app
   return Math.min(DASHBOARD_MODAL_APPROVED_COUNT, monthlyCount);
 }
 
+function listMissionReportOverrideYearMonths() {
+  return Array.from(new Set(MISSION_REPORT_COUNT_OVERRIDES.map((override) => override.yearMonth))).sort((a, b) => a.localeCompare(b));
+}
+
+function buildMissionReportFromOverride(override, user, mission, effectiveEndDate) {
+  const reports = [];
+  const { year, month } = parseYearMonth(override.yearMonth);
+  const lastDayOfMonth = getLastDayOfMonth(year, month);
+  const isEndMonth = override.yearMonth === toYearMonth(effectiveEndDate);
+  const maxDay = isEndMonth ? Math.min(effectiveEndDate.getDate(), lastDayOfMonth) : lastDayOfMonth;
+  const totalCount = override.approvedCount + override.pendingCount;
+
+  for (let sequence = 0; sequence < totalCount; sequence += 1) {
+    const isApproved = sequence < override.approvedCount;
+    const baseKey = `override:${override.yearMonth}:${override.missionId}:${override.userId}:${sequence}`;
+    const day = ((hashString(`${baseKey}:day`) + sequence * 7) % maxDay) + 1;
+    const hour = intFromKey(`${baseKey}:hour`, 8, 19);
+    const minute = intFromKey(`${baseKey}:minute`, 0, 59);
+
+    reports.push({
+      companyId: user.companyId,
+      userId: override.userId,
+      reportId: `mr-${override.yearMonth.replace("-", "")}-${override.missionId}-${override.userId}-${String(sequence + 1).padStart(2, "0")}`,
+      missionId: override.missionId,
+      reportedAt: formatJstDateTime(year, month, day, hour, minute),
+      status: isApproved ? "APPROVED" : "PENDING",
+      pointGranted: isApproved ? mission.score * 5 : 0,
+      scoreGranted: isApproved ? mission.score : 0,
+      comment: `閾ｪ蜍慕函謌舌Ξ繝昴・繝・(${override.missionId})`,
+    });
+  }
+
+  return reports;
+}
+
+function applyMissionReportCountOverrides(missionReports, users, missions, effectiveEndDate) {
+  if (MISSION_REPORT_COUNT_OVERRIDES.length === 0) {
+    return missionReports;
+  }
+
+  const usersById = new Map(users.map((user) => [user.userId, user]));
+  const missionsById = new Map(missions.map((mission) => [mission.missionId, mission]));
+  const overrideKeys = new Set(
+    MISSION_REPORT_COUNT_OVERRIDES.map((override) => `${override.userId}:${override.missionId}:${override.yearMonth}`)
+  );
+  const filteredReports = missionReports.filter((report) => {
+    const yearMonth = report.reportedAt.slice(0, 7);
+    return !overrideKeys.has(`${report.userId}:${report.missionId}:${yearMonth}`);
+  });
+
+  for (const override of MISSION_REPORT_COUNT_OVERRIDES) {
+    const user = usersById.get(override.userId);
+    const mission = missionsById.get(override.missionId);
+
+    if (!user) {
+      throw new Error(`Mission report override user not found: ${override.userId}`);
+    }
+
+    if (!mission) {
+      throw new Error(`Mission report override mission not found: ${override.missionId}`);
+    }
+
+    filteredReports.push(...buildMissionReportFromOverride(override, user, mission, effectiveEndDate));
+  }
+
+  return filteredReports;
+}
+
 function buildMissionReports(users, missions, yearMonths, effectiveEndDate) {
   const missionReports = [];
   const userIds = users.map((user) => user.userId);
@@ -260,7 +334,9 @@ function buildMissionReports(users, missions, yearMonths, effectiveEndDate) {
     }
   }
 
-  return missionReports.sort((a, b) => {
+  const overriddenMissionReports = applyMissionReportCountOverrides(missionReports, users, missions, effectiveEndDate);
+
+  return overriddenMissionReports.sort((a, b) => {
     const timeDiff = new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime();
     if (timeDiff !== 0) {
       return timeDiff;
@@ -451,6 +527,9 @@ function main() {
   const endYm = toYearMonth(effectiveEndDate);
   const startYm = shiftYearMonth(endYm, -(REPORT_MONTHS - 1));
   const reportYearMonths = enumerateYearMonths(startYm, endYm);
+  const statsYearMonths = Array.from(new Set([...reportYearMonths, ...listMissionReportOverrideYearMonths()])).sort((a, b) =>
+    a.localeCompare(b)
+  );
 
   const baseCompany = base.Company?.[0];
   if (!baseCompany) {
@@ -461,7 +540,7 @@ function main() {
   const users = buildUsers(base.User ?? [], baseCompany.activeEmployees ?? 18, effectiveEndDate);
   const missionReports = buildMissionReports(users, missions, reportYearMonths, effectiveEndDate);
   const exchangeHistory = buildExchangeHistory(users, effectiveEndDate);
-  const userMonthlyStats = buildUserMonthlyStats(users, missions, missionReports, exchangeHistory, reportYearMonths);
+  const userMonthlyStats = buildUserMonthlyStats(users, missions, missionReports, exchangeHistory, statsYearMonths);
   const enrichedUsers = enrichUsers(users, userMonthlyStats, effectiveEndDate);
   const company = buildCompany(baseCompany, enrichedUsers, effectiveEndDate);
   const philosophy = buildPhilosophy(base.Philosophy?.[0], effectiveEndDate);
