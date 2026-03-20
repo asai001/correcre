@@ -10,8 +10,8 @@ const DEFAULT_PARTNER_SHEET_ID = 515487691;
 const DEFAULT_MERCHANDISE_SHEET_ID = 2026862223;
 const DEFAULT_CARD_IMAGE_FOLDER_ID = "1dtDBFpKVLCoGtFAfwAZnTsu1hH0SX1d5c-6lZ7R59kweuREDrHN-xgwVJ92pO0bZoQi-mPht";
 const DEFAULT_DETAIL_IMAGE_FOLDER_ID = "1pYI8LqY-pGmA8X4lMx_O2S9CuP4F3PFvxYmuc5m9Ux4TVd3bjUQs6Epl_hbyPTYSwRrSpjSS";
-const PARTNER_INFO_RANGE = "B:L";
-const MERCHANDISE_INFO_RANGE = "C:M";
+const PARTNER_INFO_RANGE = "A:L";
+const MERCHANDISE_INFO_RANGE = "A:N";
 
 type StoreAddressMode = "same_company" | "no_store" | "other";
 
@@ -251,15 +251,43 @@ function resolveGenreLabel(payload: RegisterMerchandiseProductPayload): string {
   return payload.genre === "その他" ? payload.genreOther.trim() || "その他" : payload.genre;
 }
 
+function asSheetLiteralText(value: string): string {
+  return value === "" ? "" : `'${value}`;
+}
+
+function resolveProductCoverageArea(
+  partner: RegisterMerchandisePartnerPayload,
+  product: RegisterMerchandiseProductPayload,
+): string {
+  const hasStoreVisit = product.deliveryMethods.includes("来店");
+  const hasRemoteOrShipping = product.deliveryMethods.some((method) => method === "出張" || method === "発送" || method === "オンライン");
+  const sections: string[] = [];
+
+  if (hasStoreVisit) {
+    sections.push(resolveStoreAddress(partner));
+  }
+
+  if (hasRemoteOrShipping) {
+    sections.push(product.serviceArea);
+  }
+
+  if (sections.length === 0) {
+    return product.serviceArea;
+  }
+
+  return sections.join(" / ");
+}
+
 function buildPartnerRow(payload: RegisterMerchandisePartnerPayload): string[] {
   return [
+    "",
     formatTimestamp(),
     payload.companyName,
     payload.companyLocation,
     resolveStoreAddress(payload),
     payload.customerInquiryContact,
     payload.contactPersonName,
-    payload.contactPersonPhone,
+    asSheetLiteralText(payload.contactPersonPhone),
     payload.partnerEmail,
     payload.bankTransferAccount,
     payload.partnerEmail,
@@ -274,17 +302,20 @@ function buildProductRow(
   cardImageUrl: string,
 ): string[] {
   return [
+    "",
+    "",
     formatTimestamp(),
     partner.companyName,
     product.merchandiseName,
     product.serviceDescription,
     product.price,
     product.deliveryMethods.join("、"),
-    product.serviceArea,
+    resolveProductCoverageArea(partner, product),
     detailImageUrl,
     cardImageUrl,
     product.heading,
     resolveGenreLabel(product),
+    partner.partnerEmail,
   ];
 }
 
