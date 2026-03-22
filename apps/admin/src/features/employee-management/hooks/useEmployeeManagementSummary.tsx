@@ -8,6 +8,7 @@ type UseEmployeeManagementSummaryResult = {
   summary: EmployeeManagementSummary | null;
   loading: boolean;
   error: string | null;
+  reload: () => void;
 };
 
 export function useEmployeeManagementSummary(
@@ -17,6 +18,7 @@ export function useEmployeeManagementSummary(
   const [summary, setSummary] = useState<EmployeeManagementSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!companyId) {
@@ -57,7 +59,12 @@ export function useEmployeeManagementSummary(
     return () => {
       ac.abort();
     };
-  }, [adminUserId, companyId]);
+  }, [adminUserId, companyId, reloadKey]);
 
-  return { summary, loading, error };
+  return {
+    summary,
+    loading,
+    error,
+    reload: () => setReloadKey((current) => current + 1),
+  };
 }

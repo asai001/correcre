@@ -4,8 +4,26 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
 import AdminPageHeader from "@admin/components/AdminPageHeader";
 import Table, { type ColumnDef } from "@admin/components/Table";
+import {
+  createDepartment,
+  createEmployee,
+  deleteDepartment,
+  deleteEmployee,
+  renameDepartment,
+  updateEmployee,
+} from "../api/client";
 import { useEmployeeManagementSummary } from "../hooks/useEmployeeManagementSummary";
-import type { EmployeeManagementEmployee, EmployeeManagementRole } from "../model/types";
+import type {
+  CreateEmployeeInput,
+  EmployeeManagementEmployee,
+  EmployeeManagementRole,
+  MutationResult,
+  UpdateEmployeeInput,
+} from "../model/types";
+import DepartmentManagementDialog from "./DepartmentManagementDialog";
+import EmployeeDeleteDialog from "./EmployeeDeleteDialog";
+import EmployeeEditDialog from "./EmployeeEditDialog";
+import EmployeeRegistrationDialog from "./EmployeeRegistrationDialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBuilding,
@@ -58,11 +76,7 @@ function formatDateTime(value?: string) {
 }
 
 function formatDate(value?: string) {
-  if (!value) {
-    return "-";
-  }
-
-  return value;
+  return value || "-";
 }
 
 function formatNumber(value: number) {
@@ -100,7 +114,8 @@ function StatCard({ label, value, description, accentClassName }: StatCardProps)
 
 function getEmployeeColumns(
   pointUnitLabel: string,
-  onPlaceholderAction: (actionLabel: string, employeeName?: string) => void
+  onEditEmployee: (employee: EmployeeManagementEmployee) => void,
+  onDeleteEmployee: (employee: EmployeeManagementEmployee) => void
 ): ColumnDef<EmployeeManagementEmployee>[] {
   return [
     {
@@ -117,14 +132,19 @@ function getEmployeeColumns(
       ),
     },
     {
-      id: "department",
+      id: "departments",
       label: "部署 / 権限",
-      width: "18%",
+      width: "22%",
       render: (row) => (
-        <div className="flex min-w-[170px] flex-wrap gap-2">
-          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-            {row.department}
-          </span>
+        <div className="flex min-w-[190px] flex-wrap gap-2">
+          {row.departments.map((department) => (
+            <span
+              key={`${row.userId}-${department}`}
+              className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700"
+            >
+              {department}
+            </span>
+          ))}
           {row.roles.map((role) => (
             <span
               key={`${row.userId}-${role}`}
@@ -182,7 +202,7 @@ function getEmployeeColumns(
           <IconButton
             size="small"
             aria-label={`${row.name}を編集`}
-            onClick={() => onPlaceholderAction("編集", row.name)}
+            onClick={() => onEditEmployee(row)}
             sx={{ color: "#2563EB" }}
           >
             <FontAwesomeIcon icon={faPenToSquare} />
@@ -190,7 +210,7 @@ function getEmployeeColumns(
           <IconButton
             size="small"
             aria-label={`${row.name}を削除`}
-            onClick={() => onPlaceholderAction("削除", row.name)}
+            onClick={() => onDeleteEmployee(row)}
             sx={{ color: "#EF4444" }}
           >
             <FontAwesomeIcon icon={faTrashCan} />
@@ -202,26 +222,34 @@ function getEmployeeColumns(
 }
 
 export default function EmployeeManagement({ companyId, adminUserId }: EmployeeManagementProps) {
-  const { summary, loading, error } = useEmployeeManagementSummary(companyId, adminUserId);
+  const { summary, loading, error, reload } = useEmployeeManagementSummary(companyId, adminUserId);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(8);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isRegistrationDialogOpen, setRegistrationDialogOpen] = useState(false);
+  const [isDepartmentDialogOpen, setDepartmentDialogOpen] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeManagementEmployee | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [updatingEmployee, setUpdatingEmployee] = useState(false);
+  const [employeePendingDeletion, setEmployeePendingDeletion] = useState<EmployeeManagementEmployee | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingEmployee, setDeletingEmployee] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const employees = useMemo(() => summary?.employees ?? [], [summary]);
-
-  const departments = useMemo(
-    () => ["all", ...new Set(employees.map((employee) => employee.department))],
-    [employees]
-  );
+  const departmentOptions = useMemo(() => summary?.departmentOptions ?? [], [summary]);
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return employees.filter((employee) => {
-      const matchesDepartment = selectedDepartment === "all" || employee.department === selectedDepartment;
+      const matchesDepartment =
+        selectedDepartment === "all" || employee.departments.includes(selectedDepartment);
+
       if (!matchesDepartment) {
         return false;
       }
@@ -233,7 +261,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       const searchableValues = [
         employee.name,
         employee.userId,
-        employee.department,
+        employee.departments.join(" "),
         employee.email,
         employee.phone,
         employee.address,
@@ -251,6 +279,17 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   }, [deferredSearchQuery, selectedDepartment]);
 
   useEffect(() => {
+    if (selectedDepartment === "all") {
+      return;
+    }
+
+    const departmentExists = departmentOptions.some((department) => department.name === selectedDepartment);
+    if (!departmentExists) {
+      setSelectedDepartment("all");
+    }
+  }, [departmentOptions, selectedDepartment]);
+
+  useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(filteredEmployees.length / rowsPerPage) - 1);
     if (page > maxPage) {
       setPage(maxPage);
@@ -260,7 +299,144 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   const pagedEmployees = filteredEmployees.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   const adminName = summary?.adminName ?? "システム管理者";
 
-  if (loading) {
+  const handleOpenRegistrationDialog = () => {
+    setRegistrationError(null);
+    setRegistrationDialogOpen(true);
+  };
+
+  const handleCloseRegistrationDialog = () => {
+    if (registering) {
+      return;
+    }
+
+    setRegistrationDialogOpen(false);
+    setRegistrationError(null);
+  };
+
+  const handleOpenEditDialog = (employee: EmployeeManagementEmployee) => {
+    setEditingEmployee(employee);
+    setEditError(null);
+  };
+
+  const handleCloseEditDialog = () => {
+    if (updatingEmployee) {
+      return;
+    }
+
+    setEditingEmployee(null);
+    setEditError(null);
+  };
+
+  const handleOpenDeleteDialog = (employee: EmployeeManagementEmployee) => {
+    setEmployeePendingDeletion(employee);
+    setDeleteError(null);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    if (deletingEmployee) {
+      return;
+    }
+
+    setEmployeePendingDeletion(null);
+    setDeleteError(null);
+  };
+
+  const handleRegisterEmployee = async (input: CreateEmployeeInput) => {
+    try {
+      setRegistering(true);
+      setRegistrationError(null);
+
+      const createdEmployee = await createEmployee(companyId, input);
+
+      setRegistrationDialogOpen(false);
+      setSearchQuery("");
+      setSelectedDepartment("all");
+      setPage(0);
+      setNotice(`${createdEmployee.name}を登録しました。`);
+      reload();
+    } catch (err) {
+      setRegistrationError(err instanceof Error ? err.message : "従業員の登録に失敗しました");
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleUpdateEmployee = async (input: UpdateEmployeeInput) => {
+    try {
+      setUpdatingEmployee(true);
+      setEditError(null);
+
+      const updatedEmployee = await updateEmployee(companyId, input);
+
+      setEditingEmployee(null);
+      setNotice(`${updatedEmployee.name}を更新しました。`);
+      reload();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "従業員情報の更新に失敗しました");
+    } finally {
+      setUpdatingEmployee(false);
+    }
+  };
+
+  const handleDeleteEmployee = async (userId: string): Promise<MutationResult> => {
+    setDeletingEmployee(true);
+    setDeleteError(null);
+
+    try {
+      const result = await deleteEmployee(companyId, { userId });
+      if (!result.ok) {
+        setDeleteError(result.error);
+        return result;
+      }
+
+      const deletedEmployeeName =
+        employeePendingDeletion?.userId === userId
+          ? employeePendingDeletion.name
+          : employees.find((employee) => employee.userId === userId)?.name ?? userId;
+
+      setEmployeePendingDeletion(null);
+      setNotice(`${deletedEmployeeName}を削除しました。`);
+      reload();
+      return result;
+    } finally {
+      setDeletingEmployee(false);
+    }
+  };
+
+  const handleCreateDepartment = async (name: string): Promise<MutationResult> => {
+    const result = await createDepartment(companyId, { name });
+    if (!result.ok) {
+      return result;
+    }
+    setSelectedDepartment("all");
+    setNotice(`部署「${name}」を追加しました。`);
+    reload();
+    return result;
+  };
+
+  const handleRenameDepartment = async (currentName: string, nextName: string): Promise<MutationResult> => {
+    const result = await renameDepartment(companyId, { currentName, nextName });
+    if (!result.ok) {
+      return result;
+    }
+    setSelectedDepartment("all");
+    setNotice(`部署名を「${nextName}」へ更新しました。`);
+    reload();
+    return result;
+  };
+
+  const handleDeleteDepartment = async (name: string): Promise<MutationResult> => {
+    const result = await deleteDepartment(companyId, name);
+    if (!result.ok) {
+      return result;
+    }
+    setSelectedDepartment("all");
+    setNotice(`部署「${name}」を削除しました。`);
+    reload();
+    return result;
+  };
+
+  if (loading && !summary) {
     return (
       <div className="space-y-6 pb-5">
         <AdminPageHeader title="従業員管理" adminName={adminName} />
@@ -276,21 +452,23 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
     );
   }
 
-  if (error || !summary) {
+  if (error && !summary) {
     return (
       <div className="space-y-6 pb-5">
         <AdminPageHeader title="従業員管理" adminName={adminName} />
         <div className="my-5 rounded-[28px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700 shadow-sm">
-          {error ?? "従業員管理データを表示できませんでした。"}
+          {error}
         </div>
       </div>
     );
   }
 
+  if (!summary) {
+    return null;
+  }
+
   const pointUnitLabel = summary.pointUnitLabel;
-  const columns = getEmployeeColumns(pointUnitLabel, (actionLabel, employeeName) => {
-    setNotice(`${employeeName ? `${employeeName}の` : ""}${actionLabel}機能は未接続です。画面モックとして実装しています。`);
-  });
+  const columns = getEmployeeColumns(pointUnitLabel, handleOpenEditDialog, handleOpenDeleteDialog);
   const footer = (
     <TablePagination
       component="div"
@@ -319,7 +497,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
             <Button
               variant="contained"
               startIcon={<FontAwesomeIcon icon={faPlus} />}
-              onClick={() => setNotice("新規従業員登録機能は未接続です。画面モックとして実装しています。")}
+              onClick={handleOpenRegistrationDialog}
               sx={{
                 borderRadius: "14px",
                 backgroundColor: "#2563EB",
@@ -332,7 +510,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
             <Button
               variant="contained"
               startIcon={<FontAwesomeIcon icon={faBuilding} />}
-              onClick={() => setNotice("部署管理機能は未接続です。画面モックとして実装しています。")}
+              onClick={() => setDepartmentDialogOpen(true)}
               sx={{
                 borderRadius: "14px",
                 backgroundColor: "#10B981",
@@ -352,7 +530,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                     [
                       "名前",
                       "ユーザーID",
-                      "部署",
+                      "所属部署",
                       "権限",
                       "メールアドレス",
                       "連絡先",
@@ -365,7 +543,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                     ...filteredEmployees.map((employee) => [
                       employee.name,
                       employee.userId,
-                      employee.department,
+                      employee.departments.join(" / "),
                       employee.roles.map((role) => roleLabelMap[role]).join(" / "),
                       employee.email,
                       employee.phone,
@@ -412,13 +590,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
               onChange={(event) => setSelectedDepartment(event.target.value)}
             >
               <MenuItem value="all">全部署</MenuItem>
-              {departments
-                .filter((department) => department !== "all")
-                .map((department) => (
-                  <MenuItem key={department} value={department}>
-                    {department}
-                  </MenuItem>
-                ))}
+              {departmentOptions.map((departmentOption) => (
+                <MenuItem key={departmentOption.name} value={departmentOption.name}>
+                  {departmentOption.name}
+                </MenuItem>
+              ))}
             </TextField>
           </div>
         </div>
@@ -444,7 +620,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         <StatCard
           label="部署数"
           value={`${summary.departmentCount}`}
-          description="アクティブな所属部署の数"
+          description="登録されている所属部署の数"
           accentClassName="bg-gradient-to-r from-emerald-500 to-teal-400"
         />
         <StatCard
@@ -469,7 +645,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">従業員一覧</h2>
-              <p className="text-sm text-slate-500">所属、連絡先、ポイント残高を一覧で確認できます。</p>
+              <p className="text-sm text-slate-500">所属部署、連絡先、ポイント残高を一覧で確認できます。</p>
             </div>
           </div>
 
@@ -486,6 +662,44 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
           </div>
         )}
       </section>
+
+      <EmployeeRegistrationDialog
+        open={isRegistrationDialogOpen}
+        submitting={registering}
+        error={registrationError}
+        departmentOptions={departmentOptions}
+        onClose={handleCloseRegistrationDialog}
+        onSubmit={handleRegisterEmployee}
+      />
+
+      <EmployeeEditDialog
+        open={Boolean(editingEmployee)}
+        employee={editingEmployee}
+        submitting={updatingEmployee}
+        error={editError}
+        pointUnitLabel={pointUnitLabel}
+        departmentOptions={departmentOptions}
+        onClose={handleCloseEditDialog}
+        onSubmit={handleUpdateEmployee}
+      />
+
+      <EmployeeDeleteDialog
+        open={Boolean(employeePendingDeletion)}
+        employee={employeePendingDeletion}
+        submitting={deletingEmployee}
+        error={deleteError}
+        onClose={handleCloseDeleteDialog}
+        onSubmit={handleDeleteEmployee}
+      />
+
+      <DepartmentManagementDialog
+        open={isDepartmentDialogOpen}
+        departments={departmentOptions}
+        onClose={() => setDepartmentDialogOpen(false)}
+        onCreateDepartment={handleCreateDepartment}
+        onRenameDepartment={handleRenameDepartment}
+        onDeleteDepartment={handleDeleteDepartment}
+      />
     </div>
   );
 }
