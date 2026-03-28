@@ -1,6 +1,7 @@
 import Philosophy from "@employee/features/philosophy";
 import LoginInfo from "@employee/features/login-info";
 import DashboardSummary from "@employee/features/dashboard-summary";
+import DashboardLinks from "@employee/features/dashboard-links";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";
 import ExchangeHistory from "@employee/features/exchange-history/";
@@ -27,7 +28,10 @@ export default function DashboardPage() {
       <div className="mt-5">
         <MissionReport icon={faTasks} companyId={companyId} userId={userId} />
       </div>
-      <div className="mt-5">
+      <div className="mt-10">
+        <DashboardLinks />
+      </div>
+      <div className="mt-10">
         <MonthlyPointsHistory icon={faChartLine} companyId={companyId} userId={userId} />
       </div>
       <div className="mt-5">
