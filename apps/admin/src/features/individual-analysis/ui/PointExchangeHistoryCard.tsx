@@ -62,7 +62,7 @@ async function fetchPointExchangeHistory(
 
   if (!res.ok) {
     console.error("fetchPointExchangeHistory error", res.status, await res.text());
-    throw new Error("\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
+    throw new Error("ポイント交換履歴の取得に失敗しました");
   }
 
   const data = (await res.json()) as PointExchangeHistoryItem[] | null;
@@ -130,7 +130,7 @@ export default function PointExchangeHistoryCard({
         }
 
         console.error(err);
-        setError("\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
+        setError("ポイント交換履歴の取得に失敗しました");
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false);
@@ -166,7 +166,7 @@ export default function PointExchangeHistoryCard({
   return (
     <section className="min-h-[320px] rounded-2xl bg-white p-6 shadow-lg">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-2xl font-bold text-slate-900">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</h3>
+        <h3 className="text-2xl font-bold text-slate-900">{"ポイント交換履歴"}</h3>
         <Button
           variant="contained"
           startIcon={<FontAwesomeIcon icon={faDownload} />}
@@ -180,18 +180,18 @@ export default function PointExchangeHistoryCard({
             py: 1.25,
           }}
         >
-          {"\u30c7\u30fc\u30bf\u30a8\u30af\u30b9\u30dd\u30fc\u30c8"}
+          {"データエクスポート"}
         </Button>
       </div>
 
       <div className="mt-8">
-        {loading && <div className="text-sm text-slate-400">{"\u8aad\u307f\u8fbc\u307f\u4e2d\u002e\u002e\u002e"}</div>}
+        {loading && <div className="text-sm text-slate-400">{"読み込み中..."}</div>}
 
         {!loading && error && <div className="text-sm text-red-500">{error}</div>}
 
         {!loading && !error && items.length === 0 && (
           <div className="flex min-h-[220px] items-center justify-center text-sm text-slate-400">
-            {"\u6307\u5b9a\u671f\u9593\u306e\u4ea4\u63db\u5c65\u6b74\u306f\u3042\u308a\u307e\u305b\u3093"}
+            {"指定期間の交換履歴はありません"}
           </div>
         )}
 
@@ -211,7 +211,7 @@ export default function PointExchangeHistoryCard({
 
                     <div className="shrink-0 sm:text-right">
                       <p className="text-lg font-semibold text-red-500">-{item.usedPoint.toLocaleString()}pt</p>
-                      <p className="mt-1 text-sm font-medium text-emerald-500">{"\u4ea4\u63db\u6e08\u307f"}</p>
+                      <p className="mt-1 text-sm font-medium text-emerald-500">{"交換済み"}</p>
                     </div>
                   </div>
                 </div>

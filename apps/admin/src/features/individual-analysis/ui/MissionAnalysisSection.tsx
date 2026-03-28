@@ -18,11 +18,11 @@ export default function MissionAnalysisSection({
 }: MissionAnalysisSectionProps) {
   return (
     <div className={`rounded-lg bg-white p-6 shadow-sm ${className ?? ""}`}>
-      <h3 className="mb-4 text-2xl font-bold">{"\u9805\u76ee\u5206\u6790"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">{"項目分析"}</h3>
       <div className="space-y-6">
         <div>
           <h4 className="mb-3 text-base font-bold" style={{ color: "#10b981" }}>
-            {"\u9054\u6210\u7387\u304c\u9ad8\u3044\u9805\u76ee"}
+            {"達成率が高い項目"}
           </h4>
           <ul className="space-y-2">
             {goodMissions.map((mission, index) => (
@@ -38,7 +38,7 @@ export default function MissionAnalysisSection({
 
         <div>
           <h4 className="mb-3 text-base font-bold" style={{ color: "#ef4444" }}>
-            {"\u6539\u5584\u4f59\u5730\u304c\u3042\u308b\u9805\u76ee"}
+            {"改善余地がある項目"}
           </h4>
           <ul className="space-y-2">
             {improvementMissions.map((mission, index) => (

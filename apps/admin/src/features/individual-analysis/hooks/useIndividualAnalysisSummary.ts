@@ -50,7 +50,7 @@ export function useIndividualAnalysisSummary(
         console.error(err);
         setSummary(null);
         setError(
-          err instanceof Error ? err.message : "\u500b\u5225\u5206\u6790\u30c7\u30fc\u30bf\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f"
+          err instanceof Error ? err.message : "個別分析データの取得に失敗しました"
         );
       } finally {
         if (!ac.signal.aborted) {

@@ -36,7 +36,7 @@ export async function fetchRecentReports(
 
   if (!res.ok) {
     console.error("fetchRecentReports error", res.status, await res.text());
-    throw new Error("\u5831\u544a\u5185\u5bb9\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
+    throw new Error("報告内容の取得に失敗しました");
   }
 
   const data = (await res.json()) as RecentReport[] | null;

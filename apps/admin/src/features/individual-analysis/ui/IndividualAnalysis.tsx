@@ -30,11 +30,11 @@ export default function IndividualAnalysis() {
   const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const employees: EmployeeOption[] = useMemo(
     () => [
-      { userId: "u-001", name: "\u5c71\u7530\u0020\u592a\u90ce", department: "\u55b6\u696d\u90e8" },
-      { userId: "u-002", name: "\u4f50\u85e4\u0020\u82b1\u5b50", department: "\u6280\u8853\u90e8" },
-      { userId: "u-003", name: "\u9234\u6728\u0020\u4e00\u90ce", department: "\u30de\u30fc\u30b1\u30c6\u30a3\u30f3\u30b0\u90e8" },
-      { userId: "u-004", name: "\u9ad8\u6a4b\u0020\u7f8e\u54b2", department: "\u4eba\u4e8b\u90e8" },
-      { userId: "u-005", name: "\u4f0a\u85e4\u0020\u5065\u592a", department: "\u55b6\u696d\u90e8" },
+      { userId: "u-001", name: "山田 太郎", department: "営業部" },
+      { userId: "u-002", name: "佐藤 花子", department: "技術部" },
+      { userId: "u-003", name: "鈴木 一郎", department: "マーケティング部" },
+      { userId: "u-004", name: "高橋 美咲", department: "人事部" },
+      { userId: "u-005", name: "伊藤 健太", department: "営業部" },
     ],
     []
   );
@@ -93,12 +93,12 @@ export default function IndividualAnalysis() {
         <EmployeeProfileCard
           name={selectedEmployee.name}
           department={selectedEmployee.department}
-          role={"\u30c1\u30fc\u30e0\u30ea\u30fc\u30c0\u30fc"}
+          role={"チームリーダー"}
         />
       )}
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-      {loading && <div className="mb-4 text-sm text-slate-500">{"\u5206\u6790\u30c7\u30fc\u30bf\u3092\u8aad\u307f\u8fbc\u307f\u4e2d\u002e\u002e\u002e"}</div>}
+      {loading && <div className="mb-4 text-sm text-slate-500">{"分析データを読み込み中..."}</div>}
 
       <EmployeeStatsCards
         earnedPoints={currentSummary.earnedPoints}

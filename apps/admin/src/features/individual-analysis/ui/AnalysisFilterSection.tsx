@@ -28,15 +28,15 @@ export default function AnalysisFilterSection({
 
   return (
     <div className="mb-6 rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-2xl font-bold">{"\u793e\u54e1\u9078\u629e"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">{"社員選択"}</h3>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <FormControl sx={{ width: "100%" }}>
-          <InputLabel id="employee-select-label">{"\u793e\u54e1\u3092\u9078\u629e"}</InputLabel>
+          <InputLabel id="employee-select-label">{"社員を選択"}</InputLabel>
           <Select
             labelId="employee-select-label"
             id="employee-select"
             value={selectedUserId}
-            label={"\u793e\u54e1\u3092\u9078\u629e"}
+            label={"社員を選択"}
             onChange={handleUserChange}
           >
             {employees.map((emp) => (
@@ -47,7 +47,7 @@ export default function AnalysisFilterSection({
           </Select>
         </FormControl>
         <TextField
-          label={"\u958b\u59cb\u65e5"}
+          label={"開始日"}
           type="date"
           value={selectedStartDate}
           onChange={(event) => onStartDateChange(event.target.value)}
@@ -56,7 +56,7 @@ export default function AnalysisFilterSection({
           inputProps={{ max: selectedEndDate || undefined }}
         />
         <TextField
-          label={"\u7d42\u4e86\u65e5"}
+          label={"終了日"}
           type="date"
           value={selectedEndDate}
           onChange={(event) => onEndDateChange(event.target.value)}

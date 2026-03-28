@@ -22,7 +22,7 @@ export async function fetchIndividualAnalysisSummary(
 
   if (!res.ok) {
     console.error("fetchIndividualAnalysisSummary error", res.status, await res.text());
-    throw new Error("\u500b\u5225\u5206\u6790\u30c7\u30fc\u30bf\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
+    throw new Error("個別分析データの取得に失敗しました");
   }
 
   const data = (await res.json()) as IndividualAnalysisSummary | null;

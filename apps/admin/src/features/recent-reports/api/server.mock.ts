@@ -41,10 +41,10 @@ function buildFallbackFieldValues(report: MissionReport): Record<string, string>
   switch (report.missionId) {
     case "greetings": {
       const samples = [
-        "\u59cb\u696d\u524d\u30fb\u663c\u30fb\u9000\u52e4\u6642\u306b\u5b9f\u65bd\uff08\u8a083\u56de\uff09",
-        "\u671d\u4f1a\u524d\u306b\u53d7\u4ed8\u3068\u57f7\u52d9\u5ba4\u3067\u58f0\u639b\u3051",
-        "\u4ed6\u90e8\u7f72\u3078\u8cc7\u6599\u53d7\u3051\u6e21\u3057\u306e\u969b\u306b\u6328\u62f6",
-        "\u7d42\u696d\u524d\u306e\u5de1\u56de\u6642\u306b\u4e00\u8a00\u6dfb\u3048\u3066\u5b9f\u65bd",
+        "始業前・昼・退勤時に実施（計3回）",
+        "朝会前に受付と執務室で声掛け",
+        "他部署へ資料受け渡しの際に挨拶",
+        "終業前の巡回時に一言添えて実施",
       ];
       const note = samples[hashString(report.reportId) % samples.length];
 
@@ -55,10 +55,10 @@ function buildFallbackFieldValues(report: MissionReport): Record<string, string>
     }
     case "health": {
       const samples = [
-        "\u30a6\u30a9\u30fc\u30ad\u30f3\u30b0\u5e73\u5747 8,200 \u6b69/\u65e5\uff08\u96e8\u5929\u306f\u30b9\u30c8\u30ec\u30c3\u30c1\uff09",
-        "\u663c\u4f11\u307f\u306b\u968e\u6bb5\u5229\u7528\u306815\u5206\u306e\u6563\u6b69",
-        "\u5c31\u5bdd\u524d\u306b\u30b9\u30c8\u30ec\u30c3\u30c110\u5206\u3001\u80a9\u307e\u308f\u308a\u4e2d\u5fc3",
-        "\u901a\u52e4\u3092\u4e00\u99c5\u5206\u6b69\u304d\u306b\u5909\u66f4\u3001\u90314\u65e5\u5b9f\u65bd",
+        "ウォーキング平均 8,200 歩/日（雨天はストレッチ）",
+        "昼休みに階段利用と15分の散歩",
+        "就寝前にストレッチ10分、肩まわり中心",
+        "通勤を一駅分歩きに変更、週4日実施",
       ];
 
       return {
@@ -68,24 +68,24 @@ function buildFallbackFieldValues(report: MissionReport): Record<string, string>
     case "growth": {
       const samples = [
         {
-          reference_title: "\u300e\u30ea\u30fc\u30c0\u30d6\u30eb\u30b3\u30fc\u30c9\u300f",
-          learning_content: "\u95a2\u6570\u547d\u540d\u30fb\u65e9\u671freturn\u30fb\u30b3\u30e1\u30f3\u30c8\u6307\u91dd",
-          application_plan: "PR\u30c6\u30f3\u30d7\u30ec\u306b\u30c1\u30a7\u30c3\u30af\u9805\u76ee\u3092\u8ffd\u52a0",
+          reference_title: "『リーダブルコード』",
+          learning_content: "関数命名・早期return・コメント指針",
+          application_plan: "PRテンプレにチェック項目を追加",
         },
         {
-          reference_title: "\u793e\u5185\u52c9\u5f37\u4f1a\u8cc7\u6599\u300cSQL\u30c1\u30e5\u30fc\u30cb\u30f3\u30b0\u57fa\u790e\u300d",
-          learning_content: "\u30a4\u30f3\u30c7\u30c3\u30af\u30b9\u8a2d\u8a08\u3068\u5b9f\u884c\u8a08\u753b\u306e\u898b\u65b9",
-          application_plan: "\u6708\u6b21\u96c6\u8a08\u30af\u30a8\u30ea\u306e\u898b\u76f4\u3057\u306b\u53cd\u6620",
+          reference_title: "社内勉強会資料「SQLチューニング基礎」",
+          learning_content: "インデックス設計と実行計画の見方",
+          application_plan: "月次集計クエリの見直しに反映",
         },
         {
-          reference_title: "Udemy\u8b1b\u5ea7\u300cNext.js\u5b9f\u8df5\u5165\u9580\u300d",
-          learning_content: "Server Actions \u3068\u30d5\u30a9\u30fc\u30e0\u8a2d\u8a08",
-          application_plan: "\u7533\u8acb\u753b\u9762\u306e\u30d0\u30ea\u30c7\u30fc\u30b7\u30e7\u30f3\u6539\u5584\u306b\u6d3b\u7528",
+          reference_title: "Udemy講座「Next.js実践入門」",
+          learning_content: "Server Actions とフォーム設計",
+          application_plan: "申請画面のバリデーション改善に活用",
         },
         {
-          reference_title: "\u6280\u8853\u30d6\u30ed\u30b0\u300c\u30ec\u30d3\u30e5\u30fc\u3057\u3084\u3059\u3044PR\u306e\u4f5c\u308a\u65b9\u300d",
-          learning_content: "\u5909\u66f4\u7c92\u5ea6\u306e\u5206\u5272\u3068\u8aac\u660e\u6587\u306e\u66f8\u304d\u65b9",
-          application_plan: "\u4eca\u5f8c\u306ePR\u8aac\u660e\u30c6\u30f3\u30d7\u30ec\u3092\u7d71\u4e00",
+          reference_title: "技術ブログ「レビューしやすいPRの作り方」",
+          learning_content: "変更粒度の分割と説明文の書き方",
+          application_plan: "今後のPR説明テンプレを統一",
         },
       ];
 
@@ -94,20 +94,20 @@ function buildFallbackFieldValues(report: MissionReport): Record<string, string>
     case "improve": {
       const samples = [
         {
-          proposal_detail: "\u52e4\u6020\u96c6\u8a08\u306e\u81ea\u52d5\u5316\uff08GAS\uff09",
-          expected_effect: "\u96c6\u8a08\u5de5\u6570 \u670830\u5206\u21925\u5206\u3001\u5165\u529b\u30df\u30b9\u524a\u6e1b",
+          proposal_detail: "勤怠集計の自動化（GAS）",
+          expected_effect: "集計工数 月30分→5分、入力ミス削減",
         },
         {
-          proposal_detail: "\u554f\u3044\u5408\u308f\u305b\u4e00\u6b21\u56de\u7b54\u30c6\u30f3\u30d7\u30ec\u30fc\u30c8\u306e\u6574\u5099",
-          expected_effect: "\u8fd4\u4fe1\u6642\u9593\u3092\u77ed\u7e2e\u3057\u3001\u56de\u7b54\u54c1\u8cea\u3092\u5e73\u6e96\u5316",
+          proposal_detail: "問い合わせ一次回答テンプレートの整備",
+          expected_effect: "返信時間を短縮し、回答品質を平準化",
         },
         {
-          proposal_detail: "\u9031\u5831\u30d5\u30a9\u30fc\u30e0\u306e\u5165\u529b\u9805\u76ee\u898b\u76f4\u3057",
-          expected_effect: "\u91cd\u8907\u5165\u529b\u3092\u306a\u304f\u3057\u3001\u8a18\u5165\u6642\u9593\u3092\u7d0410\u5206\u77ed\u7e2e",
+          proposal_detail: "週報フォームの入力項目見直し",
+          expected_effect: "重複入力をなくし、記入時間を約10分短縮",
         },
         {
-          proposal_detail: "\u8acb\u6c42\u66f8\u30c1\u30a7\u30c3\u30af\u30ea\u30b9\u30c8\u306e\u5171\u901a\u5316",
-          expected_effect: "\u78ba\u8a8d\u6f0f\u308c\u9632\u6b62\u3068\u5f15\u304d\u7d99\u304e\u3057\u3084\u3059\u3055\u5411\u4e0a",
+          proposal_detail: "請求書チェックリストの共通化",
+          expected_effect: "確認漏れ防止と引き継ぎしやすさ向上",
         },
       ];
 
@@ -115,10 +115,10 @@ function buildFallbackFieldValues(report: MissionReport): Record<string, string>
     }
     case "community": {
       const samples = [
-        "\u99c5\u524d\u301c\u516c\u5712\u306e\u6e05\u6383",
-        "\u4f1a\u793e\u5468\u8fba\u306e\u6b69\u9053\u6e05\u6383\u3068\u843d\u3061\u8449\u56de\u53ce",
-        "\u5730\u57df\u30a4\u30d9\u30f3\u30c8\u306e\u53d7\u4ed8\u88dc\u52a9",
-        "\u8fd1\u96a3\u516c\u5712\u306e\u82b1\u58c7\u6574\u5099\u3068\u3054\u307f\u62fe\u3044",
+        "駅前〜公園の清掃",
+        "会社周辺の歩道清掃と落ち葉回収",
+        "地域イベントの受付補助",
+        "近隣公園の花壇整備とごみ拾い",
       ];
 
       return {

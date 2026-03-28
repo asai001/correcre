@@ -54,7 +54,7 @@ export function useRecentReports(companyId: string | undefined, options?: UseRec
         }
 
         console.error(err);
-        setError("\u5831\u544a\u5185\u5bb9\u306e\u53d6\u5f97\u306b\u5931\u6557\u3057\u307e\u3057\u305f");
+        setError("報告内容の取得に失敗しました");
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false);
