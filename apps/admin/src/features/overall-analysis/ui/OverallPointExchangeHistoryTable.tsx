@@ -1,18 +1,25 @@
 "use client";
 
-import { faTable } from "@fortawesome/free-solid-svg-icons";
+import { faDownload, faTable } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Table, { type ColumnDef } from "@admin/components/Table";
+import { downloadCsv } from "@admin/lib/csv";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
-import { TablePagination } from "@mui/material";
+import { Button, TablePagination } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import type { OverallExchangeHistoryItem } from "../model/types";
 
 type OverallPointExchangeHistoryTableProps = {
   items: OverallExchangeHistoryItem[];
+  startDate: string;
+  endDate: string;
   rowsPerPageOptions?: number[];
   initialRowsPerPage?: number;
 };
+
+function formatDateTime(value: string) {
+  return toYYYYMMDDHHmm(new Date(value)).replace("T", " ");
+}
 
 function getColumns(): ColumnDef<OverallExchangeHistoryItem>[] {
   return [
@@ -20,7 +27,7 @@ function getColumns(): ColumnDef<OverallExchangeHistoryItem>[] {
       id: "date",
       label: "\u65e5\u6642",
       width: "22%",
-      render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
+      render: (row) => formatDateTime(row.date),
     },
     {
       id: "employeeName",
@@ -42,8 +49,17 @@ function getColumns(): ColumnDef<OverallExchangeHistoryItem>[] {
   ];
 }
 
+function buildExportRows(items: OverallExchangeHistoryItem[]) {
+  return [
+    ["\u65e5\u6642", "\u5f93\u696d\u54e1\u540d", "\u4ea4\u63db\u5546\u54c1", "\u4f7f\u7528\u30dd\u30a4\u30f3\u30c8"],
+    ...items.map((item) => [formatDateTime(item.date), item.employeeName, item.merchandiseName, item.usedPoint]),
+  ];
+}
+
 export default function OverallPointExchangeHistoryTable({
   items,
+  startDate,
+  endDate,
   rowsPerPageOptions,
   initialRowsPerPage,
 }: OverallPointExchangeHistoryTableProps) {
@@ -58,6 +74,7 @@ export default function OverallPointExchangeHistoryTable({
   }, [initialRowsPerPage, resolvedRowsPerPageOptions]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);
+  const exportRows = useMemo(() => buildExportRows(items), [items]);
 
   useEffect(() => {
     setPage(0);
@@ -71,9 +88,26 @@ export default function OverallPointExchangeHistoryTable({
   }, [items.length, page, rowsPerPage]);
 
   const heading = (
-    <div className="mb-4 flex items-center">
-      <FontAwesomeIcon icon={faTable} className="mr-3 text-xl text-blue-600 lg:text-2xl" />
-      <div className="text-lg font-bold lg:text-2xl">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</div>
+    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center">
+        <FontAwesomeIcon icon={faTable} className="mr-3 text-xl text-blue-600 lg:text-2xl" />
+        <div className="text-lg font-bold lg:text-2xl">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</div>
+      </div>
+      <Button
+        variant="contained"
+        startIcon={<FontAwesomeIcon icon={faDownload} />}
+        disabled={items.length === 0}
+        onClick={() => downloadCsv(`overall-point-exchange-history-${startDate}_${endDate}.csv`, exportRows)}
+        sx={{
+          alignSelf: { xs: "stretch", sm: "center" },
+          borderRadius: "14px",
+          backgroundColor: "#475569",
+          px: 2.5,
+          py: 1.25,
+        }}
+      >
+        {"\u30c7\u30fc\u30bf\u30a8\u30af\u30b9\u30dd\u30fc\u30c8"}
+      </Button>
     </div>
   );
 

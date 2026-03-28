@@ -91,6 +91,8 @@ export default function OverallAnalysis() {
 
       <OverallPointExchangeHistoryTable
         items={currentSummary.exchangeHistory}
+        startDate={selectedStartDate}
+        endDate={selectedEndDate}
         rowsPerPageOptions={exchangeHistoryPagination.rowsPerPageOptions}
         initialRowsPerPage={exchangeHistoryPagination.initialRowsPerPage}
       />

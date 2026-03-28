@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
 import AdminPageHeader from "@admin/components/AdminPageHeader";
 import Table, { type ColumnDef } from "@admin/components/Table";
+import { downloadCsv } from "@admin/lib/csv";
 import {
   createDepartment,
   createEmployee,
@@ -81,24 +82,6 @@ function formatDate(value?: string) {
 
 function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
-}
-
-function escapeCsvField(value: string | number) {
-  const normalized = String(value).replaceAll('"', '""');
-  return `"${normalized}"`;
-}
-
-function downloadCsv(filename: string, rows: Array<Array<string | number>>) {
-  const csv = `\uFEFF${rows.map((row) => row.map(escapeCsvField).join(",")).join("\r\n")}`;
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-
-  window.URL.revokeObjectURL(url);
 }
 
 function StatCard({ label, value, description, accentClassName }: StatCardProps) {

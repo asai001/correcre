@@ -124,6 +124,7 @@ export default function IndividualAnalysis() {
         <PointExchangeHistoryCard
           companyId={companyId}
           userId={selectedUserId}
+          employeeName={selectedEmployee?.name}
           startDate={selectedStartDate}
           endDate={selectedEndDate}
           fetchAll

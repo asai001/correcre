@@ -1,6 +1,9 @@
 "use client";
 
-import { TablePagination } from "@mui/material";
+import { faDownload } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { downloadCsv } from "@admin/lib/csv";
+import { Button, TablePagination } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 
 type PointExchangeHistoryItem = {
@@ -12,6 +15,7 @@ type PointExchangeHistoryItem = {
 type PointExchangeHistoryCardProps = {
   companyId: string;
   userId: string;
+  employeeName?: string;
   startDate: string;
   endDate: string;
   limit?: number;
@@ -19,6 +23,17 @@ type PointExchangeHistoryCardProps = {
   rowsPerPageOptions?: number[];
   initialRowsPerPage?: number;
 };
+
+function buildExportRows(employeeName: string, items: PointExchangeHistoryItem[]) {
+  return [
+    ["従業員名", "交換日", "交換商品", "使用ポイント"],
+    ...items.map((item) => [employeeName, item.date, item.merchandiseName, item.usedPoint]),
+  ];
+}
+
+function sanitizeFilenamePart(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "_").trim() || "employee";
+}
 
 async function fetchPointExchangeHistory(
   companyId: string,
@@ -58,6 +73,7 @@ async function fetchPointExchangeHistory(
 export default function PointExchangeHistoryCard({
   companyId,
   userId,
+  employeeName,
   startDate,
   endDate,
   limit = 3,
@@ -139,10 +155,34 @@ export default function PointExchangeHistoryCard({
   }, [items.length, page, rowsPerPage]);
 
   const displayedItems = items.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const exportEmployeeName = employeeName || userId;
+  const exportRows = useMemo(() => buildExportRows(exportEmployeeName, items), [exportEmployeeName, items]);
+  const exportFilename = useMemo(
+    () =>
+      `individual-point-exchange-history-${sanitizeFilenamePart(exportEmployeeName)}-${startDate}_${endDate}.csv`,
+    [endDate, exportEmployeeName, startDate]
+  );
 
   return (
     <section className="min-h-[320px] rounded-2xl bg-white p-6 shadow-lg">
-      <h3 className="text-2xl font-bold text-slate-900">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</h3>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-2xl font-bold text-slate-900">{"\u30dd\u30a4\u30f3\u30c8\u4ea4\u63db\u5c65\u6b74"}</h3>
+        <Button
+          variant="contained"
+          startIcon={<FontAwesomeIcon icon={faDownload} />}
+          disabled={loading || items.length === 0}
+          onClick={() => downloadCsv(exportFilename, exportRows)}
+          sx={{
+            alignSelf: { xs: "stretch", sm: "center" },
+            borderRadius: "14px",
+            backgroundColor: "#475569",
+            px: 2.5,
+            py: 1.25,
+          }}
+        >
+          {"\u30c7\u30fc\u30bf\u30a8\u30af\u30b9\u30dd\u30fc\u30c8"}
+        </Button>
+      </div>
 
       <div className="mt-8">
         {loading && <div className="text-sm text-slate-400">{"\u8aad\u307f\u8fbc\u307f\u4e2d\u002e\u002e\u002e"}</div>}
