@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -296,7 +296,7 @@ export default function RegisterMerchandisePage() {
 
       setNotice({
         severity: "success",
-        message: "提携企業情報と商品・サービス情報をスプレッドシートへ登録しました。",
+        message: "商品・サービス情報を登録しました。",
       });
     } catch (error) {
       setNotice({
@@ -748,3 +748,4 @@ export default function RegisterMerchandisePage() {
     </div>
   );
 }
+
