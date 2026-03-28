@@ -139,7 +139,7 @@ export async function getIndividualAnalysisSummaryFromDynamoMock(
     reportScoreByMissionId.set(report.missionId, (reportScoreByMissionId.get(report.missionId) ?? 0) + (report.scoreGranted ?? 0));
   }
 
-  const monthlyScores: number[] = [];
+  let totalEarnedPoints = 0;
   const trendData: AnalysisTrendItem[] = months.map((yearMonth) => {
     const monthlyStat = monthlyStats.find((item) => item.yearMonth === yearMonth);
     const reportsInMonth = monthlyApprovedReports.get(yearMonth) ?? [];
@@ -147,7 +147,7 @@ export async function getIndividualAnalysisSummaryFromDynamoMock(
     const selectedMonthReports = reportsInMonth.filter((report) => isWithinDateRange(report.reportedAt, startDate, endDate));
     const selectedMonthScore = selectedMonthReports.reduce((sum, report) => sum + (report.scoreGranted ?? 0), 0);
 
-    const points =
+    const earnedPointsInRange =
       monthlyStat && totalMonthScore > 0 ? round((monthlyStat.earnedPoints * selectedMonthScore) / totalMonthScore, 0) : 0;
 
     let targetMonthScore = 0;
@@ -160,15 +160,14 @@ export async function getIndividualAnalysisSummaryFromDynamoMock(
       targetMonthScore += (mission.monthlyCount * mission.score * coveredDays) / getDaysInMonth(yearMonth);
     }
 
-    monthlyScores.push(toRate(selectedMonthScore, targetMonthScore));
+    const score = toRate(selectedMonthScore, targetMonthScore);
+    totalEarnedPoints += earnedPointsInRange;
 
     return {
       month: formatYearMonth(yearMonth),
-      points,
+      score,
     };
   });
-
-  const totalEarnedPoints = trendData.reduce((sum, item) => sum + item.points, 0);
 
   let totalTargetScore = 0;
   let totalActualScore = 0;
@@ -216,7 +215,7 @@ export async function getIndividualAnalysisSummaryFromDynamoMock(
     }));
 
   const averageScore =
-    monthlyScores.length > 0 ? round(monthlyScores.reduce((sum, score) => sum + score, 0) / monthlyScores.length, 1) : 0;
+    trendData.length > 0 ? round(trendData.reduce((sum, item) => sum + item.score, 0) / trendData.length, 1) : 0;
 
   return {
     earnedPoints: totalEarnedPoints,

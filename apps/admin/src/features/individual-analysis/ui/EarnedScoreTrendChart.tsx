@@ -10,6 +10,7 @@ import {
   LinearScale,
   PointElement,
   Title,
+  type TooltipItem,
   Tooltip,
 } from "chart.js";
 
@@ -17,24 +18,20 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 type TrendDataPoint = {
   month: string;
-  points: number;
+  score: number;
 };
 
-type PointsTrendChartProps = {
+type EarnedScoreTrendChartProps = {
   data: TrendDataPoint[];
 };
 
-export default function PointsTrendChart({ data }: PointsTrendChartProps) {
-  const maxPoint = data.reduce((max, item) => Math.max(max, item.points), 0);
-  const yAxisMax = maxPoint > 0 ? Math.ceil(maxPoint / 100) * 100 : 100;
-  const stepSize = yAxisMax <= 100 ? 20 : Math.max(50, Math.ceil(yAxisMax / 5 / 10) * 10);
-
+export default function EarnedScoreTrendChart({ data }: EarnedScoreTrendChartProps) {
   const chartData = {
     labels: data.map((item) => item.month),
     datasets: [
       {
-        label: "\u7372\u5f97\u30dd\u30a4\u30f3\u30c8",
-        data: data.map((item) => item.points),
+        label: "獲得点数",
+        data: data.map((item) => item.score),
         borderColor: "rgba(16, 185, 129, 1)",
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         borderWidth: 2,
@@ -60,13 +57,19 @@ export default function PointsTrendChart({ data }: PointsTrendChartProps) {
       title: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          label: (context: TooltipItem<"line">) =>
+            `${context.dataset.label ?? ""}: ${(context.parsed.y ?? 0).toLocaleString()}点`,
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
-        max: yAxisMax,
+        max: 100,
         ticks: {
-          stepSize,
+          stepSize: 20,
         },
       },
       x: {
@@ -79,7 +82,7 @@ export default function PointsTrendChart({ data }: PointsTrendChartProps) {
 
   return (
     <div className="rounded-lg bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-2xl font-bold">{"\u7372\u5f97\u30dd\u30a4\u30f3\u30c8\u63a8\u79fb"}</h3>
+      <h3 className="mb-4 text-2xl font-bold">獲得点数推移</h3>
       <div style={{ height: "400px" }}>
         <Line data={chartData} options={options} />
       </div>

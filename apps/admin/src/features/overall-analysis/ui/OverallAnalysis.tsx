@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
 import { useMemo, useState } from "react";
 import MissionAnalysisSection from "@admin/features/individual-analysis/ui/MissionAnalysisSection";
 import OverallAchievementChart from "./OverallAchievementChart";
@@ -23,11 +24,8 @@ const emptySummary: OverallAnalysisSummary = {
   exchangeHistory: [],
 };
 
-function formatLocalDate(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-}
-
 export default function OverallAnalysis() {
+  const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const exchangeHistoryPagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],
@@ -35,10 +33,8 @@ export default function OverallAnalysis() {
     }),
     []
   );
-  const [selectedStartDate, setSelectedStartDate] = useState(() =>
-    formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1))
-  );
-  const [selectedEndDate, setSelectedEndDate] = useState(() => formatLocalDate(new Date()));
+  const [selectedStartDate, setSelectedStartDate] = useState(initialDateRange.startDate);
+  const [selectedEndDate, setSelectedEndDate] = useState(initialDateRange.endDate);
   const { summary, loading, error } = useOverallAnalysisSummary(companyId, selectedStartDate, selectedEndDate);
   const currentSummary = summary ?? emptySummary;
 
@@ -68,7 +64,7 @@ export default function OverallAnalysis() {
       />
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
-      {loading && <div className="mb-4 text-sm text-slate-500">全体分析データを読み込み中...</div>}
+      {loading && <div className="mb-4 text-sm text-slate-500">分析データを読み込み中...</div>}
 
       <div className="mb-6 space-y-6">
         <OverallAnalysisStatsCards

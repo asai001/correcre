@@ -1,12 +1,13 @@
 "use client";
 
+import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
 import { useMemo, useState } from "react";
 import RecentReports from "@admin/features/recent-reports";
 import AnalysisFilterSection from "./AnalysisFilterSection";
+import EarnedScoreTrendChart from "./EarnedScoreTrendChart";
 import EmployeeProfileCard from "./EmployeeProfileCard";
 import EmployeeStatsCards from "./EmployeeStatsCards";
 import MonthlyAchievementRadar from "./MonthlyAchievementRadar";
-import PointsTrendChart from "./PointsTrendChart";
 import MissionAnalysisSection from "./MissionAnalysisSection";
 import PointExchangeHistoryCard from "./PointExchangeHistoryCard";
 import { useIndividualAnalysisSummary } from "../hooks/useIndividualAnalysisSummary";
@@ -25,11 +26,8 @@ const emptySummary: IndividualAnalysisSummary = {
   improvementMissions: [],
 };
 
-function formatLocalDate(date: Date) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-}
-
 export default function IndividualAnalysis() {
+  const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const employees: EmployeeOption[] = useMemo(
     () => [
       { userId: "u-001", name: "\u5c71\u7530\u0020\u592a\u90ce", department: "\u55b6\u696d\u90e8" },
@@ -56,10 +54,8 @@ export default function IndividualAnalysis() {
   );
 
   const [selectedUserId, setSelectedUserId] = useState(employees[0]?.userId ?? "");
-  const [selectedStartDate, setSelectedStartDate] = useState(() =>
-    formatLocalDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-  );
-  const [selectedEndDate, setSelectedEndDate] = useState(() => formatLocalDate(new Date()));
+  const [selectedStartDate, setSelectedStartDate] = useState(initialDateRange.startDate);
+  const [selectedEndDate, setSelectedEndDate] = useState(initialDateRange.endDate);
 
   const selectedEmployee = employees.find((emp) => emp.userId === selectedUserId);
   const { summary, loading, error } = useIndividualAnalysisSummary(companyId, selectedUserId, selectedStartDate, selectedEndDate);
@@ -113,7 +109,7 @@ export default function IndividualAnalysis() {
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <MonthlyAchievementRadar data={currentSummary.radarData} />
-        <PointsTrendChart data={currentSummary.trendData} />
+        <EarnedScoreTrendChart data={currentSummary.trendData} />
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">

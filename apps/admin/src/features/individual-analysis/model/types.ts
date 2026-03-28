@@ -24,7 +24,7 @@ export type AnalysisRadarItem = {
 
 export type AnalysisTrendItem = {
   month: string;
-  points: number;
+  score: number;
 };
 
 export type IndividualAnalysisSummary = {
