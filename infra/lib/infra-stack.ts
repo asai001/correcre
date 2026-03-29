@@ -2,6 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 
 import { createSharedCognito } from "./cognito";
+import { createApplicationDynamoTables } from "./dynamodb";
 
 export type InfraStage = "dev" | "stg" | "prod";
 
@@ -26,6 +27,9 @@ export class InfraStack extends cdk.Stack {
       stage: props.stage,
       account: props.env?.account,
       region: props.env?.region,
+    });
+    const dynamoTables = createApplicationDynamoTables(this, {
+      stage: props.stage,
     });
 
     new cdk.CfnOutput(this, "EnvironmentName", {
@@ -110,6 +114,38 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "EmployeeCognitoDomainPrefix", {
       value: sharedCognito.domainPrefix,
+    });
+
+    new cdk.CfnOutput(this, "CompanyTableName", {
+      value: dynamoTables.companyTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "UserTableName", {
+      value: dynamoTables.userTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "DepartmentTableName", {
+      value: dynamoTables.departmentTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MissionTableName", {
+      value: dynamoTables.missionTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MissionReportTableName", {
+      value: dynamoTables.missionReportTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "UserMonthlyStatsTableName", {
+      value: dynamoTables.userMonthlyStatsTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "ExchangeHistoryTableName", {
+      value: dynamoTables.exchangeHistoryTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "PointTransactionTableName", {
+      value: dynamoTables.pointTransactionTable.tableName,
     });
   }
 }
