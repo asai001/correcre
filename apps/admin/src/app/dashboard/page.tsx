@@ -1,8 +1,9 @@
-import LoginInfo from "@admin/features/login-info";
+import { logout } from "@admin/app/lib/actions/authenticate";
 import AvgItemCompletion from "@admin/features/avg-item-completion";
-import DashboardSummary from "@admin/features/dashboard-summary";
-import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
 import AvgPointsTrend from "@admin/features/avg-points-trend";
+import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
+import DashboardSummary from "@admin/features/dashboard-summary";
+import LoginInfo from "@admin/features/login-info";
 import RecentReports from "@admin/features/recent-reports";
 
 const companyId = "em";
@@ -12,20 +13,34 @@ const targetYearMonth = "2025-11";
 export default function DashboardPage() {
   return (
     <>
+      <div className="mt-6 flex justify-end">
+        <form action={logout}>
+          <button
+            type="submit"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+          >
+            ログアウト
+          </button>
+        </form>
+      </div>
+
       <div className="my-5">
         <LoginInfo companyId={companyId} userId={userId} />
       </div>
+
       <div className="mt-5">
         <DashboardSummary companyId={companyId} userId={userId} targetYearMonth={targetYearMonth} />
       </div>
-      {/* md (768px) 以上の場合に ScoreTile をグリッドで3等分で横並びにする */}
+
       <div className="mt-5">
         <DashboardMenuTile />
       </div>
-      <div className="grid lg:grid-cols-2 mt-5 gap-4">
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <AvgPointsTrend companyId={companyId} />
         <AvgItemCompletion className="min-w-[220px] md:min-w-0" companyId={companyId} />
       </div>
+
       <div className="mt-5">
         <RecentReports companyId={companyId} />
       </div>

@@ -55,6 +55,7 @@
 infra/*.js
 infra/!jest.config.js
 infra/*.d.ts
+infra/dist
 
 # CDK asset staging directory
 infra/.cdk.staging

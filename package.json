@@ -5,6 +5,7 @@
   "type": "commonjs",
   "private": true,
   "workspaces": [
+    "infra",
     "apps/*",
     "packages/*",
     "packages/features/*"

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1019.0",
     "@correcre/individual-analysis": "0.0.1",
     "@correcre/theme": "0.0.1",
     "@emotion/react": "^11.14.0",
@@ -19,6 +20,7 @@
     "@mui/material": "^7.3.2",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
+    "jose": "^6.2.2",
     "next": "15.5.9",
     "react": "19.1.0",
     "react-chartjs-2": "^5.3.1",

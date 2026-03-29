@@ -1,5 +1,10 @@
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20"></div>
-  );
+import { redirect } from "next/navigation";
+
+import { EMPLOYEE_DEFAULT_REDIRECT_PATH, EMPLOYEE_LOGIN_PATH } from "@employee/lib/auth/constants";
+import { getEmployeeSession } from "@employee/lib/auth/session";
+
+export default async function Home() {
+  const session = await getEmployeeSession();
+
+  redirect(session ? EMPLOYEE_DEFAULT_REDIRECT_PATH : EMPLOYEE_LOGIN_PATH);
 }

@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faUserShield } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+import { logout } from "@admin/app/lib/actions/authenticate";
 
 type AdminPageHeaderProps = {
   title: string;
@@ -37,8 +39,16 @@ export default function AdminPageHeader({
         </div>
 
         <div className="flex items-center gap-4 self-end sm:self-auto">
+          <form action={logout}>
+            <button
+              type="submit"
+              className="rounded-full border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              ログアウト
+            </button>
+          </form>
           <div className="text-right">
-            <div className="text-xs font-semibold tracking-[0.2em] text-white/70">管理者</div>
+            <div className="text-xs font-semibold tracking-[0.2em] text-white/70">ADMIN</div>
             <div className="mt-1 text-lg font-bold sm:text-[1.7rem]">{adminName}</div>
           </div>
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/18 text-lg shadow-lg shadow-violet-900/15">

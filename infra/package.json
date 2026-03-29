@@ -2,13 +2,16 @@
   "name": "infra",
   "version": "0.1.0",
   "bin": {
-    "infra": "bin/infra.js"
+    "infra": "dist/bin/infra.js"
   },
   "scripts": {
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "deploy:dev": "cdk deploy CorrecreDevInfraStack --profile CorreCre-Dev-Account",
+    "deploy:stg": "cdk deploy CorrecreStgInfraStack --profile CorreCre-Stg-Account --require-approval never",
+    "deploy:prod": "cdk deploy CorrecreProdInfraStack --profile CorreCre-Prod-Account --require-approval never"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

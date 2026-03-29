@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Cognito Login
+
+Set these environment variables for the admin app:
+
+```bash
+ADMIN_COGNITO_REGION=ap-northeast-1
+ADMIN_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
+ADMIN_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The values are emitted by the CDK stack as `AdminCognitoRegion`, `AdminCognitoUserPoolId`, and `AdminCognitoUserPoolClientId`.
+
+`AdminCognitoUserPoolId` is shared with the employee app. Only the app client ID differs between the two applications.
+
+This configuration uses email-and-password sign-in. The Cognito password policy is 8 characters minimum with no uppercase, lowercase, digit, or symbol requirement.
+
 ## Getting Started
 
 First, run the development server:
