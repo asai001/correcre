@@ -5,7 +5,7 @@ import { Button, TablePagination } from "@mui/material";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
-import { downloadCsv } from "@admin/lib/csv";
+import { downloadCsv } from "@correcre/individual-analysis";
 
 type PointExchangeHistoryItem = {
   date: string;

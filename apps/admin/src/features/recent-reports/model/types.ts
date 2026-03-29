@@ -1,7 +1,1 @@
-export type RecentReport = {
-  date: string;
-  name: string;
-  itemName: string;
-  progress: string;
-  inputContent: string;
-};
+export type { RecentReport } from "@correcre/individual-analysis";

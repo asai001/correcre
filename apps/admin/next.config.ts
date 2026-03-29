@@ -7,6 +7,13 @@ const nextConfig: NextConfig = {
   // Keep local `next build` output separate, but use the standard `.next` directory in CI/Vercel.
   distDir: isLocalProductionBuild ? ".next-build" : ".next",
   typedRoutes: true,
-  transpilePackages: ["@correcre/validation", "@correcre/types", "@correcre/adapters", "@correcre/theme", "@correcre/lib"],
+  transpilePackages: [
+    "@correcre/validation",
+    "@correcre/types",
+    "@correcre/adapters",
+    "@correcre/theme",
+    "@correcre/lib",
+    "@correcre/individual-analysis",
+  ],
 };
 export default nextConfig;

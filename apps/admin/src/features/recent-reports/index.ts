@@ -1,3 +1,1 @@
-import RecentReports from "./ui/RecentReports";
-
-export default RecentReports;
+export { RecentReports as default } from "@correcre/individual-analysis";

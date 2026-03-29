@@ -19,6 +19,8 @@
       "@correcre/theme/*": ["packages/theme/src/*"],
       "@correcre/lib": ["packages/lib/src/index.ts"],
       "@correcre/lib/*": ["packages/lib/src/*"],
+      "@correcre/individual-analysis": ["packages/features/individual-analysis/src/index.ts"],
+      "@correcre/individual-analysis/*": ["packages/features/individual-analysis/src/*"],
       "@admin/*": ["apps/admin/src/*"],
       "@employee/*": ["apps/employee/src/*"]
     },

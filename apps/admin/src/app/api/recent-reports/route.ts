@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRecentReportsFromDynamoMock } from "@admin/features/recent-reports/api/server.mock";
+import { getRecentReportsFromDynamoMock } from "@correcre/individual-analysis/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

@@ -42,7 +42,7 @@ export default function AdminPageHeader({
             <div className="mt-1 text-lg font-bold sm:text-[1.7rem]">{adminName}</div>
           </div>
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/18 text-lg shadow-lg shadow-violet-900/15">
-            <FontAwesomeIcon icon={faUserShield} />
+            <FontAwesomeIcon icon={faUserShield} style={{ color: "#fff", width: "1.5rem", height: "1.5rem" }} />
           </div>
         </div>
       </div>

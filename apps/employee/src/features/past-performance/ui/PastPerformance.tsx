@@ -2,13 +2,15 @@
 
 import { useMemo, useState } from "react";
 
-import RecentReports from "@admin/features/recent-reports";
-import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
-import type { IndividualAnalysisSummary } from "@admin/features/individual-analysis/model/types";
-import { useIndividualAnalysisSummary } from "@admin/features/individual-analysis/hooks/useIndividualAnalysisSummary";
-import MonthlyAchievementRadar from "@admin/features/individual-analysis/ui/MonthlyAchievementRadar";
-import EarnedScoreTrendChart from "@admin/features/individual-analysis/ui/EarnedScoreTrendChart";
-import MissionAnalysisSection from "@admin/features/individual-analysis/ui/MissionAnalysisSection";
+import {
+  EarnedScoreTrendChart,
+  getDefaultAnalysisDateRange,
+  type IndividualAnalysisSummary,
+  MissionAnalysisSection,
+  MonthlyAchievementRadar,
+  RecentReports,
+  useIndividualAnalysisSummary,
+} from "@correcre/individual-analysis";
 
 import { useLoginInfo } from "@employee/features/login-info/hooks/useLoginInfo";
 

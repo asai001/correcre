@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getIndividualAnalysisSummaryFromDynamoMock } from "@admin/features/individual-analysis/api/server.mock";
+import { getIndividualAnalysisSummaryFromDynamoMock } from "@correcre/individual-analysis/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

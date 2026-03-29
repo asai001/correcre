@@ -6,7 +6,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/features/*"
   ],
   "scripts": {
     "dev:employee": "npm run dev --workspace @correcre/employee",
