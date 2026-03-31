@@ -10,8 +10,27 @@ import type {
   DeleteEmployeeInput,
   UpdateEmployeeInput,
 } from "@admin/features/employee-management/model/types";
+import { getOperatorAccessStatus } from "@admin/lib/auth/operator";
+
+async function authorizeOperator() {
+  const access = await getOperatorAccessStatus();
+
+  if (access.allowed) {
+    return null;
+  }
+
+  const status = access.reason === "unauthenticated" ? 401 : 403;
+  const error = access.reason === "unauthenticated" ? "unauthorized" : "operator_only";
+
+  return NextResponse.json({ error }, { status });
+}
 
 export async function GET(req: Request) {
+  const unauthorized = await authorizeOperator();
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const { searchParams } = new URL(req.url);
   const companyId = searchParams.get("companyId");
   const adminUserId = searchParams.get("adminUserId") ?? undefined;
@@ -42,6 +61,11 @@ type DeleteEmployeeRequest = DeleteEmployeeInput & {
 };
 
 export async function POST(req: Request) {
+  const unauthorized = await authorizeOperator();
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   let body: CreateEmployeeRequest | null = null;
 
   try {
@@ -71,6 +95,11 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const unauthorized = await authorizeOperator();
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   let body: UpdateEmployeeRequest | null = null;
 
   try {
@@ -100,6 +129,11 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const unauthorized = await authorizeOperator();
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   let body: DeleteEmployeeRequest | null = null;
 
   try {

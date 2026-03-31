@@ -13,6 +13,7 @@
   "scripts": {
     "dev:employee": "npm run dev --workspace @correcre/employee",
     "dev:admin": "npm run dev --workspace @correcre/admin",
+    "dev:operator": "npm run dev --workspace @correcre/operator",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces"

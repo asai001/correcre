@@ -22,6 +22,7 @@
       "@correcre/individual-analysis": ["packages/features/individual-analysis/src/index.ts"],
       "@correcre/individual-analysis/*": ["packages/features/individual-analysis/src/*"],
       "@admin/*": ["apps/admin/src/*"],
+      "@operator/*": ["apps/operator/src/*"],
       "@employee/*": ["apps/employee/src/*"]
     },
 

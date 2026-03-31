@@ -5,5 +5,4 @@ export const EMPLOYEE_DEFAULT_REDIRECT_PATH = "/dashboard";
 export const EMPLOYEE_PROTECTED_PATH_PREFIXES = [
   "/dashboard",
   "/past-performance",
-  "/register-merchandise",
 ] as const;

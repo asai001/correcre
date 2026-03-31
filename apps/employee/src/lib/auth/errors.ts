@@ -1,11 +1,11 @@
 export const LOGIN_ERROR_MESSAGES = {
   invalid_credentials: "ID またはパスワードが正しくありません。",
   missing_fields: "ID とパスワードを入力してください。",
-  new_password_required: "初回ログインのため、Cognito 側でパスワード変更が必要です。",
-  password_reset_required: "パスワード再設定が必要です。管理者にお問い合わせください。",
-  rate_limited: "試行回数が多すぎます。しばらくしてから再度お試しください。",
-  user_not_confirmed: "ユーザーが未確認です。管理者にお問い合わせください。",
-  system_error: "ログインに失敗しました。設定値と Cognito の状態を確認してください。",
+  new_password_required: "初回ログインのため、パスワード変更が必要です。",
+  password_reset_required: "パスワードの再設定が必要です。再設定してからもう一度お試しください。",
+  rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
+  user_not_confirmed: "ユーザー確認が完了していません。登録状況を確認してください。",
+  system_error: "ログインに失敗しました。設定内容とアカウント状態を確認してください。",
 } as const;
 
 export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;

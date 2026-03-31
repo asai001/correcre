@@ -4,9 +4,11 @@ import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
   DeleteEmployeeInput,
+  EmployeeAuthLinkStatus,
   EmployeeDepartmentOption,
   EmployeeManagementEmployee,
   EmployeeManagementRole,
+  EmployeeManagementStatus,
   EmployeeManagementSummary,
   RenameDepartmentInput,
   UpdateEmployeeInput,
@@ -18,6 +20,8 @@ type RawMockUser = {
   name: string;
   department?: string;
   departments?: string[];
+  loginId?: string;
+  cognitoSub?: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -26,7 +30,7 @@ type RawMockUser = {
   currentPointBalance?: number;
   currentMonthCompletionRate?: number;
   roles?: EmployeeManagementRole[];
-  status?: "ACTIVE" | "INACTIVE" | "DELETED";
+  status?: EmployeeManagementStatus | "ACTIVE" | "INACTIVE" | "DELETED";
 };
 
 const mockAddresses = [
@@ -46,9 +50,14 @@ const companyStore: Company[] = (data.Company as Company[]).map((company) => ({ 
 const userStore: RawMockUser[] = (data.User as RawMockUser[]).map((user) => ({
   ...user,
   departments: normalizeDepartmentNames(user.departments ?? (user.department ? [user.department] : [])),
+  loginId: normalizeLoginId(user.loginId, user.userId),
+  cognitoSub: user.cognitoSub?.trim() || undefined,
   roles: user.roles ? [...user.roles] : undefined,
+  status: normalizeUserStatus(user.status, user.lastLoginAt),
 }));
 const departmentStore = new Map<string, string[]>();
+
+assertUniqueCognitoSubs();
 
 for (const company of companyStore) {
   departmentStore.set(company.companyId, []);
@@ -74,6 +83,10 @@ function buildFallbackEmail(userId: string) {
   return `${userId.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}@correcre.jp`;
 }
 
+function buildFallbackLoginId(userId: string) {
+  return userId.replace(/[^a-zA-Z0-9._-]/g, "").toLowerCase();
+}
+
 function buildFallbackPhone(index: number) {
   const middle = String(1000 + index * 37).padStart(4, "0");
   const last = String(2000 + index * 53).slice(-4);
@@ -85,12 +98,62 @@ function buildFallbackAddress(index: number) {
   return mockAddresses[index % mockAddresses.length];
 }
 
+function normalizeLoginId(loginId: string | undefined, userId: string) {
+  const normalized = loginId?.trim().toLowerCase();
+  return normalized || buildFallbackLoginId(userId);
+}
+
+function normalizeUserStatus(
+  status: RawMockUser["status"],
+  lastLoginAt?: string
+): EmployeeManagementStatus | "DELETED" {
+  if (status === "DELETED") {
+    return "DELETED";
+  }
+
+  if (status === "INACTIVE" || status === "SUSPENDED") {
+    return "SUSPENDED";
+  }
+
+  if (status === "INVITED") {
+    return "INVITED";
+  }
+
+  if (status === "ACTIVE") {
+    return "ACTIVE";
+  }
+
+  return lastLoginAt ? "ACTIVE" : "INVITED";
+}
+
+function getAuthLinkStatus(cognitoSub?: string): EmployeeAuthLinkStatus {
+  return cognitoSub?.trim() ? "LINKED" : "UNLINKED";
+}
+
 function normalizeRoles(roles?: EmployeeManagementRole[]) {
   if (!roles?.length) {
     return ["EMPLOYEE"] satisfies EmployeeManagementRole[];
   }
 
   return roles;
+}
+
+function assertUniqueCognitoSubs() {
+  const cognitoSubToUserId = new Map<string, string>();
+
+  for (const user of userStore) {
+    const cognitoSub = user.cognitoSub?.trim();
+    if (!cognitoSub) {
+      continue;
+    }
+
+    const existingUserId = cognitoSubToUserId.get(cognitoSub);
+    if (existingUserId && existingUserId !== user.userId) {
+      throw new Error(`Duplicate cognitoSub detected in mock data: ${cognitoSub}`);
+    }
+
+    cognitoSubToUserId.set(cognitoSub, user.userId);
+  }
 }
 
 function addDepartmentName(companyId: string, name: string) {
@@ -112,8 +175,12 @@ function getCompany(companyId: string) {
   return companyStore.find((item) => item.companyId === companyId) ?? null;
 }
 
+function getAllCompanyUsers(companyId: string) {
+  return userStore.filter((item) => item.companyId === companyId);
+}
+
 function getCompanyUsers(companyId: string) {
-  return userStore.filter((item) => item.companyId === companyId && item.status !== "DELETED");
+  return getAllCompanyUsers(companyId).filter((item) => item.status !== "DELETED");
 }
 
 function findCompanyUser(companyId: string, userId: string) {
@@ -141,8 +208,11 @@ function toEmployee(user: RawMockUser, index: number): EmployeeManagementEmploye
   return {
     userId: user.userId,
     name: user.name,
+    loginId: normalizeLoginId(user.loginId, user.userId),
     departments: normalizeDepartmentNames(user.departments ?? (user.department ? [user.department] : [])),
     roles: normalizeRoles(user.roles),
+    status: normalizeUserStatus(user.status, user.lastLoginAt) as EmployeeManagementStatus,
+    authLinkStatus: getAuthLinkStatus(user.cognitoSub),
     email: user.email ?? buildFallbackEmail(user.userId),
     phone: user.phone ?? buildFallbackPhone(index + 1),
     address: user.address ?? buildFallbackAddress(index),
@@ -180,8 +250,13 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function isValidLoginId(loginId: string) {
+  return /^[a-z0-9._-]{3,64}$/.test(loginId);
+}
+
 function validateCreateEmployeeInput(companyId: string, input: CreateEmployeeInput) {
   const name = input.name.trim();
+  const loginId = input.loginId.trim().toLowerCase();
   const departments = normalizeDepartmentNames(input.departments);
   const email = input.email.trim().toLowerCase();
   const phone = input.phone.trim();
@@ -189,8 +264,12 @@ function validateCreateEmployeeInput(companyId: string, input: CreateEmployeeInp
   const joinedAt = input.joinedAt.trim();
   const availableDepartments = getCompanyDepartments(companyId);
 
-  if (!name || !departments.length || !email || !phone || !address || !joinedAt) {
+  if (!name || !loginId || !departments.length || !email || !phone || !address || !joinedAt) {
     throw new Error("必須項目を入力してください");
+  }
+
+  if (!isValidLoginId(loginId)) {
+    throw new Error("ログインIDは英小文字・数字・._- のみで 3〜64 文字で入力してください");
   }
 
   if (!departments.every((department) => availableDepartments.includes(department))) {
@@ -212,10 +291,19 @@ function validateCreateEmployeeInput(companyId: string, input: CreateEmployeeInp
   if (emailExists) {
     throw new Error("同じメールアドレスの従業員が既に存在します");
   }
+
+  const loginIdExists = getCompanyUsers(companyId).some(
+    (user) => normalizeLoginId(user.loginId, user.userId) === loginId
+  );
+
+  if (loginIdExists) {
+    throw new Error("同じログインIDの従業員が既に存在します");
+  }
 }
 
 function validateUpdateEmployeeInput(companyId: string, employee: RawMockUser, input: UpdateEmployeeInput) {
   const name = input.name.trim();
+  const loginId = input.loginId.trim().toLowerCase();
   const departments = normalizeDepartmentNames(input.departments);
   const email = input.email.trim().toLowerCase();
   const phone = input.phone.trim();
@@ -225,8 +313,12 @@ function validateUpdateEmployeeInput(companyId: string, employee: RawMockUser, i
   const availableDepartments = getCompanyDepartments(companyId);
   const currentPointBalance = employee.currentPointBalance ?? 0;
 
-  if (!name || !departments.length || !email || !phone || !address || !joinedAt) {
+  if (!name || !loginId || !departments.length || !email || !phone || !address || !joinedAt) {
     throw new Error("必須項目を入力してください");
+  }
+
+  if (!isValidLoginId(loginId)) {
+    throw new Error("ログインIDは英小文字・数字・._- のみで 3〜64 文字で入力してください");
   }
 
   if (!departments.every((department) => availableDepartments.includes(department))) {
@@ -256,6 +348,14 @@ function validateUpdateEmployeeInput(companyId: string, employee: RawMockUser, i
 
   if (emailExists) {
     throw new Error("同じメールアドレスの従業員が既に存在します");
+  }
+
+  const loginIdExists = getCompanyUsers(companyId).some(
+    (user) => user.userId !== employee.userId && normalizeLoginId(user.loginId, user.userId) === loginId
+  );
+
+  if (loginIdExists) {
+    throw new Error("同じログインIDの従業員が既に存在します");
   }
 }
 
@@ -313,8 +413,9 @@ export async function createEmployeeInDynamoMock(
 
   const createdUser: RawMockUser = {
     companyId,
-    userId: getNextUserId(getCompanyUsers(companyId)),
+    userId: getNextUserId(getAllCompanyUsers(companyId)),
     name: input.name.trim(),
+    loginId: input.loginId.trim().toLowerCase(),
     departments: normalizeDepartmentNames(input.departments),
     email: input.email.trim().toLowerCase(),
     phone: input.phone.trim(),
@@ -323,7 +424,7 @@ export async function createEmployeeInDynamoMock(
     currentPointBalance: 0,
     currentMonthCompletionRate: 0,
     roles: [input.role],
-    status: "ACTIVE",
+    status: "INVITED",
   };
 
   userStore.unshift(createdUser);
@@ -354,6 +455,7 @@ export async function updateEmployeeInDynamoMock(
   }
 
   targetUser.name = input.name.trim();
+  targetUser.loginId = input.loginId.trim().toLowerCase();
   targetUser.departments = normalizeDepartmentNames(input.departments);
   targetUser.email = input.email.trim().toLowerCase();
   targetUser.phone = input.phone.trim();

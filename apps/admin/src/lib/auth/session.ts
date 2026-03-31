@@ -3,14 +3,31 @@ import "server-only";
 import {
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
-import { ADMIN_SESSION_COOKIE_NAME } from "./constants";
+import { ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME } from "./constants";
 import { getAdminCognitoConfig } from "./config";
 import { type AdminSession, verifyAdminIdToken } from "./verify-token";
 
 const cognitoClientCache = new Map<string, CognitoIdentityProviderClient>();
+const NEW_PASSWORD_CHALLENGE_COOKIE_TTL_MS = 10 * 60 * 1000;
+
+export type PendingNewPasswordChallenge = {
+  email: string;
+  username: string;
+  session: string;
+};
+
+type SignInAdminResult =
+  | {
+      status: "authenticated";
+      session: AdminSession;
+    }
+  | {
+      status: "new_password_required";
+    };
 
 function getCognitoClient(region: string) {
   const cached = cognitoClientCache.get(region);
@@ -38,6 +55,67 @@ async function setAdminSessionCookie(session: AdminSession) {
   });
 }
 
+function encodePendingNewPasswordChallenge(challenge: PendingNewPasswordChallenge) {
+  return Buffer.from(JSON.stringify(challenge), "utf8").toString("base64url");
+}
+
+function decodePendingNewPasswordChallenge(value: string): PendingNewPasswordChallenge | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+
+    if (
+      typeof parsed?.email !== "string" ||
+      typeof parsed?.username !== "string" ||
+      typeof parsed?.session !== "string"
+    ) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function setPendingNewPasswordChallenge(challenge: PendingNewPasswordChallenge) {
+  const cookieStore = await cookies();
+
+  cookieStore.set({
+    name: ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME,
+    value: encodePendingNewPasswordChallenge(challenge),
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(Date.now() + NEW_PASSWORD_CHALLENGE_COOKIE_TTL_MS),
+  });
+}
+
+export async function clearPendingNewPasswordChallenge() {
+  const cookieStore = await cookies();
+
+  cookieStore.set({
+    name: ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0),
+  });
+}
+
+export async function getPendingNewPasswordChallenge(): Promise<PendingNewPasswordChallenge | null> {
+  const cookieStore = await cookies();
+  const encodedChallenge = cookieStore.get(ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME)?.value;
+
+  if (!encodedChallenge) {
+    return null;
+  }
+
+  return decodePendingNewPasswordChallenge(encodedChallenge);
+}
+
 export async function clearAdminSession() {
   const cookieStore = await cookies();
 
@@ -50,11 +128,14 @@ export async function clearAdminSession() {
     path: "/",
     expires: new Date(0),
   });
+
+  await clearPendingNewPasswordChallenge();
 }
 
-export async function signInAdmin(params: { email: string; password: string }) {
+export async function signInAdmin(params: { email: string; password: string }): Promise<SignInAdminResult> {
   const { region, clientId } = getAdminCognitoConfig();
   const cognitoClient = getCognitoClient(region);
+  await clearPendingNewPasswordChallenge();
 
   const response = await cognitoClient.send(
     new InitiateAuthCommand({
@@ -68,9 +149,21 @@ export async function signInAdmin(params: { email: string; password: string }) {
   );
 
   if (response.ChallengeName === "NEW_PASSWORD_REQUIRED") {
-    const error = new Error("Cognito requires a password change before sign-in.");
-    error.name = "NewPasswordRequired";
-    throw error;
+    const challengeSession = response.Session;
+
+    if (!challengeSession) {
+      const error = new Error("Cognito did not return a challenge session.");
+      error.name = "MissingChallengeSession";
+      throw error;
+    }
+
+    await setPendingNewPasswordChallenge({
+      email: params.email,
+      username: response.ChallengeParameters?.USER_ID_FOR_SRP ?? params.email,
+      session: challengeSession,
+    });
+
+    return { status: "new_password_required" };
   }
 
   const idToken = response.AuthenticationResult?.IdToken;
@@ -91,7 +184,7 @@ export async function signInAdmin(params: { email: string; password: string }) {
 
   await setAdminSessionCookie(session);
 
-  return session;
+  return { status: "authenticated", session };
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
@@ -103,4 +196,50 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   }
 
   return verifyAdminIdToken(idToken);
+}
+
+export async function completeAdminNewPassword(params: { newPassword: string }) {
+  const challenge = await getPendingNewPasswordChallenge();
+
+  if (!challenge) {
+    const error = new Error("Pending new password challenge not found.");
+    error.name = "NewPasswordChallengeExpired";
+    throw error;
+  }
+
+  const { region, clientId } = getAdminCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  const response = await cognitoClient.send(
+    new RespondToAuthChallengeCommand({
+      ChallengeName: "NEW_PASSWORD_REQUIRED",
+      ClientId: clientId,
+      Session: challenge.session,
+      ChallengeResponses: {
+        USERNAME: challenge.username,
+        NEW_PASSWORD: params.newPassword,
+      },
+    }),
+  );
+
+  const idToken = response.AuthenticationResult?.IdToken;
+
+  if (!idToken) {
+    const error = new Error("Cognito did not return an ID token after new password challenge.");
+    error.name = "MissingIdToken";
+    throw error;
+  }
+
+  const session = await verifyAdminIdToken(idToken);
+
+  if (!session) {
+    const error = new Error("Failed to verify the ID token returned by Cognito.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  await setAdminSessionCookie(session);
+  await clearPendingNewPasswordChallenge();
+
+  return session;
 }

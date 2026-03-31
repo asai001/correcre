@@ -1,11 +1,13 @@
 export const LOGIN_ERROR_MESSAGES = {
   invalid_credentials: "ID またはパスワードが正しくありません。",
-  missing_fields: "ID とパスワードを入力してください。",
-  new_password_required: "初回ログインのため、Cognito 側でパスワード変更が必要です。",
-  password_reset_required: "パスワード再設定が必要です。管理者にお問い合わせください。",
-  rate_limited: "試行回数が多すぎます。しばらくしてから再度お試しください。",
-  user_not_confirmed: "ユーザーが未確認です。管理者にお問い合わせください。",
-  system_error: "ログインに失敗しました。設定値と Cognito の状態を確認してください。",
+  missing_fields: "必須項目を入力してください。",
+  new_password_session_expired: "パスワード設定のセッションが失効しました。もう一度ログインしてください。",
+  invalid_new_password: "新しいパスワードが条件を満たしていません。8文字以上で入力してください。",
+  password_confirmation_mismatch: "新しいパスワードと確認用パスワードが一致しません。",
+  password_reset_required: "パスワードの再設定が必要です。再設定してからもう一度お試しください。",
+  rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
+  user_not_confirmed: "ユーザー確認が完了していません。登録状況を確認してください。",
+  system_error: "ログイン処理に失敗しました。設定内容とアカウント状態を確認してください。",
 } as const;
 
 export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
@@ -31,8 +33,24 @@ export function mapAuthenticationErrorToCode(error: unknown): LoginErrorCode {
       return "rate_limited";
     case "UserNotConfirmedException":
       return "user_not_confirmed";
-    case "NewPasswordRequired":
-      return "new_password_required";
+    default:
+      return "system_error";
+  }
+}
+
+export function mapNewPasswordErrorToCode(error: unknown): LoginErrorCode {
+  const name = error instanceof Error ? error.name : undefined;
+
+  switch (name) {
+    case "InvalidPasswordException":
+    case "InvalidParameterException":
+      return "invalid_new_password";
+    case "NewPasswordChallengeExpired":
+    case "NotAuthorizedException":
+    case "ExpiredCodeException":
+      return "new_password_session_expired";
+    case "TooManyRequestsException":
+      return "rate_limited";
     default:
       return "system_error";
   }

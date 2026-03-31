@@ -8,6 +8,7 @@ Set these environment variables for the admin app:
 ADMIN_COGNITO_REGION=ap-northeast-1
 ADMIN_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 ADMIN_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+ADMIN_OPERATOR_EMAILS=operator1@example.com,operator2@example.com
 ```
 
 The values are emitted by the CDK stack as `AdminCognitoRegion`, `AdminCognitoUserPoolId`, and `AdminCognitoUserPoolClientId`.
@@ -15,6 +16,10 @@ The values are emitted by the CDK stack as `AdminCognitoRegion`, `AdminCognitoUs
 `AdminCognitoUserPoolId` is shared with the employee app. Only the app client ID differs between the two applications.
 
 This configuration uses email-and-password sign-in. The Cognito password policy is 8 characters minimum with no uppercase, lowercase, digit, or symbol requirement.
+
+`ADMIN_OPERATOR_EMAILS` is optional. When set, the `/employee-management` screen and its API are restricted to the comma-separated email addresses in the Cognito ID token. If it is omitted, any authenticated admin user can access that screen.
+
+If a user is created from the Cognito console with a temporary password, the admin app redirects that user to `/login/new-password` and completes the `NEW_PASSWORD_REQUIRED` challenge there.
 
 ## Getting Started
 

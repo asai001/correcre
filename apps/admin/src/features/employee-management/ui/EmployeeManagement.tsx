@@ -15,9 +15,11 @@ import {
 } from "../api/client";
 import { useEmployeeManagementSummary } from "../hooks/useEmployeeManagementSummary";
 import type {
+  EmployeeAuthLinkStatus,
   CreateEmployeeInput,
   EmployeeManagementEmployee,
   EmployeeManagementRole,
+  EmployeeManagementStatus,
   MutationResult,
   UpdateEmployeeInput,
 } from "../model/types";
@@ -68,6 +70,28 @@ const roleBadgeClassMap: Record<EmployeeManagementRole, string> = {
   ADMIN: "bg-violet-50 text-violet-700 border-violet-200",
 };
 
+const statusLabelMap: Record<EmployeeManagementStatus, string> = {
+  INVITED: "招待中",
+  ACTIVE: "有効",
+  SUSPENDED: "停止中",
+};
+
+const statusBadgeClassMap: Record<EmployeeManagementStatus, string> = {
+  INVITED: "bg-amber-50 text-amber-700 border-amber-200",
+  ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  SUSPENDED: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
+const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
+  UNLINKED: "認証未連携",
+  LINKED: "認証連携済み",
+};
+
+const authLinkBadgeClassMap: Record<EmployeeAuthLinkStatus, string> = {
+  UNLINKED: "bg-orange-50 text-orange-700 border-orange-200",
+  LINKED: "bg-cyan-50 text-cyan-700 border-cyan-200",
+};
+
 function formatDateTime(value?: string) {
   if (!value) {
     return "-";
@@ -108,6 +132,7 @@ function getEmployeeColumns(
       render: (row) => (
         <div className="min-w-[150px]">
           <div className="font-semibold text-slate-900">{row.name}</div>
+          <div className="mt-1 text-xs text-slate-500">loginId {row.loginId}</div>
           <div className="mt-1 text-xs text-slate-500">
             {row.userId} / 入社日 {formatDate(row.joinedAt)}
           </div>
@@ -116,7 +141,7 @@ function getEmployeeColumns(
     },
     {
       id: "departments",
-      label: "部署 / 権限",
+      label: "部署 / 権限 / 状態",
       width: "22%",
       render: (row) => (
         <div className="flex min-w-[190px] flex-wrap gap-2">
@@ -136,6 +161,16 @@ function getEmployeeColumns(
               {roleLabelMap[role]}
             </span>
           ))}
+          <span
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClassMap[row.status]}`}
+          >
+            {statusLabelMap[row.status]}
+          </span>
+          <span
+            className={`rounded-full border px-3 py-1 text-xs font-semibold ${authLinkBadgeClassMap[row.authLinkStatus]}`}
+          >
+            {authLinkLabelMap[row.authLinkStatus]}
+          </span>
         </div>
       ),
     },
@@ -146,7 +181,9 @@ function getEmployeeColumns(
       render: (row) => (
         <div className="min-w-[220px]">
           <div className="font-medium text-slate-900">{row.email}</div>
-          <div className="mt-1 text-xs text-slate-500">最終ログイン {formatDateTime(row.lastLoginAt)}</div>
+          <div className="mt-1 text-xs text-slate-500">
+            {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "初回ログイン待ち"}
+          </div>
         </div>
       ),
     },
@@ -225,6 +262,14 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
 
   const employees = useMemo(() => summary?.employees ?? [], [summary]);
   const departmentOptions = useMemo(() => summary?.departmentOptions ?? [], [summary]);
+  const invitedEmployeeCount = useMemo(
+    () => employees.filter((employee) => employee.status === "INVITED").length,
+    [employees]
+  );
+  const unlinkedEmployeeCount = useMemo(
+    () => employees.filter((employee) => employee.authLinkStatus === "UNLINKED").length,
+    [employees]
+  );
 
   const filteredEmployees = useMemo(() => {
     const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
@@ -244,11 +289,14 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       const searchableValues = [
         employee.name,
         employee.userId,
+        employee.loginId,
         employee.departments.join(" "),
         employee.email,
         employee.phone,
         employee.address,
         ...employee.roles.map((role) => roleLabelMap[role]),
+        statusLabelMap[employee.status],
+        authLinkLabelMap[employee.authLinkStatus],
       ]
         .join(" ")
         .toLowerCase();
@@ -335,7 +383,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name}を登録しました。`);
+      setNotice(`${createdEmployee.name}を招待登録しました。認証連携は初回ログイン後に行う想定です。`);
       reload();
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "従業員の登録に失敗しました");
@@ -422,7 +470,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   if (loading && !summary) {
     return (
       <div className="space-y-6 pb-5">
-        <AdminPageHeader title="従業員管理" adminName={adminName} />
+        <AdminPageHeader title="ユーザー登録・管理" adminName={adminName} />
         <div className="h-24 animate-pulse rounded-[28px] bg-slate-200/70" />
         <div className="h-32 animate-pulse rounded-[28px] bg-slate-200/70" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -438,7 +486,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   if (error && !summary) {
     return (
       <div className="space-y-6 pb-5">
-        <AdminPageHeader title="従業員管理" adminName={adminName} />
+        <AdminPageHeader title="ユーザー登録・管理" adminName={adminName} />
         <div className="my-5 rounded-[28px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700 shadow-sm">
           {error}
         </div>
@@ -472,7 +520,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
 
   return (
     <div className="space-y-6 pb-5">
-      <AdminPageHeader title="従業員管理" adminName={summary.adminName} />
+      <AdminPageHeader
+        title="ユーザー登録・管理"
+        adminName={summary.adminName}
+        subtitle="運営用の事前招待登録と認証連携状況の確認"
+      />
 
       <section className="rounded-[28px] bg-white p-5 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.35)] lg:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -488,7 +540,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                 py: 1.25,
               }}
             >
-              新規従業員登録
+              ユーザーを招待登録
             </Button>
             <Button
               variant="contained"
@@ -513,8 +565,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                     [
                       "名前",
                       "ユーザーID",
+                      "ログインID",
                       "所属部署",
                       "権限",
+                      "招待状態",
+                      "認証連携",
                       "メールアドレス",
                       "連絡先",
                       "住所",
@@ -526,8 +581,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                     ...filteredEmployees.map((employee) => [
                       employee.name,
                       employee.userId,
+                      employee.loginId,
                       employee.departments.join(" / "),
                       employee.roles.map((role) => roleLabelMap[role]).join(" / "),
+                      statusLabelMap[employee.status],
+                      authLinkLabelMap[employee.authLinkStatus],
                       employee.email,
                       employee.phone,
                       employee.address,
@@ -556,7 +614,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
               fullWidth
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="名前・メール・部署で検索..."
+              placeholder="名前・loginId・メール・部署で検索..."
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -585,7 +643,15 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
           <div className="rounded-full bg-slate-100 px-4 py-2">会社名 {summary.companyName}</div>
           <div className="rounded-full bg-slate-100 px-4 py-2">平均達成率 {summary.averageCompletionRate}%</div>
+          <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中 {invitedEmployeeCount} 名</div>
+          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">認証未連携 {unlinkedEmployeeCount} 名</div>
           <div className="rounded-full bg-slate-100 px-4 py-2">最終更新 {formatDateTime(summary.updatedAt)}</div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
+          この画面は、DynamoDB への手入力をやめて運営側が事前招待登録を行うための画面です。
+          認証連携IDはここでは直接入力せず、初回ログイン後の連携で管理する前提にしています。
+          登録時は `loginId` と `email` の重複をサーバー側でも検証します。
         </div>
 
         {notice && (
@@ -627,8 +693,8 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
               <FontAwesomeIcon icon={faUsers} className="text-lg" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">従業員一覧</h2>
-              <p className="text-sm text-slate-500">所属部署、連絡先、ポイント残高を一覧で確認できます。</p>
+              <h2 className="text-xl font-bold text-slate-900">登録済みユーザー一覧</h2>
+              <p className="text-sm text-slate-500">部署、権限、招待状態、認証連携状態を一覧で確認できます。</p>
             </div>
           </div>
 
