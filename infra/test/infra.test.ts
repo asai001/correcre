@@ -154,4 +154,24 @@ describe("InfraStack", () => {
       (stgCompanyTable.Properties as { PointInTimeRecoverySpecification?: unknown }).PointInTimeRecoverySpecification,
     ).toBeUndefined();
   });
+
+  test("configures Cognito with 8+ character passwords and no required character classes", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        Policies: {
+          PasswordPolicy: Match.objectLike({
+            MinimumLength: 8,
+            RequireLowercase: false,
+            RequireNumbers: false,
+            RequireSymbols: false,
+            RequireUppercase: false,
+            TemporaryPasswordValidityDays: 7,
+          }),
+        },
+      }),
+    );
+  });
 });

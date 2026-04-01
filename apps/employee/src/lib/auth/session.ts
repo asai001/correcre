@@ -6,6 +6,9 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import { updateUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/user";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import { EMPLOYEE_SESSION_COOKIE_NAME } from "./constants";
 import { getEmployeeCognitoConfig } from "./config";
 import { type EmployeeSession, verifyEmployeeIdToken } from "./verify-token";
@@ -36,6 +39,26 @@ async function setEmployeeSessionCookie(session: EmployeeSession) {
     path: "/",
     expires: session.expiresAt,
   });
+}
+
+async function syncEmployeeLastLoginAt(session: EmployeeSession) {
+  const cognitoSub = session.payload.sub?.trim();
+
+  if (!cognitoSub) {
+    return;
+  }
+
+  const updatedUser = await updateUserLastLoginAtByCognitoSub(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    },
+    cognitoSub,
+  );
+
+  if (!updatedUser) {
+    console.warn("Employee sign-in completed but no matching User record was found for Cognito sub.");
+  }
 }
 
 export async function clearEmployeeSession() {
@@ -90,6 +113,7 @@ export async function signInEmployee(params: { email: string; password: string }
   }
 
   await setEmployeeSessionCookie(session);
+  await syncEmployeeLastLoginAt(session);
 
   return session;
 }

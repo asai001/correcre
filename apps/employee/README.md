@@ -8,9 +8,19 @@ Set these environment variables for the employee app:
 EMPLOYEE_COGNITO_REGION=ap-northeast-1
 EMPLOYEE_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 EMPLOYEE_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+AWS_REGION=ap-northeast-1
+AWS_PROFILE=CorreCre-Dev-Account
+DDB_USER_TABLE_NAME=correcre-user-dev
+DDB_COMPANY_TABLE_NAME=correcre-company-dev
+DDB_MISSION_TABLE_NAME=correcre-mission-dev
+DDB_MISSION_REPORT_TABLE_NAME=correcre-mission-report-dev
+DDB_USER_MONTHLY_STATS_TABLE_NAME=correcre-user-monthly-stats-dev
+DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
 ```
 
 The values are emitted by the CDK stack as `EmployeeCognitoRegion`, `EmployeeCognitoUserPoolId`, and `EmployeeCognitoUserPoolClientId`.
+The DynamoDB table names are emitted by the CDK stack as `UserTableName`, `CompanyTableName`, `MissionTableName`, `MissionReportTableName`, `UserMonthlyStatsTableName`, and `ExchangeHistoryTableName`.
+For local development against the dev AWS account, use `AWS_PROFILE=CorreCre-Dev-Account` and run `aws sso login --profile CorreCre-Dev-Account` beforehand.
 
 `EmployeeCognitoUserPoolId` is shared with the admin app. Only the app client ID differs between the two applications.
 

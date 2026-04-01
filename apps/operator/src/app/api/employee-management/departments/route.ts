@@ -1,9 +1,9 @@
 ﻿import { NextResponse } from "next/server";
 import {
-  createDepartmentInDynamoMock,
-  deleteDepartmentInDynamoMock,
-  renameDepartmentInDynamoMock,
-} from "@operator/features/user-registration/api/server.mock";
+  createDepartmentInDynamo,
+  deleteDepartmentInDynamo,
+  renameDepartmentInDynamo,
+} from "@operator/features/user-registration/api/server";
 import type { CreateDepartmentInput, RenameDepartmentInput } from "@operator/features/user-registration/model/types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    await createDepartmentInDynamoMock(body.companyId, { name: body.name });
+    await createDepartmentInDynamo(body.companyId, { name: body.name });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     console.error("POST /api/employee-management/departments error", err);
@@ -84,7 +84,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    await renameDepartmentInDynamoMock(body.companyId, {
+    await renameDepartmentInDynamo(body.companyId, {
       currentName: body.currentName,
       nextName: body.nextName,
     });
@@ -125,7 +125,7 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    await deleteDepartmentInDynamoMock(body.companyId, body.name);
+    await deleteDepartmentInDynamo(body.companyId, body.name);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/employee-management/departments error", err);

@@ -9,5 +9,10 @@
   "types": "./src/index.ts",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1019.0",
+    "@aws-sdk/credential-provider-ini": "^3.972.27",
+    "@aws-sdk/lib-dynamodb": "^3.1019.0"
+  }
 }

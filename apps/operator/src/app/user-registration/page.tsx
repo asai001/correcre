@@ -1,7 +1,9 @@
 import UserRegistrationManagement from "@operator/features/user-registration";
-import { listOperatorCompaniesFromDynamoMock } from "@operator/features/user-registration/api/server.mock";
+import { listOperatorCompaniesFromDynamo } from "@operator/features/user-registration/api/server";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
+
+export const dynamic = "force-dynamic";
 
 type UserRegistrationPageProps = {
   searchParams: Promise<{
@@ -16,7 +18,7 @@ function pickFirstQueryValue(value: string | string[] | undefined) {
 export default async function UserRegistrationPage({ searchParams }: UserRegistrationPageProps) {
   const [session, companies, params] = await Promise.all([
     requireOperatorSession(),
-    listOperatorCompaniesFromDynamoMock(),
+    listOperatorCompaniesFromDynamo(),
     searchParams,
   ]);
 

@@ -18,13 +18,11 @@ export type EmployeeManagementEmployee = {
   userId: string;
   name: string;
   loginId: string;
-  departments: string[];
+  departmentName?: string;
   roles: EmployeeManagementRole[];
   status: EmployeeManagementStatus;
   authLinkStatus: EmployeeAuthLinkStatus;
   email: string;
-  phone: string;
-  address: string;
   pointBalance: number;
   completionRate: number;
   joinedAt?: string;
@@ -34,10 +32,8 @@ export type EmployeeManagementEmployee = {
 export type CreateEmployeeInput = {
   name: string;
   loginId: string;
-  departments: string[];
+  departmentName: string;
   email: string;
-  phone: string;
-  address: string;
   role: EmployeeManagementRole;
   joinedAt: string;
 };
@@ -46,10 +42,8 @@ export type UpdateEmployeeInput = {
   userId: string;
   name: string;
   loginId: string;
-  departments: string[];
+  departmentName: string;
   email: string;
-  phone: string;
-  address: string;
   role: EmployeeManagementRole;
   joinedAt: string;
   pointAdjustment: number;

@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Button,
-  Checkbox,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -13,9 +11,7 @@ import {
   FormControl,
   FormHelperText,
   InputLabel,
-  ListItemText,
   MenuItem,
-  OutlinedInput,
   Select,
   Stack,
   TextField,
@@ -75,10 +71,8 @@ function createInitialFormState(employee: EmployeeManagementEmployee | null): Fo
     userId: employee?.userId ?? "",
     name: employee?.name ?? "",
     loginId: employee?.loginId ?? "",
-    departments: employee?.departments ?? [],
+    departmentName: employee?.departmentName ?? "",
     email: employee?.email ?? "",
-    phone: employee?.phone ?? "",
-    address: employee?.address ?? "",
     role: employee ? getPrimaryRole(employee.roles) : "EMPLOYEE",
     joinedAt: employee?.joinedAt ?? "",
     pointAdjustment: "0",
@@ -117,18 +111,15 @@ export default function EmployeeEditDialog({
   const validation = useMemo(() => {
     const name = form.name.trim();
     const loginId = form.loginId.trim();
+    const departmentName = form.departmentName.trim();
     const email = form.email.trim();
-    const phone = form.phone.trim();
-    const address = form.address.trim();
     const joinedAt = form.joinedAt.trim();
 
     return {
       name: !name,
       loginId: !loginId,
-      departments: form.departments.length === 0,
+      departmentName: !departmentName,
       email: !email || !isValidEmail(email),
-      phone: !phone,
-      address: !address,
       joinedAt: !joinedAt,
       pointAdjustment: parsedPointAdjustment === null,
       pointBalance: parsedPointAdjustment !== null && nextPointBalance < 0,
@@ -148,10 +139,8 @@ export default function EmployeeEditDialog({
       userId: employee.userId,
       name: form.name.trim(),
       loginId: form.loginId.trim(),
-      departments: form.departments,
+      departmentName: form.departmentName.trim(),
       email: form.email.trim(),
-      phone: form.phone.trim(),
-      address: form.address.trim(),
       role: form.role,
       joinedAt: form.joinedAt.trim(),
       pointAdjustment: parsedPointAdjustment,
@@ -172,9 +161,9 @@ export default function EmployeeEditDialog({
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <div className="text-2xl font-bold text-slate-900">従業員情報を編集</div>
+        <div className="text-2xl font-bold text-slate-900">従業員情報を更新</div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          基本情報の更新とポイントの調整を行います。ポイント調整は1回の送信で反映されます。
+          User テーブルに保存される項目のみを編集します。ポイント調整は会社残高との整合性を条件付き更新で保ちます。
         </Typography>
       </DialogTitle>
 
@@ -183,9 +172,7 @@ export default function EmployeeEditDialog({
           {error && <Alert severity="error">{error}</Alert>}
           {employee && (
             <Alert severity={employee.authLinkStatus === "LINKED" ? "success" : "info"}>
-              認証連携状態: {employee.authLinkStatus === "LINKED" ? "認証連携済み" : "未連携"}
-              {" / "}
-              認証連携IDはこの画面では編集せず、初回ログイン後の連携で管理します。
+              Cognito 連携状態: {employee.authLinkStatus === "LINKED" ? "連携済み" : "未連携"}
             </Alert>
           )}
 
@@ -199,49 +186,40 @@ export default function EmployeeEditDialog({
               error={hasSubmitted && validation.name}
               helperText={hasSubmitted && validation.name ? "氏名を入力してください" : " "}
             />
-            <FormControl fullWidth error={hasSubmitted && validation.departments}>
-              <InputLabel id="employee-edit-department-select-label">所属部署</InputLabel>
+            <FormControl fullWidth error={hasSubmitted && validation.departmentName}>
+              <InputLabel id="employee-edit-department-label">所属部署</InputLabel>
               <Select
-                labelId="employee-edit-department-select-label"
-                multiple
-                value={form.departments}
+                labelId="employee-edit-department-label"
+                value={form.departmentName}
+                label="所属部署"
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    departments: typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value,
+                    departmentName: event.target.value,
                   }))
                 }
-                input={<OutlinedInput label="所属部署" />}
-                renderValue={(selected) => (
-                  <div className="flex flex-wrap gap-1">
-                    {(selected as string[]).map((department) => (
-                      <Chip key={department} label={department} size="small" />
-                    ))}
-                  </div>
-                )}
               >
                 {departmentOptions.map((departmentOption) => (
                   <MenuItem key={departmentOption.name} value={departmentOption.name}>
-                    <Checkbox checked={form.departments.includes(departmentOption.name)} />
-                    <ListItemText primary={departmentOption.name} secondary={`${departmentOption.employeeCount}名`} />
+                    {departmentOption.name} ({departmentOption.employeeCount}名)
                   </MenuItem>
                 ))}
               </Select>
               <FormHelperText>
-                {hasSubmitted && validation.departments ? "所属部署を1つ以上選択してください" : " "}
+                {hasSubmitted && validation.departmentName ? "所属部署を選択してください" : " "}
               </FormHelperText>
             </FormControl>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
-              label="ログインID"
+              label="ログイン ID"
               value={form.loginId}
               onChange={(event) => setForm((current) => ({ ...current, loginId: event.target.value }))}
               fullWidth
               required
               error={hasSubmitted && validation.loginId}
-              helperText={hasSubmitted && validation.loginId ? "ログインIDを入力してください" : "英小文字・数字・._- を推奨"}
+              helperText={hasSubmitted && validation.loginId ? "ログイン ID を入力してください" : "英小文字・数字・._- を使用"}
             />
             <TextField
               label="メールアドレス"
@@ -251,30 +229,23 @@ export default function EmployeeEditDialog({
               fullWidth
               required
               error={hasSubmitted && validation.email}
-              helperText={hasSubmitted && validation.email ? "メールアドレスを正しく入力してください" : " "}
+              helperText={
+                hasSubmitted && validation.email ? "有効なメールアドレスを入力してください" : " "
+              }
             />
           </div>
 
-          <TextField
-            label="連絡先"
-            value={form.phone}
-            onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-            fullWidth
-            required
-            placeholder="090-1234-5678"
-            error={hasSubmitted && validation.phone}
-            helperText={hasSubmitted && validation.phone ? "連絡先を入力してください" : " "}
-          />
-
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
             <TextField
-              label="住所"
-              value={form.address}
-              onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+              label="入社日"
+              type="date"
+              value={form.joinedAt}
+              onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
               fullWidth
               required
-              error={hasSubmitted && validation.address}
-              helperText={hasSubmitted && validation.address ? "住所を入力してください" : " "}
+              slotProps={{ inputLabel: { shrink: true } }}
+              error={hasSubmitted && validation.joinedAt}
+              helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
             />
             <TextField
               select
@@ -293,29 +264,17 @@ export default function EmployeeEditDialog({
             </TextField>
           </div>
 
-          <TextField
-            label="入社日"
-            type="date"
-            value={form.joinedAt}
-            onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
-            fullWidth
-            required
-            slotProps={{ inputLabel: { shrink: true } }}
-            error={hasSubmitted && validation.joinedAt}
-            helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
-          />
-
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="mb-3 text-sm font-semibold text-slate-700">ポイントを調整</div>
+            <div className="mb-3 text-sm font-semibold text-slate-700">ポイント調整</div>
             <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_180px]">
               <TextField
-                label="現在のポイント"
+                label="現在の残高"
                 value={`${formatNumber(currentPointBalance)}${pointUnitLabel}`}
                 fullWidth
                 slotProps={{ input: { readOnly: true } }}
               />
               <TextField
-                label="ポイント調整"
+                label="調整数"
                 type="number"
                 value={form.pointAdjustment}
                 onChange={(event) => setForm((current) => ({ ...current, pointAdjustment: event.target.value }))}
@@ -324,14 +283,14 @@ export default function EmployeeEditDialog({
                 error={hasSubmitted && (validation.pointAdjustment || validation.pointBalance)}
                 helperText={
                   hasSubmitted && validation.pointAdjustment
-                    ? "ポイント調整は整数で入力してください"
+                    ? "整数で入力してください"
                     : hasSubmitted && validation.pointBalance
-                      ? "調整後のポイントが0未満になります"
-                      : "増やす場合は正の数、減らす場合は負の数を入力してください"
+                      ? "調整後ポイントが 0 未満になります"
+                      : "加算は正の数、減算は負の数で入力してください"
                 }
               />
               <TextField
-                label="調整後のポイント"
+                label="調整後残高"
                 value={`${formatNumber(Math.max(nextPointBalance, 0))}${pointUnitLabel}`}
                 fullWidth
                 slotProps={{ input: { readOnly: true } }}

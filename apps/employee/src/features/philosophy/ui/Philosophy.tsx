@@ -1,5 +1,7 @@
-// 「取得済みのデータをどう表示するか」だけ知っている層
 "use client";
+
+import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
+
 import { usePhilosophyForDashboard } from "../hooks/usePhilosophyForDashboard";
 import PhilosophyInfo from "./PhilosophyInfo";
 
@@ -8,20 +10,13 @@ type PhilosophyProps = {
 };
 
 export default function Philosophy({ companyId }: PhilosophyProps) {
-  // 本コンポーネントが再レンダされたら都度実行される（useEffect フックの中身は依存配列次第で走る）
   const { data, loading, error } = usePhilosophyForDashboard(companyId);
 
-  if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
-    return null;
+  if (loading || (!data && !error)) {
+    return <SkeletonBlock className="h-40 rounded-2xl" />;
   }
 
-  if (error) {
-    // 将来的に別コンポーネントにしても良い
-    return null;
-  }
-
-  if (!data) {
+  if (error || !data) {
     return null;
   }
 

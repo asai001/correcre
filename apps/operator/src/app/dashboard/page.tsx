@@ -3,9 +3,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faBuilding, faUsers } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { listOperatorCompaniesFromDynamoMock } from "@operator/features/user-registration/api/server.mock";
+import { listOperatorCompaniesFromDynamo } from "@operator/features/user-registration/api/server";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
+
+export const dynamic = "force-dynamic";
 
 function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
@@ -30,7 +32,7 @@ const dashboardCards = [
 
 export default async function DashboardPage() {
   const session = await requireOperatorSession();
-  const companies = await listOperatorCompaniesFromDynamoMock();
+  const companies = await listOperatorCompaniesFromDynamo();
   const totalUsers = companies.reduce((sum, company) => sum + company.employeeCount, 0);
 
   return (

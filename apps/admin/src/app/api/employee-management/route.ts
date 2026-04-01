@@ -1,46 +1,28 @@
 import { NextResponse } from "next/server";
 import {
-  createEmployeeInDynamoMock,
-  deleteEmployeeInDynamoMock,
-  getEmployeeManagementSummaryFromDynamoMock,
-  updateEmployeeInDynamoMock,
-} from "@admin/features/employee-management/api/server.mock";
+  createEmployeeInDynamo,
+  deleteEmployeeInDynamo,
+  getEmployeeManagementSummaryFromDynamo,
+  updateEmployeeInDynamo,
+} from "@admin/features/employee-management/api/server";
 import type {
   CreateEmployeeInput,
   DeleteEmployeeInput,
   UpdateEmployeeInput,
 } from "@admin/features/employee-management/model/types";
-import { getOperatorAccessStatus } from "@admin/lib/auth/operator";
+import { authorizeEmployeeManagementRequest } from "./authorize";
 
-async function authorizeOperator() {
-  const access = await getOperatorAccessStatus();
-
-  if (access.allowed) {
-    return null;
-  }
-
-  const status = access.reason === "unauthenticated" ? 401 : 403;
-  const error = access.reason === "unauthenticated" ? "unauthorized" : "operator_only";
-
-  return NextResponse.json({ error }, { status });
-}
-
-export async function GET(req: Request) {
-  const unauthorized = await authorizeOperator();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
-  const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
-  const adminUserId = searchParams.get("adminUserId") ?? undefined;
-
-  if (!companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
+export async function GET() {
   try {
-    const summary = await getEmployeeManagementSummaryFromDynamoMock(companyId, adminUserId);
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
+    const summary = await getEmployeeManagementSummaryFromDynamo(
+      currentAdminUser.companyId,
+      currentAdminUser.userId,
+    );
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/employee-management error", err);
@@ -61,28 +43,23 @@ type DeleteEmployeeRequest = DeleteEmployeeInput & {
 };
 
 export async function POST(req: Request) {
-  const unauthorized = await authorizeOperator();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
   let body: CreateEmployeeRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as CreateEmployeeRequest;
-  } catch (err) {
-    console.error("POST /api/employee-management invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  try {
-    const employee = await createEmployeeInDynamoMock(body.companyId, body);
+    const employee = await createEmployeeInDynamo(currentAdminUser.companyId, body);
     return NextResponse.json(employee, { status: 201 });
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("POST /api/employee-management invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("POST /api/employee-management error", err);
 
     if (err instanceof Error) {
@@ -95,28 +72,23 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const unauthorized = await authorizeOperator();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
   let body: UpdateEmployeeRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as UpdateEmployeeRequest;
-  } catch (err) {
-    console.error("PATCH /api/employee-management invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  try {
-    const employee = await updateEmployeeInDynamoMock(body.companyId, body);
+    const employee = await updateEmployeeInDynamo(currentAdminUser.companyId, body);
     return NextResponse.json(employee);
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("PATCH /api/employee-management invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("PATCH /api/employee-management error", err);
 
     if (err instanceof Error) {
@@ -129,28 +101,23 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const unauthorized = await authorizeOperator();
-  if (unauthorized) {
-    return unauthorized;
-  }
-
   let body: DeleteEmployeeRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as DeleteEmployeeRequest;
-  } catch (err) {
-    console.error("DELETE /api/employee-management invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  try {
-    await deleteEmployeeInDynamoMock(body.companyId, body);
+    await deleteEmployeeInDynamo(currentAdminUser.companyId, body);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("DELETE /api/employee-management invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("DELETE /api/employee-management error", err);
 
     if (err instanceof Error) {

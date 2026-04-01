@@ -1,9 +1,11 @@
 "use client";
 
-import AvgItemCompletionView from "./AvgItemCompletionView";
-import { useAvgItemCompletion } from "../hooks/useAvgItemCompletion";
-import { faChartLine } from "@fortawesome/free-solid-svg-icons";
+import { SkeletonBlock } from "@admin/components/LoadingSkeleton";
 import { toYYYYMM } from "@correcre/lib";
+import { faChartLine } from "@fortawesome/free-solid-svg-icons";
+
+import { useAvgItemCompletion } from "../hooks/useAvgItemCompletion";
+import AvgItemCompletionView from "./AvgItemCompletionView";
 
 type Props = {
   className?: string;
@@ -15,12 +17,10 @@ export default function AvgItemCompletion({ className, companyId }: Props) {
   const { labels, data, loading, error } = useAvgItemCompletion(companyId, thisYearMonth);
 
   if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
-    return null;
+    return <SkeletonBlock className={`h-[440px] ${className ?? ""}`} />;
   }
 
   if (error) {
-    // 将来的に別コンポーネントにしても良い
     return null;
   }
 

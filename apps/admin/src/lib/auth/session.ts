@@ -7,6 +7,9 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import { updateUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/user";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import { ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME } from "./constants";
 import { getAdminCognitoConfig } from "./config";
 import { type AdminSession, verifyAdminIdToken } from "./verify-token";
@@ -53,6 +56,26 @@ async function setAdminSessionCookie(session: AdminSession) {
     path: "/",
     expires: session.expiresAt,
   });
+}
+
+async function syncAdminLastLoginAt(session: AdminSession) {
+  const cognitoSub = session.payload.sub?.trim();
+
+  if (!cognitoSub) {
+    return;
+  }
+
+  const updatedUser = await updateUserLastLoginAtByCognitoSub(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    },
+    cognitoSub,
+  );
+
+  if (!updatedUser) {
+    console.warn("Admin sign-in completed but no matching User record was found for Cognito sub.");
+  }
 }
 
 function encodePendingNewPasswordChallenge(challenge: PendingNewPasswordChallenge) {
@@ -183,6 +206,7 @@ export async function signInAdmin(params: { email: string; password: string }): 
   }
 
   await setAdminSessionCookie(session);
+  await syncAdminLastLoginAt(session);
 
   return { status: "authenticated", session };
 }
@@ -239,6 +263,7 @@ export async function completeAdminNewPassword(params: { newPassword: string }) 
   }
 
   await setAdminSessionCookie(session);
+  await syncAdminLastLoginAt(session);
   await clearPendingNewPasswordChallenge();
 
   return session;

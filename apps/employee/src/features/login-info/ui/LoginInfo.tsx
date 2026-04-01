@@ -1,5 +1,7 @@
-// 「取得済みのデータをどう表示するか」だけ知っている層
 "use client";
+
+import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
+
 import { useLoginInfo } from "../hooks/useLoginInfo";
 import LoginInfoView from "./LoginInfoView";
 
@@ -9,20 +11,13 @@ type LoginInfoProps = {
 };
 
 export default function LoginInfo({ companyId, userId }: LoginInfoProps) {
-  // 本コンポーネントが再レンダされたら都度実行される（useEffect フックの中身は依存配列次第で走る）
   const { data, loading, error } = useLoginInfo(companyId, userId);
 
-  if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
-    return null;
+  if (loading || (!data && !error)) {
+    return <SkeletonBlock className="h-24 rounded-2xl" />;
   }
 
-  if (error) {
-    // 将来的に別コンポーネントにしても良い
-    return null;
-  }
-
-  if (!data) {
+  if (error || !data) {
     return null;
   }
 

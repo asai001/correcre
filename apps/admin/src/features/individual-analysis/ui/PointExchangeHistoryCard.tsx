@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import { SkeletonBlock } from "@admin/components/LoadingSkeleton";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { downloadCsv } from "@admin/lib/csv";
@@ -185,7 +186,14 @@ export default function PointExchangeHistoryCard({
       </div>
 
       <div className="mt-8">
-        {loading && <div className="text-sm text-slate-400">{"読み込み中..."}</div>}
+        {loading && (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <SkeletonBlock key={index} className="h-16 rounded-2xl" />
+            ))}
+          </div>
+        )}
+        {false && loading && <div className="text-sm text-slate-400">{"読み込み中..."}</div>}
 
         {!loading && error && <div className="text-sm text-red-500">{error}</div>}
 
@@ -242,3 +250,4 @@ export default function PointExchangeHistoryCard({
     </section>
   );
 }
+

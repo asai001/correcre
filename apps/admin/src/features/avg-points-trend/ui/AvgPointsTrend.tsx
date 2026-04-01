@@ -1,9 +1,11 @@
 "use client";
 
-import { useAvgPointsTrend } from "../hooks/useAvgPointsTrend";
-import AvgPointsTrendView from "./AvgPointsTrendView";
+import { SkeletonBlock } from "@admin/components/LoadingSkeleton";
 
 import { faChartLine } from "@fortawesome/free-solid-svg-icons";
+
+import { useAvgPointsTrend } from "../hooks/useAvgPointsTrend";
+import AvgPointsTrendView from "./AvgPointsTrendView";
 
 type Props = {
   className?: string;
@@ -15,12 +17,10 @@ export default function AvgPointsTrend({ className, companyId, months = 12 }: Pr
   const { labels, data, loading, error } = useAvgPointsTrend(companyId, months);
 
   if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
-    return null;
+    return <SkeletonBlock className={`h-[440px] ${className ?? ""}`} />;
   }
 
   if (error) {
-    // 将来的に別コンポーネントにしても良い
     return null;
   }
 

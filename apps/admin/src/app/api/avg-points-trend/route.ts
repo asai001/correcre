@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAvgPointsTrendFromDynamoMock } from "@admin/features/avg-points-trend/api/server.mock";
+import { getAvgPointsTrendFromDynamo } from "@admin/features/avg-points-trend/api/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const months = !monthsRaw || monthsRaw < 1 || !Number.isFinite(monthsRaw) ? 12 : monthsRaw; // monthsParam が Nan や負数の場合の考慮
 
   try {
-    const history = await getAvgPointsTrendFromDynamoMock(companyId, months);
+    const history = await getAvgPointsTrendFromDynamo(companyId, months);
     return NextResponse.json(history);
   } catch (err) {
     console.error("GET /api/avg-points-trend error", err);

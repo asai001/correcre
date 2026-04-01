@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import {
-  createCompanyInDynamoMock,
-  listOperatorCompaniesFromDynamoMock,
-} from "@operator/features/user-registration/api/server.mock";
+  createCompanyInDynamo,
+  listOperatorCompaniesFromDynamo,
+} from "@operator/features/user-registration/api/server";
 import type { CreateCompanyInput } from "@operator/features/company-registration/model/types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
@@ -27,7 +27,7 @@ export async function GET() {
   }
 
   try {
-    const companies = await listOperatorCompaniesFromDynamoMock();
+    const companies = await listOperatorCompaniesFromDynamo();
     return NextResponse.json(companies);
   } catch (err) {
     console.error("GET /api/companies error", err);
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const company = await createCompanyInDynamoMock(body);
+    const company = await createCompanyInDynamo(body);
     return NextResponse.json(company, { status: 201 });
   } catch (err) {
     console.error("POST /api/companies error", err);

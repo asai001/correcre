@@ -2,7 +2,7 @@ export const LOGIN_ERROR_MESSAGES = {
   invalid_credentials: "ID またはパスワードが正しくありません。",
   missing_fields: "必須項目を入力してください。",
   new_password_session_expired: "パスワード設定のセッションが失効しました。もう一度ログインしてください。",
-  invalid_new_password: "新しいパスワードが条件を満たしていません。8文字以上で入力してください。",
+  invalid_new_password: "新しいパスワードが条件を満たしていません。半角英数字8文字以上で入力してください。",
   password_confirmation_mismatch: "新しいパスワードと確認用パスワードが一致しません。",
   password_reset_required: "パスワードの再設定が必要です。再設定してからもう一度お試しください。",
   rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMonthlyPointsHistoryFromDynamoMock } from "@employee/features/monthly-points-history/api/server.mock";
+import { getMonthlyPointsHistoryFromDynamo } from "@employee/features/monthly-points-history/api/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   const months = monthsParam ? Number(monthsParam) : 24;
 
   try {
-    const history = await getMonthlyPointsHistoryFromDynamoMock(companyId, userId, months);
+    const history = await getMonthlyPointsHistoryFromDynamo(companyId, userId, months);
     return NextResponse.json(history);
   } catch (err) {
     console.error("GET /api/monthly-points-history error", err);

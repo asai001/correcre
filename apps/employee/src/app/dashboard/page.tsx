@@ -7,13 +7,14 @@ import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";
 import Philosophy from "@employee/features/philosophy";
 import { logout } from "@employee/app/lib/actions/authenticate";
+import { requireCurrentEmployeeUser } from "@employee/lib/auth/current-user";
 
 import { faChartLine, faReceipt, faTasks } from "@fortawesome/free-solid-svg-icons";
 
-const companyId = "em";
-const userId = "u-002";
+export default async function DashboardPage() {
+  const currentUser = await requireCurrentEmployeeUser();
+  const { companyId, userId } = currentUser;
 
-export default function DashboardPage() {
   return (
     <div className="container mx-auto mb-10 px-6">
       <div className="mt-6 flex justify-end">

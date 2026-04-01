@@ -21,6 +21,7 @@ import {
   completeOperatorNewPassword,
   signInOperator,
 } from "@operator/lib/auth/session";
+import { isValidCognitoPassword } from "@correcre/lib/auth/password";
 
 function getFormValue(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
@@ -98,6 +99,10 @@ export async function completeNewPassword(formData: FormData) {
 
   if (!newPassword || !confirmPassword) {
     redirect(buildNewPasswordRedirect("missing_fields", redirectTo) as Route);
+  }
+
+  if (!isValidCognitoPassword(newPassword)) {
+    redirect(buildNewPasswordRedirect("invalid_new_password", redirectTo) as Route);
   }
 
   if (newPassword !== confirmPassword) {

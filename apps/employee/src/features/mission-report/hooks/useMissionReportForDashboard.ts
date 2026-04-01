@@ -1,15 +1,13 @@
-// apps/employee/src/features/mission-report/hooks/useMissionReportForDashboard.ts
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-
-import type { Mission, MissionReport, SubmitPayload } from "../model/types";
-import { fetchMission } from "../api/client";
+import { useEffect, useMemo, useState } from "react";
 
 import { nowYYYYMM } from "@correcre/lib";
 
+import { fetchMission } from "../api/client";
+import type { Mission, MissionReport, SubmitPayload } from "../model/types";
+
 type UseMissionForDashboardOptions = {
-  /** 初期ロードを抑制したい場合などに使う */
   enabled?: boolean;
 };
 
@@ -28,7 +26,7 @@ type UseMissionForDashboardResult = {
 export function useMissionReportForDashboard(
   companyId: string,
   userId: string,
-  options?: UseMissionForDashboardOptions
+  options?: UseMissionForDashboardOptions,
 ): UseMissionForDashboardResult {
   const { enabled = true } = options ?? {};
 
@@ -37,12 +35,15 @@ export function useMissionReportForDashboard(
   const [missionReports, setMissionReports] = useState<MissionReport[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // companyId / userId がまだ分からないとき or 明示的に無効化されているとき
     if (!enabled || !companyId || !userId) {
+      setMission([]);
+      setMissionReports([]);
+      setError(null);
+      setLoading(false);
       return;
     }
 
@@ -65,6 +66,7 @@ export function useMissionReportForDashboard(
         if (ac.signal.aborted) {
           return;
         }
+
         console.error(err);
         setError("ミッション情報の取得に失敗しました。");
       } finally {
@@ -80,7 +82,7 @@ export function useMissionReportForDashboard(
   }, [companyId, userId, enabled]);
 
   const orderedMissionItems = useMemo(() => {
-    return mission.filter((i) => i.enabled !== false).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+    return mission.filter((item) => item.enabled !== false).sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
   }, [mission]);
 
   const handleOpen = (missionId: string) => {
@@ -94,8 +96,8 @@ export function useMissionReportForDashboard(
   };
 
   const handleSubmit = async (payload: SubmitPayload) => {
-    // TODO: 後で API に POST する
-    console.log("MissionReport submit", { ...payload, period: yearMonth });
+    void payload;
+    void yearMonth;
   };
 
   return {

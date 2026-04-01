@@ -14,19 +14,13 @@ import {
   faTrashCan,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
-import {
-  Button,
-  IconButton,
-  InputAdornment,
-  MenuItem,
-  TablePagination,
-  TextField,
-} from "@mui/material";
+import { Button, IconButton, InputAdornment, MenuItem, TablePagination, TextField } from "@mui/material";
 
 import type { OperatorCompanySummary } from "@operator/features/company-registration/model/types";
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import Table, { type ColumnDef } from "@operator/components/Table";
 import { downloadCsv } from "@operator/lib/csv";
+
 import {
   createDepartment,
   createEmployee,
@@ -64,7 +58,7 @@ type StatCardProps = {
 };
 
 const roleLabelMap: Record<EmployeeManagementRole, string> = {
-  EMPLOYEE: "従業員",
+  EMPLOYEE: "一般",
   MANAGER: "マネージャー",
   ADMIN: "管理者",
 };
@@ -88,8 +82,8 @@ const statusBadgeClassMap: Record<EmployeeManagementStatus, string> = {
 };
 
 const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
-  UNLINKED: "認証未連携",
-  LINKED: "認証連携済み",
+  UNLINKED: "未連携",
+  LINKED: "連携済み",
 };
 
 const authLinkBadgeClassMap: Record<EmployeeAuthLinkStatus, string> = {
@@ -133,9 +127,9 @@ function getEmployeeColumns(
     {
       id: "name",
       label: "氏名",
-      width: "20%",
+      width: "22%",
       render: (row) => (
-        <div className="min-w-[160px]">
+        <div className="min-w-[180px]">
           <div className="font-semibold text-slate-900">{row.name}</div>
           <div className="mt-1 text-xs text-slate-500">loginId: {row.loginId}</div>
           <div className="mt-1 text-xs text-slate-500">
@@ -145,19 +139,16 @@ function getEmployeeColumns(
       ),
     },
     {
-      id: "departments",
-      label: "部門 / 権限 / 状態",
-      width: "24%",
+      id: "departmentName",
+      label: "部署 / 権限 / 状態",
+      width: "28%",
       render: (row) => (
         <div className="flex min-w-[220px] flex-wrap gap-2">
-          {row.departments.map((department) => (
-            <span
-              key={`${row.userId}-${department}`}
-              className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700"
-            >
-              {department}
+          {row.departmentName ? (
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+              {row.departmentName}
             </span>
-          ))}
+          ) : null}
           {row.roles.map((role) => (
             <span
               key={`${row.userId}-${role}`}
@@ -178,31 +169,21 @@ function getEmployeeColumns(
     {
       id: "email",
       label: "メールアドレス",
-      width: "18%",
+      width: "24%",
       render: (row) => (
         <div className="min-w-[220px]">
           <div className="font-medium text-slate-900">{row.email}</div>
           <div className="mt-1 text-xs text-slate-500">
-            {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "初回ログイン待ち"}
+            {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "最終ログインなし"}
           </div>
         </div>
       ),
     },
     {
-      id: "phone",
-      label: "電話番号",
-      width: "12%",
-    },
-    {
-      id: "address",
-      label: "住所",
-      width: "16%",
-    },
-    {
       id: "pointBalance",
-      label: "現在ポイント",
+      label: "ポイント",
       align: "right",
-      width: "10%",
+      width: "16%",
       render: (row) => (
         <div className="min-w-[120px] text-right">
           <div className="font-bold text-emerald-600">
@@ -217,28 +198,51 @@ function getEmployeeColumns(
       id: "userId",
       label: "操作",
       align: "center",
-      width: "8%",
+      width: "10%",
       render: (row) => (
         <div className="flex items-center justify-center gap-1">
-          <IconButton
-            size="small"
-            aria-label={`${row.name}を編集`}
-            onClick={() => onEditEmployee(row)}
-            sx={{ color: "#2563EB" }}
-          >
+          <IconButton size="small" aria-label={`${row.name}を編集`} onClick={() => onEditEmployee(row)} sx={{ color: "#2563EB" }}>
             <FontAwesomeIcon icon={faPenToSquare} />
           </IconButton>
-          <IconButton
-            size="small"
-            aria-label={`${row.name}を削除`}
-            onClick={() => onDeleteEmployee(row)}
-            sx={{ color: "#EF4444" }}
-          >
+          <IconButton size="small" aria-label={`${row.name}を削除`} onClick={() => onDeleteEmployee(row)} sx={{ color: "#EF4444" }}>
             <FontAwesomeIcon icon={faTrashCan} />
           </IconButton>
         </div>
       ),
     },
+  ];
+}
+
+function buildExportRows(employees: EmployeeManagementEmployee[]) {
+  return [
+    [
+      "氏名",
+      "ユーザーID",
+      "loginId",
+      "部署",
+      "権限",
+      "状態",
+      "Cognito連携",
+      "メールアドレス",
+      "保有ポイント",
+      "達成率",
+      "入社日",
+      "最終ログイン",
+    ],
+    ...employees.map((employee) => [
+      employee.name,
+      employee.userId,
+      employee.loginId,
+      employee.departmentName ?? "-",
+      employee.roles.map((role) => roleLabelMap[role]).join(" / "),
+      statusLabelMap[employee.status],
+      authLinkLabelMap[employee.authLinkStatus],
+      employee.email,
+      employee.pointBalance,
+      `${employee.completionRate}%`,
+      formatDate(employee.joinedAt),
+      formatDateTime(employee.lastLoginAt),
+    ]),
   ];
 }
 
@@ -282,8 +286,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return employees.filter((employee) => {
-      const matchesDepartment = selectedDepartment === "all" || employee.departments.includes(selectedDepartment);
-
+      const matchesDepartment = selectedDepartment === "all" || employee.departmentName === selectedDepartment;
       if (!matchesDepartment) {
         return false;
       }
@@ -296,10 +299,8 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         employee.name,
         employee.userId,
         employee.loginId,
-        employee.departments.join(" "),
+        employee.departmentName ?? "",
         employee.email,
-        employee.phone,
-        employee.address,
         ...employee.roles.map((role) => roleLabelMap[role]),
         statusLabelMap[employee.status],
         authLinkLabelMap[employee.authLinkStatus],
@@ -344,48 +345,6 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     router.push(`/user-registration?companyId=${encodeURIComponent(nextCompanyId)}`);
   };
 
-  const handleOpenRegistrationDialog = () => {
-    setRegistrationError(null);
-    setRegistrationDialogOpen(true);
-  };
-
-  const handleCloseRegistrationDialog = () => {
-    if (registering) {
-      return;
-    }
-
-    setRegistrationDialogOpen(false);
-    setRegistrationError(null);
-  };
-
-  const handleOpenEditDialog = (employee: EmployeeManagementEmployee) => {
-    setEditingEmployee(employee);
-    setEditError(null);
-  };
-
-  const handleCloseEditDialog = () => {
-    if (updatingEmployee) {
-      return;
-    }
-
-    setEditingEmployee(null);
-    setEditError(null);
-  };
-
-  const handleOpenDeleteDialog = (employee: EmployeeManagementEmployee) => {
-    setEmployeePendingDeletion(employee);
-    setDeleteError(null);
-  };
-
-  const handleCloseDeleteDialog = () => {
-    if (deletingEmployee) {
-      return;
-    }
-
-    setEmployeePendingDeletion(null);
-    setDeleteError(null);
-  };
-
   const handleRegisterEmployee = async (input: CreateEmployeeInput) => {
     if (!selectedCompanyId) {
       return;
@@ -394,17 +353,16 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     try {
       setRegistering(true);
       setRegistrationError(null);
-
       const createdEmployee = await createEmployee(selectedCompanyId, input);
 
       setRegistrationDialogOpen(false);
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name} を登録しました。認証連携は初回ログイン後に紐づく想定です。`);
+      setNotice(`${createdEmployee.name} を登録しました`);
       reload();
     } catch (err) {
-      setRegistrationError(err instanceof Error ? err.message : "ユーザーの登録に失敗しました。");
+      setRegistrationError(err instanceof Error ? err.message : "ユーザーの登録に失敗しました");
     } finally {
       setRegistering(false);
     }
@@ -418,14 +376,13 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     try {
       setUpdatingEmployee(true);
       setEditError(null);
-
       const updatedEmployee = await updateEmployee(selectedCompanyId, input);
 
       setEditingEmployee(null);
-      setNotice(`${updatedEmployee.name} を更新しました。`);
+      setNotice(`${updatedEmployee.name} を更新しました`);
       reload();
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "ユーザー情報の更新に失敗しました。");
+      setEditError(err instanceof Error ? err.message : "ユーザー情報の更新に失敗しました");
     } finally {
       setUpdatingEmployee(false);
     }
@@ -433,7 +390,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
 
   const handleDeleteEmployee = async (userId: string): Promise<MutationResult> => {
     if (!selectedCompanyId) {
-      return { ok: false, error: "管理対象の企業が選択されていません。" };
+      return { ok: false, error: "会社が選択されていません" };
     }
 
     setDeletingEmployee(true);
@@ -452,7 +409,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           : employees.find((employee) => employee.userId === userId)?.name ?? userId;
 
       setEmployeePendingDeletion(null);
-      setNotice(`${deletedEmployeeName} を削除しました。`);
+      setNotice(`${deletedEmployeeName} を削除しました`);
       reload();
       return result;
     } finally {
@@ -462,7 +419,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
 
   const handleCreateDepartment = async (name: string): Promise<MutationResult> => {
     if (!selectedCompanyId) {
-      return { ok: false, error: "管理対象の企業が選択されていません。" };
+      return { ok: false, error: "会社が選択されていません" };
     }
 
     const result = await createDepartment(selectedCompanyId, { name });
@@ -471,14 +428,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     }
 
     setSelectedDepartment("all");
-    setNotice(`部門「${name}」を追加しました。`);
+    setNotice(`部署「${name}」を作成しました`);
     reload();
     return result;
   };
 
   const handleRenameDepartment = async (currentName: string, nextName: string): Promise<MutationResult> => {
     if (!selectedCompanyId) {
-      return { ok: false, error: "管理対象の企業が選択されていません。" };
+      return { ok: false, error: "会社が選択されていません" };
     }
 
     const result = await renameDepartment(selectedCompanyId, { currentName, nextName });
@@ -487,14 +444,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     }
 
     setSelectedDepartment("all");
-    setNotice(`部門名を「${nextName}」へ更新しました。`);
+    setNotice(`部署名を「${nextName}」へ変更しました`);
     reload();
     return result;
   };
 
   const handleDeleteDepartment = async (name: string): Promise<MutationResult> => {
     if (!selectedCompanyId) {
-      return { ok: false, error: "管理対象の企業が選択されていません。" };
+      return { ok: false, error: "会社が選択されていません" };
     }
 
     const result = await deleteDepartment(selectedCompanyId, name);
@@ -503,7 +460,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     }
 
     setSelectedDepartment("all");
-    setNotice(`部門「${name}」を削除しました。`);
+    setNotice(`部署「${name}」を削除しました`);
     reload();
     return result;
   };
@@ -513,9 +470,9 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="text-sm font-semibold tracking-[0.18em] text-slate-400">TARGET COMPANY</div>
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">管理対象の企業を選択</h2>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">対象会社の切り替え</h2>
           <p className="mt-2 text-sm leading-7 text-slate-500">
-            企業を切り替えると、ユーザー一覧・部門・ポイント残高サマリーがその企業の内容に切り替わります。
+            会社を選ぶと、ユーザー一覧・部署・ポイント残高など、その会社に紐づく DynamoDB データを表示します。
           </p>
         </div>
 
@@ -524,14 +481,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
         >
           <FontAwesomeIcon icon={faBuilding} />
-          企業登録へ
+          会社登録へ
         </Link>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,340px)_repeat(3,minmax(0,1fr))]">
         <TextField
           select
-          label="管理対象の企業"
+          label="対象会社"
           value={selectedCompanyId ?? ""}
           onChange={(event) => handleCompanyChange(event.target.value)}
           fullWidth
@@ -544,7 +501,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         </TextField>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <div className="text-sm font-semibold text-slate-500">選択中の企業</div>
+          <div className="text-sm font-semibold text-slate-500">選択中の会社</div>
           <div className="mt-2 text-lg font-bold text-slate-900">{activeCompany?.companyName ?? "-"}</div>
           <div className="mt-1 text-sm text-slate-500">{activeCompany?.companyId ?? "-"}</div>
         </div>
@@ -560,13 +517,13 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <div className="text-sm font-semibold text-slate-500">現在の企業残高</div>
+          <div className="text-sm font-semibold text-slate-500">会社ポイント残高</div>
           <div className="mt-2 text-lg font-bold text-slate-900">
             {formatNumber(activeCompany?.companyPointBalance ?? 0)}
             {activeCompany?.pointUnitLabel ?? "pt"}
           </div>
           <div className="mt-1 text-sm text-slate-500">
-            登録ユーザー {formatNumber(activeCompany?.employeeCount ?? 0)} 名
+            登録ユーザー {formatNumber(activeCompany?.employeeCount ?? 0)} 人
           </div>
         </div>
       </div>
@@ -580,7 +537,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="企業を選択して、従業員の登録・編集・部門管理を行います。"
+          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
         />
 
         <section className="rounded-[28px] bg-white p-8 shadow-lg shadow-slate-200/70">
@@ -588,16 +545,16 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
               <FontAwesomeIcon icon={faBuilding} className="text-xl" />
             </div>
-            <h2 className="mt-5 text-2xl font-bold text-slate-900">管理対象の企業がまだありません</h2>
+            <h2 className="mt-5 text-2xl font-bold text-slate-900">対象の会社がまだありません</h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-              ユーザー管理を始めるには、先に企業を登録して companyId を発行する必要があります。
+              先に会社を登録して companyId を発行してください。
             </p>
             <Link
               href="/company-registration"
               className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
             >
               <FontAwesomeIcon icon={faPlus} />
-              企業登録へ進む
+              会社登録へ移動
             </Link>
           </div>
         </section>
@@ -612,7 +569,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="企業を選択して、従業員の登録・編集・部門管理を行います。"
+          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
         />
         {companySelectorSection}
         <div className="h-32 animate-pulse rounded-[28px] bg-slate-200/70" />
@@ -633,7 +590,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="企業を選択して、従業員の登録・編集・部門管理を行います。"
+          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
         />
         {companySelectorSection}
         <div className="rounded-[28px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700 shadow-sm">
@@ -650,14 +607,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="企業を選択して、従業員の登録・編集・部門管理を行います。"
+          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
         />
         {companySelectorSection}
       </div>
     );
   }
 
-  const columns = getEmployeeColumns(pointUnitLabel, handleOpenEditDialog, handleOpenDeleteDialog);
+  const columns = getEmployeeColumns(pointUnitLabel, setEditingEmployee, setEmployeePendingDeletion);
   const footer = (
     <TablePagination
       component="div"
@@ -682,7 +639,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         title="ユーザー管理"
         adminName={operatorName}
         backHref="/dashboard"
-        subtitle="企業を選択して、従業員の登録・編集・部門管理を行います。"
+        subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
       />
 
       {companySelectorSection}
@@ -693,28 +650,21 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             <Button
               variant="contained"
               startIcon={<FontAwesomeIcon icon={faPlus} />}
-              onClick={handleOpenRegistrationDialog}
-              sx={{
-                borderRadius: "14px",
-                backgroundColor: "#2563EB",
-                px: 2.5,
-                py: 1.25,
+              onClick={() => {
+                setRegistrationError(null);
+                setRegistrationDialogOpen(true);
               }}
+              sx={{ borderRadius: "14px", backgroundColor: "#2563EB", px: 2.5, py: 1.25 }}
             >
-              ユーザーを登録
+              ユーザー登録
             </Button>
             <Button
               variant="contained"
               startIcon={<FontAwesomeIcon icon={faBuilding} />}
               onClick={() => setDepartmentDialogOpen(true)}
-              sx={{
-                borderRadius: "14px",
-                backgroundColor: "#10B981",
-                px: 2.5,
-                py: 1.25,
-              }}
+              sx={{ borderRadius: "14px", backgroundColor: "#10B981", px: 2.5, py: 1.25 }}
             >
-              部門管理
+              部署管理
             </Button>
             <Button
               variant="contained"
@@ -722,50 +672,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
               onClick={() =>
                 downloadCsv(
                   `employee-management-${summary.companyId}-${new Date().toISOString().slice(0, 10)}.csv`,
-                  [
-                    [
-                      "氏名",
-                      "ユーザーID",
-                      "loginId",
-                      "部門",
-                      "権限",
-                      "状態",
-                      "認証連携",
-                      "メールアドレス",
-                      "電話番号",
-                      "住所",
-                      "現在ポイント",
-                      "達成率",
-                      "入社日",
-                      "最終ログイン",
-                    ],
-                    ...filteredEmployees.map((employee) => [
-                      employee.name,
-                      employee.userId,
-                      employee.loginId,
-                      employee.departments.join(" / "),
-                      employee.roles.map((role) => roleLabelMap[role]).join(" / "),
-                      statusLabelMap[employee.status],
-                      authLinkLabelMap[employee.authLinkStatus],
-                      employee.email,
-                      employee.phone,
-                      employee.address,
-                      employee.pointBalance,
-                      `${employee.completionRate}%`,
-                      formatDate(employee.joinedAt),
-                      formatDateTime(employee.lastLoginAt),
-                    ]),
-                  ],
+                  buildExportRows(filteredEmployees),
                 )
               }
-              sx={{
-                borderRadius: "14px",
-                backgroundColor: "#475569",
-                px: 2.5,
-                py: 1.25,
-              }}
+              sx={{ borderRadius: "14px", backgroundColor: "#475569", px: 2.5, py: 1.25 }}
             >
-              CSV を出力
+              CSV 出力
             </Button>
           </div>
 
@@ -775,7 +687,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
               fullWidth
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="氏名・loginId・メール・部門で検索..."
+              placeholder="氏名・loginId・メールアドレス・部署で検索..."
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -791,7 +703,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
               value={selectedDepartment}
               onChange={(event) => setSelectedDepartment(event.target.value)}
             >
-              <MenuItem value="all">全部門</MenuItem>
+              <MenuItem value="all">全部署</MenuItem>
               {departmentOptions.map((departmentOption) => (
                 <MenuItem key={departmentOption.name} value={departmentOption.name}>
                   {departmentOption.name}
@@ -802,15 +714,16 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
-          <div className="rounded-full bg-slate-100 px-4 py-2">企業名 {summary.companyName}</div>
+          <div className="rounded-full bg-slate-100 px-4 py-2">会社: {summary.companyName}</div>
           <div className="rounded-full bg-slate-100 px-4 py-2">平均達成率 {summary.averageCompletionRate}%</div>
-          <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中 {invitedEmployeeCount} 名</div>
-          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">認証未連携 {unlinkedEmployeeCount} 名</div>
-          <div className="rounded-full bg-slate-100 px-4 py-2">最終更新 {formatDateTime(summary.updatedAt)}</div>
+          <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中 {invitedEmployeeCount} 人</div>
+          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">未連携 {unlinkedEmployeeCount} 人</div>
+          <div className="rounded-full bg-slate-100 px-4 py-2">更新 {formatDateTime(summary.updatedAt)}</div>
         </div>
 
         <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
-          この画面は事前招待型のユーザー登録を前提にしています。ユーザーは loginId と email を先に登録し、初回ログイン後に認証連携が紐づく想定です。
+          `infra/README.md` に定義されている User / Department / Company テーブルのみを使って管理しています。
+          会社ポイント調整は User.currentPointBalance と Company.companyPointBalance を同時に更新します。
         </div>
 
         {notice ? (
@@ -824,25 +737,25 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         <StatCard
           label="登録ユーザー数"
           value={`${summary.employeeCount}`}
-          description="現在この企業で管理している従業員数"
+          description="現在この会社で管理しているユーザー数"
           accentClassName="bg-gradient-to-r from-blue-500 to-cyan-400"
         />
         <StatCard
-          label="部門数"
+          label="部署数"
           value={`${summary.departmentCount}`}
-          description="ユーザー管理対象になっている部門の数"
+          description="管理対象として有効な部署数"
           accentClassName="bg-gradient-to-r from-emerald-500 to-teal-400"
         />
         <StatCard
           label="ユーザー保有ポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="登録ユーザー全体の現在ポイント合計"
+          description="全ユーザーの currentPointBalance 合計"
           accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
         />
         <StatCard
-          label="企業ポイント残高"
+          label="会社ポイント残高"
           value={`${formatNumber(summary.companyPointBalance)}${pointUnitLabel}`}
-          description="会社が保有しているポイント残高"
+          description="Company.companyPointBalance"
           accentClassName="bg-gradient-to-r from-violet-500 to-fuchsia-400"
         />
       </section>
@@ -855,12 +768,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">ユーザー一覧</h2>
-              <p className="text-sm text-slate-500">部門・権限・認証連携状況を横断で確認できます。</p>
+              <p className="text-sm text-slate-500">部署・権限・Cognito 連携状況を確認できます。</p>
             </div>
           </div>
 
           <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-            {filteredEmployees.length} / {summary.employeeCount} 名を表示中
+            {filteredEmployees.length} / {summary.employeeCount} 件を表示
           </div>
         </div>
 
@@ -868,7 +781,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           <Table columns={columns} rows={pagedEmployees} footer={footer} />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
-            条件に一致するユーザーが見つかりません。検索条件か部門フィルタを調整してください。
+            条件に一致するユーザーが見つかりません。検索条件または部署フィルタを見直してください。
           </div>
         )}
       </section>
@@ -878,7 +791,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         submitting={registering}
         error={registrationError}
         departmentOptions={departmentOptions}
-        onClose={handleCloseRegistrationDialog}
+        onClose={() => {
+          if (!registering) {
+            setRegistrationDialogOpen(false);
+            setRegistrationError(null);
+          }
+        }}
         onSubmit={handleRegisterEmployee}
       />
 
@@ -889,7 +807,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         error={editError}
         pointUnitLabel={pointUnitLabel}
         departmentOptions={departmentOptions}
-        onClose={handleCloseEditDialog}
+        onClose={() => {
+          if (!updatingEmployee) {
+            setEditingEmployee(null);
+            setEditError(null);
+          }
+        }}
         onSubmit={handleUpdateEmployee}
       />
 
@@ -898,7 +821,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         employee={employeePendingDeletion}
         submitting={deletingEmployee}
         error={deleteError}
-        onClose={handleCloseDeleteDialog}
+        onClose={() => {
+          if (!deletingEmployee) {
+            setEmployeePendingDeletion(null);
+            setDeleteError(null);
+          }
+        }}
         onSubmit={handleDeleteEmployee}
       />
 

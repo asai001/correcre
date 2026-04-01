@@ -1,0 +1,166 @@
+import "server-only";
+
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+
+import type { DBUserItem } from "@correcre/types";
+
+import { getDynamoDocumentClient } from "./client";
+
+export type UserTableConfig = {
+  region: string;
+  tableName: string;
+};
+
+export const USER_BY_COGNITO_SUB_INDEX = "UserByCognitoSub";
+export const USER_BY_EMAIL_INDEX = "UserByEmail";
+export const USER_BY_DEPARTMENT_INDEX = "UserByDepartment";
+
+export function buildUserSk(userId: string) {
+  return `USER#${userId}` as const;
+}
+
+export function buildUserByCognitoSubGsiPk(cognitoSub: string) {
+  return `COGNITO_SUB#${cognitoSub}` as const;
+}
+
+export function buildUserByEmailGsiPk(email: string) {
+  return `EMAIL#${email.trim().toLowerCase()}` as const;
+}
+
+export function buildUserByDepartmentGsiPk(companyId: string, departmentId: string) {
+  return `COMPANY#${companyId}#DEPT#${departmentId}` as const;
+}
+
+export function buildUserByDepartmentGsiSk(userId: string) {
+  return `USER#${userId}` as const;
+}
+
+export async function getUserByCompanyAndUserId(
+  config: UserTableConfig,
+  companyId: string,
+  userId: string,
+): Promise<DBUserItem | null> {
+  const client = getDynamoDocumentClient(config.region);
+  const { Item } = await client.send(
+    new GetCommand({
+      TableName: config.tableName,
+      Key: {
+        companyId,
+        sk: buildUserSk(userId),
+      },
+    }),
+  );
+
+  return (Item as DBUserItem | undefined) ?? null;
+}
+
+export async function getUserByCognitoSub(config: UserTableConfig, cognitoSub: string): Promise<DBUserItem | null> {
+  const normalizedCognitoSub = cognitoSub.trim();
+
+  if (!normalizedCognitoSub) {
+    return null;
+  }
+
+  const client = getDynamoDocumentClient(config.region);
+  const { Items } = await client.send(
+    new QueryCommand({
+      TableName: config.tableName,
+      IndexName: USER_BY_COGNITO_SUB_INDEX,
+      KeyConditionExpression: "gsi1pk = :gsi1pk",
+      ExpressionAttributeValues: {
+        ":gsi1pk": buildUserByCognitoSubGsiPk(normalizedCognitoSub),
+      },
+      Limit: 1,
+    }),
+  );
+
+  return (Items?.[0] as DBUserItem | undefined) ?? null;
+}
+
+export async function listUsersByCompany(config: UserTableConfig, companyId: string): Promise<DBUserItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const users: DBUserItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        KeyConditionExpression: "companyId = :companyId",
+        ExpressionAttributeValues: {
+          ":companyId": companyId,
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      users.push(...(Items as DBUserItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return users;
+}
+
+export async function listUsersByEmail(config: UserTableConfig, email: string): Promise<DBUserItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const { Items } = await client.send(
+    new QueryCommand({
+      TableName: config.tableName,
+      IndexName: USER_BY_EMAIL_INDEX,
+      KeyConditionExpression: "gsi2pk = :gsi2pk",
+      ExpressionAttributeValues: {
+        ":gsi2pk": buildUserByEmailGsiPk(email),
+      },
+    }),
+  );
+
+  return (Items as DBUserItem[] | undefined) ?? [];
+}
+
+export async function putUser(config: UserTableConfig, user: DBUserItem): Promise<void> {
+  const client = getDynamoDocumentClient(config.region);
+  await client.send(
+    new PutCommand({
+      TableName: config.tableName,
+      Item: user,
+    }),
+  );
+}
+
+export async function updateUserLastLoginAtByCognitoSub(
+  config: UserTableConfig,
+  cognitoSub: string,
+  loggedInAt: string = new Date().toISOString(),
+): Promise<DBUserItem | null> {
+  const user = await getUserByCognitoSub(config, cognitoSub);
+
+  if (!user) {
+    return null;
+  }
+
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: {
+        companyId: user.companyId,
+        sk: user.sk,
+      },
+      UpdateExpression: "SET lastLoginAt = :lastLoginAt, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":lastLoginAt": loggedInAt,
+        ":updatedAt": loggedInAt,
+      },
+    }),
+  );
+
+  return {
+    ...user,
+    lastLoginAt: loggedInAt,
+    updatedAt: loggedInAt,
+  };
+}

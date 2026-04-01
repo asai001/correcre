@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { TablePagination } from "@mui/material";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { TablePagination } from "@mui/material";
+
+import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
 import Table, { type ColumnDef } from "@employee/components/Table";
+
 import { fetchExchangeHistory } from "../api/client";
 import type { ExchangeHistory as ExchangeHistoryRow } from "../model/types";
 
@@ -40,7 +44,7 @@ export default function ExchangeHistory({
       },
       {
         id: "merchandiseName",
-        label: "商品・サービス",
+        label: "景品・サービス",
       },
       {
         id: "usedPoint",
@@ -50,24 +54,33 @@ export default function ExchangeHistory({
         render: (row) => `${row.usedPoint.toLocaleString()} pt`,
       },
     ],
-    []
+    [],
   );
   const resolvedRowsPerPageOptions = useMemo(
     () => (rowsPerPageOptions?.length ? rowsPerPageOptions : [5, 10, 25, 50]),
-    [rowsPerPageOptions]
+    [rowsPerPageOptions],
   );
   const defaultRowsPerPage = useMemo(() => {
     const candidate = initialRowsPerPage ?? 5;
     return resolvedRowsPerPageOptions.includes(candidate) ? candidate : (resolvedRowsPerPageOptions[0] ?? 5);
   }, [initialRowsPerPage, resolvedRowsPerPageOptions]);
   const [rows, setRows] = useState<ExchangeHistoryRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);
 
   useEffect(() => {
+    if (!companyId || !userId) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+
     const ac = new AbortController();
 
     (async () => {
+      setLoading(true);
+
       try {
         const data = await fetchExchangeHistory(companyId, userId, fetchAll ? undefined : limit, ac.signal);
 
@@ -81,6 +94,10 @@ export default function ExchangeHistory({
 
         console.error(error);
         setRows([]);
+      } finally {
+        if (!ac.signal.aborted) {
+          setLoading(false);
+        }
       }
     })();
 
@@ -123,13 +140,13 @@ export default function ExchangeHistory({
   );
 
   return (
-    <div className={`bg-white rounded-2xl shadow-lg p-6 mb-8 ${className ?? ""}`}>
-      <div className="flex items-center mb-4">
-        <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
-        <div className="text-lg lg:text-2xl font-bold">直近の交換履歴</div>
+    <div className={`mb-8 rounded-2xl bg-white p-6 shadow-lg ${className ?? ""}`}>
+      <div className="mb-4 flex items-center">
+        <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
+        <div className="text-lg font-bold lg:text-2xl">交換履歴</div>
       </div>
 
-      <Table columns={columns} rows={displayedRows} footer={footer} />
+      {loading ? <SkeletonBlock className="h-[320px] rounded-2xl" /> : <Table columns={columns} rows={displayedRows} footer={footer} />}
     </div>
   );
 }

@@ -1,6 +1,21 @@
 type CompanyItemStatus = "ACTIVE" | "INACTIVE" | "TRIAL";
 type CompanyPlan = "TRIAL" | "STANDARD" | "ENTERPRISE";
 
+export type CompanyPhilosophyValue = {
+  title: string;
+  description?: string;
+};
+
+export type CompanyPhilosophy = {
+  corporatePhilosophy?: string;
+  purpose?: string;
+  mission?: string;
+  vision?: string;
+  values?: CompanyPhilosophyValue[];
+  creed?: string[];
+  updatedAt?: string;
+};
+
 export type Company = {
   companyId: string;
   name: string;
@@ -36,6 +51,7 @@ export type Company = {
   logoImageUrl?: string;
   primaryColor?: string;
   allowedEmailDomains?: string[];
+  philosophy?: CompanyPhilosophy;
 
   createdAt: string;
   updatedAt: string;

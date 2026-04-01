@@ -2,31 +2,6 @@
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
-import AdminPageHeader from "@admin/components/AdminPageHeader";
-import Table, { type ColumnDef } from "@admin/components/Table";
-import { downloadCsv } from "@admin/lib/csv";
-import {
-  createDepartment,
-  createEmployee,
-  deleteDepartment,
-  deleteEmployee,
-  renameDepartment,
-  updateEmployee,
-} from "../api/client";
-import { useEmployeeManagementSummary } from "../hooks/useEmployeeManagementSummary";
-import type {
-  EmployeeAuthLinkStatus,
-  CreateEmployeeInput,
-  EmployeeManagementEmployee,
-  EmployeeManagementRole,
-  EmployeeManagementStatus,
-  MutationResult,
-  UpdateEmployeeInput,
-} from "../model/types";
-import DepartmentManagementDialog from "./DepartmentManagementDialog";
-import EmployeeDeleteDialog from "./EmployeeDeleteDialog";
-import EmployeeEditDialog from "./EmployeeEditDialog";
-import EmployeeRegistrationDialog from "./EmployeeRegistrationDialog";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBuilding,
@@ -45,6 +20,32 @@ import {
   TablePagination,
   TextField,
 } from "@mui/material";
+
+import AdminPageHeader from "@admin/components/AdminPageHeader";
+import Table, { type ColumnDef } from "@admin/components/Table";
+import { downloadCsv } from "@admin/lib/csv";
+import {
+  createDepartment,
+  createEmployee,
+  deleteDepartment,
+  deleteEmployee,
+  renameDepartment,
+  updateEmployee,
+} from "../api/client";
+import { useEmployeeManagementSummary } from "../hooks/useEmployeeManagementSummary";
+import type {
+  CreateEmployeeInput,
+  EmployeeAuthLinkStatus,
+  EmployeeManagementEmployee,
+  EmployeeManagementRole,
+  EmployeeManagementStatus,
+  MutationResult,
+  UpdateEmployeeInput,
+} from "../model/types";
+import DepartmentManagementDialog from "./DepartmentManagementDialog";
+import EmployeeDeleteDialog from "./EmployeeDeleteDialog";
+import EmployeeEditDialog from "./EmployeeEditDialog";
+import EmployeeRegistrationDialog from "./EmployeeRegistrationDialog";
 
 type EmployeeManagementProps = {
   companyId: string;
@@ -83,8 +84,8 @@ const statusBadgeClassMap: Record<EmployeeManagementStatus, string> = {
 };
 
 const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
-  UNLINKED: "認証未連携",
-  LINKED: "認証連携済み",
+  UNLINKED: "未連携",
+  LINKED: "連携済み",
 };
 
 const authLinkBadgeClassMap: Record<EmployeeAuthLinkStatus, string> = {
@@ -119,20 +120,24 @@ function StatCard({ label, value, description, accentClassName }: StatCardProps)
   );
 }
 
+function getDepartmentLabel(employee: EmployeeManagementEmployee) {
+  return employee.departmentName || "-";
+}
+
 function getEmployeeColumns(
   pointUnitLabel: string,
   onEditEmployee: (employee: EmployeeManagementEmployee) => void,
-  onDeleteEmployee: (employee: EmployeeManagementEmployee) => void
+  onDeleteEmployee: (employee: EmployeeManagementEmployee) => void,
 ): ColumnDef<EmployeeManagementEmployee>[] {
   return [
     {
       id: "name",
-      label: "名前",
-      width: "20%",
+      label: "氏名",
+      width: "24%",
       render: (row) => (
-        <div className="min-w-[150px]">
+        <div className="min-w-[180px]">
           <div className="font-semibold text-slate-900">{row.name}</div>
-          <div className="mt-1 text-xs text-slate-500">loginId {row.loginId}</div>
+          <div className="mt-1 text-xs text-slate-500">loginId: {row.loginId}</div>
           <div className="mt-1 text-xs text-slate-500">
             {row.userId} / 入社日 {formatDate(row.joinedAt)}
           </div>
@@ -140,19 +145,14 @@ function getEmployeeColumns(
       ),
     },
     {
-      id: "departments",
+      id: "departmentName",
       label: "部署 / 権限 / 状態",
-      width: "22%",
+      width: "26%",
       render: (row) => (
-        <div className="flex min-w-[190px] flex-wrap gap-2">
-          {row.departments.map((department) => (
-            <span
-              key={`${row.userId}-${department}`}
-              className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700"
-            >
-              {department}
-            </span>
-          ))}
+        <div className="flex min-w-[220px] flex-wrap gap-2">
+          <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+            {getDepartmentLabel(row)}
+          </span>
           {row.roles.map((role) => (
             <span
               key={`${row.userId}-${role}`}
@@ -161,9 +161,7 @@ function getEmployeeColumns(
               {roleLabelMap[role]}
             </span>
           ))}
-          <span
-            className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClassMap[row.status]}`}
-          >
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClassMap[row.status]}`}>
             {statusLabelMap[row.status]}
           </span>
           <span
@@ -177,9 +175,9 @@ function getEmployeeColumns(
     {
       id: "email",
       label: "メールアドレス",
-      width: "18%",
+      width: "28%",
       render: (row) => (
-        <div className="min-w-[220px]">
+        <div className="min-w-[240px]">
           <div className="font-medium text-slate-900">{row.email}</div>
           <div className="mt-1 text-xs text-slate-500">
             {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "初回ログイン待ち"}
@@ -188,20 +186,10 @@ function getEmployeeColumns(
       ),
     },
     {
-      id: "phone",
-      label: "連絡先",
-      width: "13%",
-    },
-    {
-      id: "address",
-      label: "住所",
-      width: "17%",
-    },
-    {
       id: "pointBalance",
-      label: "保有ポイント",
+      label: "ポイント",
       align: "right",
-      width: "10%",
+      width: "14%",
       render: (row) => (
         <div className="min-w-[120px] text-right">
           <div className="font-bold text-emerald-600">
@@ -264,11 +252,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   const departmentOptions = useMemo(() => summary?.departmentOptions ?? [], [summary]);
   const invitedEmployeeCount = useMemo(
     () => employees.filter((employee) => employee.status === "INVITED").length,
-    [employees]
+    [employees],
   );
   const unlinkedEmployeeCount = useMemo(
     () => employees.filter((employee) => employee.authLinkStatus === "UNLINKED").length,
-    [employees]
+    [employees],
   );
 
   const filteredEmployees = useMemo(() => {
@@ -276,7 +264,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
 
     return employees.filter((employee) => {
       const matchesDepartment =
-        selectedDepartment === "all" || employee.departments.includes(selectedDepartment);
+        selectedDepartment === "all" || employee.departmentName === selectedDepartment;
 
       if (!matchesDepartment) {
         return false;
@@ -290,10 +278,8 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         employee.name,
         employee.userId,
         employee.loginId,
-        employee.departments.join(" "),
+        employee.departmentName ?? "",
         employee.email,
-        employee.phone,
-        employee.address,
         ...employee.roles.map((role) => roleLabelMap[role]),
         statusLabelMap[employee.status],
         authLinkLabelMap[employee.authLinkStatus],
@@ -383,7 +369,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name}を招待登録しました。認証連携は初回ログイン後に行う想定です。`);
+      setNotice(`${createdEmployee.name} を登録しました。`);
       reload();
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "従業員の登録に失敗しました");
@@ -400,7 +386,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       const updatedEmployee = await updateEmployee(companyId, input);
 
       setEditingEmployee(null);
-      setNotice(`${updatedEmployee.name}を更新しました。`);
+      setNotice(`${updatedEmployee.name} を更新しました。`);
       reload();
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "従業員情報の更新に失敗しました");
@@ -426,7 +412,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
           : employees.find((employee) => employee.userId === userId)?.name ?? userId;
 
       setEmployeePendingDeletion(null);
-      setNotice(`${deletedEmployeeName}を削除しました。`);
+      setNotice(`${deletedEmployeeName} を削除しました。`);
       reload();
       return result;
     } finally {
@@ -439,6 +425,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
     if (!result.ok) {
       return result;
     }
+
     setSelectedDepartment("all");
     setNotice(`部署「${name}」を追加しました。`);
     reload();
@@ -450,8 +437,9 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
     if (!result.ok) {
       return result;
     }
+
     setSelectedDepartment("all");
-    setNotice(`部署名を「${nextName}」へ更新しました。`);
+    setNotice(`部署名を「${nextName}」に更新しました。`);
     reload();
     return result;
   };
@@ -461,6 +449,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
     if (!result.ok) {
       return result;
     }
+
     setSelectedDepartment("all");
     setNotice(`部署「${name}」を削除しました。`);
     reload();
@@ -470,7 +459,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   if (loading && !summary) {
     return (
       <div className="space-y-6 pb-5">
-        <AdminPageHeader title="ユーザー登録・管理" adminName={adminName} />
+        <AdminPageHeader title="従業員管理" adminName={adminName} subtitle="User テーブルと部署マスタを同期して管理します" />
         <div className="h-24 animate-pulse rounded-[28px] bg-slate-200/70" />
         <div className="h-32 animate-pulse rounded-[28px] bg-slate-200/70" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -486,7 +475,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   if (error && !summary) {
     return (
       <div className="space-y-6 pb-5">
-        <AdminPageHeader title="ユーザー登録・管理" adminName={adminName} />
+        <AdminPageHeader title="従業員管理" adminName={adminName} subtitle="User テーブルと部署マスタを同期して管理します" />
         <div className="my-5 rounded-[28px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700 shadow-sm">
           {error}
         </div>
@@ -521,9 +510,9 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
   return (
     <div className="space-y-6 pb-5">
       <AdminPageHeader
-        title="ユーザー登録・管理"
+        title="従業員管理"
         adminName={summary.adminName}
-        subtitle="運営用の事前招待登録と認証連携状況の確認"
+        subtitle="infra/README.md の User テーブル定義に合わせて従業員情報を管理します"
       />
 
       <section className="rounded-[28px] bg-white p-5 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.35)] lg:p-6">
@@ -540,7 +529,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                 py: 1.25,
               }}
             >
-              ユーザーを招待登録
+              従業員を登録
             </Button>
             <Button
               variant="contained"
@@ -553,7 +542,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                 py: 1.25,
               }}
             >
-              部署管理
+              部署を管理
             </Button>
             <Button
               variant="contained"
@@ -563,17 +552,15 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                   `employee-management-${new Date().toISOString().slice(0, 10)}.csv`,
                   [
                     [
-                      "名前",
+                      "氏名",
                       "ユーザーID",
                       "ログインID",
                       "所属部署",
                       "権限",
-                      "招待状態",
-                      "認証連携",
+                      "状態",
+                      "連携状態",
                       "メールアドレス",
-                      "連絡先",
-                      "住所",
-                      "保有ポイント",
+                      "ポイント",
                       "達成率",
                       "入社日",
                       "最終ログイン",
@@ -582,19 +569,17 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                       employee.name,
                       employee.userId,
                       employee.loginId,
-                      employee.departments.join(" / "),
+                      getDepartmentLabel(employee),
                       employee.roles.map((role) => roleLabelMap[role]).join(" / "),
                       statusLabelMap[employee.status],
                       authLinkLabelMap[employee.authLinkStatus],
                       employee.email,
-                      employee.phone,
-                      employee.address,
                       employee.pointBalance,
                       `${employee.completionRate}%`,
                       formatDate(employee.joinedAt),
                       formatDateTime(employee.lastLoginAt),
                     ]),
-                  ]
+                  ],
                 )
               }
               sx={{
@@ -604,7 +589,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                 py: 1.25,
               }}
             >
-              データエクスポート
+              CSV を出力
             </Button>
           </div>
 
@@ -614,7 +599,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
               fullWidth
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="名前・loginId・メール・部署で検索..."
+              placeholder="氏名・loginId・メールアドレス・部署で検索..."
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -641,17 +626,16 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 text-sm text-slate-500">
-          <div className="rounded-full bg-slate-100 px-4 py-2">会社名 {summary.companyName}</div>
-          <div className="rounded-full bg-slate-100 px-4 py-2">平均達成率 {summary.averageCompletionRate}%</div>
-          <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中 {invitedEmployeeCount} 名</div>
-          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">認証未連携 {unlinkedEmployeeCount} 名</div>
-          <div className="rounded-full bg-slate-100 px-4 py-2">最終更新 {formatDateTime(summary.updatedAt)}</div>
+          <div className="rounded-full bg-slate-100 px-4 py-2">会社: {summary.companyName}</div>
+          <div className="rounded-full bg-slate-100 px-4 py-2">平均達成率: {summary.averageCompletionRate}%</div>
+          <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中: {invitedEmployeeCount}名</div>
+          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">未連携: {unlinkedEmployeeCount}名</div>
+          <div className="rounded-full bg-slate-100 px-4 py-2">最終更新: {formatDateTime(summary.updatedAt)}</div>
         </div>
 
         <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
-          この画面は、DynamoDB への手入力をやめて運営側が事前招待登録を行うための画面です。
-          認証連携IDはここでは直接入力せず、初回ログイン後の連携で管理する前提にしています。
-          登録時は `loginId` と `email` の重複をサーバー側でも検証します。
+          従業員管理 API は DynamoDB の `User`・`Company`・`Department` テーブルを直接参照します。
+          `departmentName` は単一値で扱い、User テーブルに存在しない `phone` / `address` は管理対象から外しています。
         </div>
 
         {notice && (
@@ -661,27 +645,27 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="総従業員数"
+          label="従業員数"
           value={`${summary.employeeCount}`}
-          description="管理対象の従業員アカウント数"
+          description="User テーブル上の有効ユーザー数"
           accentClassName="bg-gradient-to-r from-blue-500 to-cyan-400"
         />
         <StatCard
           label="部署数"
           value={`${summary.departmentCount}`}
-          description="登録されている所属部署の数"
+          description="Department テーブル上の有効部署数"
           accentClassName="bg-gradient-to-r from-emerald-500 to-teal-400"
         />
         <StatCard
-          label="総保有ポイント"
+          label="従業員ポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="従業員全体の保有ポイント合計"
+          description="全従業員の currentPointBalance 合計"
           accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
         />
         <StatCard
-          label="企業保有ポイント"
+          label="会社残高"
           value={`${formatNumber(summary.companyPointBalance)}${pointUnitLabel}`}
-          description="会社アカウントが保有している残高"
+          description="Company テーブルの companyPointBalance"
           accentClassName="bg-gradient-to-r from-violet-500 to-fuchsia-400"
         />
       </section>
@@ -693,8 +677,8 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
               <FontAwesomeIcon icon={faUsers} className="text-lg" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">登録済みユーザー一覧</h2>
-              <p className="text-sm text-slate-500">部署、権限、招待状態、認証連携状態を一覧で確認できます。</p>
+              <h2 className="text-xl font-bold text-slate-900">従業員一覧</h2>
+              <p className="text-sm text-slate-500">User テーブルに保存されている従業員情報を表示しています。</p>
             </div>
           </div>
 
@@ -707,7 +691,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
           <Table columns={columns} rows={pagedEmployees} footer={footer} />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
-            条件に一致する従業員が見つかりませんでした。検索条件か部署フィルタを調整してください。
+            条件に一致する従業員が見つかりませんでした。
           </div>
         )}
       </section>

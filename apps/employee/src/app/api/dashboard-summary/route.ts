@@ -1,6 +1,5 @@
-import { getDashboardSummaryFromDynamoMock } from "@employee/features/dashboard-summary/api/server.mock";
+import { getDashboardSummaryFromDynamo } from "@employee/features/dashboard-summary/api/server";
 import { NextResponse } from "next/server";
-// import { getDashboardSummaryFromDynamo } from "@employee/features/dashboard-summary/api/server";
 
 import { isValidYYYYMM } from "@correcre/lib";
 
@@ -19,8 +18,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    // const summary = await getDashboardSummaryFromDynamo(companyId, userId);
-    const summary = await getDashboardSummaryFromDynamoMock(companyId, userId, targetYearMonth);
+    const summary = await getDashboardSummaryFromDynamo(companyId, userId, targetYearMonth);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/dashboard-summary error", err);

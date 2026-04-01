@@ -3,7 +3,7 @@ export const LOGIN_ERROR_MESSAGES = {
   missing_fields: "必須項目を入力してください。",
   new_password_session_expired:
     "パスワード設定の有効期限が切れました。もう一度ログインして設定し直してください。",
-  invalid_new_password: "新しいパスワードが条件を満たしていません。内容を確認して再入力してください。",
+  invalid_new_password: "新しいパスワードが条件を満たしていません。半角英数字8文字以上で再入力してください。",
   password_confirmation_mismatch: "新しいパスワードと確認用パスワードが一致しません。",
   password_reset_required: "パスワードの再設定が必要です。設定を完了してからもう一度ログインしてください。",
   rate_limited: "試行回数が上限に達しました。しばらく待ってから再度お試しください。",

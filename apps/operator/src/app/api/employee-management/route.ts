@@ -1,10 +1,10 @@
 ﻿import { NextResponse } from "next/server";
 import {
-  createEmployeeInDynamoMock,
-  deleteEmployeeInDynamoMock,
-  getEmployeeManagementSummaryFromDynamoMock,
-  updateEmployeeInDynamoMock,
-} from "@operator/features/user-registration/api/server.mock";
+  createEmployeeInDynamo,
+  deleteEmployeeInDynamo,
+  getEmployeeManagementSummaryFromDynamo,
+  updateEmployeeInDynamo,
+} from "@operator/features/user-registration/api/server";
 import type {
   CreateEmployeeInput,
   DeleteEmployeeInput,
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await getEmployeeManagementSummaryFromDynamoMock(companyId, adminUserId);
+    const summary = await getEmployeeManagementSummaryFromDynamo(companyId, adminUserId);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/employee-management error", err);
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const employee = await createEmployeeInDynamoMock(body.companyId, body);
+    const employee = await createEmployeeInDynamo(body.companyId, body);
     return NextResponse.json(employee, { status: 201 });
   } catch (err) {
     console.error("POST /api/employee-management error", err);
@@ -114,7 +114,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const employee = await updateEmployeeInDynamoMock(body.companyId, body);
+    const employee = await updateEmployeeInDynamo(body.companyId, body);
     return NextResponse.json(employee);
   } catch (err) {
     console.error("PATCH /api/employee-management error", err);
@@ -148,7 +148,7 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    await deleteEmployeeInDynamoMock(body.companyId, body);
+    await deleteEmployeeInDynamo(body.companyId, body);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/employee-management error", err);

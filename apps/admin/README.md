@@ -9,9 +9,20 @@ ADMIN_COGNITO_REGION=ap-northeast-1
 ADMIN_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 ADMIN_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 ADMIN_OPERATOR_EMAILS=operator1@example.com,operator2@example.com
+AWS_REGION=ap-northeast-1
+AWS_PROFILE=CorreCre-Dev-Account
+DDB_USER_TABLE_NAME=correcre-user-dev
+DDB_COMPANY_TABLE_NAME=correcre-company-dev
+DDB_DEPARTMENT_TABLE_NAME=correcre-department-dev
+DDB_MISSION_TABLE_NAME=correcre-mission-dev
+DDB_MISSION_REPORT_TABLE_NAME=correcre-mission-report-dev
+DDB_USER_MONTHLY_STATS_TABLE_NAME=correcre-user-monthly-stats-dev
+DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
 ```
 
 The values are emitted by the CDK stack as `AdminCognitoRegion`, `AdminCognitoUserPoolId`, and `AdminCognitoUserPoolClientId`.
+The DynamoDB table names are emitted as `UserTableName`, `CompanyTableName`, `DepartmentTableName`, `MissionTableName`, `MissionReportTableName`, `UserMonthlyStatsTableName`, and `ExchangeHistoryTableName`.
+For local development against the dev AWS account, use `AWS_PROFILE=CorreCre-Dev-Account` and run `aws sso login --profile CorreCre-Dev-Account` beforehand.
 
 `AdminCognitoUserPoolId` is shared with the employee app. Only the app client ID differs between the two applications.
 

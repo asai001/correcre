@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
-import data from "../../../../../mock/dynamodb.json";
 
-type ExchangeHistoryRecord = {
-  companyId: string;
-  userId: string;
-  exchangeId: string;
-  exchangedAt: string;
-  merchandiseName: string;
-  usedPoint: number;
-};
+import { listExchangeHistoryByCompanyAndUser } from "@correcre/lib/dynamodb/exchange-history";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 type ExchangeHistoryResponse = {
   date: string;
@@ -37,20 +30,26 @@ export async function GET(req: Request) {
   const limit = typeof parsedLimit === "number" && Number.isFinite(parsedLimit) ? parsedLimit : undefined;
 
   try {
-    const sortedItems = ((data as { ExchangeHistory?: ExchangeHistoryRecord[] }).ExchangeHistory ?? [])
-      .filter(
-        (item) => item.companyId === companyId && item.userId === userId && isWithinDateRange(item.exchangedAt, startDate, endDate)
-      )
+    const items = await listExchangeHistoryByCompanyAndUser(
+      {
+        region: readRequiredServerEnv("AWS_REGION"),
+        tableName: readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME"),
+      },
+      companyId,
+      userId,
+    );
+
+    const sortedItems = items
+      .filter((item) => isWithinDateRange(item.exchangedAt, startDate, endDate))
       .sort((a, b) => (a.exchangedAt < b.exchangedAt ? 1 : -1));
 
-    const items = (typeof limit === "number" ? sortedItems.slice(0, limit) : sortedItems)
-      .map<ExchangeHistoryResponse>((item) => ({
-        date: item.exchangedAt.slice(0, 10).replaceAll("-", "/"),
-        merchandiseName: item.merchandiseName,
-        usedPoint: item.usedPoint,
-      }));
+    const response = (typeof limit === "number" ? sortedItems.slice(0, limit) : sortedItems).map<ExchangeHistoryResponse>((item) => ({
+      date: item.exchangedAt.slice(0, 10).replaceAll("-", "/"),
+      merchandiseName: item.merchandiseNameSnapshot,
+      usedPoint: item.usedPoint,
+    }));
 
-    return NextResponse.json(items);
+    return NextResponse.json(response);
   } catch (err) {
     console.error("GET /api/exchange-history error", err);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });

@@ -1,4 +1,4 @@
-import { getMissionFromDynamoMock } from "@employee/features/mission-report/api/server.mock";
+import { getMissionFromDynamo } from "@employee/features/mission-report/api/server";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const res = await getMissionFromDynamoMock(companyId, userId);
+    const res = await getMissionFromDynamo(companyId, userId);
     return NextResponse.json(res);
   } catch (err) {
     console.error("GET /api/mission error", err);

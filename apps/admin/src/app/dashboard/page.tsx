@@ -5,12 +5,14 @@ import DashboardMenuTile from "@admin/features/dashboard-menu-tile";
 import DashboardSummary from "@admin/features/dashboard-summary";
 import LoginInfo from "@admin/features/login-info";
 import RecentReports from "@admin/features/recent-reports";
+import { requireCurrentAdminUser } from "@admin/lib/auth/current-user";
 
-const companyId = "em";
-const userId = "u-004";
-const targetYearMonth = "2025-11";
+export default async function DashboardPage() {
+  const currentUser = await requireCurrentAdminUser();
+  const companyId = currentUser.companyId;
+  const userId = currentUser.userId;
+  const targetYearMonth = new Date().toISOString().slice(0, 7);
 
-export default function DashboardPage() {
   return (
     <>
       <div className="mt-6 flex justify-end">

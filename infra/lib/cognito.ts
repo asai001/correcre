@@ -64,8 +64,9 @@ function createSharedUserPool(scope: Construct, props: SharedCognitoProps) {
       },
     },
     passwordPolicy: {
-      // Cognito cannot enforce "ASCII alphanumeric only". This is the closest
-      // supported policy for an 8+ character password without class requirements.
+      // Cognito passwordPolicy can enforce the 8+ length requirement, but it
+      // cannot restrict passwords to ASCII alphanumeric only. The apps validate
+      // the "半角英数字8文字以上" rule before submitting NEW_PASSWORD_REQUIRED.
       minLength: 8,
       requireDigits: false,
       requireLowercase: false,

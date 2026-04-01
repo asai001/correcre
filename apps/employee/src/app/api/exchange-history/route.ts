@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getExchangeHistoryFromDynamoMock } from "@employee/features/exchange-history/api/server.mock";
+import { getExchangeHistoryFromDynamo } from "@employee/features/exchange-history/api/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -16,13 +16,8 @@ export async function GET(req: Request) {
   const limit = limitParam ? Number(limitParam) : undefined;
 
   try {
-    const history = await getExchangeHistoryFromDynamoMock(companyId, userId);
-    const filteredHistory = history.filter(
-      (item) => (!startDate || item.date >= startDate) && (!endDate || item.date <= endDate)
-    );
-    const limitedHistory = Number.isFinite(limit) ? filteredHistory.slice(0, limit) : filteredHistory;
-
-    return NextResponse.json(limitedHistory);
+    const history = await getExchangeHistoryFromDynamo(companyId, userId, startDate, endDate, limit);
+    return NextResponse.json(history);
   } catch (err) {
     console.error("GET /api/exchange-history error", err);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
