@@ -149,6 +149,30 @@ export class InfraStack extends cdk.Stack {
       value: sharedCognito.domainPrefix,
     });
 
+    new cdk.CfnOutput(this, "OperatorCognitoRegion", {
+      value: cdk.Stack.of(this).region,
+    });
+
+    new cdk.CfnOutput(this, "OperatorCognitoUserPoolId", {
+      value: sharedCognito.userPool.userPoolId,
+    });
+
+    new cdk.CfnOutput(this, "OperatorCognitoUserPoolClientId", {
+      value: sharedCognito.operatorUserPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, "OperatorCognitoIssuer", {
+      value: sharedCognito.issuer,
+    });
+
+    new cdk.CfnOutput(this, "OperatorCognitoHostedUiBaseUrl", {
+      value: sharedCognito.userPoolDomain.baseUrl(),
+    });
+
+    new cdk.CfnOutput(this, "OperatorCognitoDomainPrefix", {
+      value: sharedCognito.domainPrefix,
+    });
+
     new cdk.CfnOutput(this, "CompanyTableName", {
       value: dynamoTables.companyTable.tableName,
     });

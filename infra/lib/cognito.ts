@@ -4,7 +4,7 @@ import { Construct } from "constructs";
 
 import type { InfraStage } from "./infra-stack";
 
-export type CognitoAppType = "admin" | "employee";
+export type CognitoAppType = "admin" | "employee" | "operator";
 
 export type SharedCognitoProps = {
   stage: InfraStage;
@@ -17,6 +17,7 @@ export type SharedCognitoResources = {
   userPoolDomain: cognito.UserPoolDomain;
   adminUserPoolClient: cognito.UserPoolClient;
   employeeUserPoolClient: cognito.UserPoolClient;
+  operatorUserPoolClient: cognito.UserPoolClient;
   issuer: string;
   domainPrefix: string;
 };
@@ -38,7 +39,14 @@ function buildUserPoolClientName(appType: CognitoAppType, stage: InfraStage): st
 }
 
 function buildConstructPrefix(appType: CognitoAppType): string {
-  return appType === "admin" ? "Admin" : "Employee";
+  switch (appType) {
+    case "admin":
+      return "Admin";
+    case "employee":
+      return "Employee";
+    case "operator":
+      return "Operator";
+  }
 }
 
 function createSharedUserPool(scope: Construct, props: SharedCognitoProps) {
@@ -114,6 +122,7 @@ export function createSharedCognito(scope: Construct, props: SharedCognitoProps)
     userPoolDomain,
     adminUserPoolClient: addUserPoolClient(userPool, props.stage, "admin"),
     employeeUserPoolClient: addUserPoolClient(userPool, props.stage, "employee"),
+    operatorUserPoolClient: addUserPoolClient(userPool, props.stage, "operator"),
     issuer: `https://cognito-idp.${cdk.Stack.of(scope).region}.amazonaws.com/${userPool.userPoolId}`,
     domainPrefix,
   };

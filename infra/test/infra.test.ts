@@ -175,6 +175,33 @@ describe("InfraStack", () => {
     );
   });
 
+  test("creates distinct app clients for admin, employee, and operator on the shared user pool", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.resourceCountIs("AWS::Cognito::UserPoolClient", 3);
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-admin-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-employee-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-operator-web-dev",
+      }),
+    );
+  });
+
   test("creates a Vercel OIDC role scoped to the expected projects and environment", () => {
     const template = Template.fromStack(createStack("stg"));
 
