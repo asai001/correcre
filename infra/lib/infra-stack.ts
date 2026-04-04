@@ -11,7 +11,7 @@ export interface InfraStackProps extends cdk.StackProps {
   stage: InfraStage;
   adminAppUrl: string;
   employeeAppUrl: string;
-  sourceBranch: string;
+  sourceContext: string;
 }
 
 function normalizeUrl(value: string): string {
@@ -49,8 +49,8 @@ export class InfraStack extends cdk.Stack {
       value: employeeAppUrl,
     });
 
-    new cdk.CfnOutput(this, "SourceBranch", {
-      value: props.sourceBranch,
+    new cdk.CfnOutput(this, "SourceContext", {
+      value: props.sourceContext,
     });
 
     new cdk.CfnOutput(this, "VercelTeamSlug", {

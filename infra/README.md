@@ -259,9 +259,10 @@ GSI:
 
 ## ブランチ対応
 
-- `develop -> dev`
+- `local -> dev`
 - `stage -> stg`
 - `main -> prod`
+- `feature/*` / `fix/*` は `stage` から切ってローカルで開発し、`stage` にマージした内容を Vercel Preview / AWS stg で確認します
 
 ## よく使うコマンド
 

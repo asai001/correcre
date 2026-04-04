@@ -14,7 +14,7 @@ function createStack(stage: InfraStage): InfraStack {
     stage,
     adminAppUrl: "https://admin.example.com/",
     employeeAppUrl: "https://employee.example.com/",
-    sourceBranch: "test",
+    sourceContext: "test",
   });
 }
 
@@ -196,6 +196,37 @@ describe("InfraStack", () => {
                     "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:preview",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:preview",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:preview",
+                  ],
+                },
+              },
+            }),
+          ]),
+        },
+      }),
+    );
+  });
+
+  test("scopes the dev AWS account to development subjects only", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.hasResourceProperties(
+      "AWS::IAM::Role",
+      Match.objectLike({
+        RoleName: "correcre-vercel-dynamodb-dev",
+        AssumeRolePolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sts:AssumeRoleWithWebIdentity",
+              Condition: {
+                StringEquals: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:aud":
+                    "https://vercel.com/asai001s-projects-3e71fbe6",
+                },
+                StringLike: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:sub": [
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:development",
                   ],
                 },
               },

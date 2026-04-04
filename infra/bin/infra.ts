@@ -9,7 +9,7 @@ type EnvironmentConfig = {
   region: string;
   adminUrl: string;
   employeeUrl: string;
-  sourceBranch: string;
+  sourceContext: string;
 };
 
 const environments: EnvironmentConfig[] = [
@@ -19,7 +19,7 @@ const environments: EnvironmentConfig[] = [
     region: "ap-northeast-1",
     adminUrl: "https://dev.correcre-admin.vercel.app/",
     employeeUrl: "https://dev.correcre-employee.vercel.app/",
-    sourceBranch: "develop",
+    sourceContext: "local",
   },
   {
     stage: "stg",
@@ -27,7 +27,7 @@ const environments: EnvironmentConfig[] = [
     region: "ap-northeast-1",
     adminUrl: "https://stg.correcre-admin.vercel.app/",
     employeeUrl: "https://stg.correcre-employee.vercel.app/",
-    sourceBranch: "stage",
+    sourceContext: "stage",
   },
   {
     stage: "prod",
@@ -35,7 +35,7 @@ const environments: EnvironmentConfig[] = [
     region: "ap-northeast-1",
     adminUrl: "https://correcre-admin.vercel.app/",
     employeeUrl: "https://correcre-employee.vercel.app/",
-    sourceBranch: "main",
+    sourceContext: "main",
   },
 ];
 
@@ -51,11 +51,11 @@ for (const environment of environments) {
     stage: environment.stage,
     adminAppUrl: environment.adminUrl,
     employeeAppUrl: environment.employeeUrl,
-    sourceBranch: environment.sourceBranch,
+    sourceContext: environment.sourceContext,
     description: `Correcre ${environment.stage} infrastructure stack`,
   });
 
   cdk.Tags.of(stack).add("Project", "correcre");
   cdk.Tags.of(stack).add("Environment", environment.stage);
-  cdk.Tags.of(stack).add("SourceBranch", environment.sourceBranch);
+  cdk.Tags.of(stack).add("SourceContext", environment.sourceContext);
 }
