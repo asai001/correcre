@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { Alert, Button, TextField } from "@mui/material";
+import { Alert, Button } from "@mui/material";
+import { PasswordTextField } from "@correcre/theme";
 
 import { completeNewPassword } from "@admin/app/lib/actions/authenticate";
 import { COGNITO_PASSWORD_RULE_TEXT, isValidCognitoPassword } from "@correcre/lib/auth/password";
@@ -81,10 +82,9 @@ export default function NewPasswordForm({
 
           <div>
             <span className="text-neutral-600">新しいパスワード</span>
-            <TextField
+            <PasswordTextField
               fullWidth
               id="newPassword"
-              type="password"
               name="newPassword"
               autoComplete="new-password"
               required
@@ -107,10 +107,9 @@ export default function NewPasswordForm({
 
           <div className="mt-5">
             <span className="text-neutral-600">確認用パスワード</span>
-            <TextField
+            <PasswordTextField
               fullWidth
               id="confirmPassword"
-              type="password"
               name="confirmPassword"
               autoComplete="new-password"
               required

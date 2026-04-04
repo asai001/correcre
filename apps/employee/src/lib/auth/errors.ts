@@ -2,6 +2,11 @@ export const LOGIN_ERROR_MESSAGES = {
   invalid_credentials: "ID またはパスワードが正しくありません。",
   missing_fields: "ID とパスワードを入力してください。",
   new_password_required: "初回ログインのため、パスワード変更が必要です。",
+  new_password_session_expired:
+    "新しいパスワードの設定セッションの有効期限が切れました。もう一度ログインして設定をやり直してください。",
+  invalid_new_password:
+    "新しいパスワードが要件を満たしていません。英大文字・英小文字・数字・記号を含めて入力してください。",
+  password_confirmation_mismatch: "新しいパスワードと確認用パスワードが一致しません。",
   password_reset_required: "パスワードの再設定が必要です。再設定してからもう一度お試しください。",
   rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
   user_not_confirmed: "ユーザー確認が完了していません。登録状況を確認してください。",
@@ -33,6 +38,24 @@ export function mapAuthenticationErrorToCode(error: unknown): LoginErrorCode {
       return "user_not_confirmed";
     case "NewPasswordRequired":
       return "new_password_required";
+    default:
+      return "system_error";
+  }
+}
+
+export function mapNewPasswordErrorToCode(error: unknown): LoginErrorCode {
+  const name = error instanceof Error ? error.name : undefined;
+
+  switch (name) {
+    case "InvalidPasswordException":
+    case "InvalidParameterException":
+      return "invalid_new_password";
+    case "NewPasswordChallengeExpired":
+    case "NotAuthorizedException":
+    case "ExpiredCodeException":
+      return "new_password_session_expired";
+    case "TooManyRequestsException":
+      return "rate_limited";
     default:
       return "system_error";
   }

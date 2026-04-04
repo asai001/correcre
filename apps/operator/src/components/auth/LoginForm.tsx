@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, Button, Checkbox, TextField } from "@mui/material";
+import { PasswordTextField } from "@correcre/theme";
 
 import { authenticate } from "@operator/app/lib/actions/authenticate";
 import { OPERATOR_DEFAULT_REDIRECT_PATH } from "@operator/lib/auth/constants";
@@ -58,11 +59,10 @@ export default function LoginForm({ redirectTo = OPERATOR_DEFAULT_REDIRECT_PATH 
 
           <div className="mt-5">
             <span className="text-neutral-600">パスワード</span>
-            <TextField
+            <PasswordTextField
               className="bg-white"
               fullWidth
               id="password"
-              type="password"
               name="password"
               autoComplete="current-password"
               required

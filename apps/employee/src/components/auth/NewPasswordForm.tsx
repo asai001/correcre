@@ -6,8 +6,8 @@ import { useFormStatus } from "react-dom";
 import { Alert, Button } from "@mui/material";
 import { PasswordTextField } from "@correcre/theme";
 
-import { completeNewPassword } from "@operator/app/lib/actions/authenticate";
-import { OPERATOR_DEFAULT_REDIRECT_PATH } from "@operator/lib/auth/constants";
+import { completeNewPassword } from "@employee/app/lib/actions/authenticate";
+import { EMPLOYEE_DEFAULT_REDIRECT_PATH } from "@employee/lib/auth/constants";
 import { COGNITO_PASSWORD_RULE_TEXT, isValidCognitoPassword } from "@correcre/lib/auth/password";
 
 type NewPasswordFormProps = {
@@ -31,7 +31,14 @@ function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" variant="contained" color="primary" fullWidth disabled={pending} sx={{ my: 4, py: 1.5 }}>
+    <Button
+      type="submit"
+      variant="contained"
+      color="primary"
+      fullWidth
+      disabled={pending}
+      sx={{ my: 4, py: 1.5 }}
+    >
       {pending ? "更新中..." : "新しいパスワードを設定"}
     </Button>
   );
@@ -40,7 +47,7 @@ function SubmitButton() {
 export default function NewPasswordForm({
   email,
   errorMessage,
-  redirectTo = OPERATOR_DEFAULT_REDIRECT_PATH,
+  redirectTo = EMPLOYEE_DEFAULT_REDIRECT_PATH,
 }: NewPasswordFormProps) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,7 +59,7 @@ export default function NewPasswordForm({
   const isPasswordMismatch = !!newPassword && !!confirmPassword && newPassword !== confirmPassword;
 
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className="w-full rounded bg-white/70 pt-15">
       <div className="mx-auto w-4/5 pb-8">
         <form
           action={completeNewPassword}
@@ -124,7 +131,7 @@ export default function NewPasswordForm({
           </div>
 
           <p className="mt-4 text-sm text-neutral-600">
-            変更後はそのままユーザー登録画面へログインします。条件に合わない場合は再入力してください。
+            変更後はそのまま従業員画面へログインします。条件に合わない場合は再入力してください。
           </p>
 
           <SubmitButton />
