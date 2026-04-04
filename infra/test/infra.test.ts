@@ -174,4 +174,35 @@ describe("InfraStack", () => {
       }),
     );
   });
+
+  test("creates a Vercel OIDC role scoped to the expected projects and environment", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    template.hasResourceProperties(
+      "AWS::IAM::Role",
+      Match.objectLike({
+        RoleName: "correcre-vercel-dynamodb-stg",
+        AssumeRolePolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sts:AssumeRoleWithWebIdentity",
+              Condition: {
+                StringEquals: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:aud":
+                    "https://vercel.com/asai001s-projects-3e71fbe6",
+                },
+                StringLike: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:sub": [
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:preview",
+                  ],
+                },
+              },
+            }),
+          ]),
+        },
+      }),
+    );
+  });
 });

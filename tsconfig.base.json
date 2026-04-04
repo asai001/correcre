@@ -10,20 +10,19 @@
     "noEmit": true, // tscで出力ファイルを生成しない（型チェック専用）
     "incremental": true, // 差分型チェックで高速化
 
-    "baseUrl": ".",
     "paths": {
-      "@correcre/validation/*": ["packages/validation/src/*"],
-      "@correcre/types": ["packages/types/src/index.ts"],
-      "@correcre/types/*": ["packages/types/src/*"],
-      "@correcre/adapters/*": ["packages/adapters/src/*"],
-      "@correcre/theme/*": ["packages/theme/src/*"],
-      "@correcre/lib": ["packages/lib/src/index.ts"],
-      "@correcre/lib/*": ["packages/lib/src/*"],
-      "@correcre/individual-analysis": ["packages/features/individual-analysis/src/index.ts"],
-      "@correcre/individual-analysis/*": ["packages/features/individual-analysis/src/*"],
-      "@admin/*": ["apps/admin/src/*"],
-      "@operator/*": ["apps/operator/src/*"],
-      "@employee/*": ["apps/employee/src/*"]
+      "@correcre/validation/*": ["./packages/validation/src/*"],
+      "@correcre/types": ["./packages/types/src/index.ts"],
+      "@correcre/types/*": ["./packages/types/src/*"],
+      "@correcre/adapters/*": ["./packages/adapters/src/*"],
+      "@correcre/theme/*": ["./packages/theme/src/*"],
+      "@correcre/lib": ["./packages/lib/src/index.ts"],
+      "@correcre/lib/*": ["./packages/lib/src/*"],
+      "@correcre/individual-analysis": ["./packages/features/individual-analysis/src/index.ts"],
+      "@correcre/individual-analysis/*": ["./packages/features/individual-analysis/src/*"],
+      "@admin/*": ["./apps/admin/src/*"],
+      "@operator/*": ["./apps/operator/src/*"],
+      "@employee/*": ["./apps/employee/src/*"]
     },
 
     "esModuleInterop": true, // CJS ↔ ESM の相互運用を許可。Nextの要件でもあり基本ON。

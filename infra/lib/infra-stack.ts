@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 
 import { createSharedCognito } from "./cognito";
 import { createApplicationDynamoTables } from "./dynamodb";
+import { createVercelOidcAccess } from "./vercel-oidc";
 
 export type InfraStage = "dev" | "stg" | "prod";
 
@@ -31,6 +32,10 @@ export class InfraStack extends cdk.Stack {
     const dynamoTables = createApplicationDynamoTables(this, {
       stage: props.stage,
     });
+    const vercelOidcAccess = createVercelOidcAccess(this, {
+      stage: props.stage,
+      dynamoTables,
+    });
 
     new cdk.CfnOutput(this, "EnvironmentName", {
       value: props.stage,
@@ -46,6 +51,34 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "SourceBranch", {
       value: props.sourceBranch,
+    });
+
+    new cdk.CfnOutput(this, "VercelTeamSlug", {
+      value: vercelOidcAccess.teamSlug,
+    });
+
+    new cdk.CfnOutput(this, "VercelOidcIssuerUrl", {
+      value: vercelOidcAccess.issuerUrl,
+    });
+
+    new cdk.CfnOutput(this, "VercelOidcAudience", {
+      value: vercelOidcAccess.audience,
+    });
+
+    new cdk.CfnOutput(this, "VercelEnvironment", {
+      value: vercelOidcAccess.vercelEnvironment,
+    });
+
+    new cdk.CfnOutput(this, "VercelProjectNames", {
+      value: vercelOidcAccess.projectNames.join(","),
+    });
+
+    new cdk.CfnOutput(this, "VercelOidcProviderArn", {
+      value: vercelOidcAccess.provider.openIdConnectProviderArn,
+    });
+
+    new cdk.CfnOutput(this, "VercelAwsRoleArn", {
+      value: vercelOidcAccess.role.roleArn,
     });
 
     new cdk.CfnOutput(this, "CognitoRegion", {
