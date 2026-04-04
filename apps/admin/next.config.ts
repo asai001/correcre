@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { NextConfig } from "next";
 
 const isLocalProductionBuild =
@@ -7,6 +9,16 @@ const nextConfig: NextConfig = {
   // Keep local `next build` output separate, but use the standard `.next` directory in CI/Vercel.
   distDir: isLocalProductionBuild ? ".next-build" : ".next",
   typedRoutes: true,
+  webpack(config) {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@admin": path.join(process.cwd(), "src"),
+      "@employee": path.join(process.cwd(), "..", "employee", "src"),
+      "@operator": path.join(process.cwd(), "..", "operator", "src"),
+    };
+
+    return config;
+  },
   transpilePackages: [
     "@correcre/validation",
     "@correcre/types",
