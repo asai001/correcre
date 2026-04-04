@@ -1,13 +1,14 @@
 "use client";
 
+import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, Button, Checkbox, TextField } from "@mui/material";
 
 import { authenticate } from "@admin/app/lib/actions/authenticate";
+import { getLoginErrorMessage, type LoginErrorCode } from "@admin/lib/auth/errors";
 
 type LoginFormProps = {
-  errorMessage?: string;
   redirectTo?: string;
 };
 
@@ -29,13 +30,17 @@ function SubmitButton() {
 }
 
 export default function LoginForm({
-  errorMessage,
   redirectTo = "/dashboard",
 }: LoginFormProps) {
+  const [state, formAction] = useActionState(authenticate, {
+    errorCode: undefined as LoginErrorCode | undefined,
+  });
+  const errorMessage = getLoginErrorMessage(state.errorCode);
+
   return (
     <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
       <div className="mx-auto w-4/5">
-        <form action={authenticate}>
+        <form action={formAction}>
           <input type="hidden" name="redirectTo" value={redirectTo} />
 
           {errorMessage ? (

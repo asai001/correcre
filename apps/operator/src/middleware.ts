@@ -6,7 +6,6 @@ import {
   OPERATOR_PROTECTED_PATH_PREFIXES,
   OPERATOR_SESSION_COOKIE_NAME,
 } from "@operator/lib/auth/constants";
-import { isOperatorAllowlistConfigured, isOperatorEmailAllowed } from "@operator/lib/auth/allowlist";
 import { sanitizeRedirectTo } from "@operator/lib/auth/redirect";
 import { verifyOperatorIdToken } from "@operator/lib/auth/verify-token";
 
@@ -50,12 +49,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!isOperatorAllowlistConfigured()) {
-    const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
-    expireSession(response);
-    return response;
-  }
-
   const sessionToken = request.cookies.get(OPERATOR_SESSION_COOKIE_NAME)?.value;
 
   if (!sessionToken) {
@@ -72,17 +65,6 @@ export async function middleware(request: NextRequest) {
     const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
     expireSession(response);
     return response;
-  }
-
-  if (!isOperatorEmailAllowed(session.payload.email as string | undefined)) {
-    const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
-    expireSession(response);
-    return response;
-  }
-
-  if (isLoginPage) {
-    const redirectTo = sanitizeRedirectTo(request.nextUrl.searchParams.get("from"));
-    return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 
   return NextResponse.next();

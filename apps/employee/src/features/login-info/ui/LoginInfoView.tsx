@@ -13,7 +13,10 @@ export default function LoginInfoView({ data }: LoginInfoViewProps) {
   return (
     <div className="flex justify-between items-center bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center gap-2 lg:gap-5">
-        <div className="w-18 h-18 mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "#5b8cf7" }}>
+        <div
+          className="flex h-18 w-18 shrink-0 items-center justify-center rounded-full"
+          style={{ backgroundColor: "#5b8cf7" }}
+        >
           <FontAwesomeIcon icon={faUser} className="text-2xl lg:text-4xl" style={{ color: "#fff" }} />
         </div>
 

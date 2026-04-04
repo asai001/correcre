@@ -1,4 +1,4 @@
-export type DBUserRole = "EMPLOYEE" | "MANAGER" | "ADMIN";
+export type DBUserRole = "EMPLOYEE" | "MANAGER" | "ADMIN" | "OPERATOR";
 
 export type DBUserStatus = "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
 

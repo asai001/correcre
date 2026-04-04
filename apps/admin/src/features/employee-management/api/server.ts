@@ -19,7 +19,7 @@ import {
   putUser,
 } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
-import type { DBUserItem, Department } from "@correcre/types";
+import type { DBUserItem, DBUserRole, Department } from "@correcre/types";
 
 import type {
   CreateDepartmentInput,
@@ -55,12 +55,16 @@ function normalizeDepartmentNames(departments: string[]) {
   return Array.from(new Set(departments.map((department) => department.trim()).filter(Boolean)));
 }
 
-function normalizeRoles(roles?: EmployeeManagementRole[]) {
-  if (!roles?.length) {
+function isEmployeeManagementRole(role: DBUserRole): role is EmployeeManagementRole {
+  return role === "EMPLOYEE" || role === "MANAGER" || role === "ADMIN";
+}
+
+function normalizeRoles(roles?: DBUserRole[]) {
+  if (!roles) {
     return ["EMPLOYEE"] satisfies EmployeeManagementRole[];
   }
 
-  return roles;
+  return roles.filter(isEmployeeManagementRole);
 }
 
 function normalizeUserStatus(status: DBUserItem["status"]): EmployeeManagementStatus | "DELETED" {
@@ -83,13 +87,19 @@ function getAuthLinkStatus(cognitoSub?: string): EmployeeAuthLinkStatus {
   return cognitoSub?.trim() ? "LINKED" : "UNLINKED";
 }
 
-function toEmployee(user: DBUserItem): EmployeeManagementEmployee {
+function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
+  const roles = normalizeRoles(user.roles);
+
+  if (!roles.length) {
+    return null;
+  }
+
   return {
     userId: user.userId,
     name: user.name,
     loginId: user.loginId,
     departmentName: user.departmentName,
-    roles: normalizeRoles(user.roles),
+    roles,
     status: normalizeUserStatus(user.status) as EmployeeManagementStatus,
     authLinkStatus: getAuthLinkStatus(user.cognitoSub),
     email: user.email,
@@ -287,7 +297,9 @@ export async function getEmployeeManagementSummaryFromDynamo(
   ]);
 
   const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const employees = currentUsers.map((user) => toEmployee(user));
+  const employees = currentUsers
+    .map((user) => toEmployee(user))
+    .filter((employee): employee is EmployeeManagementEmployee => employee !== null);
   const totalEmployeePoints = employees.reduce((sum, employee) => sum + employee.pointBalance, 0);
   const totalCompletionRate = employees.reduce((sum, employee) => sum + employee.completionRate, 0);
   const departmentOptions: EmployeeDepartmentOption[] = departments
@@ -395,7 +407,13 @@ export async function createEmployeeInDynamo(
   );
   await syncCompanyUserCounts(config, companyId, now);
 
-  return toEmployee(createdUser);
+  const createdEmployee = toEmployee(createdUser);
+
+  if (!createdEmployee) {
+    throw new Error("Created user does not have an employee-management role.");
+  }
+
+  return createdEmployee;
 }
 
 export async function updateEmployeeInDynamo(
@@ -528,7 +546,7 @@ export async function updateEmployeeInDynamo(
     }),
   );
 
-  return toEmployee({
+  const updatedEmployee = toEmployee({
     ...targetUser,
     name,
     loginId,
@@ -543,6 +561,12 @@ export async function updateEmployeeInDynamo(
     gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),
     gsi3sk: buildUserByDepartmentGsiSk(targetUser.userId),
   });
+
+  if (!updatedEmployee) {
+    throw new Error("Updated user does not have an employee-management role.");
+  }
+
+  return updatedEmployee;
 }
 
 export async function deleteEmployeeInDynamo(companyId: string, input: DeleteEmployeeInput): Promise<void> {

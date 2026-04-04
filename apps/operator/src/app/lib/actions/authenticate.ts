@@ -8,12 +8,12 @@ import {
   OPERATOR_LOGIN_PATH,
   OPERATOR_NEW_PASSWORD_PATH,
 } from "@operator/lib/auth/constants";
-import { isOperatorAllowlistConfigured, isOperatorEmailAllowed } from "@operator/lib/auth/allowlist";
 import {
   mapAuthenticationErrorToCode,
   mapNewPasswordErrorToCode,
   type LoginErrorCode,
 } from "@operator/lib/auth/errors";
+import { getOperatorUserForSession } from "@operator/lib/auth/operator";
 import { sanitizeRedirectTo } from "@operator/lib/auth/redirect";
 import {
   clearOperatorSession,
@@ -27,13 +27,16 @@ function getFormValue(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
 }
 
-function buildLoginRedirect(errorCode: LoginErrorCode, redirectTo: string) {
-  const params = new URLSearchParams({ error: errorCode });
+type LoginActionState = {
+  errorCode?: LoginErrorCode;
+};
 
-  if (redirectTo !== OPERATOR_DEFAULT_REDIRECT_PATH) {
-    params.set("from", redirectTo);
+function buildLoginRedirect(redirectTo: string) {
+  if (redirectTo === OPERATOR_DEFAULT_REDIRECT_PATH) {
+    return OPERATOR_LOGIN_PATH;
   }
 
+  const params = new URLSearchParams({ from: redirectTo });
   return `${OPERATOR_LOGIN_PATH}?${params.toString()}`;
 }
 
@@ -52,24 +55,19 @@ function buildNewPasswordRedirect(errorCode: LoginErrorCode | undefined, redirec
   return query ? `${OPERATOR_NEW_PASSWORD_PATH}?${query}` : OPERATOR_NEW_PASSWORD_PATH;
 }
 
-export async function authenticate(formData: FormData) {
+export async function authenticate(
+  _previousState: LoginActionState,
+  formData: FormData,
+): Promise<LoginActionState> {
   const email = getFormValue(formData.get("email")).trim();
   const password = getFormValue(formData.get("password"));
   const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
   let result: Awaited<ReturnType<typeof signInOperator>>;
 
   if (!email || !password) {
-    redirect(buildLoginRedirect("missing_fields", redirectTo) as Route);
-  }
-
-  if (!isOperatorAllowlistConfigured()) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_allowlist_not_configured", redirectTo) as Route);
-  }
-
-  if (!isOperatorEmailAllowed(email)) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+    return {
+      errorCode: "missing_fields",
+    };
   }
 
   try {
@@ -77,16 +75,22 @@ export async function authenticate(formData: FormData) {
   } catch (error) {
     console.error("Operator login failed", error);
     await clearOperatorSession();
-    redirect(buildLoginRedirect(mapAuthenticationErrorToCode(error), redirectTo) as Route);
+
+    return {
+      errorCode: mapAuthenticationErrorToCode(error),
+    };
   }
 
   if (result.status === "new_password_required") {
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
-  if (!isOperatorEmailAllowed(result.session.payload.email as string | undefined)) {
+  if (!(await getOperatorUserForSession(result.session))) {
     await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+
+    return {
+      errorCode: "operator_role_not_allowed",
+    };
   }
 
   redirect(redirectTo as Route);
@@ -109,17 +113,12 @@ export async function completeNewPassword(formData: FormData) {
     redirect(buildNewPasswordRedirect("password_confirmation_mismatch", redirectTo) as Route);
   }
 
-  if (!isOperatorAllowlistConfigured()) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_allowlist_not_configured", redirectTo) as Route);
-  }
-
   try {
     const session = await completeOperatorNewPassword({ newPassword });
 
-    if (!isOperatorEmailAllowed(session.payload.email as string | undefined)) {
+    if (!(await getOperatorUserForSession(session))) {
       await clearOperatorSession();
-      redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+      redirect(buildLoginRedirect(redirectTo) as Route);
     }
   } catch (error) {
     console.error("Operator new password setup failed", error);
@@ -127,7 +126,7 @@ export async function completeNewPassword(formData: FormData) {
 
     if (errorCode === "new_password_session_expired") {
       await clearPendingNewPasswordChallenge();
-      redirect(buildLoginRedirect(errorCode, redirectTo) as Route);
+      redirect(buildLoginRedirect(redirectTo) as Route);
     }
 
     redirect(buildNewPasswordRedirect(errorCode, redirectTo) as Route);

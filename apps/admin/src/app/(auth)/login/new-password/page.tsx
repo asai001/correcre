@@ -16,12 +16,11 @@ type NewPasswordPageProps = {
 };
 
 function buildLoginRedirect(redirectTo: string) {
-  const params = new URLSearchParams({ error: "new_password_session_expired" });
-
-  if (redirectTo !== ADMIN_DEFAULT_REDIRECT_PATH) {
-    params.set("from", redirectTo);
+  if (redirectTo === ADMIN_DEFAULT_REDIRECT_PATH) {
+    return ADMIN_LOGIN_PATH;
   }
 
+  const params = new URLSearchParams({ from: redirectTo });
   return `${ADMIN_LOGIN_PATH}?${params.toString()}`;
 }
 

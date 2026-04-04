@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import NewPasswordForm from "@operator/components/auth/NewPasswordForm";
 import { OPERATOR_DEFAULT_REDIRECT_PATH, OPERATOR_LOGIN_PATH } from "@operator/lib/auth/constants";
 import { getLoginErrorMessage } from "@operator/lib/auth/errors";
+import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 import { pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { getOperatorSession, getPendingNewPasswordChallenge } from "@operator/lib/auth/session";
+import { clearOperatorSession, getPendingNewPasswordChallenge } from "@operator/lib/auth/session";
 
 type NewPasswordPageProps = {
   searchParams: Promise<{
@@ -16,26 +17,29 @@ type NewPasswordPageProps = {
 };
 
 function buildLoginRedirect(redirectTo: string) {
-  const params = new URLSearchParams({ error: "new_password_session_expired" });
-
-  if (redirectTo !== OPERATOR_DEFAULT_REDIRECT_PATH) {
-    params.set("from", redirectTo);
+  if (redirectTo === OPERATOR_DEFAULT_REDIRECT_PATH) {
+    return OPERATOR_LOGIN_PATH;
   }
 
+  const params = new URLSearchParams({ from: redirectTo });
   return `${OPERATOR_LOGIN_PATH}?${params.toString()}`;
 }
 
 export default async function NewPasswordPage({ searchParams }: NewPasswordPageProps) {
-  const [session, challenge, params] = await Promise.all([
-    getOperatorSession(),
+  const [access, challenge, params] = await Promise.all([
+    getOperatorAccessStatus(),
     getPendingNewPasswordChallenge(),
     searchParams,
   ]);
   const redirectTo = sanitizeRedirectTo(pickFirstQueryValue(params.from));
   const errorMessage = getLoginErrorMessage(pickFirstQueryValue(params.error));
 
-  if (session) {
+  if (access.allowed) {
     redirect(redirectTo as Route);
+  }
+
+  if (access.reason === "forbidden") {
+    await clearOperatorSession();
   }
 
   if (!challenge) {

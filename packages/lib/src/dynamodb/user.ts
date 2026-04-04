@@ -55,26 +55,42 @@ export async function getUserByCompanyAndUserId(
 }
 
 export async function getUserByCognitoSub(config: UserTableConfig, cognitoSub: string): Promise<DBUserItem | null> {
+  const users = await listUsersByCognitoSub(config, cognitoSub);
+  return users[0] ?? null;
+}
+
+export async function listUsersByCognitoSub(config: UserTableConfig, cognitoSub: string): Promise<DBUserItem[]> {
   const normalizedCognitoSub = cognitoSub.trim();
 
   if (!normalizedCognitoSub) {
-    return null;
+    return [];
   }
 
   const client = getDynamoDocumentClient(config.region);
-  const { Items } = await client.send(
-    new QueryCommand({
-      TableName: config.tableName,
-      IndexName: USER_BY_COGNITO_SUB_INDEX,
-      KeyConditionExpression: "gsi1pk = :gsi1pk",
-      ExpressionAttributeValues: {
-        ":gsi1pk": buildUserByCognitoSubGsiPk(normalizedCognitoSub),
-      },
-      Limit: 1,
-    }),
-  );
+  const users: DBUserItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
 
-  return (Items?.[0] as DBUserItem | undefined) ?? null;
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: USER_BY_COGNITO_SUB_INDEX,
+        KeyConditionExpression: "gsi1pk = :gsi1pk",
+        ExpressionAttributeValues: {
+          ":gsi1pk": buildUserByCognitoSubGsiPk(normalizedCognitoSub),
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      users.push(...(Items as DBUserItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return users;
 }
 
 export async function listUsersByCompany(config: UserTableConfig, companyId: string): Promise<DBUserItem[]> {
