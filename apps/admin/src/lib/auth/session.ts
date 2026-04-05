@@ -1,7 +1,9 @@
 import "server-only";
 
 import {
+  ConfirmForgotPasswordCommand,
   CognitoIdentityProviderClient,
+  ForgotPasswordCommand,
   InitiateAuthCommand,
   RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -211,6 +213,18 @@ export async function signInAdmin(params: { email: string; password: string }): 
   return { status: "authenticated", session };
 }
 
+export async function requestAdminPasswordReset(params: { email: string }) {
+  const { region, clientId } = getAdminCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+    }),
+  );
+}
+
 export async function getAdminSession(): Promise<AdminSession | null> {
   const cookieStore = await cookies();
   const idToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
@@ -220,6 +234,20 @@ export async function getAdminSession(): Promise<AdminSession | null> {
   }
 
   return verifyAdminIdToken(idToken);
+}
+
+export async function confirmAdminPasswordReset(params: { email: string; confirmationCode: string; newPassword: string }) {
+  const { region, clientId } = getAdminCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ConfirmForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+      ConfirmationCode: params.confirmationCode,
+      Password: params.newPassword,
+    }),
+  );
 }
 
 export async function completeAdminNewPassword(params: { newPassword: string }) {

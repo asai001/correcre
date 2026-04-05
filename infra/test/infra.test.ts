@@ -175,6 +175,31 @@ describe("InfraStack", () => {
     );
   });
 
+  test("uses SES-backed forgot-password email customization only in development", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.hasResourceProperties(
+      "AWS::Lambda::Function",
+      Match.objectLike({
+        Description: "Customize Cognito forgot-password emails for the development environment.",
+        Handler: "index.handler",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        EmailConfiguration: Match.objectLike({
+          EmailSendingAccount: "DEVELOPER",
+          From: "=?UTF-8?B?44Kz44Os44Kv44Os?= <correcre-info@efficient-technology.com>",
+        }),
+        LambdaConfig: Match.objectLike({
+          CustomMessage: Match.anyValue(),
+        }),
+      }),
+    );
+  });
+
   test("creates distinct app clients for admin, employee, and operator on the shared user pool", () => {
     const template = Template.fromStack(createStack("dev"));
 

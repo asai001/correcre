@@ -1,7 +1,9 @@
 import "server-only";
 
 import {
+  ConfirmForgotPasswordCommand,
   CognitoIdentityProviderClient,
+  ForgotPasswordCommand,
   InitiateAuthCommand,
   RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -214,6 +216,18 @@ export async function signInEmployee(params: { email: string; password: string }
   return { status: "authenticated", session };
 }
 
+export async function requestEmployeePasswordReset(params: { email: string }) {
+  const { region, clientId } = getEmployeeCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+    }),
+  );
+}
+
 export async function getEmployeeSession(): Promise<EmployeeSession | null> {
   const cookieStore = await cookies();
   const idToken = cookieStore.get(EMPLOYEE_SESSION_COOKIE_NAME)?.value;
@@ -223,6 +237,20 @@ export async function getEmployeeSession(): Promise<EmployeeSession | null> {
   }
 
   return verifyEmployeeIdToken(idToken);
+}
+
+export async function confirmEmployeePasswordReset(params: { email: string; confirmationCode: string; newPassword: string }) {
+  const { region, clientId } = getEmployeeCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ConfirmForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+      ConfirmationCode: params.confirmationCode,
+      Password: params.newPassword,
+    }),
+  );
 }
 
 export async function completeEmployeeNewPassword(params: { newPassword: string }) {

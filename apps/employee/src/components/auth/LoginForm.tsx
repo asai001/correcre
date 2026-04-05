@@ -1,17 +1,35 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, Button, Checkbox, TextField } from "@mui/material";
 import { PasswordTextField } from "@correcre/theme";
 
 import { authenticate } from "@employee/app/lib/actions/authenticate";
+import {
+  EMPLOYEE_DEFAULT_REDIRECT_PATH,
+  EMPLOYEE_FORGOT_PASSWORD_PATH,
+  EMPLOYEE_LOGIN_NOTICE_COOKIE_NAME,
+} from "@employee/lib/auth/constants";
 import { getLoginErrorMessage, type LoginErrorCode } from "@employee/lib/auth/errors";
 
 type LoginFormProps = {
+  defaultEmail?: string;
+  noticeMessage?: string;
   redirectTo?: string;
 };
+
+function buildForgotPasswordHref(redirectTo: string) {
+  if (redirectTo === EMPLOYEE_DEFAULT_REDIRECT_PATH) {
+    return EMPLOYEE_FORGOT_PASSWORD_PATH;
+  }
+
+  const params = new URLSearchParams({ from: redirectTo });
+  return `${EMPLOYEE_FORGOT_PASSWORD_PATH}?${params.toString()}`;
+}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -31,18 +49,35 @@ function SubmitButton() {
 }
 
 export default function LoginForm({
+  defaultEmail = "",
+  noticeMessage,
   redirectTo = "/dashboard",
 }: LoginFormProps) {
   const [state, formAction] = useActionState(authenticate, {
     errorCode: undefined as LoginErrorCode | undefined,
   });
   const errorMessage = getLoginErrorMessage(state.errorCode);
+  const forgotPasswordHref = buildForgotPasswordHref(redirectTo);
+
+  useEffect(() => {
+    if (!noticeMessage) {
+      return;
+    }
+
+    document.cookie = `${EMPLOYEE_LOGIN_NOTICE_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax`;
+  }, [noticeMessage]);
 
   return (
     <div className="w-full rounded bg-white/70 pt-15">
       <div className="mx-auto w-4/5">
         <form action={formAction}>
           <input type="hidden" name="redirectTo" value={redirectTo} />
+
+          {noticeMessage ? (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              {noticeMessage}
+            </Alert>
+          ) : null}
 
           {errorMessage ? (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -58,6 +93,7 @@ export default function LoginForm({
               type="email"
               name="email"
               autoComplete="email"
+              defaultValue={defaultEmail}
               required
               variant="outlined"
               size="small"
@@ -85,7 +121,14 @@ export default function LoginForm({
           </div>
 
           <p className="mt-2 text-sm text-neutral-600">
-            パスワードを忘れた場合は、管理者にお問い合わせください。
+            パスワードを忘れた方は{" "}
+            <Link
+              href={forgotPasswordHref as Route}
+              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+            >
+              こちら
+            </Link>{" "}
+            から再設定してください。
           </p>
 
           <SubmitButton />
