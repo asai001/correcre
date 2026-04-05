@@ -6,16 +6,29 @@ import DashboardSummary from "@admin/features/dashboard-summary";
 import LoginInfo from "@admin/features/login-info";
 import RecentReports from "@admin/features/recent-reports";
 import { requireCurrentAdminUser } from "@admin/lib/auth/current-user";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 export default async function DashboardPage() {
   const currentUser = await requireCurrentAdminUser();
   const companyId = currentUser.companyId;
   const userId = currentUser.userId;
   const targetYearMonth = new Date().toISOString().slice(0, 7);
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    companyId,
+  );
+  const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
 
   return (
     <>
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="mt-1 break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{companyName}</div>
+        </div>
         <form action={logout}>
           <button
             type="submit"

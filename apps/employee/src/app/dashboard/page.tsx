@@ -1,4 +1,6 @@
 import { toYYYYMM } from "@correcre/lib";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import DashboardLinks from "@employee/features/dashboard-links";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import ExchangeHistory from "@employee/features/exchange-history/";
@@ -14,10 +16,21 @@ import { faChartLine, faReceipt, faTasks } from "@fortawesome/free-solid-svg-ico
 export default async function DashboardPage() {
   const currentUser = await requireCurrentEmployeeUser();
   const { companyId, userId } = currentUser;
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    companyId,
+  );
+  const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
 
   return (
     <div className="container mx-auto mb-10 px-6">
-      <div className="mt-6 flex justify-end">
+      <div className="mt-6 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="mt-1 break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{companyName}</div>
+        </div>
         <form action={logout}>
           <button
             type="submit"
