@@ -225,9 +225,13 @@ export default function EmployeeEditDialog({
         <Stack spacing={2.5}>
           {error && <Alert severity="error">{error}</Alert>}
           {employee && (
-            <Alert severity={employee.authLinkStatus === "LINKED" ? "success" : "info"}>
-              Cognito 連携状況: {employee.authLinkStatus === "LINKED" ? "連携済み" : "未連携"}
-            </Alert>
+            employee.authLinkStatus === "LINKED" ? (
+              <Alert severity="success">Cognito 連携状況: 連携済み</Alert>
+            ) : (
+              <Alert severity="error">
+                Cognito 連携状況: 未連携です。User.cognitoSub が欠落している異常状態のため、このユーザーは正常にログインできません。早急に確認してください。
+              </Alert>
+            )
           )}
 
           <div className="grid gap-4 md:grid-cols-4">

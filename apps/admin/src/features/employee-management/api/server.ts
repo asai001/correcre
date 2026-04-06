@@ -1,3 +1,4 @@
+import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
@@ -9,6 +10,7 @@ import {
   updateDepartmentName,
 } from "@correcre/lib/dynamodb/department";
 import {
+  buildUserByCognitoSubGsiPk,
   buildUserByDepartmentGsiPk,
   buildUserByDepartmentGsiSk,
   buildUserByEmailGsiPk,
@@ -19,9 +21,10 @@ import {
   putUser,
 } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
-import { joinNameKanaParts, joinNameParts, splitFullName } from "@correcre/lib/user-profile";
+import { joinNameKanaParts, joinNameParts } from "@correcre/lib/user-profile";
 
 import type { DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import { getAdminCognitoConfig } from "@admin/lib/auth/config";
 import type {
   CreateDepartmentInput,
   CreateEmployeeInput,
@@ -41,10 +44,11 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   departmentTableName: string;
+  cognitoRegion: string;
+  cognitoUserPoolId: string;
 };
 
 type NormalizedEmployeeInput = {
-  name: string;
   lastName: string;
   firstName: string;
   lastNameKana: string;
@@ -58,11 +62,15 @@ type NormalizedEmployeeInput = {
 };
 
 function getRuntimeConfig(): RuntimeConfig {
+  const cognitoConfig = getAdminCognitoConfig();
+
   return {
     region: readRequiredServerEnv("AWS_REGION"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     departmentTableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    cognitoRegion: cognitoConfig.region,
+    cognitoUserPoolId: cognitoConfig.userPoolId,
   };
 }
 
@@ -79,23 +87,19 @@ function normalizeRoles(roles?: DBUserRole[]) {
 }
 
 function normalizeUserStatus(status: DBUserItem["status"]): EmployeeManagementStatus | "DELETED" {
-  if (status === "DELETED") {
-    return "DELETED";
-  }
-
-  if (status === "INACTIVE") {
-    return "SUSPENDED";
-  }
-
-  if (status === "ACTIVE") {
-    return "ACTIVE";
-  }
-
-  return "INVITED";
+  return status === "DELETED" ? "DELETED" : status;
 }
 
 function getAuthLinkStatus(cognitoSub?: string): EmployeeAuthLinkStatus {
   return cognitoSub?.trim() ? "LINKED" : "UNLINKED";
+}
+
+function toEmployeeProvisionError(error: unknown) {
+  if (error instanceof Error && (error.name === "UsernameExistsException" || error.name === "AliasExistsException")) {
+    return new Error("同じメールアドレスの Cognito ユーザーが既に存在します");
+  }
+
+  return error instanceof Error ? error : new Error("ユーザー登録に失敗しました");
 }
 
 function normalizeOptionalText(value?: string) {
@@ -104,11 +108,9 @@ function normalizeOptionalText(value?: string) {
 }
 
 function getNameFields(user: DBUserItem) {
-  const fallback = splitFullName(user.name);
-
   return {
-    lastName: user.lastName?.trim() ?? fallback.lastName,
-    firstName: user.firstName?.trim() ?? fallback.firstName,
+    lastName: user.lastName.trim(),
+    firstName: user.firstName.trim(),
     lastNameKana: user.lastNameKana?.trim() ?? "",
     firstNameKana: user.firstNameKana?.trim() ?? "",
   };
@@ -122,7 +124,7 @@ function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
   }
 
   const { lastName, firstName, lastNameKana, firstNameKana } = getNameFields(user);
-  const name = joinNameParts(lastName, firstName, user.name);
+  const name = joinNameParts(lastName, firstName);
   const nameKana = joinNameKanaParts(lastNameKana, firstNameKana);
 
   return {
@@ -153,7 +155,7 @@ function getAdminName(users: DBUserItem[], adminUserId?: string) {
     users.find((user) => normalizeRoles(user.roles).includes("ADMIN")) ??
     users[0];
 
-  return selectedAdmin?.name ?? "管理者";
+  return selectedAdmin ? joinNameParts(selectedAdmin.lastName, selectedAdmin.firstName) || "管理者" : "管理者";
 }
 
 function getNextUserId(users: DBUserItem[]) {
@@ -293,7 +295,6 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
   }
 
   return {
-    name: joinNameParts(lastName, firstName),
     lastName,
     firstName,
     lastNameKana,
@@ -401,8 +402,9 @@ export async function getEmployeeManagementSummaryFromDynamo(
   const employees = currentUsers
     .map((user) => toEmployee(user))
     .filter((employee): employee is EmployeeManagementEmployee => employee !== null);
-  const totalEmployeePoints = employees.reduce((sum, employee) => sum + employee.pointBalance, 0);
-  const totalCompletionRate = employees.reduce((sum, employee) => sum + employee.completionRate, 0);
+  const activeEmployees = employees.filter((employee) => employee.status === "ACTIVE");
+  const totalEmployeePoints = activeEmployees.reduce((sum, employee) => sum + employee.pointBalance, 0);
+  const totalCompletionRate = activeEmployees.reduce((sum, employee) => sum + employee.completionRate, 0);
   const departmentOptions: EmployeeDepartmentOption[] = departments
     .filter((department) => department.status !== "INACTIVE")
     .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name, "ja"))
@@ -420,7 +422,7 @@ export async function getEmployeeManagementSummaryFromDynamo(
     departmentCount: departmentOptions.length,
     totalEmployeePoints,
     companyPointBalance: company?.companyPointBalance ?? 0,
-    averageCompletionRate: employees.length ? Math.round(totalCompletionRate / employees.length) : 0,
+    averageCompletionRate: activeEmployees.length ? Math.round(totalCompletionRate / activeEmployees.length) : 0,
     pointUnitLabel: company?.pointUnitLabel ?? "pt",
     departmentOptions,
     employees,
@@ -455,48 +457,90 @@ export async function createEmployeeInDynamo(
 
   const now = new Date().toISOString();
   const userId = getNextUserId(companyUsers);
-  const createdUser: DBUserItem = {
-    companyId,
-    sk: buildUserSk(userId),
-    userId,
-    name: normalizedInput.name,
-    lastName: normalizedInput.lastName,
-    firstName: normalizedInput.firstName,
-    lastNameKana: normalizedInput.lastNameKana,
-    firstNameKana: normalizedInput.firstNameKana,
-    email: normalizedInput.email,
-    phoneNumber: normalizedInput.phoneNumber,
-    address: normalizedInput.address,
-    departmentId: normalizedInput.department.departmentId,
-    departmentName: normalizedInput.department.name,
-    roles: normalizedInput.roles,
-    status: "INVITED",
-    joinedAt: normalizedInput.joinedAt,
-    currentPointBalance: 0,
-    currentMonthCompletionRate: 0,
-    createdAt: now,
-    updatedAt: now,
-    gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
-    gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
-    gsi3sk: buildUserByDepartmentGsiSk(userId),
-  };
+  let createdCognitoUser:
+    | {
+        cognitoSub: string;
+        username: string;
+      }
+    | null = null;
 
-  await putUser(
-    {
-      region: config.region,
-      tableName: config.userTableName,
-    },
-    createdUser,
-  );
-  await syncCompanyUserCounts(config, companyId, now);
+  try {
+    createdCognitoUser = await createCognitoUser(
+      {
+        region: config.cognitoRegion,
+        userPoolId: config.cognitoUserPoolId,
+      },
+      {
+        email: normalizedInput.email,
+        firstName: normalizedInput.firstName,
+        lastName: normalizedInput.lastName,
+        fullName: joinNameParts(normalizedInput.lastName, normalizedInput.firstName),
+      },
+    );
 
-  const createdEmployee = toEmployee(createdUser);
+    const createdUser: DBUserItem = {
+      companyId,
+      sk: buildUserSk(userId),
+      userId,
+      cognitoSub: createdCognitoUser.cognitoSub,
+      lastName: normalizedInput.lastName,
+      firstName: normalizedInput.firstName,
+      lastNameKana: normalizedInput.lastNameKana,
+      firstNameKana: normalizedInput.firstNameKana,
+      email: normalizedInput.email,
+      phoneNumber: normalizedInput.phoneNumber,
+      address: normalizedInput.address,
+      departmentId: normalizedInput.department.departmentId,
+      departmentName: normalizedInput.department.name,
+      roles: normalizedInput.roles,
+      status: "INVITED",
+      joinedAt: normalizedInput.joinedAt,
+      currentPointBalance: 0,
+      currentMonthCompletionRate: 0,
+      createdAt: now,
+      updatedAt: now,
+      gsi1pk: buildUserByCognitoSubGsiPk(createdCognitoUser.cognitoSub),
+      gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
+      gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
+      gsi3sk: buildUserByDepartmentGsiSk(userId),
+    };
 
-  if (!createdEmployee) {
-    throw new Error("Created user does not have an employee-management role.");
+    await putUser(
+      {
+        region: config.region,
+        tableName: config.userTableName,
+      },
+      createdUser,
+    );
+    await syncCompanyUserCounts(config, companyId, now);
+
+    const createdEmployee = toEmployee(createdUser);
+
+    if (!createdEmployee) {
+      throw new Error("Created user does not have an employee-management role.");
+    }
+
+    return createdEmployee;
+  } catch (error) {
+    if (createdCognitoUser) {
+      try {
+        await deleteCognitoUser(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          createdCognitoUser.username,
+        );
+      } catch (rollbackError) {
+        console.error("Failed to roll back Cognito user after DynamoDB create failure", rollbackError);
+        throw new Error("Cognito ユーザー作成後のロールバックに失敗しました。手動確認が必要です。");
+      }
+
+      throw new Error("DB へのユーザー登録に失敗したため Cognito ユーザー登録のロールバックを行いました。再度登録してください。");
+    }
+
+    throw toEmployeeProvisionError(error);
   }
-
-  return createdEmployee;
 }
 
 export async function updateEmployeeInDynamo(
@@ -549,7 +593,6 @@ export async function updateEmployeeInDynamo(
   const now = new Date().toISOString();
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
-    "#name = :name",
     "lastName = :lastName",
     "firstName = :firstName",
     "lastNameKana = :lastNameKana",
@@ -557,7 +600,7 @@ export async function updateEmployeeInDynamo(
     "email = :email",
     "departmentId = :departmentId",
     "departmentName = :departmentName",
-    "roles = :roles",
+    "#roles = :roles",
     "joinedAt = :joinedAt",
     "currentPointBalance = :nextUserPointBalance",
     "updatedAt = :updatedAt",
@@ -567,11 +610,10 @@ export async function updateEmployeeInDynamo(
   ];
   const userRemoveExpressions = ["loginId"];
   const userExpressionAttributeNames = {
-    "#name": "name",
+    "#roles": "roles",
   };
   const userExpressionAttributeValues: Record<string, unknown> = {
     ":currentPointBalance": targetUser.currentPointBalance ?? 0,
-    ":name": normalizedInput.name,
     ":lastName": normalizedInput.lastName,
     ":firstName": normalizedInput.firstName,
     ":lastNameKana": normalizedInput.lastNameKana,
@@ -639,7 +681,6 @@ export async function updateEmployeeInDynamo(
 
   const updatedEmployee = toEmployee({
     ...targetUser,
-    name: normalizedInput.name,
     lastName: normalizedInput.lastName,
     firstName: normalizedInput.firstName,
     lastNameKana: normalizedInput.lastNameKana,

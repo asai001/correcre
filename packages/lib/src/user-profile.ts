@@ -52,38 +52,12 @@ function normalizeText(value?: string) {
   return value?.trim() ?? "";
 }
 
-export function joinNameParts(lastName?: string, firstName?: string, fallback = "") {
-  const joined = [normalizeText(lastName), normalizeText(firstName)].filter(Boolean).join(" ");
-  return joined || normalizeText(fallback);
+export function joinNameParts(lastName?: string, firstName?: string) {
+  return [normalizeText(lastName), normalizeText(firstName)].filter(Boolean).join(" ");
 }
 
 export function joinNameKanaParts(lastNameKana?: string, firstNameKana?: string) {
   return [normalizeText(lastNameKana), normalizeText(firstNameKana)].filter(Boolean).join(" ");
-}
-
-export function splitFullName(fullName?: string) {
-  const normalized = normalizeText(fullName);
-
-  if (!normalized) {
-    return {
-      lastName: "",
-      firstName: "",
-    };
-  }
-
-  const parts = normalized.split(/\s+/);
-
-  if (parts.length === 1) {
-    return {
-      lastName: normalized,
-      firstName: "",
-    };
-  }
-
-  return {
-    lastName: parts[0],
-    firstName: parts.slice(1).join(" "),
-  };
 }
 
 export function splitPostalCode(postalCode?: string) {

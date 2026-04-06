@@ -1,6 +1,7 @@
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 import type { LoginInfo } from "../model/types";
 
@@ -28,7 +29,7 @@ export async function getLoginInfoFromDynamo(companyId: string, userId: string):
   }
 
   return {
-    name: user.name,
+    name: joinNameParts(user.lastName, user.firstName),
     activeEmployees: company?.activeEmployees ?? 0,
   };
 }

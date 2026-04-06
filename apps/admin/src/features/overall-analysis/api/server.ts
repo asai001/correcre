@@ -5,6 +5,7 @@ import { listMissionReportsByCompanyAndStatus } from "@correcre/lib/dynamodb/mis
 import { listUserMonthlyStatsByCompany } from "@correcre/lib/dynamodb/user-monthly-stats";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 import type { UserMonthlyStats } from "@correcre/types";
 
@@ -317,7 +318,7 @@ export async function getOverallAnalysisSummaryFromDynamo(
       percentage: item.percentage,
     }));
 
-  const userNameById = new Map(currentUsers.map((item) => [item.userId, item.name]));
+  const userNameById = new Map(currentUsers.map((item) => [item.userId, joinNameParts(item.lastName, item.firstName)]));
   const exchangeHistory: OverallExchangeHistoryItem[] = exchangeHistoryAll
     .filter((item) => isWithinDateRange(item.exchangedAt, effectiveRange.startDate, effectiveRange.endDate))
     .sort((a, b) => new Date(b.exchangedAt).getTime() - new Date(a.exchangedAt).getTime())

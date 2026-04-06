@@ -2,7 +2,7 @@ import "server-only";
 
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
-import type { DBUserItem } from "@correcre/types";
+import type { DBUserItem, DBUserStatus } from "@correcre/types";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -158,6 +158,19 @@ export async function updateUserLastLoginAtByCognitoSub(
   }
 
   const client = getDynamoDocumentClient(config.region);
+  const shouldPromoteToActive = user.status === "INVITED";
+  const setExpressions = ["lastLoginAt = :lastLoginAt", "updatedAt = :updatedAt"];
+  const expressionAttributeValues: Record<string, unknown> = {
+    ":lastLoginAt": loggedInAt,
+    ":updatedAt": loggedInAt,
+  };
+  const expressionAttributeNames: Record<string, string> = {};
+
+  if (shouldPromoteToActive) {
+    setExpressions.push("#status = :status");
+    expressionAttributeNames["#status"] = "status";
+    expressionAttributeValues[":status"] = "ACTIVE";
+  }
 
   await client.send(
     new UpdateCommand({
@@ -166,17 +179,56 @@ export async function updateUserLastLoginAtByCognitoSub(
         companyId: user.companyId,
         sk: user.sk,
       },
-      UpdateExpression: "SET lastLoginAt = :lastLoginAt, updatedAt = :updatedAt",
-      ExpressionAttributeValues: {
-        ":lastLoginAt": loggedInAt,
-        ":updatedAt": loggedInAt,
-      },
+      UpdateExpression: `SET ${setExpressions.join(", ")}`,
+      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length ? expressionAttributeNames : undefined,
+      ExpressionAttributeValues: expressionAttributeValues,
     }),
   );
 
   return {
     ...user,
     lastLoginAt: loggedInAt,
+    status: shouldPromoteToActive ? "ACTIVE" : user.status,
     updatedAt: loggedInAt,
+  };
+}
+
+export async function updateUserStatusByCompanyAndUserId(
+  config: UserTableConfig,
+  companyId: string,
+  userId: string,
+  status: DBUserStatus,
+  updatedAt: string = new Date().toISOString(),
+): Promise<DBUserItem | null> {
+  const user = await getUserByCompanyAndUserId(config, companyId, userId);
+
+  if (!user) {
+    return null;
+  }
+
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: {
+        companyId,
+        sk: buildUserSk(userId),
+      },
+      UpdateExpression: "SET #status = :status, updatedAt = :updatedAt",
+      ExpressionAttributeNames: {
+        "#status": "status",
+      },
+      ExpressionAttributeValues: {
+        ":status": status,
+        ":updatedAt": updatedAt,
+      },
+    }),
+  );
+
+  return {
+    ...user,
+    status,
+    updatedAt,
   };
 }

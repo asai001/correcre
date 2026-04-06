@@ -74,13 +74,13 @@ const roleBadgeClassMap: Record<EmployeeManagementRole, string> = {
 const statusLabelMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "招待中",
   ACTIVE: "有効",
-  SUSPENDED: "停止中",
+  INACTIVE: "休止中",
 };
 
 const statusBadgeClassMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "bg-amber-50 text-amber-700 border-amber-200",
   ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  SUSPENDED: "bg-rose-50 text-rose-700 border-rose-200",
+  INACTIVE: "bg-rose-50 text-rose-700 border-rose-200",
 };
 
 const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
@@ -243,6 +243,11 @@ function getEmployeeColumns(
           <div className="mt-1 text-xs text-slate-500">
             {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "最終ログインなし"}
           </div>
+          {row.authLinkStatus === "UNLINKED" ? (
+            <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+              要対応: Cognito 連携が失われています。User.cognitoSub を確認してください。
+            </div>
+          ) : null}
         </div>
       ),
     },
@@ -398,7 +403,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name} を登録しました`);
+      setNotice(`${createdEmployee.name} を登録しました。Cognito から招待メールを送信しています。`);
       reload();
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ユーザーの登録に失敗しました");
@@ -448,7 +453,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           : employees.find((employee) => employee.userId === userId)?.name ?? userId;
 
       setEmployeePendingDeletion(null);
-      setNotice(`${deletedEmployeeName} を削除しました`);
+      setNotice(`${deletedEmployeeName} をDELETEに変更しました`);
       reload();
       return result;
     } finally {
@@ -754,9 +759,15 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           <div className="rounded-full bg-slate-100 px-4 py-2">会社: {summary.companyName}</div>
           <div className="rounded-full bg-slate-100 px-4 py-2">平均達成率 {summary.averageCompletionRate}%</div>
           <div className="rounded-full bg-amber-50 px-4 py-2 text-amber-700">招待中 {invitedEmployeeCount} 人</div>
-          <div className="rounded-full bg-orange-50 px-4 py-2 text-orange-700">未連携 {unlinkedEmployeeCount} 人</div>
+          <div className="rounded-full bg-red-50 px-4 py-2 text-red-700">未連携 {unlinkedEmployeeCount} 人</div>
           <div className="rounded-full bg-slate-100 px-4 py-2">更新 {formatDateTime(summary.updatedAt)}</div>
         </div>
+
+        {unlinkedEmployeeCount > 0 ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
+            Cognito 未連携のユーザーが {unlinkedEmployeeCount} 人います。User.cognitoSub が欠落している重い異常状態です。対象ユーザーは正常にログインできないため、至急確認してください。
+          </div>
+        ) : null}
 
         <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
           User / Company / Department テーブルを使って管理しています。氏名は姓・名とフリガナ、連絡先は電話番号と住所まで保持します。
@@ -786,7 +797,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         <StatCard
           label="ユーザーポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="全ユーザーの currentPointBalance 合計"
+          description="有効ユーザーの currentPointBalance 合計"
           accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
         />
         <StatCard

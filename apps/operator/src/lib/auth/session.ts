@@ -7,6 +7,9 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import { updateUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/user";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import { OPERATOR_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, OPERATOR_SESSION_COOKIE_NAME } from "./constants";
 import { getOperatorCognitoConfig } from "./config";
 import { type OperatorSession, verifyOperatorIdToken } from "./verify-token";
@@ -39,6 +42,26 @@ function getCognitoClient(region: string) {
   const client = new CognitoIdentityProviderClient({ region });
   cognitoClientCache.set(region, client);
   return client;
+}
+
+async function syncOperatorLastLoginAt(session: OperatorSession) {
+  const cognitoSub = session.payload.sub?.trim();
+
+  if (!cognitoSub) {
+    return;
+  }
+
+  const updatedUser = await updateUserLastLoginAtByCognitoSub(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    },
+    cognitoSub,
+  );
+
+  if (!updatedUser) {
+    console.warn("Operator sign-in completed but no matching User record was found for Cognito sub.");
+  }
 }
 
 async function setOperatorSessionCookie(session: OperatorSession) {
@@ -183,6 +206,7 @@ export async function signInOperator(params: { email: string; password: string }
   }
 
   await setOperatorSessionCookie(session);
+  await syncOperatorLastLoginAt(session);
 
   return { status: "authenticated", session };
 }
@@ -239,6 +263,7 @@ export async function completeOperatorNewPassword(params: { newPassword: string 
   }
 
   await setOperatorSessionCookie(session);
+  await syncOperatorLastLoginAt(session);
   await clearPendingNewPasswordChallenge();
 
   return session;

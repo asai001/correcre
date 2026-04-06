@@ -1,6 +1,7 @@
 import { toYYYYMMDDHHmmss } from "@correcre/lib";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 import type { LoginInfo } from "../model/types";
 
@@ -23,7 +24,7 @@ export async function getLoginInfoFromDynamo(companyId: string, userId: string):
     : undefined;
 
   return {
-    displayName: user.name,
+    displayName: joinNameParts(user.lastName, user.firstName),
     departmentName: user.departmentName,
     lastLoginAt,
   };

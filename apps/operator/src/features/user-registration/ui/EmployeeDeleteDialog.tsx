@@ -61,22 +61,22 @@ export default function EmployeeDeleteDialog({
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <div className="text-2xl font-bold text-slate-900">従業員を削除</div>
+        <div className="text-2xl font-bold text-slate-900">DELETE ステータスへ変更</div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          誤操作防止のため、対象のユーザーIDを入力した場合のみ削除を実行できます。
+          誤操作防止のため、対象のユーザーIDを入力した場合のみ DELETE ステータスへの変更を実行できます。
         </Typography>
       </DialogTitle>
 
       <DialogContent sx={{ pt: "8px !important" }}>
         <div className="space-y-4">
           <Alert severity="warning">
-            この操作は取り消せません。削除対象は「{employee?.name ?? "-"}」です。
+            この操作を行うと対象ユーザーは DELETE 扱いになります。退職者など運用上残したいが利用停止したいユーザーにのみ使用してください。対象は「{employee?.name ?? "-"}」です。
           </Alert>
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <div className="text-sm text-slate-500">削除対象ユーザーID</div>
+            <div className="text-sm text-slate-500">対象ユーザーID</div>
             <div className="mt-2 font-mono text-lg font-semibold text-slate-900">{employee?.userId ?? "-"}</div>
           </div>
 
@@ -88,7 +88,7 @@ export default function EmployeeDeleteDialog({
             fullWidth
             helperText={
               isUserIdMatched
-                ? "ユーザーIDが一致しました。削除を実行できます。"
+                ? "ユーザーIDが一致しました。DELETE ステータスへの変更を実行できます。"
                 : "上に表示されているユーザーIDを正確に入力してください。"
             }
           />
@@ -112,7 +112,7 @@ export default function EmployeeDeleteDialog({
             },
           }}
         >
-          {submitting ? "削除中..." : "削除"}
+          {submitting ? "変更中..." : "DELETE に変更"}
         </Button>
       </DialogActions>
     </Dialog>

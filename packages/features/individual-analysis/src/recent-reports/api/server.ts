@@ -2,6 +2,7 @@ import { listLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompany } from "@correcre/lib/dynamodb/mission-report";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 import type { Mission, MissionReport } from "@correcre/types";
 
@@ -97,7 +98,7 @@ export async function getRecentReportsFromDynamo(
     .map((item) => ({
       companyId: item.companyId,
       userId: item.userId,
-      name: item.name,
+      name: joinNameParts(item.lastName, item.firstName),
       department: item.departmentName,
       roles: item.roles,
     })) as UserData[];

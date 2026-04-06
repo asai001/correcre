@@ -26,6 +26,7 @@ import type {
   EmployeeDepartmentOption,
   EmployeeManagementEmployee,
   EmployeeManagementRole,
+  EmployeeManagementStatus,
   UpdateEmployeeInput,
 } from "../model/types";
 
@@ -64,6 +65,41 @@ const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
   { value: "ADMIN", label: "管理者" },
   { value: "OPERATOR", label: "運用者" },
 ];
+
+const managedStatusOptions: Array<{ value: Exclude<EmployeeManagementStatus, "INVITED">; label: string }> = [
+  { value: "ACTIVE", label: "有効" },
+  { value: "INACTIVE", label: "休止中" },
+];
+
+const statusLabelMap: Record<EmployeeManagementStatus, string> = {
+  INVITED: "招待中",
+  ACTIVE: "有効",
+  INACTIVE: "休止中",
+};
+
+function getStatusSeverity(status: EmployeeManagementStatus): "info" | "success" | "warning" {
+  if (status === "ACTIVE") {
+    return "success";
+  }
+
+  if (status === "INACTIVE") {
+    return "warning";
+  }
+
+  return "info";
+}
+
+function getStatusDescription(status: EmployeeManagementStatus) {
+  if (status === "ACTIVE") {
+    return "集計対象に含まれる通常利用中の状態です。";
+  }
+
+  if (status === "INACTIVE") {
+    return "一時休職などで集計対象外にしたい状態です。ポイントや履歴は保持されます。";
+  }
+
+  return "初期パスワード変更完了後に自動で有効へ切り替わります。";
+}
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -111,6 +147,7 @@ function createInitialFormState(employee: EmployeeManagementEmployee | null): Fo
     city: employee?.address?.city ?? "",
     building: employee?.address?.building ?? "",
     roles: employee ? getInitialRoles(employee.roles) : ["EMPLOYEE"],
+    status: employee?.status ?? "INVITED",
     joinedAt: employee?.joinedAt ?? "",
     pointAdjustment: "0",
   };
@@ -143,6 +180,7 @@ export default function EmployeeEditDialog({
   const parsedPointAdjustment = /^-?\d+$/.test(pointAdjustmentValue) ? Number.parseInt(pointAdjustmentValue, 10) : null;
   const currentPointBalance = employee?.pointBalance ?? 0;
   const nextPointBalance = parsedPointAdjustment === null ? currentPointBalance : currentPointBalance + parsedPointAdjustment;
+  const isInvitedStatusLocked = employee?.status === "INVITED";
 
   const validation = useMemo<ValidationState>(() => {
     const email = form.email.trim();
@@ -217,6 +255,7 @@ export default function EmployeeEditDialog({
       city: normalizeOptionalText(form.city),
       building: normalizeOptionalText(form.building),
       roles: form.roles,
+      status: form.status,
       joinedAt: form.joinedAt.trim(),
       pointAdjustment: parsedPointAdjustment,
     });
@@ -248,10 +287,46 @@ export default function EmployeeEditDialog({
         <Stack spacing={2.5}>
           {error && <Alert severity="error">{error}</Alert>}
           {employee && (
-            <Alert severity={employee.authLinkStatus === "LINKED" ? "success" : "info"}>
-              Cognito 連携状況: {employee.authLinkStatus === "LINKED" ? "連携済み" : "未連携"}
-            </Alert>
+            employee.authLinkStatus === "LINKED" ? (
+              <Alert severity="success">Cognito 連携状況: 連携済み</Alert>
+            ) : (
+              <Alert severity="error">
+                Cognito 連携状況: 未連携です。User.cognitoSub が欠落している異常状態のため、このユーザーは正常にログインできません。早急に確認してください。
+              </Alert>
+            )
           )}
+          {employee ? (
+            <Alert severity={getStatusSeverity(form.status)} sx={{ "& .MuiAlert-message": { width: "100%" } }}>
+              <div className="flex w-full flex-col gap-3 md:flex-row md:items-start">
+                <div className="md:flex-1">
+                  <div className="font-semibold">ステータス: {statusLabelMap[form.status]}</div>
+                  <div className="mt-1 text-sm">{getStatusDescription(form.status)}</div>
+                </div>
+                {isInvitedStatusLocked ? null : (
+                  <FormControl size="small" sx={{ minWidth: 160, ml: "auto" }} className="self-end">
+                    <InputLabel id="operator-employee-edit-status-label">変更</InputLabel>
+                    <Select
+                      labelId="operator-employee-edit-status-label"
+                      value={form.status}
+                      label="変更"
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          status: event.target.value as EmployeeManagementStatus,
+                        }))
+                      }
+                    >
+                      {managedStatusOptions.map((statusOption) => (
+                        <MenuItem key={statusOption.value} value={statusOption.value}>
+                          {statusOption.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+              </div>
+            </Alert>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-4" style={{ marginTop: "3rem" }}>
             <TextField

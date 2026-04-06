@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import {
   createEmployeeInDynamo,
-  deleteEmployeeInDynamo,
   getEmployeeManagementSummaryFromDynamo,
   updateEmployeeInDynamo,
 } from "@admin/features/employee-management/api/server";
 import type {
   CreateEmployeeInput,
-  DeleteEmployeeInput,
   UpdateEmployeeInput,
 } from "@admin/features/employee-management/model/types";
 import { authorizeEmployeeManagementRequest } from "./authorize";
@@ -35,10 +33,6 @@ type CreateEmployeeRequest = CreateEmployeeInput & {
 };
 
 type UpdateEmployeeRequest = UpdateEmployeeInput & {
-  companyId?: string;
-};
-
-type DeleteEmployeeRequest = DeleteEmployeeInput & {
   companyId?: string;
 };
 
@@ -100,31 +94,16 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
-  let body: DeleteEmployeeRequest | null = null;
-
+export async function DELETE() {
   try {
-    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
-    if (unauthorized || !currentAdminUser) {
+    const { unauthorized } = await authorizeEmployeeManagementRequest();
+    if (unauthorized) {
       return unauthorized;
     }
-
-    body = (await req.json()) as DeleteEmployeeRequest;
-    await deleteEmployeeInDynamo(currentAdminUser.companyId, body);
-    return NextResponse.json({ ok: true });
   } catch (err) {
-    if (err instanceof SyntaxError) {
-      console.error("DELETE /api/employee-management invalid json", err);
-      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-    }
-
     console.error("DELETE /api/employee-management error", err);
-
-    if (err instanceof Error) {
-      const status = err.message === "Company not found" || err.message === "Employee not found" ? 404 : 400;
-      return NextResponse.json({ error: err.message }, { status });
-    }
-
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
+
+  return NextResponse.json({ error: "operator_only" }, { status: 403 });
 }

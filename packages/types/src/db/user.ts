@@ -14,9 +14,8 @@ export type DBUserItem = {
   sk: `USER#${string}`;
   userId: string;
   cognitoSub?: string;
-  name: string;
-  lastName?: string;
-  firstName?: string;
+  lastName: string;
+  firstName: string;
   lastNameKana?: string;
   firstNameKana?: string;
   email: string;

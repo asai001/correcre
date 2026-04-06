@@ -5,6 +5,7 @@ import { OverallAnalysis } from "@admin/features/overall-analysis";
 import { requireCurrentAdminUser } from "@admin/lib/auth/current-user";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 export default async function AnalysisReportPage() {
   const currentAdminUser = await requireCurrentAdminUser();
@@ -19,13 +20,13 @@ export default async function AnalysisReportPage() {
     .filter((user) => user.status !== "DELETED")
     .map((user) => ({
       userId: user.userId,
-      name: user.name,
+      name: joinNameParts(user.lastName, user.firstName),
       department: user.departmentName?.trim() || "部門未設定",
     }));
 
   return (
     <div className="space-y-1 pb-5">
-      <AdminPageHeader title="分析・レポート" adminName={currentAdminUser.name} />
+      <AdminPageHeader title="分析・レポート" adminName={joinNameParts(currentAdminUser.lastName, currentAdminUser.firstName)} />
       <CustomTabs
         tabs={[
           { label: "全体分析", content: <OverallAnalysis companyId={currentAdminUser.companyId} /> },
