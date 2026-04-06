@@ -97,7 +97,7 @@ CDK の定義は [`lib/dynamodb.ts`](./lib/dynamodb.ts) に集約し、[`lib/inf
 | --- | --- |
 | PK | `companyId = <companyId>` |
 | SK | `sk = USER#<userId>` |
-| 主な属性 | `userId`, `companyId`, `cognitoSub`, `name`, `lastName`, `firstName`, `lastNameKana`, `firstNameKana`, `email`, `phoneNumber`, `address.postalCode`, `address.prefecture`, `address.city`, `address.building`, `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
+| 主な属性 | `userId`, `companyId`, `cognitoSub`, `lastName`, `firstName`, `lastNameKana`, `firstNameKana`, `email`, `phoneNumber`, `address` (Map: `postalCode`, `prefecture`, `city`, `building`), `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
 
 GSI:
 
@@ -110,6 +110,7 @@ GSI:
 認可方針:
 
 - 管理者画面へのアクセス可否は `roles` に `ADMIN` を含むかで判定します
+- 運用者画面へのアクセス可否は `roles` に `OPERATOR` を含むかで判定します
 - Cognito Groups は使わず、User テーブル側を認可の正とします
 
 ### 3. Department

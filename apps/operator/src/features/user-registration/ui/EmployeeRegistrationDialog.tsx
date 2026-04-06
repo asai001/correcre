@@ -104,6 +104,7 @@ export default function EmployeeRegistrationDialog({
 }: EmployeeRegistrationDialogProps) {
   const [form, setForm] = useState<FormState>(() => createInitialFormState());
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [addressAutoFilling, setAddressAutoFilling] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -137,6 +138,32 @@ export default function EmployeeRegistrationDialog({
 
   const hasError = Object.values(validation).some(Boolean);
 
+  const handleAutoFillAddress = async () => {
+    const firstHalf = form.postalCodeFirstHalf?.trim() ?? "";
+    const secondHalf = form.postalCodeSecondHalf?.trim() ?? "";
+
+    if (!/^\d{3}$/.test(firstHalf) || !/^\d{4}$/.test(secondHalf)) {
+      return;
+    }
+
+    setAddressAutoFilling(true);
+    try {
+      const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${firstHalf}${secondHalf}`);
+      const data = await response.json();
+      const result = data.results?.[0];
+
+      if (result) {
+        setForm((current) => ({
+          ...current,
+          prefecture: result.address1 ?? "",
+          city: `${result.address2 ?? ""}${result.address3 ?? ""}`,
+        }));
+      }
+    } finally {
+      setAddressAutoFilling(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setHasSubmitted(true);
 
@@ -168,10 +195,12 @@ export default function EmployeeRegistrationDialog({
       onClose={submitting ? undefined : onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{
-        sx: {
-          borderRadius: "24px",
-          p: 1,
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: "24px",
+            p: 1,
+          },
         },
       }}
     >
@@ -187,7 +216,7 @@ export default function EmployeeRegistrationDialog({
           {error && <Alert severity="error">{error}</Alert>}
           <Alert severity="info">ユーザー登録後も Cognito 連携は未完了です。本人の初回ログイン時に認証情報が紐づきます。</Alert>
 
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-4" style={{ marginTop: "3rem" }}>
             <TextField
               label="姓"
               value={form.lastName}
@@ -226,7 +255,106 @@ export default function EmployeeRegistrationDialog({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+          <div>
+            <Typography variant="body2" fontWeight="bold" color="text.secondary" sx={{ mb: 1 }}>
+              郵便番号
+            </Typography>
+            <div className="flex items-start gap-4">
+              <TextField
+                label="前半3桁"
+                value={form.postalCodeFirstHalf}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    postalCodeFirstHalf: event.target.value.replace(/\D/g, "").slice(0, 3),
+                  }))
+                }
+                sx={{ width: 130 }}
+                error={hasSubmitted && validation.postalCode}
+                helperText={hasSubmitted && validation.postalCode ? "3桁で入力" : " "}
+              />
+              <div className="flex items-center pt-4 text-lg text-slate-500">-</div>
+              <TextField
+                label="後半4桁"
+                value={form.postalCodeSecondHalf}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    postalCodeSecondHalf: event.target.value.replace(/\D/g, "").slice(0, 4),
+                  }))
+                }
+                sx={{ width: 130 }}
+                error={hasSubmitted && validation.postalCode}
+                helperText={hasSubmitted && validation.postalCode ? "4桁で入力" : " "}
+              />
+              <Button
+                variant="outlined"
+                onClick={handleAutoFillAddress}
+                disabled={addressAutoFilling}
+                sx={{ mt: "8px", whiteSpace: "nowrap" }}
+              >
+                自動入力
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[130px_minmax(0,2fr)_minmax(0,1fr)]">
+            <TextField
+              select
+              label="都道府県"
+              value={form.prefecture}
+              onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
+              fullWidth
+              helperText=" "
+            >
+              <MenuItem value="">未選択</MenuItem>
+              {JAPAN_PREFECTURES.map((prefecture) => (
+                <MenuItem key={prefecture} value={prefecture}>
+                  {prefecture}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              label="市区町村・丁目・番地"
+              value={form.city}
+              onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+              fullWidth
+              helperText=" "
+            />
+            <TextField
+              label="建物名・部屋番号"
+              value={form.building}
+              onChange={(event) => setForm((current) => ({ ...current, building: event.target.value }))}
+              fullWidth
+              helperText=" "
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[130px_minmax(0,2fr)_minmax(0,1fr)]">
+            <TextField
+              className="md:col-span-2"
+              label="メールアドレス"
+              type="email"
+              value={form.email}
+              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.email}
+              helperText={hasSubmitted && validation.email ? "有効なメールアドレスを入力してください" : " "}
+            />
+            <TextField
+              label="電話番号"
+              value={form.phoneNumber}
+              onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
+              fullWidth
+              error={hasSubmitted && validation.phoneNumber}
+              helperText={
+                hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : "未入力でも登録できます"
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[minmax(0,8fr)_minmax(0,5fr)_minmax(0,3fr)]">
             <FormControl fullWidth error={hasSubmitted && validation.departmentName}>
               <InputLabel id="operator-employee-registration-department-label">所属部署</InputLabel>
               <Select
@@ -288,88 +416,6 @@ export default function EmployeeRegistrationDialog({
               slotProps={{ inputLabel: { shrink: true } }}
               error={hasSubmitted && validation.joinedAt}
               helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
-            <TextField
-              label="メールアドレス"
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              fullWidth
-              required
-              error={hasSubmitted && validation.email}
-              helperText={hasSubmitted && validation.email ? "有効なメールアドレスを入力してください" : " "}
-            />
-            <TextField
-              label="電話番号"
-              value={form.phoneNumber}
-              onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
-              fullWidth
-              error={hasSubmitted && validation.phoneNumber}
-              helperText={
-                hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : "未入力でも登録できます"
-              }
-            />
-            <TextField
-              select
-              label="都道府県"
-              value={form.prefecture}
-              onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
-              fullWidth
-              helperText="未入力でも登録できます"
-            >
-              <MenuItem value="">未選択</MenuItem>
-              {JAPAN_PREFECTURES.map((prefecture) => (
-                <MenuItem key={prefecture} value={prefecture}>
-                  {prefecture}
-                </MenuItem>
-              ))}
-            </TextField>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_minmax(0,1.4fr)_minmax(0,1fr)] md:items-start">
-            <TextField
-              label="郵便番号(前半)"
-              value={form.postalCodeFirstHalf}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  postalCodeFirstHalf: event.target.value.replace(/\D/g, "").slice(0, 3),
-                }))
-              }
-              fullWidth
-              error={hasSubmitted && validation.postalCode}
-              helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
-            />
-            <div className="flex h-full items-center justify-center pt-4 text-lg text-slate-500">-</div>
-            <TextField
-              label="郵便番号(後半)"
-              value={form.postalCodeSecondHalf}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  postalCodeSecondHalf: event.target.value.replace(/\D/g, "").slice(0, 4),
-                }))
-              }
-              fullWidth
-              error={hasSubmitted && validation.postalCode}
-              helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
-            />
-            <TextField
-              label="市区町村・丁目・番地"
-              value={form.city}
-              onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
-              fullWidth
-              helperText="未入力でも登録できます"
-            />
-            <TextField
-              label="建物名・部屋番号"
-              value={form.building}
-              onChange={(event) => setForm((current) => ({ ...current, building: event.target.value }))}
-              fullWidth
-              helperText="未入力でも登録できます"
             />
           </div>
         </Stack>
