@@ -22,9 +22,7 @@ type CompanyRegistrationProps = {
 };
 
 type CompanyFormState = {
-  companyId: string;
   name: string;
-  shortName: string;
   status: OperatorCompanyStatus;
   plan: OperatorCompanyPlan;
   perEmployeeMonthlyFee: string;
@@ -33,7 +31,7 @@ type CompanyFormState = {
 };
 
 const statusOptions: Array<{ value: OperatorCompanyStatus; label: string }> = [
-  { value: "ACTIVE", label: "稼働中" },
+  { value: "ACTIVE", label: "有効" },
   { value: "TRIAL", label: "トライアル" },
   { value: "INACTIVE", label: "停止中" },
 ];
@@ -46,9 +44,7 @@ const planOptions: Array<{ value: OperatorCompanyPlan; label: string }> = [
 
 function createInitialFormState(): CompanyFormState {
   return {
-    companyId: "",
     name: "",
-    shortName: "",
     status: "ACTIVE",
     plan: "STANDARD",
     perEmployeeMonthlyFee: "3000",
@@ -65,10 +61,6 @@ function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
 }
 
-function isValidCompanyId(value: string) {
-  return /^[a-z][a-z0-9-]{1,31}$/.test(value);
-}
-
 export default function CompanyRegistration({ initialCompanies, operatorName }: CompanyRegistrationProps) {
   const [companies, setCompanies] = useState(initialCompanies);
   const [form, setForm] = useState<CompanyFormState>(() => createInitialFormState());
@@ -82,13 +74,12 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
 
   const validation = useMemo(
     () => ({
-      companyId: !isValidCompanyId(form.companyId.trim()),
       name: !form.name.trim(),
       perEmployeeMonthlyFee: !Number.isInteger(parsedMonthlyFee) || parsedMonthlyFee < 0,
       companyPointBalance: !Number.isInteger(parsedCompanyPointBalance) || parsedCompanyPointBalance < 0,
       pointUnitLabel: !form.pointUnitLabel.trim(),
     }),
-    [form.companyId, form.name, form.pointUnitLabel, parsedMonthlyFee, parsedCompanyPointBalance],
+    [form.name, form.pointUnitLabel, parsedCompanyPointBalance, parsedMonthlyFee],
   );
 
   const hasValidationError = Object.values(validation).some(Boolean);
@@ -101,9 +92,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
     }
 
     const input: CreateCompanyInput = {
-      companyId: form.companyId.trim(),
       name: form.name.trim(),
-      shortName: form.shortName.trim() || undefined,
       status: form.status,
       plan: form.plan,
       perEmployeeMonthlyFee: parsedMonthlyFee,
@@ -119,7 +108,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
       setCompanies((current) => [createdCompany, ...current.filter((company) => company.companyId !== createdCompany.companyId)]);
       setForm(createInitialFormState());
       setHasSubmitted(false);
-      setNotice(`企業「${createdCompany.companyName}」を登録しました。`);
+      setNotice(`企業「${createdCompany.legalName}」を登録しました。companyId は自動採番されています。`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "企業の登録に失敗しました。");
     } finally {
@@ -133,7 +122,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
         title="企業登録"
         adminName={operatorName}
         backHref="/dashboard"
-        subtitle="運用者が管理対象の企業を追加するための画面です。"
+        subtitle="運用対象の企業を追加します。companyId は登録時に UUID で自動採番されます。"
       />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
@@ -144,7 +133,9 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">新しい企業を登録</h2>
-              <p className="text-sm text-slate-500">companyId を起点に今後のユーザー管理・データ管理がぶら下がります。</p>
+              <p className="text-sm text-slate-500">
+                会社名と契約条件を入力してください。companyId は入力不要で、自動的に発番されます。
+              </p>
             </div>
           </div>
 
@@ -153,33 +144,13 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
             {notice ? <Alert severity="success">{notice}</Alert> : null}
 
             <TextField
-              label="companyId"
-              value={form.companyId}
-              onChange={(event) => setForm((current) => ({ ...current, companyId: event.target.value }))}
-              fullWidth
-              required
-              error={hasSubmitted && validation.companyId}
-              helperText={
-                hasSubmitted && validation.companyId
-                  ? "英小文字で始まる英小文字・数字・ハイフンの 2-32 文字で入力してください。"
-                  : "例: efficient-tech"
-              }
-            />
-            <TextField
-              label="企業名"
+              label="会社名"
               value={form.name}
               onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
               fullWidth
               required
               error={hasSubmitted && validation.name}
-              helperText={hasSubmitted && validation.name ? "企業名を入力してください。" : "正式名称を登録します。"}
-            />
-            <TextField
-              label="企業略称"
-              value={form.shortName}
-              onChange={(event) => setForm((current) => ({ ...current, shortName: event.target.value }))}
-              fullWidth
-              helperText="一覧表示用の短い表記が必要な場合のみ入力してください。"
+              helperText={hasSubmitted && validation.name ? "会社名を入力してください。" : "正式名称を入力してください。"}
             />
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -217,24 +188,32 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
 
             <div className="grid gap-4 md:grid-cols-2">
               <TextField
-                label="従業員あたり月額料金"
+                label="月額単価（円）"
                 type="number"
                 value={form.perEmployeeMonthlyFee}
                 onChange={(event) => setForm((current) => ({ ...current, perEmployeeMonthlyFee: event.target.value }))}
                 fullWidth
                 required
                 error={hasSubmitted && validation.perEmployeeMonthlyFee}
-                helperText={hasSubmitted && validation.perEmployeeMonthlyFee ? "0 以上の整数で入力してください。" : "円単位で入力します。"}
+                helperText={
+                  hasSubmitted && validation.perEmployeeMonthlyFee
+                    ? "0 以上の整数で入力してください。"
+                    : "税込みの月額単価を入力してください。"
+                }
               />
               <TextField
-                label="初期ポイント残高"
+                label="初期保有ポイント"
                 type="number"
                 value={form.companyPointBalance}
                 onChange={(event) => setForm((current) => ({ ...current, companyPointBalance: event.target.value }))}
                 fullWidth
                 required
                 error={hasSubmitted && validation.companyPointBalance}
-                helperText={hasSubmitted && validation.companyPointBalance ? "0 以上の整数で入力してください。" : "会社保有ポイントの初期値です。"}
+                helperText={
+                  hasSubmitted && validation.companyPointBalance
+                    ? "0 以上の整数で入力してください。"
+                    : "企業に付与する初期ポイント残高です。"
+                }
               />
             </div>
 
@@ -245,7 +224,11 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               fullWidth
               required
               error={hasSubmitted && validation.pointUnitLabel}
-              helperText={hasSubmitted && validation.pointUnitLabel ? "ポイント単位を入力してください。" : "通常は pt のままで構いません。"}
+              helperText={
+                hasSubmitted && validation.pointUnitLabel
+                  ? "ポイント単位を入力してください。"
+                  : "通常は pt のままで問題ありません。"
+              }
             />
 
             <Button
@@ -280,7 +263,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               </div>
             </div>
             <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-              合計 {companies.length} 社
+              全 {companies.length} 社
             </div>
           </div>
 
@@ -295,7 +278,9 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                     <div>
                       <div className="text-xs font-semibold tracking-[0.22em] text-slate-400">{company.companyId}</div>
                       <div className="mt-2 text-xl font-bold text-slate-900">{company.companyName}</div>
-                      <div className="mt-1 text-sm text-slate-500">{company.legalName}</div>
+                      {company.legalName !== company.companyName ? (
+                        <div className="mt-1 text-sm text-slate-500">{company.legalName}</div>
+                      ) : null}
                     </div>
                     <Link
                       href={`/user-registration?companyId=${encodeURIComponent(company.companyId)}`}
@@ -309,28 +294,26 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                   <div className="mt-4 flex flex-wrap gap-2 text-sm">
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.plan}</span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.status}</span>
+                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">登録ユーザー {company.employeeCount} 人</span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">
-                      従業員 {company.employeeCount} 名
+                      有効ユーザー {company.activeEmployeeCount} 人
                     </span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">
-                      稼働 {company.activeEmployeeCount} 名
-                    </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">
-                      残高 {formatNumber(company.companyPointBalance)}
+                      保有ポイント {formatNumber(company.companyPointBalance)}
                       {company.pointUnitLabel}
                     </span>
                   </div>
 
                   <div className="mt-4 grid gap-3 text-sm text-slate-500 md:grid-cols-2">
-                    <div>従業員あたり月額: {formatNumber(company.perEmployeeMonthlyFee)} 円</div>
-                    <div>更新日時: {formatDateTime(company.updatedAt)}</div>
+                    <div>月額単価 {formatNumber(company.perEmployeeMonthlyFee)} 円</div>
+                    <div>最終更新 {formatDateTime(company.updatedAt)}</div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <div className="mt-5 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-14 text-center text-sm text-slate-500">
-              まだ企業が登録されていません。左のフォームから最初の企業を追加してください。
+              まだ企業が登録されていません。左のフォームから最初の企業を登録してください。
             </div>
           )}
         </div>

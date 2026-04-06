@@ -1,4 +1,5 @@
-export type EmployeeManagementRole = "EMPLOYEE" | "MANAGER" | "ADMIN";
+export type EmployeeManagementRole = "EMPLOYEE" | "MANAGER" | "ADMIN" | "OPERATOR";
+export type EmployeeAssignableRole = "EMPLOYEE" | "ADMIN" | "OPERATOR";
 export type EmployeeManagementStatus = "INVITED" | "ACTIVE" | "SUSPENDED";
 export type EmployeeAuthLinkStatus = "UNLINKED" | "LINKED";
 
@@ -14,38 +15,55 @@ export type EmployeeDepartmentOption = {
   employeeCount: number;
 };
 
+export type EmployeeAddress = {
+  postalCode?: string;
+  prefecture?: string;
+  city?: string;
+  building?: string;
+};
+
 export type EmployeeManagementEmployee = {
   userId: string;
   name: string;
-  loginId: string;
+  nameKana?: string;
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
   departmentName?: string;
   roles: EmployeeManagementRole[];
   status: EmployeeManagementStatus;
   authLinkStatus: EmployeeAuthLinkStatus;
   email: string;
+  phoneNumber?: string;
+  address?: EmployeeAddress;
   pointBalance: number;
   completionRate: number;
   joinedAt?: string;
   lastLoginAt?: string;
 };
 
-export type CreateEmployeeInput = {
-  name: string;
-  loginId: string;
+type EmployeeFormFields = {
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
   departmentName: string;
   email: string;
-  role: EmployeeManagementRole;
+  phoneNumber?: string;
+  postalCodeFirstHalf?: string;
+  postalCodeSecondHalf?: string;
+  prefecture?: string;
+  city?: string;
+  building?: string;
+  roles: EmployeeAssignableRole[];
   joinedAt: string;
 };
 
-export type UpdateEmployeeInput = {
+export type CreateEmployeeInput = EmployeeFormFields;
+
+export type UpdateEmployeeInput = EmployeeFormFields & {
   userId: string;
-  name: string;
-  loginId: string;
-  departmentName: string;
-  email: string;
-  role: EmployeeManagementRole;
-  joinedAt: string;
   pointAdjustment: number;
 };
 

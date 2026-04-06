@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById, listCompanies, putCompany } from "@correcre/lib/dynamodb/company";
 import {
   buildDepartmentSk,
@@ -7,7 +9,6 @@ import {
   putDepartment,
   updateDepartmentName,
 } from "@correcre/lib/dynamodb/department";
-import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import {
   buildUserByDepartmentGsiPk,
   buildUserByDepartmentGsiSk,
@@ -19,8 +20,9 @@ import {
   putUser,
 } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameKanaParts, joinNameParts, splitFullName } from "@correcre/lib/user-profile";
 
-import type { Company, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import type { Company, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
 import type { CreateCompanyInput, OperatorCompanySummary } from "@operator/features/company-registration/model/types";
 import type {
   CreateDepartmentInput,
@@ -43,6 +45,20 @@ type RuntimeConfig = {
   departmentTableName: string;
 };
 
+type NormalizedEmployeeInput = {
+  name: string;
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  department: Pick<Department, "departmentId" | "name">;
+  email: string;
+  phoneNumber?: string;
+  address?: DBUserAddress;
+  roles: DBUserRole[];
+  joinedAt: string;
+};
+
 function getRuntimeConfig(): RuntimeConfig {
   return {
     region: readRequiredServerEnv("AWS_REGION"),
@@ -53,7 +69,7 @@ function getRuntimeConfig(): RuntimeConfig {
 }
 
 function isEmployeeManagementRole(role: DBUserRole): role is EmployeeManagementRole {
-  return role === "EMPLOYEE" || role === "MANAGER" || role === "ADMIN";
+  return role === "EMPLOYEE" || role === "MANAGER" || role === "ADMIN" || role === "OPERATOR";
 }
 
 function normalizeRoles(roles?: DBUserRole[]) {
@@ -84,6 +100,22 @@ function getAuthLinkStatus(cognitoSub?: string): EmployeeAuthLinkStatus {
   return cognitoSub?.trim() ? "LINKED" : "UNLINKED";
 }
 
+function normalizeOptionalText(value?: string) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function getNameFields(user: DBUserItem) {
+  const fallback = splitFullName(user.name);
+
+  return {
+    lastName: user.lastName?.trim() ?? fallback.lastName,
+    firstName: user.firstName?.trim() ?? fallback.firstName,
+    lastNameKana: user.lastNameKana?.trim() ?? "",
+    firstNameKana: user.firstNameKana?.trim() ?? "",
+  };
+}
+
 function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
   const roles = normalizeRoles(user.roles);
 
@@ -91,15 +123,25 @@ function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
     return null;
   }
 
+  const { lastName, firstName, lastNameKana, firstNameKana } = getNameFields(user);
+  const name = joinNameParts(lastName, firstName, user.name);
+  const nameKana = joinNameKanaParts(lastNameKana, firstNameKana);
+
   return {
     userId: user.userId,
-    name: user.name,
-    loginId: user.loginId,
+    name,
+    nameKana: nameKana || undefined,
+    lastName,
+    firstName,
+    lastNameKana,
+    firstNameKana,
     departmentName: user.departmentName,
     roles,
     status: normalizeUserStatus(user.status) as EmployeeManagementStatus,
     authLinkStatus: getAuthLinkStatus(user.cognitoSub),
     email: user.email,
+    phoneNumber: normalizeOptionalText(user.phoneNumber),
+    address: user.address,
     pointBalance: user.currentPointBalance ?? 0,
     completionRate: user.currentMonthCompletionRate ?? 0,
     joinedAt: user.joinedAt,
@@ -144,20 +186,17 @@ function getNextDepartmentId(departments: Department[]) {
   return `dept-${String(nextNumber).padStart(3, "0")}`;
 }
 
-function normalizeCompanyId(companyId: string) {
-  return companyId.trim().toLowerCase();
-}
-
-function isValidCompanyId(companyId: string) {
-  return /^[a-z][a-z0-9-]{1,31}$/.test(companyId);
-}
-
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function isValidLoginId(loginId: string) {
-  return /^[a-z0-9._-]{3,64}$/.test(loginId);
+function isValidKana(value: string) {
+  return /^[ァ-ヶー－\s　]+$/.test(value);
+}
+
+function isValidPhoneNumber(phoneNumber: string) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  return /^[0-9-]+$/.test(phoneNumber) && digits.length >= 10 && digits.length <= 11;
 }
 
 function isValidCompanyStatus(status: Company["status"]) {
@@ -206,14 +245,76 @@ async function assertUniqueEmail(config: RuntimeConfig, email: string, currentUs
   }
 }
 
-function assertUniqueLoginId(companyUsers: DBUserItem[], loginId: string, currentUserId?: string) {
-  const existingUser = companyUsers.find(
-    (user) => user.status !== "DELETED" && user.userId !== currentUserId && user.loginId === loginId,
-  );
+function buildAddress(
+  input: Pick<CreateEmployeeInput, "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "building">,
+): DBUserAddress | undefined {
+  const postalCodeFirstHalf = input.postalCodeFirstHalf?.trim() ?? "";
+  const postalCodeSecondHalf = input.postalCodeSecondHalf?.trim() ?? "";
+  const prefecture = input.prefecture?.trim() ?? "";
+  const city = input.city?.trim() ?? "";
+  const building = normalizeOptionalText(input.building);
+  const hasAnyAddressField = [postalCodeFirstHalf, postalCodeSecondHalf, prefecture, city, building].some(Boolean);
 
-  if (existingUser) {
-    throw new Error("同じログインIDのユーザーがすでに登録されています");
+  if (!hasAnyAddressField) {
+    return undefined;
   }
+
+  const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
+  if (hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf))) {
+    throw new Error("郵便番号は 3 桁と 4 桁の数字で入力してください");
+  }
+
+  return {
+    postalCode: hasAnyPostalCodeField ? `${postalCodeFirstHalf}${postalCodeSecondHalf}` : undefined,
+    prefecture: prefecture || undefined,
+    city: city || undefined,
+    building,
+  };
+}
+
+function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput, departments: Department[]): NormalizedEmployeeInput {
+  const lastName = input.lastName.trim();
+  const firstName = input.firstName.trim();
+  const lastNameKana = input.lastNameKana.trim();
+  const firstNameKana = input.firstNameKana.trim();
+  const email = input.email.trim().toLowerCase();
+  const joinedAt = input.joinedAt.trim();
+  const phoneNumber = normalizeOptionalText(input.phoneNumber);
+  const roles = Array.from(new Set(input.roles));
+
+  if (!lastName || !firstName || !lastNameKana || !firstNameKana || !email || !joinedAt || roles.length === 0) {
+    throw new Error("必須項目を入力してください");
+  }
+
+  if (!isValidKana(lastNameKana) || !isValidKana(firstNameKana)) {
+    throw new Error("フリガナは全角カタカナで入力してください");
+  }
+
+  if (!isValidEmail(email)) {
+    throw new Error("メールアドレスの形式が正しくありません");
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
+    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
+  }
+
+  if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
+    throw new Error("電話番号は 10 桁または 11 桁の数字で入力してください");
+  }
+
+  return {
+    name: joinNameParts(lastName, firstName),
+    lastName,
+    firstName,
+    lastNameKana,
+    firstNameKana,
+    department: requireDepartment(input.departmentName, departments),
+    email,
+    phoneNumber,
+    address: buildAddress(input),
+    roles,
+    joinedAt,
+  };
 }
 
 async function getCompanyOrThrow(config: RuntimeConfig, companyId: string) {
@@ -294,23 +395,26 @@ function toOperatorCompanySummary(company: Company): OperatorCompanySummary {
   };
 }
 
-function validateCreateCompanyInput(existingCompanies: Company[], input: CreateCompanyInput) {
-  const companyId = normalizeCompanyId(input.companyId);
+function createCompanyId(existingCompanies: Company[]) {
+  const existingIds = new Set(existingCompanies.map((company) => company.companyId));
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const companyId = randomUUID();
+    if (!existingIds.has(companyId)) {
+      return companyId;
+    }
+  }
+
+  throw new Error("会社IDの自動採番に失敗しました");
+}
+
+function validateCreateCompanyInput(input: CreateCompanyInput) {
   const name = input.name.trim();
-  const shortName = input.shortName?.trim();
   const perEmployeeMonthlyFee = input.perEmployeeMonthlyFee;
   const companyPointBalance = input.companyPointBalance;
 
-  if (!companyId || !name) {
-    throw new Error("companyId と会社名は必須です");
-  }
-
-  if (!isValidCompanyId(companyId)) {
-    throw new Error("companyId は英小文字で始まる 2-32 文字の英小文字・数字・ハイフンで入力してください");
-  }
-
-  if (shortName && shortName.length > 40) {
-    throw new Error("会社略称は 40 文字以内で入力してください");
+  if (!name) {
+    throw new Error("会社名は必須です");
   }
 
   if (!isValidCompanyStatus(input.status)) {
@@ -327,10 +431,6 @@ function validateCreateCompanyInput(existingCompanies: Company[], input: CreateC
 
   if (!Number.isInteger(companyPointBalance) || companyPointBalance < 0) {
     throw new Error("会社ポイント残高は 0 以上の整数で入力してください");
-  }
-
-  if (existingCompanies.some((company) => company.companyId === companyId)) {
-    throw new Error("同じ companyId の会社がすでに存在します");
   }
 }
 
@@ -355,15 +455,13 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
       tableName: config.companyTableName,
     },
   );
-  validateCreateCompanyInput(companies, input);
+  validateCreateCompanyInput(input);
 
   const now = new Date().toISOString();
-  const companyId = normalizeCompanyId(input.companyId);
-  const shortName = input.shortName?.trim();
+  const companyId = createCompanyId(companies);
   const createdCompany: Company = {
     companyId,
     name: input.name.trim(),
-    shortName: shortName || undefined,
     status: input.status,
     plan: input.plan,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
@@ -444,7 +542,7 @@ export async function createEmployeeInDynamo(
   input: CreateEmployeeInput,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
-  const [company, companyUsers, departments] = await Promise.all([
+  const [, companyUsers, departments] = await Promise.all([
     getCompanyOrThrow(config, companyId),
     listUsersByCompany(
       {
@@ -461,32 +559,9 @@ export async function createEmployeeInDynamo(
       companyId,
     ),
   ]);
-  void company;
 
-  const name = input.name.trim();
-  const loginId = input.loginId.trim().toLowerCase();
-  const email = input.email.trim().toLowerCase();
-  const joinedAt = input.joinedAt.trim();
-
-  if (!name || !loginId || !email || !joinedAt) {
-    throw new Error("必須項目を入力してください");
-  }
-
-  if (!isValidLoginId(loginId)) {
-    throw new Error("ログインIDは英小文字・数字・._- のみで 3-64 文字で入力してください");
-  }
-
-  if (!isValidEmail(email)) {
-    throw new Error("メールアドレスの形式が正しくありません");
-  }
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
-    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
-  }
-
-  const department = requireDepartment(input.departmentName, departments);
-  await assertUniqueEmail(config, email);
-  assertUniqueLoginId(companyUsers, loginId);
+  const normalizedInput = normalizeEmployeeInput(input, departments);
+  await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();
   const userId = getNextUserId(companyUsers);
@@ -494,20 +569,25 @@ export async function createEmployeeInDynamo(
     companyId,
     sk: buildUserSk(userId),
     userId,
-    name,
-    email,
-    loginId,
-    departmentId: department.departmentId,
-    departmentName: department.name,
-    roles: [input.role],
+    name: normalizedInput.name,
+    lastName: normalizedInput.lastName,
+    firstName: normalizedInput.firstName,
+    lastNameKana: normalizedInput.lastNameKana,
+    firstNameKana: normalizedInput.firstNameKana,
+    email: normalizedInput.email,
+    phoneNumber: normalizedInput.phoneNumber,
+    address: normalizedInput.address,
+    departmentId: normalizedInput.department.departmentId,
+    departmentName: normalizedInput.department.name,
+    roles: normalizedInput.roles,
     status: "INVITED",
-    joinedAt,
+    joinedAt: normalizedInput.joinedAt,
     currentPointBalance: 0,
     currentMonthCompletionRate: 0,
     createdAt: now,
     updatedAt: now,
-    gsi2pk: buildUserByEmailGsiPk(email),
-    gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),
+    gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
+    gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
     gsi3sk: buildUserByDepartmentGsiSk(userId),
   };
 
@@ -534,7 +614,7 @@ export async function updateEmployeeInDynamo(
   input: UpdateEmployeeInput,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
-  const [company, targetUser, companyUsers, departments] = await Promise.all([
+  const [company, targetUser, departments] = await Promise.all([
     getCompanyOrThrow(config, companyId),
     getUserByCompanyAndUserId(
       {
@@ -543,13 +623,6 @@ export async function updateEmployeeInDynamo(
       },
       companyId,
       input.userId,
-    ),
-    listUsersByCompany(
-      {
-        region: config.region,
-        tableName: config.userTableName,
-      },
-      companyId,
     ),
     listDepartmentsByCompany(
       {
@@ -564,34 +637,13 @@ export async function updateEmployeeInDynamo(
     throw new Error("Employee not found");
   }
 
-  const name = input.name.trim();
-  const loginId = input.loginId.trim().toLowerCase();
-  const email = input.email.trim().toLowerCase();
-  const joinedAt = input.joinedAt.trim();
-
-  if (!name || !loginId || !email || !joinedAt) {
-    throw new Error("必須項目を入力してください");
-  }
-
-  if (!isValidLoginId(loginId)) {
-    throw new Error("ログインIDは英小文字・数字・._- のみで 3-64 文字で入力してください");
-  }
-
-  if (!isValidEmail(email)) {
-    throw new Error("メールアドレスの形式が正しくありません");
-  }
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
-    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
-  }
+  const normalizedInput = normalizeEmployeeInput(input, departments);
 
   if (!Number.isInteger(input.pointAdjustment)) {
     throw new Error("ポイント調整は整数で入力してください");
   }
 
-  const department = requireDepartment(input.departmentName, departments);
-  await assertUniqueEmail(config, email, targetUser.userId);
-  assertUniqueLoginId(companyUsers, loginId, targetUser.userId);
+  await assertUniqueEmail(config, normalizedInput.email, targetUser.userId);
 
   const nextUserPointBalance = (targetUser.currentPointBalance ?? 0) + input.pointAdjustment;
   const nextCompanyPointBalance = company.companyPointBalance - input.pointAdjustment;
@@ -606,6 +658,59 @@ export async function updateEmployeeInDynamo(
 
   const now = new Date().toISOString();
   const client = getDynamoDocumentClient(config.region);
+  const userSetExpressions = [
+    "#name = :name",
+    "lastName = :lastName",
+    "firstName = :firstName",
+    "lastNameKana = :lastNameKana",
+    "firstNameKana = :firstNameKana",
+    "email = :email",
+    "departmentId = :departmentId",
+    "departmentName = :departmentName",
+    "roles = :roles",
+    "joinedAt = :joinedAt",
+    "currentPointBalance = :nextUserPointBalance",
+    "updatedAt = :updatedAt",
+    "gsi2pk = :gsi2pk",
+    "gsi3pk = :gsi3pk",
+    "gsi3sk = :gsi3sk",
+  ];
+  const userRemoveExpressions = ["loginId"];
+  const userExpressionAttributeNames = {
+    "#name": "name",
+  };
+  const userExpressionAttributeValues: Record<string, unknown> = {
+    ":currentPointBalance": targetUser.currentPointBalance ?? 0,
+    ":name": normalizedInput.name,
+    ":lastName": normalizedInput.lastName,
+    ":firstName": normalizedInput.firstName,
+    ":lastNameKana": normalizedInput.lastNameKana,
+    ":firstNameKana": normalizedInput.firstNameKana,
+    ":email": normalizedInput.email,
+    ":departmentId": normalizedInput.department.departmentId,
+    ":departmentName": normalizedInput.department.name,
+    ":roles": normalizedInput.roles,
+    ":joinedAt": normalizedInput.joinedAt,
+    ":nextUserPointBalance": nextUserPointBalance,
+    ":updatedAt": now,
+    ":gsi2pk": buildUserByEmailGsiPk(normalizedInput.email),
+    ":gsi3pk": buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
+    ":gsi3sk": buildUserByDepartmentGsiSk(targetUser.userId),
+  };
+
+  if (normalizedInput.phoneNumber) {
+    userSetExpressions.push("phoneNumber = :phoneNumber");
+    userExpressionAttributeValues[":phoneNumber"] = normalizedInput.phoneNumber;
+  } else {
+    userRemoveExpressions.push("phoneNumber");
+  }
+
+  if (normalizedInput.address) {
+    userSetExpressions.push("address = :address");
+    userExpressionAttributeValues[":address"] = normalizedInput.address;
+  } else {
+    userRemoveExpressions.push("address");
+  }
 
   await client.send(
     new TransactWriteCommand({
@@ -618,26 +723,9 @@ export async function updateEmployeeInDynamo(
               sk: buildUserSk(targetUser.userId),
             },
             ConditionExpression: "currentPointBalance = :currentPointBalance",
-            UpdateExpression:
-              "SET #name = :name, loginId = :loginId, email = :email, departmentId = :departmentId, departmentName = :departmentName, roles = :roles, joinedAt = :joinedAt, currentPointBalance = :nextUserPointBalance, updatedAt = :updatedAt, gsi2pk = :gsi2pk, gsi3pk = :gsi3pk, gsi3sk = :gsi3sk",
-            ExpressionAttributeNames: {
-              "#name": "name",
-            },
-            ExpressionAttributeValues: {
-              ":currentPointBalance": targetUser.currentPointBalance ?? 0,
-              ":name": name,
-              ":loginId": loginId,
-              ":email": email,
-              ":departmentId": department.departmentId,
-              ":departmentName": department.name,
-              ":roles": [input.role],
-              ":joinedAt": joinedAt,
-              ":nextUserPointBalance": nextUserPointBalance,
-              ":updatedAt": now,
-              ":gsi2pk": buildUserByEmailGsiPk(email),
-              ":gsi3pk": buildUserByDepartmentGsiPk(companyId, department.departmentId),
-              ":gsi3sk": buildUserByDepartmentGsiSk(targetUser.userId),
-            },
+            UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
+            ExpressionAttributeNames: userExpressionAttributeNames,
+            ExpressionAttributeValues: userExpressionAttributeValues,
           },
         },
         {
@@ -661,17 +749,22 @@ export async function updateEmployeeInDynamo(
 
   const updatedEmployee = toEmployee({
     ...targetUser,
-    name,
-    loginId,
-    email,
-    departmentId: department.departmentId,
-    departmentName: department.name,
-    roles: [input.role],
-    joinedAt,
+    name: normalizedInput.name,
+    lastName: normalizedInput.lastName,
+    firstName: normalizedInput.firstName,
+    lastNameKana: normalizedInput.lastNameKana,
+    firstNameKana: normalizedInput.firstNameKana,
+    email: normalizedInput.email,
+    phoneNumber: normalizedInput.phoneNumber,
+    address: normalizedInput.address,
+    departmentId: normalizedInput.department.departmentId,
+    departmentName: normalizedInput.department.name,
+    roles: normalizedInput.roles,
+    joinedAt: normalizedInput.joinedAt,
     currentPointBalance: nextUserPointBalance,
     updatedAt: now,
-    gsi2pk: buildUserByEmailGsiPk(email),
-    gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),
+    gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
+    gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
     gsi3sk: buildUserByDepartmentGsiSk(targetUser.userId),
   });
 

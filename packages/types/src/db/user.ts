@@ -2,14 +2,26 @@ export type DBUserRole = "EMPLOYEE" | "MANAGER" | "ADMIN" | "OPERATOR";
 
 export type DBUserStatus = "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
 
+export type DBUserAddress = {
+  postalCode?: string;
+  prefecture?: string;
+  city?: string;
+  building?: string;
+};
+
 export type DBUserItem = {
   companyId: string;
   sk: `USER#${string}`;
   userId: string;
   cognitoSub?: string;
   name: string;
+  lastName?: string;
+  firstName?: string;
+  lastNameKana?: string;
+  firstNameKana?: string;
   email: string;
-  loginId: string;
+  phoneNumber?: string;
+  address?: DBUserAddress;
   departmentId?: string;
   departmentName?: string;
   roles: DBUserRole[];

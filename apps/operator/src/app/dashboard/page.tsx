@@ -17,7 +17,7 @@ const dashboardCards = [
   {
     href: "/company-registration",
     title: "企業登録",
-    description: "新しい企業を追加し、companyId を発行して運用対象を増やします。",
+    description: "新しい企業を追加し、自動採番された companyId で運用対象を増やします。",
     icon: faBuilding,
     accentClassName: "from-cyan-500 to-sky-600",
   },

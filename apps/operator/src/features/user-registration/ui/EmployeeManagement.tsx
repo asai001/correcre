@@ -58,15 +58,17 @@ type StatCardProps = {
 };
 
 const roleLabelMap: Record<EmployeeManagementRole, string> = {
-  EMPLOYEE: "一般",
+  EMPLOYEE: "従業員",
   MANAGER: "マネージャー",
   ADMIN: "管理者",
+  OPERATOR: "運用者",
 };
 
 const roleBadgeClassMap: Record<EmployeeManagementRole, string> = {
   EMPLOYEE: "bg-slate-100 text-slate-700 border-slate-200",
   MANAGER: "bg-emerald-50 text-emerald-700 border-emerald-200",
   ADMIN: "bg-violet-50 text-violet-700 border-violet-200",
+  OPERATOR: "bg-cyan-50 text-cyan-700 border-cyan-200",
 };
 
 const statusLabelMap: Record<EmployeeManagementStatus, string> = {
@@ -107,6 +109,28 @@ function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
 }
 
+function formatPostalCode(postalCode?: string) {
+  if (!postalCode) {
+    return "-";
+  }
+
+  const digits = postalCode.replace(/\D/g, "");
+  if (digits.length !== 7) {
+    return postalCode;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+}
+
+function formatAddress(employee: EmployeeManagementEmployee) {
+  const address = employee.address;
+  if (!address) {
+    return "-";
+  }
+
+  return [address.prefecture, address.city, address.building].filter(Boolean).join(" ");
+}
+
 function StatCard({ label, value, description, accentClassName }: StatCardProps) {
   return (
     <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
@@ -118,6 +142,47 @@ function StatCard({ label, value, description, accentClassName }: StatCardProps)
   );
 }
 
+function buildExportRows(employees: EmployeeManagementEmployee[]) {
+  return [
+    [
+      "氏名",
+      "フリガナ",
+      "ユーザーID",
+      "部署",
+      "権限",
+      "状態",
+      "Cognito連携",
+      "メールアドレス",
+      "電話番号",
+      "郵便番号",
+      "住所",
+      "建物名・部屋番号",
+      "ポイント",
+      "達成率",
+      "入社日",
+      "最終ログイン",
+    ],
+    ...employees.map((employee) => [
+      employee.name,
+      employee.nameKana ?? "-",
+      employee.userId,
+      employee.departmentName ?? "-",
+      employee.roles.map((role) => roleLabelMap[role]).join(" / "),
+      statusLabelMap[employee.status],
+      authLinkLabelMap[employee.authLinkStatus],
+      employee.email,
+      employee.phoneNumber ?? "-",
+      formatPostalCode(employee.address?.postalCode),
+      [employee.address?.prefecture, employee.address?.city].filter(Boolean).join(" ") || "-",
+      employee.address?.building ?? "-",
+      employee.pointBalance,
+      `${employee.completionRate}%`,
+      formatDate(employee.joinedAt),
+      formatDateTime(employee.lastLoginAt),
+    ]),
+  ];
+}
+
 function getEmployeeColumns(
   pointUnitLabel: string,
   onEditEmployee: (employee: EmployeeManagementEmployee) => void,
@@ -127,11 +192,11 @@ function getEmployeeColumns(
     {
       id: "name",
       label: "氏名",
-      width: "22%",
+      width: "24%",
       render: (row) => (
-        <div className="min-w-[180px]">
+        <div className="min-w-[220px]">
           <div className="font-semibold text-slate-900">{row.name}</div>
-          <div className="mt-1 text-xs text-slate-500">loginId: {row.loginId}</div>
+          <div className="mt-1 text-xs text-slate-500">{row.nameKana || "-"}</div>
           <div className="mt-1 text-xs text-slate-500">
             {row.userId} / 入社日 {formatDate(row.joinedAt)}
           </div>
@@ -168,11 +233,13 @@ function getEmployeeColumns(
     },
     {
       id: "email",
-      label: "メールアドレス",
-      width: "24%",
+      label: "連絡先",
+      width: "28%",
       render: (row) => (
-        <div className="min-w-[220px]">
+        <div className="min-w-[240px]">
           <div className="font-medium text-slate-900">{row.email}</div>
+          <div className="mt-1 text-xs text-slate-500">電話番号: {row.phoneNumber || "-"}</div>
+          <div className="mt-1 text-xs text-slate-500">住所: {formatAddress(row)}</div>
           <div className="mt-1 text-xs text-slate-500">
             {row.lastLoginAt ? `最終ログイン ${formatDateTime(row.lastLoginAt)}` : "最終ログインなし"}
           </div>
@@ -183,7 +250,7 @@ function getEmployeeColumns(
       id: "pointBalance",
       label: "ポイント",
       align: "right",
-      width: "16%",
+      width: "12%",
       render: (row) => (
         <div className="min-w-[120px] text-right">
           <div className="font-bold text-emerald-600">
@@ -198,7 +265,7 @@ function getEmployeeColumns(
       id: "userId",
       label: "操作",
       align: "center",
-      width: "10%",
+      width: "8%",
       render: (row) => (
         <div className="flex items-center justify-center gap-1">
           <IconButton size="small" aria-label={`${row.name}を編集`} onClick={() => onEditEmployee(row)} sx={{ color: "#2563EB" }}>
@@ -210,39 +277,6 @@ function getEmployeeColumns(
         </div>
       ),
     },
-  ];
-}
-
-function buildExportRows(employees: EmployeeManagementEmployee[]) {
-  return [
-    [
-      "氏名",
-      "ユーザーID",
-      "loginId",
-      "部署",
-      "権限",
-      "状態",
-      "Cognito連携",
-      "メールアドレス",
-      "保有ポイント",
-      "達成率",
-      "入社日",
-      "最終ログイン",
-    ],
-    ...employees.map((employee) => [
-      employee.name,
-      employee.userId,
-      employee.loginId,
-      employee.departmentName ?? "-",
-      employee.roles.map((role) => roleLabelMap[role]).join(" / "),
-      statusLabelMap[employee.status],
-      authLinkLabelMap[employee.authLinkStatus],
-      employee.email,
-      employee.pointBalance,
-      `${employee.completionRate}%`,
-      formatDate(employee.joinedAt),
-      formatDateTime(employee.lastLoginAt),
-    ]),
   ];
 }
 
@@ -297,10 +331,15 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
 
       const searchableValues = [
         employee.name,
+        employee.nameKana ?? "",
         employee.userId,
-        employee.loginId,
         employee.departmentName ?? "",
         employee.email,
+        employee.phoneNumber ?? "",
+        employee.address?.postalCode ?? "",
+        employee.address?.prefecture ?? "",
+        employee.address?.city ?? "",
+        employee.address?.building ?? "",
         ...employee.roles.map((role) => roleLabelMap[role]),
         statusLabelMap[employee.status],
         authLinkLabelMap[employee.authLinkStatus],
@@ -428,7 +467,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     }
 
     setSelectedDepartment("all");
-    setNotice(`部署「${name}」を作成しました`);
+    setNotice(`部署「${name}」を追加しました`);
     reload();
     return result;
   };
@@ -472,7 +511,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           <div className="text-sm font-semibold tracking-[0.18em] text-slate-400">TARGET COMPANY</div>
           <h2 className="mt-2 text-2xl font-bold text-slate-900">対象会社の切り替え</h2>
           <p className="mt-2 text-sm leading-7 text-slate-500">
-            会社を選ぶと、ユーザー一覧・部署・ポイント残高など、その会社に紐づく DynamoDB データを表示します。
+            会社を選ぶと、その会社に紐づくユーザー、部署、ポイント残高を表示します。
           </p>
         </div>
 
@@ -481,7 +520,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
         >
           <FontAwesomeIcon icon={faBuilding} />
-          会社登録へ
+          企業登録へ
         </Link>
       </div>
 
@@ -522,9 +561,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             {formatNumber(activeCompany?.companyPointBalance ?? 0)}
             {activeCompany?.pointUnitLabel ?? "pt"}
           </div>
-          <div className="mt-1 text-sm text-slate-500">
-            登録ユーザー {formatNumber(activeCompany?.employeeCount ?? 0)} 人
-          </div>
+          <div className="mt-1 text-sm text-slate-500">登録ユーザー {formatNumber(activeCompany?.employeeCount ?? 0)} 人</div>
         </div>
       </div>
     </section>
@@ -537,7 +574,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
+          subtitle="企業を選択して、ユーザー登録と部署管理を行います。"
         />
 
         <section className="rounded-[28px] bg-white p-8 shadow-lg shadow-slate-200/70">
@@ -545,16 +582,16 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
               <FontAwesomeIcon icon={faBuilding} className="text-xl" />
             </div>
-            <h2 className="mt-5 text-2xl font-bold text-slate-900">対象の会社がまだありません</h2>
+            <h2 className="mt-5 text-2xl font-bold text-slate-900">登録済みの会社がありません</h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-              先に会社を登録して companyId を発行してください。
+              先に会社を登録してください。companyId は自動採番されます。
             </p>
             <Link
               href="/company-registration"
               className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
             >
               <FontAwesomeIcon icon={faPlus} />
-              会社登録へ移動
+              企業登録へ移動
             </Link>
           </div>
         </section>
@@ -569,7 +606,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
+          subtitle="企業を選択して、ユーザー登録と部署管理を行います。"
         />
         {companySelectorSection}
         <div className="h-32 animate-pulse rounded-[28px] bg-slate-200/70" />
@@ -590,7 +627,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
+          subtitle="企業を選択して、ユーザー登録と部署管理を行います。"
         />
         {companySelectorSection}
         <div className="rounded-[28px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700 shadow-sm">
@@ -607,7 +644,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           title="ユーザー管理"
           adminName={operatorName}
           backHref="/dashboard"
-          subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
+          subtitle="企業を選択して、ユーザー登録と部署管理を行います。"
         />
         {companySelectorSection}
       </div>
@@ -639,7 +676,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         title="ユーザー管理"
         adminName={operatorName}
         backHref="/dashboard"
-        subtitle="会社を選択して、ユーザー登録・部署管理を行います。"
+        subtitle="企業を選択して、ユーザー登録と部署管理を行います。"
       />
 
       {companySelectorSection}
@@ -687,7 +724,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
               fullWidth
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="氏名・loginId・メールアドレス・部署で検索..."
+              placeholder="氏名・フリガナ・メールアドレス・電話番号・部署で検索..."
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -722,8 +759,8 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         </div>
 
         <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
-          `infra/README.md` に定義されている User / Department / Company テーブルのみを使って管理しています。
-          会社ポイント調整は User.currentPointBalance と Company.companyPointBalance を同時に更新します。
+          User / Company / Department テーブルを使って管理しています。氏名は姓・名とフリガナ、連絡先は電話番号と住所まで保持します。
+          ポイント調整は User.currentPointBalance と Company.companyPointBalance を同時に更新します。
         </div>
 
         {notice ? (
@@ -743,11 +780,11 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         <StatCard
           label="部署数"
           value={`${summary.departmentCount}`}
-          description="管理対象として有効な部署数"
+          description="管理対象の有効な部署数"
           accentClassName="bg-gradient-to-r from-emerald-500 to-teal-400"
         />
         <StatCard
-          label="ユーザー保有ポイント"
+          label="ユーザーポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
           description="全ユーザーの currentPointBalance 合計"
           accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
@@ -768,12 +805,12 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">ユーザー一覧</h2>
-              <p className="text-sm text-slate-500">部署・権限・Cognito 連携状況を確認できます。</p>
+              <p className="text-sm text-slate-500">User テーブルに登録されているユーザー情報を表示しています。</p>
             </div>
           </div>
 
           <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-            {filteredEmployees.length} / {summary.employeeCount} 件を表示
+            {filteredEmployees.length} / {summary.employeeCount} 件を表示中
           </div>
         </div>
 
@@ -781,7 +818,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           <Table columns={columns} rows={pagedEmployees} footer={footer} />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
-            条件に一致するユーザーが見つかりません。検索条件または部署フィルタを見直してください。
+            条件に一致するユーザーが見つかりませんでした。
           </div>
         )}
       </section>

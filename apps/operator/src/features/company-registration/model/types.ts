@@ -19,9 +19,7 @@ export type OperatorCompanySummary = {
 };
 
 export type CreateCompanyInput = {
-  companyId: string;
   name: string;
-  shortName?: string;
   status: OperatorCompanyStatus;
   plan: OperatorCompanyPlan;
   perEmployeeMonthlyFee: number;

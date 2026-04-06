@@ -97,7 +97,7 @@ CDK の定義は [`lib/dynamodb.ts`](./lib/dynamodb.ts) に集約し、[`lib/inf
 | --- | --- |
 | PK | `companyId = <companyId>` |
 | SK | `sk = USER#<userId>` |
-| 主な属性 | `userId`, `companyId`, `cognitoSub`, `name`, `email`, `loginId`, `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
+| 主な属性 | `userId`, `companyId`, `cognitoSub`, `name`, `lastName`, `firstName`, `lastNameKana`, `firstNameKana`, `email`, `phoneNumber`, `address.postalCode`, `address.prefecture`, `address.city`, `address.building`, `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
 
 GSI:
 
@@ -232,7 +232,7 @@ GSI:
 事前招待型を前提にします。
 
 - 管理者が先に User テーブルへユーザーを登録します
-- `email` や `loginId` は事前登録しておきます
+- `email` や氏名、所属部署、必要に応じて電話番号・住所を事前登録しておきます
 - 初回ログイン後に該当ユーザーへ `cognitoSub` を紐付けます
 - 以後は `cognitoSub` を主キー的な識別子として利用します
 
