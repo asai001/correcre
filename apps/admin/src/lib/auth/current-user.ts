@@ -3,29 +3,25 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
-import { getUserByCognitoSub } from "@correcre/lib/dynamodb/user";
+import { listUsersByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import type { DBUserItem } from "@correcre/types";
 
 import { ADMIN_LOGIN_PATH } from "./constants";
 import { getAdminSession } from "./session";
+import type { AdminSession } from "./verify-token";
 
-export async function requireCurrentAdminUser() {
-  const session = await getAdminSession();
-
-  if (!session) {
-    redirect(ADMIN_LOGIN_PATH);
-  }
-
+export async function getAdminUserForSession(session: AdminSession): Promise<DBUserItem | null> {
   const cognitoSub = session.payload.sub?.trim();
 
   if (!cognitoSub) {
-    throw new Error("Admin session does not include a Cognito sub.");
+    return null;
   }
 
-  let user;
+  let users: DBUserItem[];
 
   try {
-    user = await getUserByCognitoSub(
+    users = await listUsersByCognitoSub(
       {
         region: readRequiredServerEnv("AWS_REGION"),
         tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
@@ -40,7 +36,19 @@ export async function requireCurrentAdminUser() {
     throw error;
   }
 
-  if (!user || user.status === "DELETED") {
+  return users.find((user) => user.status !== "DELETED" && user.roles.includes("ADMIN")) ?? null;
+}
+
+export async function requireCurrentAdminUser() {
+  const session = await getAdminSession();
+
+  if (!session) {
+    redirect(ADMIN_LOGIN_PATH);
+  }
+
+  const user = await getAdminUserForSession(session);
+
+  if (!user) {
     throw new Error("Admin user was not found in the DynamoDB User table.");
   }
 

@@ -2,53 +2,45 @@
 
 ## 今回やったこと
 
-- Codex 向けの指示ファイル名を `CODEX.md` から `AGENTS.md` に変更した
-- `CLAUDE.md` と `.ai/` 配下を共有コンテキスト運用の入口として整理した
-- `.ai/handoff.md` の記述を実在ファイルに合わせて更新した
+- `apps/employee` のログイン認証に EMPLOYEE ロールチェックを追加した
+- 前回の `apps/admin` ADMIN ロールチェック追加と同じパターンで実装した
+
+## 変更ファイル
+
+### `apps/employee/src/lib/auth/current-user.ts`
+- `getEmployeeUserForSession(session)` を新設: `listUsersByCognitoSub` でユーザー一覧を取得し、`status !== "DELETED"` かつ `roles.includes("EMPLOYEE")` でフィルタ
+- `requireCurrentEmployeeUser` を `getEmployeeUserForSession` を使う形に修正
+
+### `apps/employee/src/lib/auth/errors.ts`
+- `employee_role_not_allowed` エラーコード追加（「従業員権限がないため、ログインできません。」）
+
+### `apps/employee/src/app/lib/actions/authenticate.ts`
+- `authenticate`: `signInEmployee` 成功後に `getEmployeeUserForSession` でロールチェック。EMPLOYEE ロールがなければセッションクリア＋エラー返却
+- `completeNewPassword`: `completeEmployeeNewPassword` 成功後に同様のロールチェック。EMPLOYEE ロールがなければセッションクリア＋ログイン画面へリダイレクト
 
 ## 確認できたこと
 
-- コレクレは npm workspaces の monorepo 構成である
-- app は `admin`, `employee`, `operator` の3つ
-- 共通 package 群と `infra` が同居している
-- 共有コンテキストは `.ai/` 配下に分割されている
-- Codex 側のルート指示ファイルは `AGENTS.md`、Claude 側は `CLAUDE.md` である
+- TypeScript の型チェックが `apps/employee` で通ること
+- `apps/operator` の既存 OPERATOR ロールチェック実装（参考パターン）
+- 3 app すべてのログインにロールチェックが揃った
 
-## 未確認
+## 未確認事項
 
-- 各 app の具体的な責務分担
-- 共有 package の利用実態
-- `middleware.ts` の役割差分
-- auth / Cognito / infra の接続詳細
+- 実環境での動作確認
+- ロールなしユーザーでのエラーメッセージ表示確認
 
 ## 次にやること
 
-1. 各 app の `src/app` と `src/features` を読んで役割を整理する
-2. 共有 package の import 元と責務を確認する
-3. infra と app 側認証の接続点を確認する
+1. 実環境で admin / employee のロールチェック動作を確認する
+2. ロールなしユーザーでログイン試行し、エラーが正しく表示されることを確認する
 
 ## 注意点
 
-- 単一 app 前提で読まないこと
-- 共通 package の変更影響を必ず意識すること
-- `.ai/` は補助記録なので、コードや設定ファイルと矛盾したら一次情報を優先すること
+- `getUserByCognitoSub`（単一ユーザー返却）ではなく `listUsersByCognitoSub`（複数ユーザー返却）を使っている。1つの cognitoSub が複数会社のユーザーに紐づく可能性があるため
+- operator アプリは元から OPERATOR ロールチェック済みなので今回変更なし
 
-## 次のエージェント向けメモ
+## 対象スコープ
 
-- 参照すべきファイル:
-  - `AGENTS.md`
-  - `CLAUDE.md`
-  - `.ai/agent-rules.md`
-  - `.ai/current-status.md`
-  - `.ai/next-actions.md`
-  - `.ai/decisions.md`
-  - `package.json`
-  - `apps/*/package.json`
-  - `infra/package.json`
-  - 各 app の `src/app`, `src/features`, `src/lib`, `middleware.ts`
-- 優先して見るべき論点:
-  - app 間の責務差分
-  - 共有 package の波及範囲
-  - auth / infra の接続
-- 勝手に前提化しない方がよい点:
-  - 3 app の画面・権限・責務が完全に同じであるという前提
+- `apps/employee`
+- `packages/lib`（既存関数の利用のみ、変更なし）
+- `packages/types`（既存型の利用のみ、変更なし）

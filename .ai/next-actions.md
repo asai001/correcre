@@ -5,10 +5,8 @@
 
 ## Next actions
 
-1. `apps/admin/src` のルート構成と主要画面を確認する
-2. `apps/employee/src` のルート構成と主要画面を確認する
-3. `apps/operator/src` のルート構成と主要画面を確認する
-4. `packages/theme`, `packages/types`, `packages/lib` の責務を確認する
-5. `infra/lib` と app 側認証実装の関係を確認する
-6. 各 app の `middleware.ts` の役割差分を確認する
-7. README の `packages/ui` 言及と実構成の差分有無を確認する
+1. 実環境で `apps/admin` と `apps/employee` のロールチェックの動作確認を行う
+2. ADMIN / EMPLOYEE ロールを持たないユーザーでログインし、エラーメッセージが正しく表示されることを確認する
+3. 新パスワード設定フロー（`completeNewPassword`）でもロールチェックが効いていることを確認する
+4. `apps/admin/src/lib/auth/current-user.ts` の `requireCurrentAdminUser` がページアクセス時に ADMIN ロールを正しくチェックしていることを確認する
+5. `apps/employee/src/lib/auth/current-user.ts` の `requireCurrentEmployeeUser` がページアクセス時に EMPLOYEE ロールを正しくチェックしていることを確認する

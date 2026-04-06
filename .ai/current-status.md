@@ -3,79 +3,77 @@
 ## Objective
 
 - 今回の作業目的:
-  - コレクレの monorepo 運用に適したエージェント共有コンテキストの土台を整備する
+  - 従業員側画面（`apps/employee`）のログイン時に EMPLOYEE ロールチェックを追加する
+  - 前回の管理者側画面（`apps/admin`）ADMIN ロールチェック追加に続く対応
 - 成果物:
-  - `AGENT.md`
-  - `.ai/project-overview.md`
-  - `.ai/architecture.md`
-  - `.ai/decisions.md`
-  - `.ai/current-status.md`
-  - `.ai/next-actions.md`
-  - `.ai/handoff.md`
-  - `.ai/tasks/README.md`
+  - `apps/employee/src/lib/auth/current-user.ts` — `getEmployeeUserForSession` 追加、`requireCurrentEmployeeUser` を EMPLOYEE ロールチェック付きに修正
+  - `apps/employee/src/lib/auth/errors.ts` — `employee_role_not_allowed` エラーコード追加
+  - `apps/employee/src/app/lib/actions/authenticate.ts` — `authenticate` と `completeNewPassword` に EMPLOYEE ロールチェック追加
 - 完了条件:
-  - 別エージェントに切り替わっても、`.ai/` を読めば再開しやすい状態になっていること
+  - `roles` に `EMPLOYEE` を持たないユーザーが従業員側画面にログインできないこと
 
 ---
 
 ## Scope
 
 - 対象 app:
-  - 共通
+  - `apps/employee`
 - 対象 packages:
-  - 共通
+  - `packages/lib`（`listUsersByCognitoSub` を利用）
+  - `packages/types`（`DBUserItem` 型を利用）
 - 対象 infra:
-  - `infra`
-- 今回は実装変更ではなく、共有コンテキスト設計が対象
+  - なし
 
 ---
 
 ## Confirmed
 
-- ルート `package.json` で npm workspaces が定義されている
-- workspaces には `infra`, `apps/*`, `packages/*`, `packages/features/*` が含まれる
-- app は `apps/admin`, `apps/employee`, `apps/operator` の3つがある
-- 各 app は Next.js 15 / React 19 / TypeScript ベースで構成されている
-- `infra` は AWS CDK ベースで、dev / stg / prod の deploy script を持つ
-- 共通 package として `adapters`, `features`, `lib`, `theme`, `types`, `validation` が存在する
+- `apps/employee` のログイン認証フローは `apps/admin` と同じ構造
+- 変更前は Cognito 認証のみでロールチェックなし
+- `signInEmployee` は `{ status: "authenticated", session }` を返す
+- `completeEmployeeNewPassword` は `session` を返す
+- `listUsersByCognitoSub` で同一 cognitoSub の複数ユーザーを取得し、`EMPLOYEE` ロール持ちをフィルタする実装に変更済み
+- TypeScript の型チェックが通ることを確認済み
+- `apps/operator` は既に `OPERATOR` ロールチェックが実装済み（参考にした）
 
 ---
 
 ## Hypotheses
 
-- `admin`, `employee`, `operator` は似た構造を持つが、画面や責務の差分がある可能性が高い
-- `packages/theme` と `packages/types` は複数 app に強く影響する共有基盤の可能性が高い
-- 認証や middleware の理解には app 側だけでなく `infra` の確認も必要になる可能性がある
+- なし（実装完了済み）
 
 ---
 
 ## Unknown
 
-- 各 app の具体的な責務分担
-- `packages/features/individual-analysis` の実際の適用先
-- `middleware.ts` の app 間差分
-- Cognito など認証関連の infra との実接続構成
+- 実環境での動作確認は未実施
 
 ---
 
 ## Investigated files
 
-- `package.json`
-- `README.md`
-- `apps/admin/package.json`
-- `apps/employee/package.json`
-- `apps/operator/package.json`
-- `infra/package.json`
+- `apps/employee/src/app/lib/actions/authenticate.ts`
+- `apps/employee/src/lib/auth/current-user.ts`
+- `apps/employee/src/lib/auth/errors.ts`
+- `apps/employee/src/lib/auth/session.ts`
+- `apps/employee/src/lib/auth/verify-token.ts`
+- `apps/employee/src/middleware.ts`
+- `apps/operator/src/lib/auth/operator.ts`（参考）
+- `apps/operator/src/app/lib/actions/authenticate.ts`（参考）
+- `packages/lib/src/dynamodb/user.ts`
+- `packages/types/src/db/user.ts`
 
 ---
 
 ## Blockers
 
-- 現時点では全コード読解はしていないため、責務分担の詳細は未確認
+- なし
 
 ---
 
 ## Current assessment
 
-- コレクレは app / shared packages / infra をまたぐ monorepo として扱うべき
-- コンテキスト共有は単一 `context.md` より、`overview / architecture / decisions / status / handoff` 分割の方が運用しやすい
+- 3 app すべてでログイン時のロールチェックが実装された状態:
+  - `apps/admin` → ADMIN ロール必須
+  - `apps/employee` → EMPLOYEE ロール必須
+  - `apps/operator` → OPERATOR ロール必須（元から実装済み）

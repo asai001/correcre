@@ -11,6 +11,7 @@ import {
   ADMIN_LOGIN_PATH,
   ADMIN_NEW_PASSWORD_PATH,
 } from "@admin/lib/auth/constants";
+import { getAdminUserForSession } from "@admin/lib/auth/current-user";
 import {
   mapAuthenticationErrorToCode,
   mapForgotPasswordConfirmErrorToCode,
@@ -140,6 +141,14 @@ export async function authenticate(
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
+  if (!(await getAdminUserForSession(result.session))) {
+    await clearAdminSession();
+
+    return {
+      errorCode: "admin_role_not_allowed",
+    };
+  }
+
   redirect(redirectTo as Route);
 }
 
@@ -161,7 +170,12 @@ export async function completeNewPassword(formData: FormData) {
   }
 
   try {
-    await completeAdminNewPassword({ newPassword });
+    const session = await completeAdminNewPassword({ newPassword });
+
+    if (!(await getAdminUserForSession(session))) {
+      await clearAdminSession();
+      redirect(buildLoginRedirect(redirectTo) as Route);
+    }
   } catch (error) {
     console.error("Admin new password setup failed", error);
     const errorCode = mapNewPasswordErrorToCode(error);

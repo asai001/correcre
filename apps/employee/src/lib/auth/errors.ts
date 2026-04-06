@@ -13,6 +13,7 @@ export const LOGIN_ERROR_MESSAGES = {
   expired_verification_code: "認証コードの有効期限が切れました。もう一度認証コードを送信してください。",
   rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
   user_not_confirmed: "ユーザー確認が完了していません。管理状態を確認してください。",
+  employee_role_not_allowed: "従業員権限がないため、ログインできません。",
   system_error: "ログインに失敗しました。設定内容とアカウント状態を確認してください。",
 } as const;
 

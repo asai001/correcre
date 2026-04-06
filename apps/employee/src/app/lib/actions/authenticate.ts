@@ -11,6 +11,7 @@ import {
   EMPLOYEE_LOGIN_PATH,
   EMPLOYEE_NEW_PASSWORD_PATH,
 } from "@employee/lib/auth/constants";
+import { getEmployeeUserForSession } from "@employee/lib/auth/current-user";
 import {
   mapAuthenticationErrorToCode,
   mapForgotPasswordConfirmErrorToCode,
@@ -140,6 +141,14 @@ export async function authenticate(
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
+  if (!(await getEmployeeUserForSession(result.session))) {
+    await clearEmployeeSession();
+
+    return {
+      errorCode: "employee_role_not_allowed",
+    };
+  }
+
   redirect(redirectTo as Route);
 }
 
@@ -161,7 +170,12 @@ export async function completeNewPassword(formData: FormData) {
   }
 
   try {
-    await completeEmployeeNewPassword({ newPassword });
+    const session = await completeEmployeeNewPassword({ newPassword });
+
+    if (!(await getEmployeeUserForSession(session))) {
+      await clearEmployeeSession();
+      redirect(buildLoginRedirect(redirectTo) as Route);
+    }
   } catch (error) {
     console.error("Employee new password setup failed", error);
     const errorCode = mapNewPasswordErrorToCode(error);
