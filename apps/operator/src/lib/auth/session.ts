@@ -1,7 +1,9 @@
 import "server-only";
 
 import {
+  ConfirmForgotPasswordCommand,
   CognitoIdentityProviderClient,
+  ForgotPasswordCommand,
   InitiateAuthCommand,
   RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -220,6 +222,32 @@ export async function getOperatorSession(): Promise<OperatorSession | null> {
   }
 
   return verifyOperatorIdToken(idToken);
+}
+
+export async function requestOperatorPasswordReset(params: { email: string }) {
+  const { region, clientId } = getOperatorCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+    }),
+  );
+}
+
+export async function confirmOperatorPasswordReset(params: { email: string; confirmationCode: string; newPassword: string }) {
+  const { region, clientId } = getOperatorCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ConfirmForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+      ConfirmationCode: params.confirmationCode,
+      Password: params.newPassword,
+    }),
+  );
 }
 
 export async function completeOperatorNewPassword(params: { newPassword: string }) {

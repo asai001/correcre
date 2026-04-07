@@ -5,8 +5,5 @@
 
 ## Next actions
 
-1. 実環境で `apps/admin` と `apps/employee` のロールチェックの動作確認を行う
-2. ADMIN / EMPLOYEE ロールを持たないユーザーでログインし、エラーメッセージが正しく表示されることを確認する
-3. 新パスワード設定フロー（`completeNewPassword`）でもロールチェックが効いていることを確認する
-4. `apps/admin/src/lib/auth/current-user.ts` の `requireCurrentAdminUser` がページアクセス時に ADMIN ロールを正しくチェックしていることを確認する
-5. `apps/employee/src/lib/auth/current-user.ts` の `requireCurrentEmployeeUser` がページアクセス時に EMPLOYEE ロールを正しくチェックしていることを確認する
+1. 実環境で `apps/operator` のパスワードリセット画面を表示し、helperText の背景が水色になっていることを確認する
+2. `apps/admin` の `ForgotPasswordForm.tsx` にも同じ問題がないか確認する（同じ `className="bg-white"` パターンを使用している）

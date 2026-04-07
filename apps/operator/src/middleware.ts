@@ -42,7 +42,7 @@ function expireSession(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLoginPage = pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password";
+  const isLoginPage = pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password" || pathname === "/login/forgot-password";
   const shouldCheckSession = isLoginPage || isProtectedPath(pathname);
 
   if (!shouldCheckSession) {
@@ -74,6 +74,7 @@ export const config = {
   matcher: [
     "/login",
     "/login/new-password",
+    "/login/forgot-password",
     "/dashboard/:path*",
     "/company-registration/:path*",
     "/user-registration/:path*",

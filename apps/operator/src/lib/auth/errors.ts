@@ -1,18 +1,27 @@
 export const LOGIN_ERROR_MESSAGES = {
   invalid_credentials: "メールアドレスまたはパスワードが正しくありません。",
   missing_fields: "メールアドレスとパスワードを入力してください。",
+  missing_email: "メールアドレスを入力してください。",
+  missing_reset_fields: "認証コードと新しいパスワードを入力してください。",
   new_password_session_expired:
     "新しいパスワードの設定セッションの有効期限が切れました。もう一度ログインして設定をやり直してください。",
   invalid_new_password: "新しいパスワードが条件を満たしていません。半角英数字8文字以上で入力してください。",
   password_confirmation_mismatch: "新しいパスワードと確認用パスワードが一致しません。",
   password_reset_required: "パスワードの再設定が必要です。パスワードを変更してから、もう一度ログインしてください。",
+  invalid_verification_code: "認証コードが正しくありません。",
+  expired_verification_code: "認証コードの有効期限が切れました。もう一度認証コードを送信してください。",
   rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
   user_not_confirmed: "アカウントの確認が完了していません。管理状態を確認してください。",
   operator_role_not_allowed: "運用者画面にログインする権限がありません。",
   system_error: "ログイン処理に失敗しました。設定内容とアカウント状態を確認してください。",
 } as const;
 
+export const LOGIN_NOTICE_MESSAGES = {
+  password_reset_success: "パスワードを再設定しました。新しいパスワードでログインしてください。",
+} as const;
+
 export type LoginErrorCode = keyof typeof LOGIN_ERROR_MESSAGES;
+export type LoginNoticeCode = keyof typeof LOGIN_NOTICE_MESSAGES;
 
 export function getLoginErrorMessage(code: string | undefined): string | undefined {
   if (!code) {
@@ -20,6 +29,14 @@ export function getLoginErrorMessage(code: string | undefined): string | undefin
   }
 
   return LOGIN_ERROR_MESSAGES[code as LoginErrorCode] ?? LOGIN_ERROR_MESSAGES.system_error;
+}
+
+export function getLoginNoticeMessage(code: string | undefined): string | undefined {
+  if (!code) {
+    return undefined;
+  }
+
+  return LOGIN_NOTICE_MESSAGES[code as LoginNoticeCode];
 }
 
 export function mapAuthenticationErrorToCode(error: unknown): LoginErrorCode {
@@ -52,6 +69,38 @@ export function mapNewPasswordErrorToCode(error: unknown): LoginErrorCode {
     case "ExpiredCodeException":
       return "new_password_session_expired";
     case "TooManyRequestsException":
+      return "rate_limited";
+    default:
+      return "system_error";
+  }
+}
+
+export function mapForgotPasswordRequestErrorToCode(error: unknown): LoginErrorCode {
+  const name = error instanceof Error ? error.name : undefined;
+
+  switch (name) {
+    case "TooManyRequestsException":
+    case "LimitExceededException":
+      return "rate_limited";
+    case "UserNotConfirmedException":
+      return "user_not_confirmed";
+    default:
+      return "system_error";
+  }
+}
+
+export function mapForgotPasswordConfirmErrorToCode(error: unknown): LoginErrorCode {
+  const name = error instanceof Error ? error.name : undefined;
+
+  switch (name) {
+    case "CodeMismatchException":
+      return "invalid_verification_code";
+    case "ExpiredCodeException":
+      return "expired_verification_code";
+    case "InvalidPasswordException":
+      return "invalid_new_password";
+    case "TooManyRequestsException":
+    case "LimitExceededException":
       return "rate_limited";
     default:
       return "system_error";
