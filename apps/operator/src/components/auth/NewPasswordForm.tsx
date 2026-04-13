@@ -9,6 +9,7 @@ import { PasswordTextField } from "@correcre/theme";
 import { completeNewPassword } from "@operator/app/lib/actions/authenticate";
 import { OPERATOR_DEFAULT_REDIRECT_PATH } from "@operator/lib/auth/constants";
 import { COGNITO_PASSWORD_RULE_TEXT, isValidCognitoPassword } from "@correcre/lib/auth/password";
+import { operatorAuthCardClassName } from "./styles";
 
 type NewPasswordFormProps = {
   email: string;
@@ -52,7 +53,7 @@ export default function NewPasswordForm({
   const isPasswordMismatch = !!newPassword && !!confirmPassword && newPassword !== confirmPassword;
 
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className={operatorAuthCardClassName}>
       <div className="mx-auto w-4/5 pb-8">
         <form
           action={completeNewPassword}

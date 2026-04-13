@@ -5,5 +5,8 @@
 
 ## Next actions
 
-1. 実環境で `apps/operator` のパスワードリセット画面を表示し、helperText の背景が水色になっていることを確認する
-2. `apps/admin` の `ForgotPasswordForm.tsx` にも同じ問題がないか確認する（同じ `className="bg-white"` パターンを使用している）
+1. 本番環境の差出人メールアドレスが確定したら `infra/lib/cognito.ts` の `PROD_PASSWORD_RESET_SENDER_CONFIG` を更新する
+2. `stg` / `prod` の AWS アカウントで SES の送信元 identity が有効かを確認する
+3. `infra` を `stg` と `prod` にデプロイする
+4. `stg` / `prod` で forgot password を実行し、件名・差出人・本文がカスタマイズ文面になっていることを実メールで確認する
+5. 必要なら `prod` 用 sender config を secrets / context から注入する設計へ拡張する

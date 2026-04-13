@@ -23,16 +23,33 @@ export type SharedCognitoResources = {
   domainPrefix: string;
 };
 
-const DEV_PASSWORD_RESET_FROM_EMAIL = "correcre-info@efficient-technology.com";
-const DEV_PASSWORD_RESET_FROM_NAME = "コレクレ";
-const DEV_PASSWORD_RESET_SES_VERIFIED_DOMAIN = "efficient-technology.com";
-const DEV_PASSWORD_RESET_EMAIL_SUBJECT = "【コレクレ】パスワード再設定用コードのお知らせ";
-const DEV_PASSWORD_RESET_EMAIL_HTML_PREFIX = [
+type PasswordResetSenderConfig = {
+  fromEmail: string;
+  fromName: string;
+  sesVerifiedDomain: string;
+};
+
+const DEFAULT_PASSWORD_RESET_SENDER_CONFIG: PasswordResetSenderConfig = {
+  fromEmail: "correcre-info@efficient-technology.com",
+  fromName: "コレクレ",
+  sesVerifiedDomain: "efficient-technology.com",
+};
+
+// Keep production separate so only this object needs to change once the
+// dedicated sender address is finalized.
+const PROD_PASSWORD_RESET_SENDER_CONFIG: PasswordResetSenderConfig = {
+  fromEmail: "correcre-info@efficient-technology.com",
+  fromName: "コレクレ",
+  sesVerifiedDomain: "efficient-technology.com",
+};
+
+const PASSWORD_RESET_EMAIL_SUBJECT = "【コレクレ】パスワード再設定用コードのお知らせ";
+const PASSWORD_RESET_EMAIL_HTML_PREFIX = [
   '<div style="font-family: sans-serif; line-height: 1.8; color: #111827;">',
   "<p>いつも コレクレ をご利用いただきありがとうございます。</p>",
   "<p>パスワード再設定のご依頼を受け付けました。<br />以下の確認コードを、パスワード再設定画面に入力してください。</p>",
 ];
-const DEV_PASSWORD_RESET_EMAIL_HTML_SUFFIX = [
+const PASSWORD_RESET_EMAIL_HTML_SUFFIX = [
   "<p>※確認コードの有効期限は 60 分です。<br />※このメールにお心当たりがない場合は、本メールを破棄してください。<br />※確認コードは第三者に共有しないでください。</p>",
   "</div>",
 ];
@@ -64,15 +81,15 @@ function buildConstructPrefix(appType: CognitoAppType): string {
   }
 }
 
-function createDevPasswordResetCustomMessageTrigger(scope: Construct, stage: InfraStage) {
-  if (stage !== "dev") {
-    return undefined;
-  }
+function getPasswordResetSenderConfig(stage: InfraStage): PasswordResetSenderConfig {
+  return stage === "prod" ? PROD_PASSWORD_RESET_SENDER_CONFIG : DEFAULT_PASSWORD_RESET_SENDER_CONFIG;
+}
 
-  return new lambda.Function(scope, "DevPasswordResetCustomMessageTrigger", {
+function createPasswordResetCustomMessageTrigger(scope: Construct) {
+  return new lambda.Function(scope, "PasswordResetCustomMessageTrigger", {
     runtime: lambda.Runtime.NODEJS_20_X,
     handler: "index.handler",
-    description: "Customize Cognito forgot-password emails for the development environment.",
+    description: "Customize Cognito forgot-password emails.",
     code: lambda.Code.fromInline(`
 exports.handler = async (event) => {
   if (event.triggerSource !== "CustomMessage_ForgotPassword") {
@@ -96,14 +113,14 @@ exports.handler = async (event) => {
       }
     });
   const emailHtmlParts = [
-    ...${JSON.stringify(DEV_PASSWORD_RESET_EMAIL_HTML_PREFIX)},
+    ...${JSON.stringify(PASSWORD_RESET_EMAIL_HTML_PREFIX)},
     \`<p style="margin: 24px 0; font-size: 16px; font-weight: 700;">確認コード：\${escapeHtml(codeParameter)}</p>\`,
-    ...${JSON.stringify(DEV_PASSWORD_RESET_EMAIL_HTML_SUFFIX)},
+    ...${JSON.stringify(PASSWORD_RESET_EMAIL_HTML_SUFFIX)},
   ];
 
   event.response = {
     ...(event.response ?? {}),
-    emailSubject: ${JSON.stringify(DEV_PASSWORD_RESET_EMAIL_SUBJECT)},
+    emailSubject: ${JSON.stringify(PASSWORD_RESET_EMAIL_SUBJECT)},
     emailMessage: emailHtmlParts.join(""),
   };
 
@@ -114,7 +131,8 @@ exports.handler = async (event) => {
 }
 
 function createSharedUserPool(scope: Construct, props: SharedCognitoProps) {
-  const devPasswordResetCustomMessageTrigger = createDevPasswordResetCustomMessageTrigger(scope, props.stage);
+  const passwordResetCustomMessageTrigger = createPasswordResetCustomMessageTrigger(scope);
+  const passwordResetSenderConfig = getPasswordResetSenderConfig(props.stage);
 
   return new cognito.UserPool(scope, "SharedUserPool", {
     userPoolName: buildUserPoolName(props.stage),
@@ -149,20 +167,14 @@ function createSharedUserPool(scope: Construct, props: SharedCognitoProps) {
       tempPasswordValidity: cdk.Duration.days(7),
     },
     accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-    ...(props.stage === "dev"
-      ? {
-          email: cognito.UserPoolEmail.withSES({
-            fromEmail: DEV_PASSWORD_RESET_FROM_EMAIL,
-            fromName: DEV_PASSWORD_RESET_FROM_NAME,
-            sesVerifiedDomain: DEV_PASSWORD_RESET_SES_VERIFIED_DOMAIN,
-          }),
-          lambdaTriggers: devPasswordResetCustomMessageTrigger
-            ? {
-                customMessage: devPasswordResetCustomMessageTrigger,
-              }
-            : undefined,
-        }
-      : {}),
+    email: cognito.UserPoolEmail.withSES({
+      fromEmail: passwordResetSenderConfig.fromEmail,
+      fromName: passwordResetSenderConfig.fromName,
+      sesVerifiedDomain: passwordResetSenderConfig.sesVerifiedDomain,
+    }),
+    lambdaTriggers: {
+      customMessage: passwordResetCustomMessageTrigger,
+    },
     removalPolicy: cdk.RemovalPolicy.RETAIN,
   });
 }

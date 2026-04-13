@@ -14,6 +14,7 @@ import {
   OPERATOR_LOGIN_PATH,
 } from "@operator/lib/auth/constants";
 import { COGNITO_PASSWORD_RULE_TEXT, isValidCognitoPassword } from "@correcre/lib/auth/password";
+import { operatorAuthCardClassName } from "./styles";
 
 type ForgotPasswordFormProps = {
   email?: string;
@@ -80,7 +81,7 @@ export default function ForgotPasswordForm({
   const loginHref = buildLoginHref(redirectTo);
 
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className={operatorAuthCardClassName}>
       <div className="mx-auto w-4/5 pb-8">
         {errorMessage ? (
           <Alert severity="error" sx={{ mb: 3 }}>

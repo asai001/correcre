@@ -31,6 +31,29 @@ function getSingleTableResource(template: Template, tableName: string): Record<s
   return matchedResources[0] as Record<string, unknown>;
 }
 
+function expectForgotPasswordEmailCustomization(template: Template, fromEmail: string) {
+  template.hasResourceProperties(
+    "AWS::Lambda::Function",
+    Match.objectLike({
+      Description: "Customize Cognito forgot-password emails.",
+      Handler: "index.handler",
+    }),
+  );
+
+  template.hasResourceProperties(
+    "AWS::Cognito::UserPool",
+    Match.objectLike({
+      EmailConfiguration: Match.objectLike({
+        EmailSendingAccount: "DEVELOPER",
+        From: `=?UTF-8?B?44Kz44Os44Kv44Os?= <${fromEmail}>`,
+      }),
+      LambdaConfig: Match.objectLike({
+        CustomMessage: Match.anyValue(),
+      }),
+    }),
+  );
+}
+
 describe("InfraStack", () => {
   test("provisions the requested multi-table DynamoDB design", () => {
     const template = Template.fromStack(createStack("dev"));
@@ -175,29 +198,22 @@ describe("InfraStack", () => {
     );
   });
 
-  test("uses SES-backed forgot-password email customization only in development", () => {
+  test("uses SES-backed forgot-password email customization in development", () => {
     const template = Template.fromStack(createStack("dev"));
 
-    template.hasResourceProperties(
-      "AWS::Lambda::Function",
-      Match.objectLike({
-        Description: "Customize Cognito forgot-password emails for the development environment.",
-        Handler: "index.handler",
-      }),
-    );
+    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
 
-    template.hasResourceProperties(
-      "AWS::Cognito::UserPool",
-      Match.objectLike({
-        EmailConfiguration: Match.objectLike({
-          EmailSendingAccount: "DEVELOPER",
-          From: "=?UTF-8?B?44Kz44Os44Kv44Os?= <correcre-info@efficient-technology.com>",
-        }),
-        LambdaConfig: Match.objectLike({
-          CustomMessage: Match.anyValue(),
-        }),
-      }),
-    );
+  test("uses SES-backed forgot-password email customization in staging", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
+
+  test("uses SES-backed forgot-password email customization in production", () => {
+    const template = Template.fromStack(createStack("prod"));
+
+    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
   });
 
   test("creates distinct app clients for admin, employee, and operator on the shared user pool", () => {

@@ -15,6 +15,7 @@ import {
   OPERATOR_LOGIN_NOTICE_COOKIE_NAME,
 } from "@operator/lib/auth/constants";
 import { getLoginErrorMessage, type LoginErrorCode } from "@operator/lib/auth/errors";
+import { operatorAuthCardClassName } from "./styles";
 
 type LoginFormProps = {
   defaultEmail?: string;
@@ -61,7 +62,7 @@ export default function LoginForm({
   }, [noticeMessage]);
 
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className={operatorAuthCardClassName}>
       <div className="mx-auto w-4/5">
         <form action={formAction}>
           <input type="hidden" name="redirectTo" value={redirectTo} />
@@ -111,7 +112,7 @@ export default function LoginForm({
           <div className="mt-5">
             <Checkbox id="login-info" name="login-info" size="small" sx={{ p: 0, pr: 1 }} />
             <label htmlFor="login-info" className="text-neutral-600">
-              ログイン情報を記憶する
+              ログイン情報を保存
             </label>
           </div>
 

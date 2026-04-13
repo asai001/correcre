@@ -2,24 +2,36 @@
 
 ## 今回やったこと
 
-- `apps/operator` のパスワードリセット画面（`ForgotPasswordForm.tsx`）で、入力フィールド下の helperText 背景を水色に修正した
+- 保守環境と本番環境でも forgot-password のカスタマイズメールを送るように `infra` を修正した
+- 本番環境だけ将来 sender を変えられるように、stage 別 sender config へ整理した
 
-## 変更ファイル
+## 修正ファイル
 
-### `apps/operator/src/components/auth/ForgotPasswordForm.tsx`
-- `passwordFieldSx` を `fieldSx` にリネームし、全3フィールド（認証コード・新しいパスワード・確認用パスワード）に適用
-- 3フィールドから `className="bg-white"` を削除し、入力欄の白背景は `sx` の `MuiOutlinedInput-root` のみで適用するよう変更
-- これにより helperText 部分は親コンテナの水色背景（`bg-[#D8FAFF]/40`）が透過して見えるようになった
+### `infra/lib/cognito.ts`
+- forgot-password の SES 設定と `customMessage` trigger を `dev` 限定から全 stage 共通へ変更した
+- `getPasswordResetSenderConfig(stage)` を追加し、`prod` だけ専用 config を返す構造にした
+- ただし `prod` の実アドレスは未確定のため、現時点の `PROD_PASSWORD_RESET_SENDER_CONFIG` は既存アドレスのまま
+- カスタム Lambda は `PasswordResetCustomMessageTrigger` に整理し、件名・本文のカスタマイズを全環境で使うようにした
 
-## 確認できたこと
+### `infra/test/infra.test.ts`
+- forgot-password メールのカスタマイズ確認ロジックを helper 化した
+- `dev` / `stg` / `prod` の各環境で SES-backed customization が有効であることをテストに追加した
 
-- TypeScript の型チェックが通ること
+## 検証結果
 
-## 未確認事項
+- `npm test --workspace infra -- --runInBand infra/test/infra.test.ts` が通過した
 
-- 実環境での表示確認
-- `apps/admin` の `ForgotPasswordForm.tsx` に同じ問題がないか
+## 未対応事項
+
+- 本番環境専用の差出人メールアドレスの確定
+- `stg` / `prod` AWS アカウント側の SES identity 確認
+- 実環境へのデプロイと実メール確認
+
+## 次にやること
+
+- 本番用 sender が決まったら `PROD_PASSWORD_RESET_SENDER_CONFIG` を差し替える
+- `stg` / `prod` にデプロイして forgot-password の実送信を確認する
 
 ## 対象スコープ
 
-- `apps/operator`
+- `infra`
