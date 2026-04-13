@@ -5,8 +5,6 @@
 
 ## Next actions
 
-1. 本番環境の差出人メールアドレスが確定したら `infra/lib/cognito.ts` の `PROD_PASSWORD_RESET_SENDER_CONFIG` を更新する
-2. `stg` / `prod` の AWS アカウントで SES の送信元 identity が有効かを確認する
-3. `infra` を `stg` と `prod` にデプロイする
-4. `stg` / `prod` で forgot password を実行し、件名・差出人・本文がカスタマイズ文面になっていることを実メールで確認する
-5. 実ブラウザで `apps/admin` / `apps/employee` / `apps/operator` の `/login/forgot-password` と `/login/new-password` を開き、下余白と helperText 背景が期待どおりか確認する
+1. `apps/operator` の `/user-registration` をブラウザで開き、ユーザー行クリックで編集モーダルが開くことと、削除ボタン押下で編集が開かないことを確認する
+2. 所属部署に未登録の名称を入力してユーザー登録し、保存後に部署フィルタ・部署管理ダイアログ・編集モーダル候補へ反映されることを確認する
+3. 既存ユーザーの編集モーダルで未登録部署へ変更し、更新後に一覧の部署表示と絞り込み条件へ反映されることを確認する

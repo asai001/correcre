@@ -55,7 +55,7 @@ type NormalizedEmployeeInput = {
   firstName: string;
   lastNameKana: string;
   firstNameKana: string;
-  department: Pick<Department, "departmentId" | "name">;
+  departmentName: string;
   email: string;
   phoneNumber?: string;
   address?: DBUserAddress;
@@ -232,27 +232,28 @@ function isValidCompanyPlan(plan: Company["plan"]) {
   return plan === "TRIAL" || plan === "STANDARD" || plan === "ENTERPRISE";
 }
 
-function requireDepartment(
-  departmentName: string,
-  availableDepartments: Department[],
-): Pick<Department, "departmentId" | "name"> {
+function normalizeDepartmentName(departmentName: string) {
   const normalizedDepartmentName = departmentName.trim();
 
   if (!normalizedDepartmentName) {
-    throw new Error("所属部署を選択してください");
+    throw new Error("所属部署を選択または入力してください");
   }
 
-  const department = availableDepartments.find(
-    (item) => item.name === normalizedDepartmentName && item.status !== "INACTIVE",
-  );
+  return normalizedDepartmentName;
+}
 
-  if (!department) {
-    throw new Error("存在しない部署が選択されています");
-  }
+function createDepartmentRecord(companyId: string, name: string, departments: Department[], now: string): Department {
+  const departmentId = getNextDepartmentId(departments);
 
   return {
-    departmentId: department.departmentId,
-    name: department.name,
+    companyId,
+    sk: buildDepartmentSk(departmentId),
+    departmentId,
+    name,
+    status: "ACTIVE",
+    sortOrder: departments.length,
+    createdAt: now,
+    updatedAt: now,
   };
 }
 
@@ -297,11 +298,49 @@ function buildAddress(
   };
 }
 
-function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput, departments: Department[]): NormalizedEmployeeInput {
+async function resolveDepartment(
+  config: RuntimeConfig,
+  companyId: string,
+  departmentName: string,
+  availableDepartments: Department[],
+): Promise<Pick<Department, "departmentId" | "name">> {
+  const normalizedDepartmentName = normalizeDepartmentName(departmentName);
+  const existingDepartment = availableDepartments.find((department) => department.name === normalizedDepartmentName);
+
+  if (existingDepartment) {
+    if (existingDepartment.status === "INACTIVE") {
+      throw new Error("同名の休止部署が存在します。部署管理を確認してください");
+    }
+
+    return {
+      departmentId: existingDepartment.departmentId,
+      name: existingDepartment.name,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const createdDepartment = createDepartmentRecord(companyId, normalizedDepartmentName, availableDepartments, now);
+
+  await putDepartment(
+    {
+      region: config.region,
+      tableName: config.departmentTableName,
+    },
+    createdDepartment,
+  );
+
+  return {
+    departmentId: createdDepartment.departmentId,
+    name: createdDepartment.name,
+  };
+}
+
+function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput): NormalizedEmployeeInput {
   const lastName = input.lastName.trim();
   const firstName = input.firstName.trim();
   const lastNameKana = input.lastNameKana.trim();
   const firstNameKana = input.firstNameKana.trim();
+  const departmentName = normalizeDepartmentName(input.departmentName);
   const email = input.email.trim().toLowerCase();
   const joinedAt = input.joinedAt.trim();
   const phoneNumber = normalizeOptionalText(input.phoneNumber);
@@ -332,7 +371,7 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
     firstName,
     lastNameKana,
     firstNameKana,
-    department: requireDepartment(input.departmentName, departments),
+    departmentName,
     email,
     phoneNumber,
     address: buildAddress(input),
@@ -585,7 +624,7 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const normalizedInput = normalizeEmployeeInput(input, departments);
+  const normalizedInput = normalizeEmployeeInput(input);
   await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();
@@ -611,6 +650,8 @@ export async function createEmployeeInDynamo(
       },
     );
 
+    const department = await resolveDepartment(config, companyId, normalizedInput.departmentName, departments);
+
     const createdUser: DBUserItem = {
       companyId,
       sk: buildUserSk(userId),
@@ -623,8 +664,8 @@ export async function createEmployeeInDynamo(
       email: normalizedInput.email,
       phoneNumber: normalizedInput.phoneNumber,
       address: normalizedInput.address,
-      departmentId: normalizedInput.department.departmentId,
-      departmentName: normalizedInput.department.name,
+      departmentId: department.departmentId,
+      departmentName: department.name,
       roles: normalizedInput.roles,
       status: "INVITED",
       joinedAt: normalizedInput.joinedAt,
@@ -634,7 +675,7 @@ export async function createEmployeeInDynamo(
       updatedAt: now,
       gsi1pk: buildUserByCognitoSubGsiPk(createdCognitoUser.cognitoSub),
       gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
-      gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
+      gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),
       gsi3sk: buildUserByDepartmentGsiSk(userId),
     };
 
@@ -704,7 +745,7 @@ export async function updateEmployeeInDynamo(
     throw new Error("Employee not found");
   }
 
-  const normalizedInput = normalizeEmployeeInput(input, departments);
+  const normalizedInput = normalizeEmployeeInput(input);
   const nextStatus = normalizeOperatorManagedStatus(targetUser.status, input.status);
 
   if (!Number.isInteger(input.pointAdjustment)) {
@@ -725,6 +766,7 @@ export async function updateEmployeeInDynamo(
   }
 
   const now = new Date().toISOString();
+  const department = await resolveDepartment(config, companyId, normalizedInput.departmentName, departments);
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
     "lastName = :lastName",
@@ -755,15 +797,15 @@ export async function updateEmployeeInDynamo(
     ":lastNameKana": normalizedInput.lastNameKana,
     ":firstNameKana": normalizedInput.firstNameKana,
     ":email": normalizedInput.email,
-    ":departmentId": normalizedInput.department.departmentId,
-    ":departmentName": normalizedInput.department.name,
+    ":departmentId": department.departmentId,
+    ":departmentName": department.name,
     ":status": nextStatus,
     ":roles": normalizedInput.roles,
     ":joinedAt": normalizedInput.joinedAt,
     ":nextUserPointBalance": nextUserPointBalance,
     ":updatedAt": now,
     ":gsi2pk": buildUserByEmailGsiPk(normalizedInput.email),
-    ":gsi3pk": buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
+    ":gsi3pk": buildUserByDepartmentGsiPk(companyId, department.departmentId),
     ":gsi3sk": buildUserByDepartmentGsiSk(targetUser.userId),
   };
 
@@ -825,15 +867,15 @@ export async function updateEmployeeInDynamo(
     email: normalizedInput.email,
     phoneNumber: normalizedInput.phoneNumber,
     address: normalizedInput.address,
-    departmentId: normalizedInput.department.departmentId,
-    departmentName: normalizedInput.department.name,
+    departmentId: department.departmentId,
+    departmentName: department.name,
     status: nextStatus,
     roles: normalizedInput.roles,
     joinedAt: normalizedInput.joinedAt,
     currentPointBalance: nextUserPointBalance,
     updatedAt: now,
     gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
-    gsi3pk: buildUserByDepartmentGsiPk(companyId, normalizedInput.department.departmentId),
+    gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),
     gsi3sk: buildUserByDepartmentGsiSk(targetUser.userId),
   });
 
@@ -886,10 +928,7 @@ export async function createDepartmentInDynamo(companyId: string, input: CreateD
   const config = getRuntimeConfig();
   await getCompanyOrThrow(config, companyId);
 
-  const name = input.name.trim();
-  if (!name) {
-    throw new Error("部署名を入力してください");
-  }
+  const name = normalizeDepartmentName(input.name);
 
   const departments = await listDepartmentsByCompany(
     {
@@ -904,22 +943,12 @@ export async function createDepartmentInDynamo(companyId: string, input: CreateD
   }
 
   const now = new Date().toISOString();
-  const departmentId = getNextDepartmentId(departments);
   await putDepartment(
     {
       region: config.region,
       tableName: config.departmentTableName,
     },
-    {
-      companyId,
-      sk: buildDepartmentSk(departmentId),
-      departmentId,
-      name,
-      status: "ACTIVE",
-      sortOrder: departments.length,
-      createdAt: now,
-      updatedAt: now,
-    },
+    createDepartmentRecord(companyId, name, departments, now),
   );
   await touchCompany(config, companyId, now);
 }

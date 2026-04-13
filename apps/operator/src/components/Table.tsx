@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { Table as MuiTable, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from "@mui/material";
 
 export type ColumnDef<T> = {
@@ -14,9 +15,23 @@ export type TableProps<T> = {
   columns: ColumnDef<T>[];
   rows: T[];
   footer?: React.ReactNode;
+  getRowKey?: (row: T, index: number) => string | number;
+  onRowClick?: (row: T) => void;
+  getRowAriaLabel?: (row: T) => string;
 };
 
-export default function Table<T>({ columns, rows, footer }: TableProps<T>) {
+export default function Table<T>({ columns, rows, footer, getRowKey, onRowClick, getRowAriaLabel }: TableProps<T>) {
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, row: T) => {
+    if (!onRowClick) {
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onRowClick(row);
+    }
+  };
+
   return (
     <Paper
       sx={{
@@ -53,7 +68,26 @@ export default function Table<T>({ columns, rows, footer }: TableProps<T>) {
           <TableBody>
             {rows.map((row, i) => {
               return (
-                <TableRow key={i}>
+                <TableRow
+                  key={getRowKey ? getRowKey(row, i) : i}
+                  hover={Boolean(onRowClick)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onKeyDown={onRowClick ? (event) => handleRowKeyDown(event, row) : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={onRowClick && getRowAriaLabel ? getRowAriaLabel(row) : undefined}
+                  sx={
+                    onRowClick
+                      ? {
+                          cursor: "pointer",
+                          "&:focus-visible": {
+                            outline: "2px solid",
+                            outlineColor: "primary.main",
+                            outlineOffset: "-2px",
+                          },
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((col) => (
                     <TableCell key={col.id} align={col.align ?? "left"}>
                       {col.render ? col.render(row) : (row[col.id] as React.ReactNode)}

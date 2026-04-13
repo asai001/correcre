@@ -9,7 +9,6 @@ import {
   faBuilding,
   faDownload,
   faMagnifyingGlass,
-  faPenToSquare,
   faPlus,
   faTrashCan,
   faUsers,
@@ -185,7 +184,6 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
 
 function getEmployeeColumns(
   pointUnitLabel: string,
-  onEditEmployee: (employee: EmployeeManagementEmployee) => void,
   onDeleteEmployee: (employee: EmployeeManagementEmployee) => void,
 ): ColumnDef<EmployeeManagementEmployee>[] {
   return [
@@ -268,15 +266,23 @@ function getEmployeeColumns(
     },
     {
       id: "userId",
-      label: "操作",
+      label: "削除",
       align: "center",
-      width: "8%",
+      width: "6%",
       render: (row) => (
         <div className="flex items-center justify-center gap-1">
-          <IconButton size="small" aria-label={`${row.name}を編集`} onClick={() => onEditEmployee(row)} sx={{ color: "#2563EB" }}>
-            <FontAwesomeIcon icon={faPenToSquare} />
-          </IconButton>
-          <IconButton size="small" aria-label={`${row.name}を削除`} onClick={() => onDeleteEmployee(row)} sx={{ color: "#EF4444" }}>
+          <IconButton
+            size="small"
+            aria-label={`${row.name}を削除`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteEmployee(row);
+            }}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+            }}
+            sx={{ color: "#EF4444" }}
+          >
             <FontAwesomeIcon icon={faTrashCan} />
           </IconButton>
         </div>
@@ -656,7 +662,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     );
   }
 
-  const columns = getEmployeeColumns(pointUnitLabel, setEditingEmployee, setEmployeePendingDeletion);
+  const columns = getEmployeeColumns(pointUnitLabel, setEmployeePendingDeletion);
   const footer = (
     <TablePagination
       component="div"
@@ -816,7 +822,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">ユーザー一覧</h2>
-              <p className="text-sm text-slate-500">User テーブルに登録されているユーザー情報を表示しています。</p>
+              <p className="text-sm text-slate-500">行クリックで編集、右端の削除ボタンで削除できます。</p>
             </div>
           </div>
 
@@ -826,7 +832,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         </div>
 
         {filteredEmployees.length ? (
-          <Table columns={columns} rows={pagedEmployees} footer={footer} />
+          <Table
+            columns={columns}
+            rows={pagedEmployees}
+            footer={footer}
+            getRowKey={(row) => row.userId}
+            onRowClick={setEditingEmployee}
+            getRowAriaLabel={(row) => `${row.name}を編集`}
+          />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
             条件に一致するユーザーが見つかりませんでした。
