@@ -22,7 +22,7 @@ type ForgotPasswordFormProps = {
   redirectTo?: string;
 };
 
-const passwordFieldSx = {
+const fieldSx = {
   "& .MuiOutlinedInput-root": {
     backgroundColor: "#ffffff",
   },
@@ -135,7 +135,6 @@ export default function ForgotPasswordForm({
             <div>
               <span className="text-neutral-600">認証コード</span>
               <TextField
-                className="bg-white"
                 fullWidth
                 id="confirmationCode"
                 name="confirmationCode"
@@ -146,6 +145,7 @@ export default function ForgotPasswordForm({
                 value={confirmationCode}
                 onChange={(event) => setConfirmationCode(event.target.value)}
                 error={hasSubmitted && isMissingConfirmationCode}
+                sx={fieldSx}
                 helperText={hasSubmitted && isMissingConfirmationCode ? "認証コードを入力してください" : "メールに記載された認証コードを入力してください"}
               />
             </div>
@@ -153,7 +153,6 @@ export default function ForgotPasswordForm({
             <div className="mt-5">
               <span className="text-neutral-600">新しいパスワード</span>
               <PasswordTextField
-                className="bg-white"
                 fullWidth
                 id="newPassword"
                 name="newPassword"
@@ -164,7 +163,7 @@ export default function ForgotPasswordForm({
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 error={hasSubmitted && (isMissingNewPassword || isPasswordInvalid)}
-                sx={passwordFieldSx}
+                sx={fieldSx}
                 helperText={
                   hasSubmitted && isMissingNewPassword
                     ? "新しいパスワードを入力してください"
@@ -179,7 +178,6 @@ export default function ForgotPasswordForm({
             <div className="mt-5">
               <span className="text-neutral-600">確認用パスワード</span>
               <PasswordTextField
-                className="bg-white"
                 fullWidth
                 id="confirmPassword"
                 name="confirmPassword"
@@ -190,7 +188,7 @@ export default function ForgotPasswordForm({
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 error={hasSubmitted && (isMissingConfirmPassword || isPasswordMismatch)}
-                sx={passwordFieldSx}
+                sx={fieldSx}
                 helperText={
                   hasSubmitted && isMissingConfirmPassword
                     ? "確認用パスワードを入力してください"

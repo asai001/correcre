@@ -9,4 +9,4 @@
 2. `stg` / `prod` の AWS アカウントで SES の送信元 identity が有効かを確認する
 3. `infra` を `stg` と `prod` にデプロイする
 4. `stg` / `prod` で forgot password を実行し、件名・差出人・本文がカスタマイズ文面になっていることを実メールで確認する
-5. 必要なら `prod` 用 sender config を secrets / context から注入する設計へ拡張する
+5. 実ブラウザで `apps/admin` / `apps/employee` / `apps/operator` の `/login/forgot-password` と `/login/new-password` を開き、下余白と helperText 背景が期待どおりか確認する

@@ -47,7 +47,7 @@ export default async function NewPasswordPage({ searchParams }: NewPasswordPageP
   return (
     <div className="flex min-h-dvh flex-col items-center bg-gradient-to-br from-blue-200 via-teal-50 to-blue-200">
       <Image className="mt-12 lg:mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
-      <div className="mt-12 w-9/10 max-w-[400px]">
+      <div className="mt-12 mb-16 w-9/10 max-w-[400px] lg:mb-20">
         <NewPasswordForm email={challenge.email} errorMessage={errorMessage} redirectTo={redirectTo} />
       </div>
       <Image

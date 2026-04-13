@@ -44,7 +44,7 @@ export default async function NewPasswordPage({ searchParams }: NewPasswordPageP
   return (
     <>
       <Image className="mt-12 lg:mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
-      <div className="mt-12 w-9/10 max-w-[440px]">
+      <div className="mt-12 mb-16 w-9/10 max-w-[440px] lg:mb-20">
         <NewPasswordForm email={challenge.email} errorMessage={errorMessage} redirectTo={redirectTo} />
       </div>
       <Image

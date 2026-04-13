@@ -30,7 +30,7 @@ export default async function ForgotPasswordPage({ searchParams }: ForgotPasswor
   return (
     <>
       <Image className="mt-12 lg:mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
-      <div className="mt-12 w-9/10 max-w-[440px]">
+      <div className="mt-12 mb-16 w-9/10 max-w-[440px] lg:mb-20">
         <ForgotPasswordForm email={email} emailSent={emailSent} errorMessage={errorMessage} redirectTo={redirectTo} />
       </div>
       <Image
