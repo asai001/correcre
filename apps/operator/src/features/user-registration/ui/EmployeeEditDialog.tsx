@@ -461,9 +461,7 @@ export default function EmployeeEditDialog({
               onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
               fullWidth
               error={hasSubmitted && validation.phoneNumber}
-              helperText={
-                hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : "未入力でも登録できます"
-              }
+              helperText={hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : " "}
             />
           </div>
 

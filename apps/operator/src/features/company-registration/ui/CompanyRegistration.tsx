@@ -8,50 +8,25 @@ import { faArrowUpRightFromSquare, faBuilding, faCirclePlus } from "@fortawesome
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { createCompany } from "../api/client";
-import type {
-  CreateCompanyInput,
-  OperatorCompanyPlan,
-  OperatorCompanyStatus,
-  OperatorCompanySummary,
-} from "../model/types";
+import { createCompany, updateCompany } from "../api/client";
+import type { OperatorCompanySummary, UpdateCompanyInput } from "../model/types";
+import CompanyEditDialog from "./CompanyEditDialog";
+import CompanyPhilosophyFields from "./CompanyPhilosophyFields";
+import {
+  createEmptyCompanyPhilosophyItem,
+  createInitialCompanyFormState,
+  getCompanyFormState,
+  hasCompanyFormError,
+  planOptions,
+  statusOptions,
+  toCreateCompanyInput,
+  type CompanyFormState,
+} from "./company-form";
 
 type CompanyRegistrationProps = {
   initialCompanies: OperatorCompanySummary[];
   operatorName: string;
 };
-
-type CompanyFormState = {
-  name: string;
-  status: OperatorCompanyStatus;
-  plan: OperatorCompanyPlan;
-  perEmployeeMonthlyFee: string;
-  companyPointBalance: string;
-  pointUnitLabel: string;
-};
-
-const statusOptions: Array<{ value: OperatorCompanyStatus; label: string }> = [
-  { value: "ACTIVE", label: "有効" },
-  { value: "TRIAL", label: "トライアル" },
-  { value: "INACTIVE", label: "停止中" },
-];
-
-const planOptions: Array<{ value: OperatorCompanyPlan; label: string }> = [
-  { value: "TRIAL", label: "TRIAL" },
-  { value: "STANDARD", label: "STANDARD" },
-  { value: "ENTERPRISE", label: "ENTERPRISE" },
-];
-
-function createInitialFormState(): CompanyFormState {
-  return {
-    name: "",
-    status: "ACTIVE",
-    plan: "STANDARD",
-    perEmployeeMonthlyFee: "3000",
-    companyPointBalance: "0",
-    pointUnitLabel: "pt",
-  };
-}
 
 function formatDateTime(value: string) {
   return toYYYYMMDDHHmm(new Date(value)).replace("T", " ");
@@ -61,28 +36,29 @@ function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
 }
 
+function upsertCompany(
+  companies: OperatorCompanySummary[],
+  nextCompany: OperatorCompanySummary,
+): OperatorCompanySummary[] {
+  return [nextCompany, ...companies.filter((company) => company.companyId !== nextCompany.companyId)];
+}
+
 export default function CompanyRegistration({ initialCompanies, operatorName }: CompanyRegistrationProps) {
   const [companies, setCompanies] = useState(initialCompanies);
-  const [form, setForm] = useState<CompanyFormState>(() => createInitialFormState());
+  const [form, setForm] = useState<CompanyFormState>(() => createInitialCompanyFormState());
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingCompany, setEditingCompany] = useState<OperatorCompanySummary | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  const parsedMonthlyFee = Number.parseInt(form.perEmployeeMonthlyFee, 10);
-  const parsedCompanyPointBalance = Number.parseInt(form.companyPointBalance, 10);
-
-  const validation = useMemo(
-    () => ({
-      name: !form.name.trim(),
-      perEmployeeMonthlyFee: !Number.isInteger(parsedMonthlyFee) || parsedMonthlyFee < 0,
-      companyPointBalance: !Number.isInteger(parsedCompanyPointBalance) || parsedCompanyPointBalance < 0,
-      pointUnitLabel: !form.pointUnitLabel.trim(),
-    }),
-    [form.name, form.pointUnitLabel, parsedCompanyPointBalance, parsedMonthlyFee],
+  const { parsedMonthlyFee, parsedCompanyPointBalance, validation } = useMemo(
+    () => getCompanyFormState(form),
+    [form],
   );
-
-  const hasValidationError = Object.values(validation).some(Boolean);
+  const hasValidationError = hasCompanyFormError(validation);
 
   const handleSubmit = async () => {
     setHasSubmitted(true);
@@ -91,22 +67,16 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
       return;
     }
 
-    const input: CreateCompanyInput = {
-      name: form.name.trim(),
-      status: form.status,
-      plan: form.plan,
-      perEmployeeMonthlyFee: parsedMonthlyFee,
-      companyPointBalance: parsedCompanyPointBalance,
-      pointUnitLabel: form.pointUnitLabel.trim(),
-    };
-
     try {
       setSubmitting(true);
       setError(null);
-      const createdCompany = await createCompany(input);
 
-      setCompanies((current) => [createdCompany, ...current.filter((company) => company.companyId !== createdCompany.companyId)]);
-      setForm(createInitialFormState());
+      const createdCompany = await createCompany(
+        toCreateCompanyInput(form, parsedMonthlyFee, parsedCompanyPointBalance),
+      );
+
+      setCompanies((current) => upsertCompany(current, createdCompany));
+      setForm(createInitialCompanyFormState());
       setHasSubmitted(false);
       setNotice(`企業「${createdCompany.legalName}」を登録しました。companyId は自動採番されています。`);
     } catch (err) {
@@ -116,13 +86,68 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
     }
   };
 
+  const handleOpenEdit = (company: OperatorCompanySummary) => {
+    setEditingCompany(company);
+    setEditError(null);
+  };
+
+  const handleCloseEdit = () => {
+    if (editSubmitting) {
+      return;
+    }
+
+    setEditingCompany(null);
+    setEditError(null);
+  };
+
+  const handleUpdate = async (input: UpdateCompanyInput) => {
+    try {
+      setEditSubmitting(true);
+      setEditError(null);
+
+      const updatedCompany = await updateCompany(input);
+
+      setCompanies((current) => upsertCompany(current, updatedCompany));
+      setEditingCompany(null);
+      setNotice(`企業「${updatedCompany.legalName}」を更新しました。`);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "企業情報の更新に失敗しました。");
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleAddPhilosophyItem = () => {
+    setForm((current) => ({
+      ...current,
+      philosophyItems: [...current.philosophyItems, createEmptyCompanyPhilosophyItem()],
+    }));
+  };
+
+  const handleChangePhilosophyItem = (
+    itemId: string,
+    nextItem: Partial<CompanyFormState["philosophyItems"][number]>,
+  ) => {
+    setForm((current) => ({
+      ...current,
+      philosophyItems: current.philosophyItems.map((item) => (item.id === itemId ? { ...item, ...nextItem } : item)),
+    }));
+  };
+
+  const handleRemovePhilosophyItem = (itemId: string) => {
+    setForm((current) => ({
+      ...current,
+      philosophyItems: current.philosophyItems.filter((item) => item.id !== itemId),
+    }));
+  };
+
   return (
     <div className="space-y-6 pb-5">
       <AdminPageHeader
         title="企業登録"
         adminName={operatorName}
         backHref="/dashboard"
-        subtitle="運用対象の企業を追加します。companyId は登録時に UUID で自動採番されます。"
+        subtitle="運用対象の企業を追加します。契約条件と理念体系もあわせて設定できます。companyId は登録時に UUID で自動採番されます。"
       />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
@@ -134,7 +159,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
             <div>
               <h2 className="text-xl font-bold text-slate-900">新しい企業を登録</h2>
               <p className="text-sm text-slate-500">
-                会社名と契約条件を入力してください。companyId は入力不要で、自動的に発番されます。
+                会社名、契約条件、理念体系を入力してください。companyId は入力不要で、自動的に発番されます。
               </p>
             </div>
           </div>
@@ -159,7 +184,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                 label="ステータス"
                 value={form.status}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, status: event.target.value as OperatorCompanyStatus }))
+                  setForm((current) => ({ ...current, status: event.target.value as CompanyFormState["status"] }))
                 }
                 fullWidth
               >
@@ -169,12 +194,13 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                   </MenuItem>
                 ))}
               </TextField>
+
               <TextField
                 select
                 label="プラン"
                 value={form.plan}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, plan: event.target.value as OperatorCompanyPlan }))
+                  setForm((current) => ({ ...current, plan: event.target.value as CompanyFormState["plan"] }))
                 }
                 fullWidth
               >
@@ -201,6 +227,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                     : "税込みの月額単価を入力してください。"
                 }
               />
+
               <TextField
                 label="初期保有ポイント"
                 type="number"
@@ -224,11 +251,16 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               fullWidth
               required
               error={hasSubmitted && validation.pointUnitLabel}
-              helperText={
-                hasSubmitted && validation.pointUnitLabel
-                  ? "ポイント単位を入力してください。"
-                  : "通常は pt のままで問題ありません。"
-              }
+              helperText={hasSubmitted && validation.pointUnitLabel ? "ポイント単位を入力してください。" : "通常は pt のままで問題ありません。"}
+            />
+
+            <CompanyPhilosophyFields
+              items={form.philosophyItems}
+              validation={validation.philosophyItems}
+              hasSubmitted={hasSubmitted}
+              onAdd={handleAddPhilosophyItem}
+              onChangeItem={handleChangePhilosophyItem}
+              onRemoveItem={handleRemovePhilosophyItem}
             />
 
             <Button
@@ -259,9 +291,10 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">登録済み企業</h2>
-                <p className="text-sm text-slate-500">登録後はそのままユーザー管理画面へ移動できます。</p>
+                <p className="text-sm text-slate-500">企業カードをクリックすると企業情報と理念体系を編集できます。</p>
               </div>
             </div>
+
             <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
               全 {companies.length} 社
             </div>
@@ -272,29 +305,40 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               {companies.map((company) => (
                 <div
                   key={company.companyId}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm shadow-slate-200/50"
+                  className="group relative rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 shadow-sm shadow-slate-200/50 transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white"
                 >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <button
+                    type="button"
+                    className="absolute inset-0 z-0 cursor-pointer rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                    onClick={() => handleOpenEdit(company)}
+                    aria-label={`企業 ${company.companyName} を編集`}
+                  />
+
+                  <div className="pointer-events-none relative z-10 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="text-xs font-semibold tracking-[0.22em] text-slate-400">{company.companyId}</div>
                       <div className="mt-2 text-xl font-bold text-slate-900">{company.companyName}</div>
                       {company.legalName !== company.companyName ? (
                         <div className="mt-1 text-sm text-slate-500">{company.legalName}</div>
                       ) : null}
+                      <div className="mt-2 text-xs font-medium text-blue-600">クリックして編集</div>
                     </div>
+
                     <Link
                       href={`/user-registration?companyId=${encodeURIComponent(company.companyId)}`}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+                      className="pointer-events-auto relative z-20 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
                     >
                       ユーザー管理へ
                       <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-xs" />
                     </Link>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2 text-sm">
+                  <div className="pointer-events-none relative z-10 mt-4 flex flex-wrap gap-2 text-sm">
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.plan}</span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.status}</span>
-                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">登録ユーザー {company.employeeCount} 人</span>
+                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">
+                      登録ユーザー {company.employeeCount} 人
+                    </span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">
                       有効ユーザー {company.activeEmployeeCount} 人
                     </span>
@@ -302,9 +346,12 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                       保有ポイント {formatNumber(company.companyPointBalance)}
                       {company.pointUnitLabel}
                     </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">
+                      理念体系 {company.philosophyItems.length} 件
+                    </span>
                   </div>
 
-                  <div className="mt-4 grid gap-3 text-sm text-slate-500 md:grid-cols-2">
+                  <div className="pointer-events-none relative z-10 mt-4 grid gap-3 text-sm text-slate-500 md:grid-cols-2">
                     <div>月額単価 {formatNumber(company.perEmployeeMonthlyFee)} 円</div>
                     <div>最終更新 {formatDateTime(company.updatedAt)}</div>
                   </div>
@@ -318,6 +365,15 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
           )}
         </div>
       </section>
+
+      <CompanyEditDialog
+        open={editingCompany !== null}
+        company={editingCompany}
+        submitting={editSubmitting}
+        error={editError}
+        onClose={handleCloseEdit}
+        onSubmit={handleUpdate}
+      />
     </div>
   );
 }

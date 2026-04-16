@@ -1,57 +1,53 @@
 # handoff.md
 
-## 今回やったこと
+## What changed
 
-- `apps/operator` のユーザー管理一覧で編集アイコンを廃止し、データ行クリックで編集モーダルを開く UI に変更した
-- 登録 / 編集モーダルの所属部署入力を、既存部署の選択と新規部署名の入力を両立する `Autocomplete freeSolo` ベースに差し替えた
-- ユーザー登録 / 更新 API を修正し、未登録部署名が渡された場合は DynamoDB に部署を作成してから user レコードへ反映するようにした
+- Employee side
+  - Implemented the dashboard profile modal in `apps/employee`.
+  - Added `PATCH /api/profile` for self-service profile updates.
+  - Added pointer cursor behavior to the profile dashboard card.
+  - Removed the optional phone-number helper text from:
+    - `apps/employee/src/features/profile-edit/ui/ProfileEditDialog.tsx`
+    - `apps/operator/src/features/user-registration/ui/EmployeeRegistrationDialog.tsx`
+    - `apps/operator/src/features/user-registration/ui/EmployeeEditDialog.tsx`
+  - Updated the dashboard philosophy flow:
+    - `apps/employee/src/features/philosophy/api/server.ts` now reads `company.philosophy.entries`, filters to `displayOnDashboard: true`, sorts by `order`, and falls back to legacy `corporatePhilosophy` / `purpose`
+    - `apps/employee/src/features/philosophy/model/types.ts` now uses a dashboard item array shape
+    - `apps/employee/src/features/philosophy/hooks/usePhilosophyForDashboard.ts` no longer leaves the UI stuck in a skeleton state when the API returns `null`
+    - `apps/employee/src/features/philosophy/ui/Philosophy.tsx` and `PhilosophyInfo.tsx` now render the configurable philosophy items at the top of the dashboard in a single centered white card that matches the reference layout more closely
+- Operator side
+  - Implemented company editing from the company registration screen.
+  - Registered company cards now open an edit dialog in:
+    - `apps/operator/src/features/company-registration/ui/CompanyRegistration.tsx`
+    - `apps/operator/src/features/company-registration/ui/CompanyEditDialog.tsx`
+  - Fixed the card hit area so the company-name section also opens the edit dialog while the separate navigation action stays clickable.
+  - Added shared company form helpers in:
+    - `apps/operator/src/features/company-registration/ui/company-form.ts`
+    - `apps/operator/src/features/company-registration/ui/CompanyPhilosophyFields.tsx`
+  - Added update types and client/API support in:
+    - `apps/operator/src/features/company-registration/model/types.ts`
+    - `apps/operator/src/features/company-registration/api/client.ts`
+    - `apps/operator/src/app/api/companies/route.ts`
+    - `apps/operator/src/features/user-registration/api/server.ts`
+  - Added configurable philosophy entries to company create/edit:
+    - operators can add any number of philosophy items
+    - each item stores `label`, `content`, and `displayOnDashboard`
+    - DynamoDB persistence now uses `company.philosophy.entries` map data with `order`
+  - Adjusted the philosophy input area styling in `apps/operator/src/features/company-registration/ui/CompanyPhilosophyFields.tsx`.
+- Shared types
+  - `packages/types/src/db/company.ts` now includes typed `CompanyPhilosophyEntry` map support while keeping legacy philosophy fields for compatibility.
 
-## 修正ファイル
+## Verification run
 
-### `apps/operator/src/components/Table.tsx`
-- 汎用テーブルに `getRowKey` / `onRowClick` / `getRowAriaLabel` を追加した
-- 行クリック時の hover / focus-visible スタイルと Enter / Space キー操作を追加した
+- `npx tsc --noEmit -p apps/employee/tsconfig.json`
+- `npm run build --workspace @correcre/employee`
+- `npm run build --workspace @correcre/operator`
+- `npx tsc --noEmit -p apps/operator/tsconfig.json`
+  - This repo still hits an existing intermittent issue when `apps/operator/.next-build/types/**/*.ts` references missing generated files.
 
-### `apps/operator/src/features/user-registration/ui/EmployeeManagement.tsx`
-- 編集アイコンを削除し、一覧の説明文を「行クリックで編集」に更新した
-- 一覧テーブルへ `onRowClick={setEditingEmployee}` を渡すようにした
-- 削除ボタンで `stopPropagation()` を入れ、編集モーダルが誤って開かないようにした
+## Important notes
 
-### `apps/operator/src/features/user-registration/ui/DepartmentAutocompleteField.tsx`
-- 新規追加
-- 部署候補のサジェスト、自由入力、候補件数表示、未一致時の案内文をまとめた共通入力コンポーネントを実装した
-
-### `apps/operator/src/features/user-registration/ui/EmployeeRegistrationDialog.tsx`
-### `apps/operator/src/features/user-registration/ui/EmployeeEditDialog.tsx`
-- 所属部署の `Select` を `DepartmentAutocompleteField` に差し替えた
-- ヘルプ文言を「新規部署名を入力すると保存 / 更新時に登録される」内容へ更新した
-
-### `apps/operator/src/features/user-registration/api/server.ts`
-- `normalizeEmployeeInput` では部署の存在前提を外し、部署名そのものを正規化するようにした
-- `resolveDepartment()` を追加し、既存部署の再利用または新規部署作成を担当させた
-- `createEmployeeInDynamo()` / `updateEmployeeInDynamo()` で `resolveDepartment()` を呼び、部署 ID / 部署名を user レコードへ反映するようにした
-- `createDepartmentInDynamo()` も共通の部署レコード生成ロジックを使うように整理した
-
-## 検証結果
-
-- `npm run lint --workspace @correcre/operator -- "src/components/Table.tsx" "src/features/user-registration/api/server.ts" "src/features/user-registration/ui/DepartmentAutocompleteField.tsx" "src/features/user-registration/ui/EmployeeManagement.tsx" "src/features/user-registration/ui/EmployeeRegistrationDialog.tsx" "src/features/user-registration/ui/EmployeeEditDialog.tsx"` が通過した
-- `npx tsc --noEmit -p apps/operator/tsconfig.json` が通過した
-
-## 未対応事項
-
-- ブラウザでの一覧行クリック編集の実操作確認
-- 実データ環境での「新規部署名を入力して登録 / 更新」の手動確認
-
-## 次にやること
-
-- `/user-registration` をブラウザで開き、行クリック編集と削除ボタンの競合がないことを確認する
-- 新規部署名を入力した登録 / 更新を実行し、部署候補やフィルタへ反映されることを確認する
-
-## 注意点
-
-- 新規部署の自動作成は user 保存処理の中で行っているため、同時に同名部署を複数操作したときの競合対策までは今回入れていない
-- 部署の自動作成は `apps/operator` 側 API のみで実装しており、共通 package にはまだ切り出していない
-
-## 対象スコープ
-
-- `apps/operator`
+- Browser verification for the operator company edit/philosophy flow is still pending.
+- Browser verification for the employee dashboard philosophy display is still pending.
+- Employee email updates still only update DynamoDB. Cognito email attributes are not updated yet.
+- `apps/operator/src/features/user-registration/api/server.ts` had unrelated existing worktree changes before this task. Keep that in mind when editing or reviewing diffs.

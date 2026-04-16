@@ -7,6 +7,7 @@ import {
   CognitoIdentityProviderClient,
   type AttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
+import type { DBUserRole } from "@correcre/types";
 
 export type CognitoUserPoolConfig = {
   region: string;
@@ -18,6 +19,7 @@ export type CreateCognitoUserInput = {
   firstName: string;
   lastName: string;
   fullName: string;
+  roles: DBUserRole[];
 };
 
 export type CreatedCognitoUser = {
@@ -48,24 +50,36 @@ function createTemporaryPassword() {
   return `Tmp${randomBytes(8).toString("hex")}A1`;
 }
 
+function serializeRoles(roles: DBUserRole[]) {
+  return Array.from(new Set(roles)).join(",");
+}
+
 export async function createCognitoUser(
   config: CognitoUserPoolConfig,
   input: CreateCognitoUserInput,
 ): Promise<CreatedCognitoUser> {
   const client = getCognitoClient(config.region);
+  const serializedRoles = serializeRoles(input.roles);
+  const userAttributes: AttributeType[] = [
+    { Name: "email", Value: input.email },
+    { Name: "email_verified", Value: "true" },
+    { Name: "given_name", Value: input.firstName },
+    { Name: "family_name", Value: input.lastName },
+    { Name: "name", Value: input.fullName },
+  ];
+
   const response = await client.send(
     new AdminCreateUserCommand({
       UserPoolId: config.userPoolId,
       Username: input.email,
       TemporaryPassword: createTemporaryPassword(),
       DesiredDeliveryMediums: ["EMAIL"],
-      UserAttributes: [
-        { Name: "email", Value: input.email },
-        { Name: "email_verified", Value: "true" },
-        { Name: "given_name", Value: input.firstName },
-        { Name: "family_name", Value: input.lastName },
-        { Name: "name", Value: input.fullName },
-      ],
+      ClientMetadata: serializedRoles
+        ? {
+            roles: serializedRoles,
+          }
+        : undefined,
+      UserAttributes: userAttributes,
     }),
   );
 

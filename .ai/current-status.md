@@ -2,47 +2,91 @@
 
 ## Objective
 
-- 今回の作業目的:
-  - `apps/operator` のユーザー管理一覧で編集ボタンを廃止し、データ行クリックで編集モーダルを開く
-  - ユーザー登録 / 編集モーダルの所属部署で既存部署の選択と未登録部署の新規入力を両立する
-  - 保存 / 更新時に未登録の部署名を DynamoDB に登録し、その部署をユーザー情報へ反映する
-- 完了条件:
-  - ユーザー一覧の行クリックで編集モーダルが開く
-  - 削除ボタン押下時に行クリック編集が誤発火しない
-  - 所属部署で自由入力した名称が保存 / 更新時に DB 登録される
-  - `apps/operator` の lint と TypeScript チェックが通る
-
----
+- Employee dashboard
+  - Added a profile edit modal behind the profile card in `apps/employee`.
+  - Existing user data is prefilled and can be updated via `PATCH /api/profile`.
+  - Required fields align with the operator-side user registration/edit modal.
+  - Removed the optional phone-number helper copy from both operator and employee dialogs without changing validation rules.
+  - Dashboard philosophy now reads `company.philosophy.entries` and renders only items with `displayOnDashboard: true`.
+  - If there are no displayable `entries`, the dashboard falls back to the legacy `corporatePhilosophy` / `purpose` fields.
+- Operator company registration
+  - Added company edit support in `apps/operator`.
+  - Clicking a registered company card on the company registration screen opens an edit dialog.
+  - The dialog updates company name, status, plan, monthly fee, company point balance, and point unit.
+  - Company create/edit supports configurable philosophy entries with arbitrary labels, content, and dashboard-display flags.
+  - Philosophy settings are persisted on the company item as `company.philosophy.entries` map data with `order` and `displayOnDashboard`.
+  - `PATCH /api/companies` persists company edits to DynamoDB while preserving existing company metadata.
 
 ## Scope
 
-- 対象:
-  - `apps/operator`
-- 対象ファイル:
-  - `apps/operator/src/components/Table.tsx`
-  - `apps/operator/src/features/user-registration/api/server.ts`
-  - `apps/operator/src/features/user-registration/ui/DepartmentAutocompleteField.tsx`
-  - `apps/operator/src/features/user-registration/ui/EmployeeManagement.tsx`
-  - `apps/operator/src/features/user-registration/ui/EmployeeRegistrationDialog.tsx`
-  - `apps/operator/src/features/user-registration/ui/EmployeeEditDialog.tsx`
-
----
+- `apps/employee`
+- `apps/operator`
+- `packages/types`
+- `.ai`
 
 ## Confirmed
 
-- `apps/operator/src/components/Table.tsx` に行クリック・キーボード操作用の `onRowClick` / `getRowKey` / `getRowAriaLabel` を追加した
-- `apps/operator/src/features/user-registration/ui/EmployeeManagement.tsx` で編集アイコンを削除し、行クリックで編集モーダルを開く構成へ変更した
-- 同一覧の削除ボタンには `stopPropagation()` を入れ、クリック時とキーボード操作時に編集モーダルが誤発火しないようにした
-- `apps/operator/src/features/user-registration/ui/DepartmentAutocompleteField.tsx` を追加し、所属部署で既存部署候補の選択と新規部署名の自由入力を両立した
-- `apps/operator/src/features/user-registration/ui/EmployeeRegistrationDialog.tsx` / `EmployeeEditDialog.tsx` の所属部署入力を上記コンポーネントへ差し替えた
-- `apps/operator/src/features/user-registration/api/server.ts` では、ユーザー登録 / 更新時に部署が未登録なら新規作成してから user レコードへ反映するようにした
-- `createDepartmentInDynamo` も共通の部署レコード生成ロジックを使うように揃えた
-- `npm run lint --workspace @correcre/operator -- "src/components/Table.tsx" "src/features/user-registration/api/server.ts" "src/features/user-registration/ui/DepartmentAutocompleteField.tsx" "src/features/user-registration/ui/EmployeeManagement.tsx" "src/features/user-registration/ui/EmployeeRegistrationDialog.tsx" "src/features/user-registration/ui/EmployeeEditDialog.tsx"` が通過した
-- `npx tsc --noEmit -p apps/operator/tsconfig.json` が通過した
+- `apps/employee/src/features/dashboard-links/ui/DashboardLinks.tsx`
+  - The profile card opens a modal instead of navigating away.
+  - Card hover shows the same pointer cursor as the other dashboard link cards.
+- `apps/employee/src/features/profile-edit/*`
+  - Profile edit dialog and update flow are implemented.
+  - Existing values are prefilled.
+  - Postal-code autofill works.
+  - Optional phone-number behavior remains, but the helper copy was removed.
+- `apps/employee/src/app/api/profile/route.ts`
+  - Added employee self-service profile update endpoint.
+- `apps/employee/src/features/philosophy/api/server.ts`
+  - Reads dashboard philosophy data from `company.philosophy.entries`.
+  - Returns only entries with `displayOnDashboard: true` and non-empty label/content.
+  - Sorts dashboard items by `order`.
+  - Falls back to legacy `corporatePhilosophy` / `purpose` when no displayable entries exist.
+- `apps/employee/src/features/philosophy/model/types.ts`
+  - Replaced the fixed philosophy shape with a dashboard item array plus `updatedAt`.
+- `apps/employee/src/features/philosophy/hooks/usePhilosophyForDashboard.ts`
+  - Fixed the initial loading state so a `null` response no longer leaves the dashboard stuck on a skeleton.
+  - Updated the fetch error message to refer to philosophy data instead of user data.
+- `apps/employee/src/features/philosophy/ui/Philosophy.tsx`
+  - Shows a skeleton only while loading and hides cleanly when there is no data to render.
+- `apps/employee/src/features/philosophy/ui/PhilosophyInfo.tsx`
+  - Renders configurable dashboard philosophy items in a single centered white card styled to match the dashboard reference rather than separate mini-cards.
+- `apps/operator/src/features/company-registration/ui/CompanyRegistration.tsx`
+  - Registered company cards are clickable and open a company edit dialog.
+  - The existing create form remains in place.
+  - Fixed the card layering so clicking the company-name area also opens the edit dialog.
+  - Added a configurable philosophy section to the company create form.
+- `apps/operator/src/features/company-registration/ui/CompanyEditDialog.tsx`
+  - Added a company edit modal with prefilled values.
+- `apps/operator/src/features/company-registration/ui/CompanyPhilosophyFields.tsx`
+  - Added reusable add/remove philosophy-entry UI.
+  - Adjusted header layout, add-button sizing, entry-card hierarchy, textarea presentation, and dashboard-display checkbox styling.
+- `apps/operator/src/features/company-registration/ui/company-form.ts`
+  - Added variable-length philosophy form state and validation helpers.
+- `apps/operator/src/features/company-registration/model/types.ts`
+  - Added `philosophyItems` to operator company summary and create/update payloads.
+- `apps/operator/src/app/api/companies/route.ts`
+  - Added `PATCH` handler for company updates.
+- `apps/operator/src/features/user-registration/api/server.ts`
+  - Added DynamoDB company update logic that preserves existing fields and refreshes `updatedAt`.
+  - Normalizes philosophy item arrays into DynamoDB map data under `company.philosophy.entries`.
+- `packages/types/src/db/company.ts`
+  - Added typed `CompanyPhilosophyEntry` map support while keeping legacy philosophy fields for compatibility.
 
----
+## Verification
 
-## Blockers
+- `npx tsc --noEmit -p apps/employee/tsconfig.json`
+- `npm run build --workspace @correcre/employee`
+- `npm run build --workspace @correcre/operator`
+- `npx tsc --noEmit -p apps/operator/tsconfig.json`
+  - This repo still hits an existing intermittent issue when `apps/operator/.next-build/types/**/*.ts` points at missing generated files.
 
-- 実ブラウザでの操作確認は未実施
-- 実 DB を使った新規部署追加フローの手動確認は未実施
+## Known Gaps
+
+- Browser-based manual verification has not been completed for the operator company edit/philosophy flow.
+- Browser-based manual verification has not been completed for the employee dashboard philosophy display.
+- Employee email updates currently update DynamoDB only; Cognito email attributes are not synchronized.
+
+## Worktree Notes
+
+- There are unrelated dirty changes elsewhere in the repo, including `infra`, `packages/lib`, `apps/admin`, and `apps/operator`.
+- `apps/operator/src/features/user-registration/api/server.ts` already had unrelated edits in the worktree; do not revert them blindly.

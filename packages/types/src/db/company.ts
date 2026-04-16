@@ -6,7 +6,17 @@ export type CompanyPhilosophyValue = {
   description?: string;
 };
 
+export type CompanyPhilosophyEntry = {
+  label: string;
+  content: string;
+  displayOnDashboard: boolean;
+  order: number;
+};
+
 export type CompanyPhilosophy = {
+  entries?: Record<string, CompanyPhilosophyEntry>;
+
+  // 既存の従業員側表示との互換性のため、旧フィールドも当面は保持する。
   corporatePhilosophy?: string;
   purpose?: string;
   mission?: string;

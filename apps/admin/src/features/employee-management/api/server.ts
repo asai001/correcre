@@ -475,6 +475,7 @@ export async function createEmployeeInDynamo(
         firstName: normalizedInput.firstName,
         lastName: normalizedInput.lastName,
         fullName: joinNameParts(normalizedInput.lastName, normalizedInput.firstName),
+        roles: normalizedInput.roles,
       },
     );
 

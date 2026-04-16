@@ -24,8 +24,13 @@ import {
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameKanaParts, joinNameParts } from "@correcre/lib/user-profile";
 
-import type { Company, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
-import type { CreateCompanyInput, OperatorCompanySummary } from "@operator/features/company-registration/model/types";
+import type { Company, CompanyPhilosophy, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import type {
+  CreateCompanyInput,
+  OperatorCompanyPhilosophyItem,
+  OperatorCompanySummary,
+  UpdateCompanyInput,
+} from "@operator/features/company-registration/model/types";
 import { getOperatorCognitoConfig } from "@operator/lib/auth/config";
 import type {
   CreateDepartmentInput,
@@ -441,6 +446,123 @@ async function touchCompany(config: RuntimeConfig, companyId: string, updatedAt:
   );
 }
 
+function normalizeCompanyPhilosophyItems(
+  items: CreateCompanyInput["philosophyItems"],
+): OperatorCompanyPhilosophyItem[] {
+  if (items == null) {
+    return [];
+  }
+
+  if (!Array.isArray(items)) {
+    throw new Error("理念体系の形式が不正です");
+  }
+
+  const usedIds = new Set<string>();
+
+  return items.map((item, index) => {
+    const label = typeof item?.label === "string" ? item.label.trim() : "";
+    const content = typeof item?.content === "string" ? item.content.trim() : "";
+
+    if (!label) {
+      throw new Error(`理念体系 ${index + 1} 件目の項目名を入力してください`);
+    }
+
+    if (!content) {
+      throw new Error(`理念体系 ${index + 1} 件目の内容を入力してください`);
+    }
+
+    let itemId = typeof item?.id === "string" ? item.id.trim() : "";
+
+    if (!itemId) {
+      itemId = randomUUID();
+    }
+
+    while (usedIds.has(itemId)) {
+      itemId = randomUUID();
+    }
+
+    usedIds.add(itemId);
+
+    return {
+      id: itemId,
+      label,
+      content,
+      displayOnDashboard: Boolean(item?.displayOnDashboard),
+    };
+  });
+}
+
+function hasLegacyCompanyPhilosophyContent(philosophy?: CompanyPhilosophy) {
+  return Boolean(
+    philosophy?.corporatePhilosophy ||
+      philosophy?.purpose ||
+      philosophy?.mission ||
+      philosophy?.vision ||
+      philosophy?.values?.length ||
+      philosophy?.creed?.length,
+  );
+}
+
+function buildCompanyPhilosophy(
+  items: OperatorCompanyPhilosophyItem[],
+  updatedAt: string,
+  existing?: CompanyPhilosophy,
+): CompanyPhilosophy | undefined {
+  const entries =
+    items.length > 0
+      ? Object.fromEntries(
+          items.map((item, index) => [
+            item.id,
+            {
+              label: item.label,
+              content: item.content,
+              displayOnDashboard: item.displayOnDashboard,
+              order: index,
+            },
+          ]),
+        )
+      : undefined;
+
+  if (!entries && !hasLegacyCompanyPhilosophyContent(existing)) {
+    return undefined;
+  }
+
+  return {
+    corporatePhilosophy: existing?.corporatePhilosophy,
+    purpose: existing?.purpose,
+    mission: existing?.mission,
+    vision: existing?.vision,
+    values: existing?.values,
+    creed: existing?.creed,
+    entries,
+    updatedAt,
+  };
+}
+
+function toOperatorCompanyPhilosophyItems(company: Company): OperatorCompanySummary["philosophyItems"] {
+  const entries = company.philosophy?.entries;
+
+  if (!entries) {
+    return [];
+  }
+
+  return Object.entries(entries)
+    .map(([id, entry]) => ({
+      id,
+      label: entry.label,
+      content: entry.content,
+      displayOnDashboard: entry.displayOnDashboard,
+      order: entry.order,
+    }))
+    .sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, "ja"))
+    .map(({ id, label, content, displayOnDashboard }) => ({
+      id,
+      label,
+      content,
+      displayOnDashboard,
+    }));
+}
+
 function toOperatorCompanySummary(company: Company): OperatorCompanySummary {
   return {
     companyId: company.companyId,
@@ -454,6 +576,7 @@ function toOperatorCompanySummary(company: Company): OperatorCompanySummary {
     companyPointBalance: company.companyPointBalance,
     perEmployeeMonthlyFee: company.perEmployeeMonthlyFee,
     pointUnitLabel: company.pointUnitLabel ?? "pt",
+    philosophyItems: toOperatorCompanyPhilosophyItems(company),
     updatedAt: company.updatedAt,
   };
 }
@@ -518,6 +641,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
       tableName: config.companyTableName,
     },
   );
+  const normalizedPhilosophyItems = normalizeCompanyPhilosophyItems(input.philosophyItems);
   validateCreateCompanyInput(input);
 
   const now = new Date().toISOString();
@@ -532,6 +656,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     totalEmployees: 0,
     activeEmployees: 0,
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
+    philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, now),
     createdAt: now,
     updatedAt: now,
   };
@@ -545,6 +670,40 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
   );
 
   return toOperatorCompanySummary(createdCompany);
+}
+
+export async function updateCompanyInDynamo(
+  companyId: string,
+  input: UpdateCompanyInput,
+): Promise<OperatorCompanySummary> {
+  const config = getRuntimeConfig();
+  const company = await getCompanyOrThrow(config, companyId);
+  const normalizedPhilosophyItems = normalizeCompanyPhilosophyItems(input.philosophyItems);
+
+  validateCreateCompanyInput(input);
+
+  const updatedAt = new Date().toISOString();
+  const updatedCompany: Company = {
+    ...company,
+    name: input.name.trim(),
+    status: input.status,
+    plan: input.plan,
+    perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
+    companyPointBalance: input.companyPointBalance,
+    pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
+    philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),
+    updatedAt,
+  };
+
+  await putCompany(
+    {
+      region: config.region,
+      tableName: config.companyTableName,
+    },
+    updatedCompany,
+  );
+
+  return toOperatorCompanySummary(updatedCompany);
 }
 
 export async function getEmployeeManagementSummaryFromDynamo(
@@ -647,6 +806,7 @@ export async function createEmployeeInDynamo(
         firstName: normalizedInput.firstName,
         lastName: normalizedInput.lastName,
         fullName: joinNameParts(normalizedInput.lastName, normalizedInput.firstName),
+        roles: normalizedInput.roles,
       },
     );
 

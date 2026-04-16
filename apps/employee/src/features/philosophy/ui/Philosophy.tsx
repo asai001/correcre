@@ -12,11 +12,11 @@ type PhilosophyProps = {
 export default function Philosophy({ companyId }: PhilosophyProps) {
   const { data, loading, error } = usePhilosophyForDashboard(companyId);
 
-  if (loading || (!data && !error)) {
-    return <SkeletonBlock className="h-40 rounded-2xl" />;
+  if (loading) {
+    return <SkeletonBlock className="h-44 rounded-2xl" />;
   }
 
-  if (error || !data) {
+  if (error || !data || !data.items.length) {
     return null;
   }
 

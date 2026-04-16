@@ -23,7 +23,7 @@ export function usePhilosophyForDashboard(
   const { enabled = true } = options ?? {};
 
   const [data, setData] = useState<Philosophy | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(enabled && companyId));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function usePhilosophyForDashboard(
           return;
         }
         console.error(err);
-        setError("ユーザー情報の取得に失敗しました。");
+        setError("理念情報の取得に失敗しました。");
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false);

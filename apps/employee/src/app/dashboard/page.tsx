@@ -53,7 +53,17 @@ export default async function DashboardPage() {
         <MissionReport icon={faTasks} companyId={companyId} userId={userId} />
       </div>
       <div className="mt-10">
-        <DashboardLinks />
+        <DashboardLinks
+          initialProfile={{
+            lastName: currentUser.lastName,
+            firstName: currentUser.firstName,
+            lastNameKana: currentUser.lastNameKana ?? "",
+            firstNameKana: currentUser.firstNameKana ?? "",
+            email: currentUser.email,
+            phoneNumber: currentUser.phoneNumber,
+            address: currentUser.address,
+          }}
+        />
       </div>
       <div className="mt-10">
         <MonthlyPointsHistory icon={faChartLine} companyId={companyId} userId={userId} />

@@ -31,11 +31,27 @@ function getSingleTableResource(template: Template, tableName: string): Record<s
   return matchedResources[0] as Record<string, unknown>;
 }
 
-function expectForgotPasswordEmailCustomization(template: Template, fromEmail: string) {
+function getCustomMessageLambdaCode(template: Template) {
+  const resources = template.findResources("AWS::Lambda::Function", {
+    Properties: {
+      Description: "Customize Cognito forgot-password and admin-create-user emails.",
+      Handler: "index.handler",
+    },
+  });
+  const matchedResources = Object.values(resources);
+
+  expect(matchedResources).toHaveLength(1);
+
+  return (
+    ((matchedResources[0] as { Properties?: { Code?: { ZipFile?: string } } }).Properties?.Code?.ZipFile as string) ?? ""
+  );
+}
+
+function expectCustomMessageEmailCustomization(template: Template, fromEmail: string) {
   template.hasResourceProperties(
     "AWS::Lambda::Function",
     Match.objectLike({
-      Description: "Customize Cognito forgot-password emails.",
+      Description: "Customize Cognito forgot-password and admin-create-user emails.",
       Handler: "index.handler",
     }),
   );
@@ -201,19 +217,43 @@ describe("InfraStack", () => {
   test("uses SES-backed forgot-password email customization in development", () => {
     const template = Template.fromStack(createStack("dev"));
 
-    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
   });
 
   test("uses SES-backed forgot-password email customization in staging", () => {
     const template = Template.fromStack(createStack("stg"));
 
-    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
   });
 
   test("uses SES-backed forgot-password email customization in production", () => {
     const template = Template.fromStack(createStack("prod"));
 
-    expectForgotPasswordEmailCustomization(template, "correcre-info@efficient-technology.com");
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
+
+  test("embeds development admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("dev"));
+    const code = getCustomMessageLambdaCode(template);
+
+    expect(code).toContain("CustomMessage_AdminCreateUser");
+    expect(code).toContain("http://localhost:3000/login");
+  });
+
+  test("embeds staging admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("stg"));
+    const code = getCustomMessageLambdaCode(template);
+
+    expect(code).toContain("https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(code).toContain("https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+  });
+
+  test("embeds production admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("prod"));
+    const code = getCustomMessageLambdaCode(template);
+
+    expect(code).toContain("https://correcre-admin.example.com/login");
+    expect(code).toContain("https://correcre-employee.example.com/login");
   });
 
   test("creates distinct app clients for admin, employee, and operator on the shared user pool", () => {
