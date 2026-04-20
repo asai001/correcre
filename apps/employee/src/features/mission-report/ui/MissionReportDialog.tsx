@@ -1,9 +1,10 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box } from "@mui/material";
+import { useEffect, useState, type FormEvent } from "react";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box, MenuItem } from "@mui/material";
 
 import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog";
+import { fetchMissionFormConfig } from "../api/client";
 import type { Mission, SubmitPayload, FieldConfig } from "../model/types";
 import { useMissionReportDialog } from "../hooks/useMissionReportDialog";
 
@@ -22,10 +23,59 @@ type MissionReportDialogProps = {
 };
 
 export default function MissionReportDialog({ open, onClose, onSubmit, companyId, missionId, missionConfig }: MissionReportDialogProps) {
+  const [resolvedMissionConfig, setResolvedMissionConfig] = useState<Mission>(missionConfig);
+  const [configLoading, setConfigLoading] = useState(false);
+
+  useEffect(() => {
+    setResolvedMissionConfig(missionConfig);
+  }, [missionConfig]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      setConfigLoading(true);
+
+      try {
+        const formConfig = await fetchMissionFormConfig(companyId, missionId ?? missionConfig.missionId);
+
+        if (cancelled || !formConfig) {
+          return;
+        }
+
+        setResolvedMissionConfig((current) => ({
+          ...current,
+          missionId: formConfig.missionId,
+          version: formConfig.version,
+          title: formConfig.title,
+          fields: formConfig.fields,
+          score: formConfig.points,
+          monthlyCount: formConfig.monthlyCount,
+          order: formConfig.order,
+          enabled: formConfig.enabled,
+        }));
+      } catch (fetchError) {
+        console.error("failed to refresh mission form config", fetchError);
+      } finally {
+        if (!cancelled) {
+          setConfigLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, companyId, missionId, missionConfig.missionId]);
+
   const { values, submitting, error, successOpen, successMessage, setSuccessOpen, handleChange, handleSubmit } = useMissionReportDialog({
     companyId,
     missionId,
-    missionConfig,
+    missionConfig: resolvedMissionConfig,
     onSubmit,
     onClose,
   });
@@ -54,10 +104,44 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
       id: field.id,
       name: field.id,
       label: field.label,
+      placeholder: field.placeholder,
+      helperText: field.helpText,
       required: field.required,
     };
 
-    // === textarea / select は今のままでOK ===
+    if (field.type === "textarea") {
+      return (
+        <TextField
+          key={field.id}
+          {...commonProps}
+          multiline
+          rows={field.rows ?? 4}
+          value={value}
+          onChange={handleChange(field)}
+        />
+      );
+    }
+
+    if (field.type === "select") {
+      return (
+        <TextField
+          key={field.id}
+          {...commonProps}
+          select
+          value={value}
+          onChange={handleChange(field)}
+        >
+          {!field.required ? (
+            <MenuItem value="">未選択</MenuItem>
+          ) : null}
+          {field.options?.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    }
 
     if (field.type === "number") {
       return (
@@ -95,7 +179,7 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
       );
     }
 
-    // 他のタイプ（text など）
+    // 他のタイプ（text / url など）
     return <TextField key={field.id} {...commonProps} value={value} onChange={handleChange(field)} />;
   };
 
@@ -125,10 +209,15 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
           </>
         ) : (
           <Box component="form" onSubmit={handleFormSubmit}>
-            <DialogTitle>{missionConfig.title}</DialogTitle>
+            <DialogTitle>{resolvedMissionConfig.title}</DialogTitle>
             <DialogContent>
               <Stack spacing={2} sx={{ mt: 1 }}>
-                {missionConfig.fields.map((f) => renderField(f))}
+                {configLoading ? (
+                  <Typography variant="body2" color="text.secondary">
+                    最新のフォーム設定を読み込み中...
+                  </Typography>
+                ) : null}
+                {resolvedMissionConfig.fields.map((f) => renderField(f))}
 
                 {/* Points 表示（左右に振り分け、丸角の背景で視認性UP） */}
                 <Box
@@ -143,7 +232,7 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
                 >
                   <Typography component="span">獲得点数</Typography>
                   <Typography component="span" fontWeight="bold">
-                    {missionConfig.score}点
+                    {resolvedMissionConfig.score}点
                   </Typography>
                 </Box>
 

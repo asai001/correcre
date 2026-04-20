@@ -189,6 +189,10 @@ export class InfraStack extends cdk.Stack {
       value: dynamoTables.missionTable.tableName,
     });
 
+    new cdk.CfnOutput(this, "MissionHistoryTableName", {
+      value: dynamoTables.missionHistoryTable.tableName,
+    });
+
     new cdk.CfnOutput(this, "MissionReportTableName", {
       value: dynamoTables.missionReportTable.tableName,
     });

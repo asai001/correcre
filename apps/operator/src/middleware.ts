@@ -78,5 +78,6 @@ export const config = {
     "/dashboard/:path*",
     "/company-registration/:path*",
     "/user-registration/:path*",
+    "/missions/:path*",
   ],
 };

@@ -3,21 +3,30 @@
 import { useMemo } from "react";
 import { Autocomplete, TextField } from "@mui/material";
 
-import type { EmployeeDepartmentOption } from "../model/types";
+export type DepartmentOption = {
+  name: string;
+  employeeCount: number;
+};
 
 type DepartmentAutocompleteFieldProps = {
-  departmentOptions: EmployeeDepartmentOption[];
+  departmentOptions: DepartmentOption[];
   value: string;
   error?: boolean;
   helperText?: string;
+  label?: string;
+  placeholder?: string;
+  noOptionsText?: string;
   onChange: (value: string) => void;
 };
 
-export default function DepartmentAutocompleteField({
+export function DepartmentAutocompleteField({
   departmentOptions,
   value,
   error = false,
   helperText,
+  label = "部署",
+  placeholder = "既存部署を選択、または新しい部署名を入力",
+  noOptionsText = "一致する部署はありません。この名前で新規追加できます。",
   onChange,
 }: DepartmentAutocompleteFieldProps) {
   const selectedValue = useMemo(
@@ -26,14 +35,14 @@ export default function DepartmentAutocompleteField({
   );
 
   return (
-    <Autocomplete<EmployeeDepartmentOption, false, false, true>
+    <Autocomplete<DepartmentOption, false, false, true>
       freeSolo
       fullWidth
       selectOnFocus
       handleHomeEndKeys
       options={departmentOptions}
       value={selectedValue}
-      noOptionsText="一致する部署はありません。この名称で新規登録されます。"
+      noOptionsText={noOptionsText}
       getOptionLabel={(option) => (typeof option === "string" ? option : option.name)}
       isOptionEqualToValue={(option, currentValue) =>
         typeof currentValue !== "string" && option.name === currentValue.name
@@ -49,23 +58,27 @@ export default function DepartmentAutocompleteField({
       onInputChange={(_event, nextValue) => {
         onChange(nextValue);
       }}
-      renderOption={(props, option) => (
-        <li {...props}>
-          <div className="flex w-full items-center justify-between gap-3">
-            <span>{option.name}</span>
-            <span className="text-xs text-slate-500">{option.employeeCount}人</span>
-          </div>
-        </li>
-      )}
+      renderOption={(props, option) => {
+        const { key, ...optionProps } = props;
+
+        return (
+          <li key={key} {...optionProps}>
+            <div className="flex w-full items-center justify-between gap-3">
+              <span>{option.name}</span>
+              <span className="text-xs text-slate-500">{option.employeeCount}人</span>
+            </div>
+          </li>
+        );
+      }}
       renderInput={(params) => (
         <TextField
           {...params}
-          label="所属部署"
+          label={label}
           required
           fullWidth
           error={error}
           helperText={helperText}
-          placeholder="既存部署を選択、または新規部署名を入力"
+          placeholder={placeholder}
         />
       )}
     />

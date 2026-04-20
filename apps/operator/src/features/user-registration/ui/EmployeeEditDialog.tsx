@@ -20,6 +20,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { DepartmentAutocompleteField } from "@correcre/ui";
 
 import type {
   EmployeeAssignableRole,
@@ -29,7 +30,6 @@ import type {
   EmployeeManagementStatus,
   UpdateEmployeeInput,
 } from "../model/types";
-import DepartmentAutocompleteField from "./DepartmentAutocompleteField";
 
 type EmployeeEditDialogProps = {
   open: boolean;

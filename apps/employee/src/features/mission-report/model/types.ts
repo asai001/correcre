@@ -19,6 +19,7 @@ export type FieldConfig = {
   label: string;
   type: FieldType;
   placeholder?: string;
+  helpText?: string;
   required?: boolean;
   rows?: number; // textarea
   min?: number;

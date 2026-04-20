@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import {
   createDepartmentInDynamo,
   deleteDepartmentInDynamo,
@@ -16,6 +17,7 @@ type RenameDepartmentRequest = DepartmentRequestBase & RenameDepartmentInput;
 type DeleteDepartmentRequest = DepartmentRequestBase & {
   name?: string;
 };
+const DEPARTMENT_MUTATION_FAILED_MESSAGE = "部署の更新に失敗しました。時間をおいて再度お試しください。";
 
 export async function POST(req: Request) {
   let body: CreateDepartmentRequest | null = null;
@@ -36,6 +38,10 @@ export async function POST(req: Request) {
     }
 
     console.error("POST /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -69,6 +75,10 @@ export async function PATCH(req: Request) {
 
     console.error("PATCH /api/employee-management/departments error", err);
 
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
+
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
       return NextResponse.json({ error: err.message }, { status });
@@ -101,6 +111,10 @@ export async function DELETE(req: Request) {
     }
 
     console.error("DELETE /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;

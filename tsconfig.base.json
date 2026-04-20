@@ -15,6 +15,8 @@
       "@correcre/types": ["./packages/types/src/index.ts"],
       "@correcre/types/*": ["./packages/types/src/*"],
       "@correcre/adapters/*": ["./packages/adapters/src/*"],
+      "@correcre/ui": ["./packages/ui/src/index.ts"],
+      "@correcre/ui/*": ["./packages/ui/src/*"],
       "@correcre/theme/*": ["./packages/theme/src/*"],
       "@correcre/lib": ["./packages/lib/src/index.ts"],
       "@correcre/lib/*": ["./packages/lib/src/*"],

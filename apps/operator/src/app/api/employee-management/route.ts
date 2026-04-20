@@ -1,4 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
+
 import {
   createEmployeeInDynamo,
   deleteEmployeeInDynamo,
@@ -11,6 +13,8 @@ import type {
   UpdateEmployeeInput,
 } from "@operator/features/user-registration/model/types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
+
+const USER_REGISTRATION_FAILED_MESSAGE = "ユーザー登録に失敗しました。時間をおいて再度お試しください。";
 
 async function authorizeOperator() {
   const access = await getOperatorAccessStatus();
@@ -85,6 +89,10 @@ export async function POST(req: Request) {
   } catch (err) {
     console.error("POST /api/employee-management error", err);
 
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
+
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
       return NextResponse.json({ error: err.message }, { status });
@@ -118,6 +126,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json(employee);
   } catch (err) {
     console.error("PATCH /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" || err.message === "Employee not found" ? 404 : 400;
@@ -161,4 +173,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
-

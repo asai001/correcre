@@ -11,8 +11,8 @@ export default function DashboardMenuTile() {
         className="md:min-w-0"
         icon={faUsers}
         iconColor="#000000"
-        menuName="従業員管理"
-        desc="従業員情報、部署、ポイント残高をまとめて確認し、管理画面から運用できる一覧です。"
+        menuName="ユーザー管理"
+        desc="ユーザー情報、権限、ログイン状況をまとめて確認し、登録や編集を行えます。"
       />
       <MenuTile
         link="/analysis-report"
@@ -20,15 +20,15 @@ export default function DashboardMenuTile() {
         icon={faChartBar}
         iconColor="#2563EB"
         menuName="分析レポート"
-        desc="全体分析と個人分析を切り替えながら、達成率やポイント推移を確認できます。"
+        desc="全社傾向と個人分析を見ながら、日々の運用状況を確認できます。"
       />
       <MenuTile
-        link="#"
+        link="/info"
         className="md:min-w-0"
         icon={faCog}
         iconColor="#6B7280"
-        menuName="システム設定"
-        desc="基本設定や権限管理などの管理機能を今後拡張できる枠として配置しています。"
+        menuName="各種情報画面"
+        desc="理念体系、会社情報、ポイント設定、部署、ミッション定義、アカウント情報をまとめて確認・更新できます。"
       />
     </div>
   );

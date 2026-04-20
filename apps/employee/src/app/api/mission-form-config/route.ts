@@ -39,6 +39,7 @@ function missionToFormConfig(mission: Mission): FormConfig {
       label: field.label,
       type: field.type,
       placeholder: field.placeholder,
+      helpText: field.helpText,
       required: field.required,
       rows: field.rows,
       min: field.min,

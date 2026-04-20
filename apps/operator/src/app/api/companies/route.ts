@@ -4,8 +4,8 @@ import {
   createCompanyInDynamo,
   listOperatorCompaniesFromDynamo,
   updateCompanyInDynamo,
-} from "@operator/features/user-registration/api/server";
-import type { CreateCompanyInput, UpdateCompanyInput } from "@operator/features/company-registration/model/types";
+} from "@correcre/lib/company-management-server";
+import type { CreateCompanyInput, UpdateCompanyInput } from "@correcre/lib/company-management-types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
 async function authorizeOperator() {

@@ -1,5 +1,5 @@
 import CompanyRegistration from "@operator/features/company-registration";
-import { listOperatorCompaniesFromDynamo } from "@operator/features/user-registration/api/server";
+import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
 

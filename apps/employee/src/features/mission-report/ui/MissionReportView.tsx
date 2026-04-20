@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
+import type { Mission, MissionReport, SubmitPayload } from "../model/types";
+import MissionListDialog from "./MissionListDialog";
 import MissionReportCards from "./MissionReportCards";
 import MissionReportDialog from "./MissionReportDialog";
-
-import type { Mission, MissionReport, SubmitPayload } from "../model/types";
 
 type MissionReportViewProps = {
   icon: IconDefinition;
@@ -32,22 +33,23 @@ export default function MissionReportView({
   handleClose,
   handleSubmit,
 }: MissionReportViewProps) {
-  // ダイアログに渡すミッション（未選択の場合は null）
-  const selectedMission = orderedMissionItems.find((m) => m.missionId === selectedMissionId) ?? null;
+  const [missionListOpen, setMissionListOpen] = useState(false);
+  const selectedMission = orderedMissionItems.find((mission) => mission.missionId === selectedMissionId) ?? null;
 
   return (
     <>
-      {/* カード描画は専用コンポーネントに丸投げ */}
       <MissionReportCards
         icon={icon}
         iconColor={iconColor}
         missions={orderedMissionItems}
         missionReports={missionReports}
         onClickMission={handleOpen}
+        onOpenMissionList={() => setMissionListOpen(true)}
       />
 
-      {/* ダイアログ描画は MissionReportDialog に丸投げ */}
-      {selectedMission && (
+      <MissionListDialog open={missionListOpen} onOpenChange={setMissionListOpen} missions={orderedMissionItems} />
+
+      {selectedMission ? (
         <MissionReportDialog
           open={open}
           onClose={handleClose}
@@ -56,7 +58,7 @@ export default function MissionReportView({
           missionId={selectedMission.missionId}
           missionConfig={selectedMission}
         />
-      )}
+      ) : null}
     </>
   );
 }

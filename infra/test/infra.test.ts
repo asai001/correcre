@@ -75,7 +75,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 8);
+    template.resourceCountIs("AWS::DynamoDB::Table", 9);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -137,6 +137,42 @@ describe("InfraStack", () => {
         SSESpecification: {
           SSEEnabled: true,
         },
+      }),
+    );
+
+    // Mission テーブル: slotIndex 方式（GSI なし）
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-mission-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "companyId",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
+      }),
+    );
+
+    // MissionHistory テーブル
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-mission-history-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
       }),
     );
 

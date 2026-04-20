@@ -1,15 +1,13 @@
 import "server-only";
 
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 import type { Mission } from "@correcre/types";
 
 import { getDynamoDocumentClient } from "./client";
 
 type MissionItem = Mission & {
-  sk: `MISSION#${string}#VER#${number}`;
-  gsi1pk?: `COMPANY#${string}`;
-  gsi1sk?: `ENABLED#${0 | 1}#ORDER#${string}#MISSION#${string}#VER#${number}`;
+  sk: `MISSION#${number}`;
 };
 
 export type MissionTableConfig = {
@@ -17,53 +15,73 @@ export type MissionTableConfig = {
   tableName: string;
 };
 
-export function buildMissionSk(missionId: string, version: number) {
-  return `MISSION#${missionId}#VER#${version}` as const;
+export function buildMissionSk(slotIndex: number) {
+  return `MISSION#${slotIndex}` as const;
 }
 
-export async function listLatestMissionsByCompany(config: MissionTableConfig, companyId: string): Promise<Mission[]> {
+// 企業の全ミッション（最大 5 件）を slotIndex 順で取得
+export async function listMissionsByCompany(config: MissionTableConfig, companyId: string): Promise<Mission[]> {
   const client = getDynamoDocumentClient(config.region);
-  const missions: MissionItem[] = [];
-  let exclusiveStartKey: Record<string, unknown> | undefined;
+  const { Items } = await client.send(
+    new QueryCommand({
+      TableName: config.tableName,
+      KeyConditionExpression: "companyId = :companyId",
+      ExpressionAttributeValues: {
+        ":companyId": companyId,
+      },
+    }),
+  );
 
-  do {
-    const { Items, LastEvaluatedKey } = await client.send(
-      new QueryCommand({
-        TableName: config.tableName,
-        KeyConditionExpression: "companyId = :companyId",
-        ExpressionAttributeValues: {
-          ":companyId": companyId,
-        },
-        ExclusiveStartKey: exclusiveStartKey,
-      }),
-    );
-
-    if (Items?.length) {
-      missions.push(...(Items as MissionItem[]));
-    }
-
-    exclusiveStartKey = LastEvaluatedKey;
-  } while (exclusiveStartKey);
-
-  const latestMissionById = new Map<string, MissionItem>();
-
-  for (const mission of missions) {
-    const current = latestMissionById.get(mission.missionId);
-
-    if (!current || mission.version > current.version) {
-      latestMissionById.set(mission.missionId, mission);
-    }
+  if (!Items?.length) {
+    return [];
   }
 
-  return [...latestMissionById.values()].sort(
-    (left, right) => left.order - right.order || left.title.localeCompare(right.title, "ja"),
-  );
+  return (Items as MissionItem[]).sort((a, b) => a.slotIndex - b.slotIndex);
 }
 
-export async function listEnabledLatestMissionsByCompany(
+// 特定スロットのミッションを取得
+export async function getMissionBySlot(
   config: MissionTableConfig,
   companyId: string,
-): Promise<Mission[]> {
-  const missions = await listLatestMissionsByCompany(config, companyId);
-  return missions.filter((mission) => mission.enabled);
+  slotIndex: number,
+): Promise<Mission | null> {
+  const client = getDynamoDocumentClient(config.region);
+  const { Items } = await client.send(
+    new QueryCommand({
+      TableName: config.tableName,
+      KeyConditionExpression: "companyId = :companyId AND sk = :sk",
+      ExpressionAttributeValues: {
+        ":companyId": companyId,
+        ":sk": buildMissionSk(slotIndex),
+      },
+    }),
+  );
+
+  return (Items?.[0] as Mission | undefined) ?? null;
+}
+
+// 有効なミッションのみ取得（enabled = true）
+export async function listEnabledMissionsByCompany(config: MissionTableConfig, companyId: string): Promise<Mission[]> {
+  const missions = await listMissionsByCompany(config, companyId);
+  return missions.filter((m) => m.enabled);
+}
+
+// 後方互換エイリアス
+export const listEnabledLatestMissionsByCompany = listEnabledMissionsByCompany;
+export const listLatestMissionsByCompany = listMissionsByCompany;
+
+// ミッションを保存（新規作成・上書き）
+export async function putMission(config: MissionTableConfig, mission: Mission): Promise<void> {
+  const client = getDynamoDocumentClient(config.region);
+  const item: MissionItem = {
+    ...mission,
+    sk: buildMissionSk(mission.slotIndex),
+  };
+
+  await client.send(
+    new PutCommand({
+      TableName: config.tableName,
+      Item: item,
+    }),
+  );
 }

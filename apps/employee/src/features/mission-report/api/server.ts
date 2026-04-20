@@ -9,16 +9,18 @@ import type { FieldConfig, Mission, MissionReport } from "../model/types";
 
 function toFieldConfig(field: MissionField): FieldConfig {
   return {
-    id: field.id,
+    id: field.key,
     label: field.label,
-    type: field.type,
+    type: field.type === "multiSelect" ? "select" : field.type === "datetime" ? "datetime-local" : field.type as FieldConfig["type"],
     placeholder: field.placeholder,
+    helpText: field.helpText,
     required: field.required,
-    rows: field.rows,
-    selectValueType: field.selectValueType,
+    rows: field.type === "textarea" ? 4 : undefined,
+    min: field.min ?? field.minLength,
+    max: field.max ?? field.maxLength,
     options: field.options?.map((option) => ({
-      label: option.label,
-      value: String(option.value),
+      label: option,
+      value: option,
     })),
   };
 }
@@ -34,7 +36,7 @@ function toMission(mission: DBMission): Mission {
     category: mission.category,
     monthlyCount: mission.monthlyCount,
     score: mission.score,
-    order: mission.order,
+    order: mission.slotIndex,
     fields: mission.fields.map(toFieldConfig),
   };
 }

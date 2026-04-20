@@ -63,6 +63,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.userTable,
     dynamoTables.departmentTable,
     dynamoTables.missionTable,
+    dynamoTables.missionHistoryTable,
     dynamoTables.missionReportTable,
     dynamoTables.userMonthlyStatsTable,
     dynamoTables.exchangeHistoryTable,

@@ -4,10 +4,11 @@ import { randomBytes } from "node:crypto";
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
-  CognitoIdentityProviderClient,
   type AttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import type { DBUserRole } from "@correcre/types";
+
+import { getCognitoIdentityProviderClient } from "./client";
 
 export type CognitoUserPoolConfig = {
   region: string;
@@ -27,19 +28,8 @@ export type CreatedCognitoUser = {
   username: string;
 };
 
-const cognitoClientCache = new Map<string, CognitoIdentityProviderClient>();
-
 function getCognitoClient(region: string) {
-  const cached = cognitoClientCache.get(region);
-
-  if (cached) {
-    return cached;
-  }
-
-  const client = new CognitoIdentityProviderClient({ region });
-  cognitoClientCache.set(region, client);
-
-  return client;
+  return getCognitoIdentityProviderClient(region);
 }
 
 function getAttributeValue(attributes: AttributeType[] | undefined, name: string) {

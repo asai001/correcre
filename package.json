@@ -11,11 +11,11 @@
     "packages/features/*"
   ],
   "scripts": {
-    "dev:employee": "npm run dev --workspace @correcre/employee",
-    "dev:admin": "npm run dev --workspace @correcre/admin",
-    "dev:operator": "npm run dev --workspace @correcre/operator",
-    "build": "npm run build --workspaces",
-    "lint": "npm run lint --workspaces",
-    "test": "npm run test --workspaces"
+    "dev:employee": "npm run dev --workspace @correcre/employee -- -p 3000",
+    "dev:admin": "npm run dev --workspace @correcre/admin -- -p 3001",
+    "dev:operator": "npm run dev --workspace @correcre/operator -- -p 3002",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
   }
 }

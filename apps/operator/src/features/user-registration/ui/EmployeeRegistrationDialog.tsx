@@ -20,9 +20,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { DepartmentAutocompleteField } from "@correcre/ui";
 
 import type { CreateEmployeeInput, EmployeeAssignableRole, EmployeeDepartmentOption } from "../model/types";
-import DepartmentAutocompleteField from "./DepartmentAutocompleteField";
 
 type EmployeeRegistrationDialogProps = {
   open: boolean;

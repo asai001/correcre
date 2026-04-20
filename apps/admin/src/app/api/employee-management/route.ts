@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
+import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import {
+  createDepartmentInDynamo,
   createEmployeeInDynamo,
   getEmployeeManagementSummaryFromDynamo,
   updateEmployeeInDynamo,
@@ -9,6 +14,35 @@ import type {
   UpdateEmployeeInput,
 } from "@admin/features/employee-management/model/types";
 import { authorizeEmployeeManagementRequest } from "./authorize";
+
+const USER_REGISTRATION_FAILED_MESSAGE = "ユーザー登録に失敗しました。時間をおいて再度お試しください。";
+
+async function ensureDepartmentExists(companyId: string, departmentName?: string) {
+  const normalizedDepartmentName = departmentName?.trim();
+
+  if (!normalizedDepartmentName) {
+    return;
+  }
+
+  const departments = await listDepartmentsByCompany(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    },
+    companyId,
+  );
+
+  const existingDepartment = departments.find((department) => department.name === normalizedDepartmentName);
+
+  if (!existingDepartment) {
+    await createDepartmentInDynamo(companyId, { name: normalizedDepartmentName });
+    return;
+  }
+
+  if (existingDepartment.status === "INACTIVE") {
+    throw new Error("現在の所属部署が無効化されています。部署管理を確認してください");
+  }
+}
 
 export async function GET() {
   try {
@@ -46,6 +80,7 @@ export async function POST(req: Request) {
     }
 
     body = (await req.json()) as CreateEmployeeRequest;
+    await ensureDepartmentExists(currentAdminUser.companyId, body.departmentName);
     const employee = await createEmployeeInDynamo(currentAdminUser.companyId, body);
     return NextResponse.json(employee, { status: 201 });
   } catch (err) {
@@ -55,6 +90,10 @@ export async function POST(req: Request) {
     }
 
     console.error("POST /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -75,6 +114,7 @@ export async function PATCH(req: Request) {
     }
 
     body = (await req.json()) as UpdateEmployeeRequest;
+    await ensureDepartmentExists(currentAdminUser.companyId, body.departmentName);
     const employee = await updateEmployeeInDynamo(currentAdminUser.companyId, body);
     return NextResponse.json(employee);
   } catch (err) {
@@ -84,6 +124,10 @@ export async function PATCH(req: Request) {
     }
 
     console.error("PATCH /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" || err.message === "Employee not found" ? 404 : 400;

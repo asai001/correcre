@@ -13,6 +13,7 @@ export interface ApplicationDynamoTables {
   userTable: dynamodb.Table;
   departmentTable: dynamodb.Table;
   missionTable: dynamodb.Table;
+  missionHistoryTable: dynamodb.Table;
   missionReportTable: dynamodb.Table;
   userMonthlyStatsTable: dynamodb.Table;
   exchangeHistoryTable: dynamodb.Table;
@@ -127,19 +128,18 @@ function createDepartmentTable(scope: Construct, stage: InfraStage): dynamodb.Ta
 
 // Mission
 // - companyId = <companyId>
-// - sk = MISSION#<missionId>#VER#<version>
-// - gsi1pk = COMPANY#<companyId>
-// - gsi1sk = ENABLED#<0|1>#ORDER#<order>#MISSION#<missionId>#VER#<version>
+// - sk = MISSION#<slotIndex>
+// - 5 スロット固定のため GSI 不要（PK の Query で最大 5 件）
 function createMissionTable(scope: Construct, stage: InfraStage): dynamodb.Table {
-  const table = new dynamodb.Table(scope, "MissionTable", buildTableProps(stage, buildTableName("mission", stage), "companyId", "sk"));
+  return new dynamodb.Table(scope, "MissionTable", buildTableProps(stage, buildTableName("mission", stage), "companyId", "sk"));
+}
 
-  table.addGlobalSecondaryIndex({
-    indexName: "MissionByCompanyAndEnabledOrder",
-    partitionKey: stringAttribute("gsi1pk"),
-    sortKey: stringAttribute("gsi1sk"),
-  });
-
-  return table;
+// MissionHistory
+// - pk = COMPANY#<companyId>#MISSION#<missionId>
+// - sk = VER#<version>
+// - GSI なし
+function createMissionHistoryTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(scope, "MissionHistoryTable", buildTableProps(stage, buildTableName("mission-history", stage), "pk", "sk"));
 }
 
 // MissionReport
@@ -244,6 +244,7 @@ export function createApplicationDynamoTables(
     userTable: createUserTable(scope, props.stage),
     departmentTable: createDepartmentTable(scope, props.stage),
     missionTable: createMissionTable(scope, props.stage),
+    missionHistoryTable: createMissionHistoryTable(scope, props.stage),
     missionReportTable: createMissionReportTable(scope, props.stage),
     userMonthlyStatsTable: createUserMonthlyStatsTable(scope, props.stage),
     exchangeHistoryTable: createExchangeHistoryTable(scope, props.stage),

@@ -4,7 +4,7 @@ import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
-import type { Mission, MissionReport } from "@correcre/types";
+import type { Mission, MissionField, MissionReport } from "@correcre/types";
 
 import type { RecentReport } from "../model/types";
 
@@ -93,7 +93,7 @@ export async function getRecentReportsFromDynamo(
     ),
   ]);
 
-  const currentUsers = users
+  const currentUsers: UserData[] = users
     .filter((item) => item.status !== "DELETED")
     .map((item) => ({
       companyId: item.companyId,
@@ -103,25 +103,25 @@ export async function getRecentReportsFromDynamo(
       roles: item.roles,
     })) as UserData[];
 
-  const sortedReports = missionReports
+  const sortedReports: MissionReport[] = missionReports
     .filter(
-      (report) =>
+      (report: MissionReport) =>
         (!userId || report.userId === userId) &&
         isWithinDateRange(report.reportedAt, startDate, endDate),
     )
-    .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
+    .sort((a: MissionReport, b: MissionReport) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
 
   const filteredReports = typeof limit === "number" ? sortedReports.slice(0, limit) : sortedReports;
 
   const progressByReportId = new Map<string, number>();
-  const approvedReportsInRange = missionReports
+  const approvedReportsInRange: MissionReport[] = missionReports
     .filter(
-      (report) =>
+      (report: MissionReport) =>
         (!userId || report.userId === userId) &&
         report.status === "APPROVED" &&
         isWithinDateRange(report.reportedAt, startDate, endDate),
     )
-    .sort((a, b) => {
+    .sort((a: MissionReport, b: MissionReport) => {
       const timeDiff = new Date(a.reportedAt).getTime() - new Date(b.reportedAt).getTime();
 
       if (timeDiff !== 0) {
@@ -140,16 +140,16 @@ export async function getRecentReportsFromDynamo(
     progressByReportId.set(report.reportId, nextCount);
   }
 
-  return filteredReports.map((report) => {
-    const user = currentUsers.find((item) => item.companyId === report.companyId && item.userId === report.userId);
-    const mission = missions.find((item) => item.companyId === report.companyId && item.missionId === report.missionId);
+  return filteredReports.map((report: MissionReport) => {
+    const user = currentUsers.find((item: UserData) => item.companyId === report.companyId && item.userId === report.userId);
+    const mission = missions.find((item: Mission) => item.companyId === report.companyId && item.missionId === report.missionId);
     const fieldValues = report.fieldValues;
 
     let inputContent = "";
     if (fieldValues && mission?.fields?.length) {
       inputContent = mission.fields
-        .map((field) => {
-          const value = fieldValues[field.id];
+        .map((field: { key: string; label: string }) => {
+          const value = fieldValues[field.key];
           if (value === undefined || value === null || value === "") {
             return null;
           }

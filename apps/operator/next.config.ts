@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
     "@correcre/validation",
     "@correcre/types",
     "@correcre/adapters",
+    "@correcre/ui",
     "@correcre/theme",
     "@correcre/lib",
     "@correcre/individual-analysis",

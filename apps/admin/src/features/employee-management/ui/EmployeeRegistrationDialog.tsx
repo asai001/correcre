@@ -20,6 +20,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { DepartmentAutocompleteField } from "@correcre/ui";
 
 import type {
   CreateEmployeeInput,
@@ -238,29 +239,23 @@ export default function EmployeeRegistrationDialog({
           </div>
 
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
-            <FormControl fullWidth error={hasSubmitted && validation.departmentName}>
-              <InputLabel id="admin-employee-registration-department-label">所属部署</InputLabel>
-              <Select
-                labelId="admin-employee-registration-department-label"
-                value={form.departmentName}
-                label="所属部署"
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    departmentName: event.target.value,
-                  }))
-                }
-              >
-                {departmentOptions.map((departmentOption) => (
-                  <MenuItem key={departmentOption.name} value={departmentOption.name}>
-                    {departmentOption.name} ({departmentOption.employeeCount}人)
-                  </MenuItem>
-                ))}
-              </Select>
-              <FormHelperText>
-                {hasSubmitted && validation.departmentName ? "所属部署を選択してください" : " "}
-              </FormHelperText>
-            </FormControl>
+            <DepartmentAutocompleteField
+              departmentOptions={departmentOptions}
+              value={form.departmentName}
+              error={hasSubmitted && validation.departmentName}
+              helperText={
+                hasSubmitted && validation.departmentName
+                  ? "所属部署を入力してください"
+                  : "既存部署を選択、または新しい部署名を入力すると登録時に追加されます"
+              }
+              label="所属部署"
+              onChange={(departmentName) =>
+                setForm((current) => ({
+                  ...current,
+                  departmentName,
+                }))
+              }
+            />
 
             <FormControl fullWidth error={hasSubmitted && validation.roles}>
               <InputLabel id="admin-employee-registration-roles-label">権限</InputLabel>

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBuilding, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faBuilding, faBullseye, faUsers } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { listOperatorCompaniesFromDynamo } from "@operator/features/user-registration/api/server";
+import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
 
@@ -27,6 +27,13 @@ const dashboardCards = [
     description: "対象企業を選択して、ユーザー登録・編集・部門管理を進めます。",
     icon: faUsers,
     accentClassName: "from-emerald-500 to-teal-600",
+  },
+  {
+    href: "/missions",
+    title: "ミッション管理",
+    description: "対象企業を選択して、ミッション項目の編集・履歴管理を行います。",
+    icon: faBullseye,
+    accentClassName: "from-amber-500 to-orange-600",
   },
 ] as const;
 
