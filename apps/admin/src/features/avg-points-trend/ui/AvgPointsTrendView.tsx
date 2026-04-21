@@ -41,6 +41,7 @@ export default function AvgPointsTrendView({ icon, iconColor = "#2563EB", classN
         scales: {
           y: {
             beginAtZero: true,
+            max: 100,
             grid: {
               color: "rgba(0,0,0,0.05)",
             },
