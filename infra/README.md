@@ -291,3 +291,43 @@ GSI:
 - `deploy:stg` は `CorreCre-Stg-Account` プロファイルを使います
 - `deploy:prod` は `CorreCre-Prod-Account` プロファイルを使います
 - 事前に `aws sso login --profile <profile>` が必要になる場合があります
+
+## 保守環境向けシードデータ投入
+
+分析・レポート画面の確認用に、ミッション達成傾向が対照的な 2 社（`seed-poor-company` / `seed-good-company`）をシード投入するスクリプトを用意しています。
+
+実行:
+
+```bash
+# infra ディレクトリで
+STAGE=stg AWS_PROFILE=CorreCre-Stg-Account npm run seed:maintenance
+```
+
+既存のシードデータを削除したい場合:
+
+```bash
+STAGE=stg AWS_PROFILE=CorreCre-Stg-Account npm run seed:maintenance:reset
+```
+
+`reportId` などは決定論的に採番しているため、同じデータ構成で再実行する場合はリセット不要（上書きされる）です。  
+一方で投入後にミッション件数や期間を変更する場合は、件数が減る側で旧行が残ってしまうため、先にリセットを実行してください。
+
+生成される内容:
+
+- 企業 × 2（`seed-poor-company`: 株式会社アカマツ商会 / `seed-good-company`: 株式会社シラカワエンジニアリング）
+- 部門 × 2（営業部 / 開発部）
+- ユーザー × 6（ADMIN 1 / MANAGER 1 / EMPLOYEE 4、Cognito は使わずダミー `cognitoSub` で登録）
+- ミッション × 5（各 `score × monthlyCount = 20`、合計 100）
+- 過去 13 ヶ月分の `MissionReport`（全て `APPROVED`）と `UserMonthlyStats`
+
+会社 ID・ユーザー ID・部門 ID は決定論的なため再実行で上書きされます。
+
+データ傾向:
+
+- `seed-poor-company`: 各項目達成割合は左から順に 85 / 80 / 30 / 50 / 75 ％周辺、平均獲得点数は 70 点付近から 30 点付近へ緩やかに低下。
+- `seed-good-company`: 各項目達成割合はいずれも 95 ％前後、平均獲得点数は 80〜95 点を維持。
+
+注意:
+
+- Cognito ユーザーは作成しないため、これらのアカウントでログインはできません（画面表示確認専用）。
+- `prod` ステージでの実行は想定していません。`STAGE=prod` を指定しないでください。

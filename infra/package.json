@@ -11,7 +11,9 @@
     "cdk": "cdk",
     "deploy:dev": "cdk deploy CorrecreDevInfraStack --profile CorreCre-Dev-Account",
     "deploy:stg": "cdk deploy CorrecreStgInfraStack --profile CorreCre-Stg-Account --require-approval never",
-    "deploy:prod": "cdk deploy CorrecreProdInfraStack --profile CorreCre-Prod-Account --require-approval never"
+    "deploy:prod": "cdk deploy CorrecreProdInfraStack --profile CorreCre-Prod-Account --require-approval never",
+    "seed:maintenance": "ts-node --transpile-only scripts/seed-maintenance.ts",
+    "seed:maintenance:reset": "ts-node --transpile-only scripts/reset-maintenance-seed.ts"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -23,6 +25,9 @@
     "typescript": "~5.6.3"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1019.0",
+    "@aws-sdk/credential-provider-ini": "^3.972.27",
+    "@aws-sdk/lib-dynamodb": "^3.1019.0",
     "aws-cdk-lib": "^2.217.0",
     "constructs": "^10.0.0"
   }
