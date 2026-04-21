@@ -43,7 +43,7 @@ export const planOptions: Array<{ value: CompanyPlan; label: string }> = [
 ];
 
 function normalizeNonNegativeInteger(value: number | undefined, fallback: number) {
-  return Number.isInteger(value) && value >= 0 ? value : fallback;
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
 function normalizePointUnitLabel(value?: string) {
