@@ -108,7 +108,7 @@ export default function CompanyEditDialog({
       </DialogTitle>
 
       <DialogContent sx={{ pt: "8px !important" }}>
-        <Stack spacing={2.5}>
+        <Stack spacing={3.5}>
           {error ? <Alert severity="error">{error}</Alert> : null}
 
           {company ? (
@@ -130,7 +130,7 @@ export default function CompanyEditDialog({
             helperText={hasSubmitted && validation.name ? "会社名を入力してください。" : "正式名称を入力してください。"}
           />
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 pt-5 md:grid-cols-2">
             <TextField
               select
               label="ステータス"
@@ -164,7 +164,7 @@ export default function CompanyEditDialog({
             </TextField>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <TextField
               label="月額単価（円）"
               type="number"
@@ -206,14 +206,16 @@ export default function CompanyEditDialog({
             helperText={hasSubmitted && validation.pointUnitLabel ? "ポイント単位を入力してください。" : "通常は pt のままで問題ありません。"}
           />
 
-          <CompanyPhilosophyFields
-            items={form.philosophyItems}
-            validation={validation.philosophyItems}
-            hasSubmitted={hasSubmitted}
-            onAdd={handleAddPhilosophyItem}
-            onChangeItem={handleChangePhilosophyItem}
-            onRemoveItem={handleRemovePhilosophyItem}
-          />
+          <div className="pt-1">
+            <CompanyPhilosophyFields
+              items={form.philosophyItems}
+              validation={validation.philosophyItems}
+              hasSubmitted={hasSubmitted}
+              onAdd={handleAddPhilosophyItem}
+              onChangeItem={handleChangePhilosophyItem}
+              onRemoveItem={handleRemovePhilosophyItem}
+            />
+          </div>
         </Stack>
       </DialogContent>
 

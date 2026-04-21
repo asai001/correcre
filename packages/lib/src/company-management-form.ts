@@ -42,6 +42,15 @@ export const planOptions: Array<{ value: CompanyPlan; label: string }> = [
   { value: "ENTERPRISE", label: "ENTERPRISE" },
 ];
 
+function normalizeNonNegativeInteger(value: number | undefined, fallback: number) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+function normalizePointUnitLabel(value?: string) {
+  const normalized = value?.trim();
+  return normalized ? normalized : "pt";
+}
+
 function createCompanyPhilosophyItemId() {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
@@ -80,9 +89,9 @@ export function createCompanyFormStateFromCompany(company: CompanySummary | null
     name: company.legalName,
     status: company.status,
     plan: company.plan,
-    perEmployeeMonthlyFee: String(company.perEmployeeMonthlyFee),
-    companyPointBalance: String(company.companyPointBalance),
-    pointUnitLabel: company.pointUnitLabel,
+    perEmployeeMonthlyFee: String(normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0)),
+    companyPointBalance: String(normalizeNonNegativeInteger(company.companyPointBalance, 0)),
+    pointUnitLabel: normalizePointUnitLabel(company.pointUnitLabel),
     philosophyItems: company.philosophyItems.map((item) => ({ ...item })),
   };
 }

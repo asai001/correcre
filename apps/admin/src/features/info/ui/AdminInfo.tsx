@@ -59,8 +59,8 @@ function formatDateTime(value?: string) {
   return toYYYYMMDDHHmm(date).replace("T", " ");
 }
 
-function normalizeOptionalText(value: string) {
-  const normalizedValue = value.trim();
+function normalizeOptionalText(value?: string) {
+  const normalizedValue = value?.trim() ?? "";
   return normalizedValue ? normalizedValue : undefined;
 }
 
@@ -98,7 +98,8 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFormState>(() =>
     createCompanyDetailsFormState(initialData.company),
   );
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [hasSubmittedCompanyInfo, setHasSubmittedCompanyInfo] = useState(false);
+  const [hasSubmittedPhilosophy, setHasSubmittedPhilosophy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,11 +111,14 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   useEffect(() => {
     setCompanyForm(createCompanyFormStateFromCompany(initialData.editableCompany));
     setCompanyDetails(createCompanyDetailsFormState(initialData.company));
+    setHasSubmittedCompanyInfo(false);
+    setHasSubmittedPhilosophy(false);
     setExpandedDepartmentIds({});
   }, [initialData]);
 
   const { validation } = useMemo(() => getCompanyFormState(companyForm), [companyForm]);
-  const hasCompanyFormValidationError = validation.name || validation.philosophyItems.some((item) => item.label || item.content);
+  const hasCompanyInfoValidationError = validation.name;
+  const hasPhilosophyValidationError = validation.philosophyItems.some((item) => item.label || item.content);
   const readOnlyMessage =
     "既存の権限制御に合わせ、この画面は現在閲覧のみです。編集が必要な場合は運用者権限のあるアカウントで操作してください。";
 
@@ -123,30 +127,31 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
       return;
     }
 
-    setHasSubmitted(true);
+    setHasSubmittedCompanyInfo(true);
     setError(null);
     setNotice(null);
 
-    if (hasCompanyFormValidationError) {
+    if (hasCompanyInfoValidationError) {
       setError("入力内容を確認してください");
       return;
     }
 
+    const baseCompanyForm = createCompanyFormStateFromCompany(initialData.editableCompany);
+    const companyInfoForm: CompanyFormState = {
+      ...baseCompanyForm,
+      name: companyForm.name,
+      status: companyForm.status,
+      plan: companyForm.plan,
+    };
+
     try {
       setSubmitting(true);
-      const baseCompanyForm: CompanyFormState = {
-        ...companyForm,
-        perEmployeeMonthlyFee: String(initialData.editableCompany.perEmployeeMonthlyFee),
-        companyPointBalance: String(initialData.editableCompany.companyPointBalance),
-        pointUnitLabel: initialData.editableCompany.pointUnitLabel,
-      };
-
       await updateAdminCompanyInfo({
         ...toUpdateCompanyInput(
           initialData.editableCompany.companyId,
-          baseCompanyForm,
-          initialData.editableCompany.perEmployeeMonthlyFee,
-          initialData.editableCompany.companyPointBalance,
+          companyInfoForm,
+          Number.parseInt(baseCompanyForm.perEmployeeMonthlyFee, 10),
+          Number.parseInt(baseCompanyForm.companyPointBalance, 10),
         ),
         shortName: normalizeOptionalText(companyDetails.shortName),
         contactName: initialData.company.contactName,
@@ -164,6 +169,60 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "各種情報の更新に失敗しました");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSavePhilosophy = async () => {
+    if (!canEdit) {
+      return;
+    }
+
+    setHasSubmittedPhilosophy(true);
+    setError(null);
+    setNotice(null);
+
+    if (hasPhilosophyValidationError) {
+      setError("\u5165\u529b\u5185\u5bb9\u3092\u78ba\u8a8d\u3057\u3066\u304f\u3060\u3055\u3044");
+      return;
+    }
+
+    const baseCompanyForm = createCompanyFormStateFromCompany(initialData.editableCompany);
+    const philosophyForm: CompanyFormState = {
+      ...baseCompanyForm,
+      philosophyItems: companyForm.philosophyItems,
+    };
+
+    try {
+      setSubmitting(true);
+      await updateAdminCompanyInfo({
+        ...toUpdateCompanyInput(
+          initialData.editableCompany.companyId,
+          philosophyForm,
+          Number.parseInt(baseCompanyForm.perEmployeeMonthlyFee, 10),
+          Number.parseInt(baseCompanyForm.companyPointBalance, 10),
+        ),
+        shortName: normalizeOptionalText(initialData.company.shortName),
+        contactName: initialData.company.contactName,
+        contactEmail: initialData.company.contactEmail,
+        contactPhone: initialData.company.contactPhone,
+        billingEmail: initialData.company.billingEmail,
+        logoImageUrl: initialData.company.logoImageUrl,
+        primaryColor: initialData.company.primaryColor,
+        pointConversionRate: initialData.company.pointConversionRate ?? null,
+      });
+
+      setNotice("\u7406\u5ff5\u4f53\u7cfb\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f");
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "\u7406\u5ff5\u4f53\u7cfb\u306e\u66f4\u65b0\u306b\u5931\u6557\u3057\u307e\u3057\u305f",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -303,7 +362,7 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
               <CompanyPhilosophyFields
                 items={companyForm.philosophyItems}
                 validation={validation.philosophyItems}
-                hasSubmitted={hasSubmitted}
+                hasSubmitted={hasSubmittedPhilosophy}
                 onAdd={handleAddPhilosophyItem}
                 onChangeItem={handleChangePhilosophyItem}
                 onRemoveItem={handleRemovePhilosophyItem}
@@ -312,7 +371,7 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
 
             {canEdit ? (
               <div className="mt-5 flex justify-end">
-                <Button variant="contained" onClick={handleSaveCompanyInfo} disabled={submitting}>
+                <Button variant="contained" onClick={handleSavePhilosophy} disabled={submitting}>
                   {submitting ? "保存中..." : "理念体系を保存"}
                 </Button>
               </div>
@@ -346,8 +405,8 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
                 onChange={(event) => setCompanyForm((current) => ({ ...current, name: event.target.value }))}
                 required
                 disabled={!canEdit}
-                error={hasSubmitted && validation.name}
-                helperText={hasSubmitted && validation.name ? "会社名を入力してください" : " "}
+                error={hasSubmittedCompanyInfo && validation.name}
+                helperText={hasSubmittedCompanyInfo && validation.name ? "会社名を入力してください" : " "}
                 fullWidth
               />
               <TextField

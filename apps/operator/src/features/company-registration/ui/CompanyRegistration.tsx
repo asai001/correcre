@@ -151,7 +151,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
       />
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-        <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
+        <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70 sm:p-7">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
               <FontAwesomeIcon icon={faCirclePlus} className="text-lg" />
@@ -164,7 +164,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
             </div>
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-6 md:space-y-7">
             {error ? <Alert severity="error">{error}</Alert> : null}
             {notice ? <Alert severity="success">{notice}</Alert> : null}
 
@@ -178,7 +178,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               helperText={hasSubmitted && validation.name ? "会社名を入力してください。" : "正式名称を入力してください。"}
             />
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-5 pt-5 md:grid-cols-2">
               <TextField
                 select
                 label="ステータス"
@@ -212,7 +212,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               </TextField>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2">
               <TextField
                 label="月額単価（円）"
                 type="number"
@@ -254,14 +254,16 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               helperText={hasSubmitted && validation.pointUnitLabel ? "ポイント単位を入力してください。" : "通常は pt のままで問題ありません。"}
             />
 
-            <CompanyPhilosophyFields
-              items={form.philosophyItems}
-              validation={validation.philosophyItems}
-              hasSubmitted={hasSubmitted}
-              onAdd={handleAddPhilosophyItem}
-              onChangeItem={handleChangePhilosophyItem}
-              onRemoveItem={handleRemovePhilosophyItem}
-            />
+            <div className="pt-2 md:pt-3">
+              <CompanyPhilosophyFields
+                items={form.philosophyItems}
+                validation={validation.philosophyItems}
+                hasSubmitted={hasSubmitted}
+                onAdd={handleAddPhilosophyItem}
+                onChangeItem={handleChangePhilosophyItem}
+                onRemoveItem={handleRemovePhilosophyItem}
+              />
+            </div>
 
             <Button
               variant="contained"

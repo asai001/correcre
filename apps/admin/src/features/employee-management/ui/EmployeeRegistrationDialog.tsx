@@ -257,13 +257,15 @@ export default function EmployeeRegistrationDialog({
               }
             />
 
-            <FormControl fullWidth error={hasSubmitted && validation.roles}>
-              <InputLabel id="admin-employee-registration-roles-label">権限</InputLabel>
+            <FormControl fullWidth required error={hasSubmitted && validation.roles}>
+              <InputLabel id="admin-employee-registration-roles-label" required>
+                権限
+              </InputLabel>
               <Select
                 labelId="admin-employee-registration-roles-label"
                 multiple
                 value={form.roles}
-                label="権限"
+                label="権限 *"
                 renderValue={(selected) =>
                   (selected as EmployeeAssignableRole[])
                     .map((role) => roleOptions.find((option) => option.value === role)?.label ?? role)
@@ -321,7 +323,7 @@ export default function EmployeeRegistrationDialog({
               helperText={
                 hasSubmitted && validation.phoneNumber
                   ? "電話番号は 10 桁または 11 桁の数字で入力してください"
-                  : "未入力でも登録できます"
+                  : " "
               }
             />
             <TextField
@@ -330,7 +332,7 @@ export default function EmployeeRegistrationDialog({
               value={form.prefecture}
               onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
               fullWidth
-              helperText="未入力でも登録できます"
+              helperText=" "
             >
               <MenuItem value="">未選択</MenuItem>
               {JAPAN_PREFECTURES.map((prefecture) => (
@@ -355,7 +357,9 @@ export default function EmployeeRegistrationDialog({
               error={hasSubmitted && validation.postalCode}
               helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
             />
-            <div className="flex h-full items-center justify-center pt-4 text-lg text-slate-500">-</div>
+            <div aria-hidden="true" className="hidden self-start text-lg text-slate-500 md:flex md:h-14 md:items-center md:justify-center">
+              -
+            </div>
             <TextField
               label="郵便番号(後半)"
               value={form.postalCodeSecondHalf}
@@ -374,14 +378,14 @@ export default function EmployeeRegistrationDialog({
               value={form.city}
               onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               fullWidth
-              helperText="未入力でも登録できます"
+              helperText=" "
             />
             <TextField
               label="建物名・部屋番号"
               value={form.building}
               onChange={(event) => setForm((current) => ({ ...current, building: event.target.value }))}
               fullWidth
-              helperText="未入力でも登録できます"
+              helperText=" "
             />
           </div>
         </Stack>

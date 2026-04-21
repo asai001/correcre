@@ -48,6 +48,7 @@ export default function CompanyPhilosophyFields({
             onClick={onAdd}
             sx={{
               alignSelf: "flex-start",
+              mb: 1.5,
               borderRadius: "999px",
               borderColor: "#22C1DC",
               color: "#0891B2",

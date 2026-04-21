@@ -35,6 +35,7 @@ export class InfraStack extends cdk.Stack {
     const vercelOidcAccess = createVercelOidcAccess(this, {
       stage: props.stage,
       dynamoTables,
+      cognitoUserPoolArn: sharedCognito.userPool.userPoolArn,
     });
 
     new cdk.CfnOutput(this, "EnvironmentName", {

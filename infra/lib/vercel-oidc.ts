@@ -12,6 +12,7 @@ type VercelEnvironment = "development" | "preview" | "production";
 export interface VercelOidcAccessProps {
   stage: InfraStage;
   dynamoTables: ApplicationDynamoTables;
+  cognitoUserPoolArn: string;
 }
 
 export interface VercelOidcAccess {
@@ -98,6 +99,13 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
   for (const table of getApplicationTables(props.dynamoTables)) {
     table.grantReadWriteData(role);
   }
+
+  role.addToPolicy(
+    new iam.PolicyStatement({
+      actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"],
+      resources: [props.cognitoUserPoolArn],
+    }),
+  );
 
   return {
     provider,

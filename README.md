@@ -1,11 +1,39 @@
-## そのまま使うときの初回プロンプト
+# Correcre
 
-毎回エージェントに投げる文の最初に、以下の文章をつけてください。
+Correcre の monorepo です。
 
-```text
-このリポジトリでは会話履歴ではなく .ai 配下の共有ファイルを正式なコンテキスト源とします。
-最初に AGENT.md, .ai/project-overview.md, .ai/architecture.md, .ai/decisions.md, .ai/current-status.md, .ai/next-actions.md, .ai/handoff.md を確認してください。
-今回の対象が apps/admin, apps/employee, apps/operator, packages/*, infra のどこかを最初に明確にしてください。
-コードや仕様書と矛盾する場合は一次情報を優先してください。
-作業後は .ai/current-status.md, .ai/next-actions.md, .ai/handoff.md を更新してください。
+## Directory
+
+- `apps/admin`: 企業管理者向けアプリ
+- `apps/employee`: 従業員向けアプリ
+- `apps/operator`: 運用者向けアプリ
+- `infra`: AWS CDK
+- `packages/*`: 共有ライブラリ
+
+## Workspace Commands
+
+```bash
+npm run dev:admin
+npm run dev:employee
+npm run dev:operator
+npm run build
+npm run lint
 ```
+
+## Initial Operator Bootstrap
+
+最初の運用者ユーザーを 1 人だけ作る手順は [apps/operator/README.md](apps/operator/README.md) を参照してください。
+
+要点だけ書くと、次の順です。
+
+1. Operator 用 Cognito User Pool に手動でユーザーを 1 人作成する
+2. DynamoDB の User テーブルに、そのユーザーに対応するレコードを 1 行追加する
+3. 運用者アプリの `/login` で初期パスワードログインし、`/login/new-password` で新しいパスワードを設定する
+
+この最初の 1 人は、2 人目以降のユーザーや企業を運用者画面から作成していくための起点ユーザーです。
+
+## Notes
+
+- Operator 初回ログインでは DynamoDB の `roles` が配列で存在し、`"OPERATOR"` を含んでいる必要があります
+- `gsi1pk` は Cognito の `sub` から `COGNITO_SUB#<sub>` の形式で設定する必要があります
+- `email` と `gsi2pk` は同じメールアドレスを基準に揃えてください

@@ -350,6 +350,25 @@ describe("InfraStack", () => {
     );
   });
 
+  test("grants the Vercel OIDC role Cognito admin user provisioning permissions", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    template.hasResourceProperties(
+      "AWS::IAM::Policy",
+      Match.objectLike({
+        PolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: Match.arrayWith(["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"]),
+              Effect: "Allow",
+              Resource: Match.anyValue(),
+            }),
+          ]),
+        },
+      }),
+    );
+  });
+
   test("scopes the dev AWS account to development subjects only", () => {
     const template = Template.fromStack(createStack("dev"));
 

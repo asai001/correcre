@@ -164,6 +164,10 @@ function toCompanyPhilosophyItems(company: Company): CompanySummary["philosophyI
     }));
 }
 
+function normalizeNonNegativeInteger(value: number | undefined, fallback: number) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
 export function toCompanySummary(company: Company): CompanySummary {
   return {
     companyId: company.companyId,
@@ -172,11 +176,11 @@ export function toCompanySummary(company: Company): CompanySummary {
     shortName: company.shortName,
     status: company.status,
     plan: company.plan,
-    employeeCount: company.totalEmployees ?? company.activeEmployees,
-    activeEmployeeCount: company.activeEmployees,
-    companyPointBalance: company.companyPointBalance,
-    perEmployeeMonthlyFee: company.perEmployeeMonthlyFee,
-    pointUnitLabel: company.pointUnitLabel ?? "pt",
+    employeeCount: company.totalEmployees ?? company.activeEmployees ?? 0,
+    activeEmployeeCount: company.activeEmployees ?? 0,
+    companyPointBalance: normalizeNonNegativeInteger(company.companyPointBalance, 0),
+    perEmployeeMonthlyFee: normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0),
+    pointUnitLabel: company.pointUnitLabel?.trim() || "pt",
     philosophyItems: toCompanyPhilosophyItems(company),
     updatedAt: company.updatedAt,
   };
