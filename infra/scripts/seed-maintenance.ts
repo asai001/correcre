@@ -37,6 +37,16 @@ type CompanySpec = {
   pattern: Pattern;
 };
 
+type MissionFieldTemplate = {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "multiSelect" | "date" | "datetime" | "number";
+  required: boolean;
+  order: number;
+  options?: string[];
+  placeholder?: string;
+};
+
 type MissionTemplate = {
   slotIndex: number;
   title: string;
@@ -45,6 +55,8 @@ type MissionTemplate = {
   score: number;
   monthlyCount: number;
   baseRate: Record<Pattern, number>;
+  fields: MissionFieldTemplate[];
+  sampleValues: Record<string, string>[];
 };
 
 type UserTemplate = {
@@ -105,6 +117,16 @@ const MISSIONS: MissionTemplate[] = [
     score: 2,
     monthlyCount: 10,
     baseRate: { poor: 85, good: 95 },
+    fields: [
+      { key: "shareTopic", label: "共有内容", type: "text", required: true, order: 1, placeholder: "当日の予定や共有事項" },
+    ],
+    sampleValues: [
+      { shareTopic: "午前はA社向け提案書の作成、午後は訪問予定" },
+      { shareTopic: "新人オンボーディングの進捗共有" },
+      { shareTopic: "進行中プロジェクトの課題共有とヘルプ依頼" },
+      { shareTopic: "顧客問い合わせへの回答ステータスを報告" },
+      { shareTopic: "来週のリリース計画のすり合わせ" },
+    ],
   },
   {
     slotIndex: 2,
@@ -114,6 +136,16 @@ const MISSIONS: MissionTemplate[] = [
     score: 5,
     monthlyCount: 4,
     baseRate: { poor: 80, good: 95 },
+    fields: [
+      { key: "area", label: "対象エリア", type: "select", required: true, order: 1, options: ["執務スペース", "会議室", "共有棚", "サーバールーム"] },
+      { key: "detail", label: "実施内容", type: "textarea", required: true, order: 2 },
+    ],
+    sampleValues: [
+      { area: "執務スペース", detail: "デスク周りの書類を整理し、不要物を廃棄した" },
+      { area: "会議室", detail: "ホワイトボード・配線を整え、備品を所定位置に戻した" },
+      { area: "共有棚", detail: "ラベルを貼り替え、在庫一覧を更新した" },
+      { area: "サーバールーム", detail: "ケーブル結束と清掃を実施" },
+    ],
   },
   {
     slotIndex: 3,
@@ -123,6 +155,15 @@ const MISSIONS: MissionTemplate[] = [
     score: 10,
     monthlyCount: 2,
     baseRate: { poor: 30, good: 95 },
+    fields: [
+      { key: "title", label: "提案タイトル", type: "text", required: true, order: 1 },
+      { key: "summary", label: "提案内容", type: "textarea", required: true, order: 2 },
+    ],
+    sampleValues: [
+      { title: "日報フォーマットの見直し", summary: "入力必須項目を絞り、運用負荷を3割削減できる見込み" },
+      { title: "共有ドライブの階層整理", summary: "部門別フォルダを統一ルールで再編し検索性を向上" },
+      { title: "定例会議の時間短縮", summary: "事前アジェンダ配布により30分を20分に短縮する運用へ" },
+    ],
   },
   {
     slotIndex: 4,
@@ -132,6 +173,15 @@ const MISSIONS: MissionTemplate[] = [
     score: 4,
     monthlyCount: 5,
     baseRate: { poor: 50, good: 95 },
+    fields: [
+      { key: "counterpartDept", label: "相手部署", type: "text", required: true, order: 1 },
+      { key: "agenda", label: "主な議題", type: "textarea", required: true, order: 2 },
+    ],
+    sampleValues: [
+      { counterpartDept: "開発部", agenda: "新機能リリース時の役割分担と窓口調整" },
+      { counterpartDept: "営業部", agenda: "顧客要望のフィードバック共有と優先度調整" },
+      { counterpartDept: "管理部", agenda: "経費精算フローの改善方針をすり合わせ" },
+    ],
   },
   {
     slotIndex: 5,
@@ -141,6 +191,16 @@ const MISSIONS: MissionTemplate[] = [
     score: 1,
     monthlyCount: 20,
     baseRate: { poor: 75, good: 95 },
+    fields: [
+      { key: "doneToday", label: "本日の実施内容", type: "textarea", required: true, order: 1 },
+      { key: "nextPlan", label: "翌営業日の予定", type: "textarea", required: false, order: 2 },
+    ],
+    sampleValues: [
+      { doneToday: "顧客A社との定例MTGを実施。次回までに見積案を送付予定", nextPlan: "見積案のドラフトを作成し、上長レビューを依頼" },
+      { doneToday: "障害対応のログ調査と再発防止策の整理", nextPlan: "チーム内で再発防止策をレビュー" },
+      { doneToday: "新規案件の要件ヒアリング2件", nextPlan: "要件整理メモを展開しチームで確認" },
+      { doneToday: "週次レポートを作成し関係者へ共有", nextPlan: "フィードバックを反映し翌週の計画を更新" },
+    ],
   },
 ];
 
@@ -343,7 +403,7 @@ function buildMissionItem(companyId: string, mission: PreparedCompany["missions"
     monthlyCount: mission.monthlyCount,
     score: mission.score,
     enabled: true,
-    fields: [],
+    fields: mission.fields,
     createdAt: now,
     updatedAt: now,
   };
@@ -362,7 +422,7 @@ function buildMissionHistoryItem(companyId: string, mission: PreparedCompany["mi
     category: mission.category,
     monthlyCount: mission.monthlyCount,
     score: mission.score,
-    fields: [],
+    fields: mission.fields,
     validFrom: now,
     validTo: null,
     changedByUserId,
@@ -380,6 +440,7 @@ function buildMissionReportItem(params: {
   reportedAt: string;
   reviewedAt: string;
   reportId: string;
+  fieldValues: Record<string, string>;
 }): DynamoItem {
   const reportId = params.reportId;
   const pk = `COMPANY#${params.companyId}#USER#${params.userId}`;
@@ -403,6 +464,7 @@ function buildMissionReportItem(params: {
     status: "APPROVED",
     reportedAt: params.reportedAt,
     reviewedAt: params.reviewedAt,
+    fieldValues: params.fieldValues,
     createdAt: params.reportedAt,
     updatedAt: params.reviewedAt,
     gsi1pk,
@@ -530,16 +592,28 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
     // 端数切り捨てによる表示割合の下振れを避ける。
     for (const mission of missions) {
       const targetRate = missionRateForMonth(mission, spec.pattern, monthIndex, yearMonths.length, rng);
-      const totalCapacity = mission.monthlyCount * users.length;
-      // round だと monthlyCount が小さいミッションで 100% に張り付くため floor を使う。
-      const targetTotalReports = clamp(Math.floor((targetRate / 100) * totalCapacity), 0, totalCapacity);
-      const base = Math.floor(targetTotalReports / users.length);
-      let remainder = targetTotalReports - base * users.length;
-      for (const user of users) {
-        const bump = remainder > 0 ? 1 : 0;
-        if (bump > 0) remainder -= 1;
-        const count = clamp(base + bump, 0, mission.monthlyCount);
-        perUserReportCounts.get(user.userId)!.set(mission.slotIndex, count);
+      if (spec.pattern === "poor") {
+        // poor 企業は個々の従業員ごとにミッション毎の得意/不得意を設け、
+        // レーダーチャートがでこぼこになるよう per-user per-mission でバラつかせる。
+        for (const user of users) {
+          const bias = userMissionBiasPct(user.userId, mission.slotIndex);
+          const userNoise = (rng() - 0.5) * 10; // 月内ノイズ ±5pt
+          const userRate = clamp(targetRate + bias + userNoise, 0, 100);
+          const count = clamp(Math.round((userRate / 100) * mission.monthlyCount), 0, mission.monthlyCount);
+          perUserReportCounts.get(user.userId)!.set(mission.slotIndex, count);
+        }
+      } else {
+        const totalCapacity = mission.monthlyCount * users.length;
+        // round だと monthlyCount が小さいミッションで 100% に張り付くため floor を使う。
+        const targetTotalReports = clamp(Math.floor((targetRate / 100) * totalCapacity), 0, totalCapacity);
+        const base = Math.floor(targetTotalReports / users.length);
+        let remainder = targetTotalReports - base * users.length;
+        for (const user of users) {
+          const bump = remainder > 0 ? 1 : 0;
+          if (bump > 0) remainder -= 1;
+          const count = clamp(base + bump, 0, mission.monthlyCount);
+          perUserReportCounts.get(user.userId)!.set(mission.slotIndex, count);
+        }
       }
     }
 
@@ -563,6 +637,8 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
           const reportedAt = new Date(Date.UTC(year, month, day, hour - 9, minute, second)).toISOString();
           const reviewedAt = new Date(Date.UTC(year, month, Math.min(dim, day + 1), hour - 9, minute, second)).toISOString();
           const reportId = `seed-${spec.companyId}-${user.userId}-m${mission.slotIndex}-${ym}-${String(i).padStart(2, "0")}`;
+          const sampleIndex = hashString(`${reportId}:values`) % mission.sampleValues.length;
+          const fieldValues = mission.sampleValues[sampleIndex] ?? {};
           addItem(
             buckets,
             TABLES.missionReport,
@@ -576,6 +652,7 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
               reportedAt,
               reviewedAt,
               reportId,
+              fieldValues,
             }),
           );
         }
@@ -622,6 +699,13 @@ function hashString(s: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
+}
+
+// ユーザー × ミッションで決定論的に決まる達成率バイアス (-35〜+35pt)。
+// poor 企業のレーダーチャートがでこぼこに見えるよう、得意/不得意を作る。
+function userMissionBiasPct(userId: string, slotIndex: number): number {
+  const h = hashString(`${userId}:mission-bias:${slotIndex}`);
+  return (h % 71) - 35;
 }
 
 async function main(): Promise<void> {

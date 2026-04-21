@@ -17,6 +17,19 @@ const PROFILE = process.env.AWS_PROFILE;
 
 const TARGET_COMPANY_IDS = ["seed-poor-company", "seed-good-company"];
 
+// 保守オーナー用に手動で作成したユーザーは削除対象から除外する。
+// 会社自体は削除されるため、ここに含めるユーザーは reset 後も DynamoDB 上に残る
+// が、会社行は再シードで再生成されるまで孤立する点に注意。
+const PRESERVED_USER_KEYS: Array<{ companyId: string; userId: string }> = [
+  { companyId: "seed-poor-company", userId: "u-007" },
+  { companyId: "seed-good-company", userId: "u-007" },
+];
+
+function isPreservedUser(companyId: string, userId: string | undefined): boolean {
+  if (!userId) return false;
+  return PRESERVED_USER_KEYS.some((key) => key.companyId === companyId && key.userId === userId);
+}
+
 const TABLES = {
   company: `correcre-company-${STAGE}`,
   user: `correcre-user-${STAGE}`,
@@ -131,11 +144,16 @@ async function deleteCompany(client: DynamoDBDocumentClient, companyId: string):
 
   // User (PK=companyId, SK=USER#...)
   const users = await queryAll(client, TABLES.user, "companyId = :cid", { ":cid": companyId });
+  const deletableUsers = users.filter((u) => !isPreservedUser(companyId, u["userId"] as string | undefined));
   await batchDelete(
     client,
     TABLES.user,
-    users.map((u) => ({ companyId, sk: u["sk"] })),
+    deletableUsers.map((u) => ({ companyId, sk: u["sk"] })),
   );
+  const preservedCount = users.length - deletableUsers.length;
+  if (preservedCount > 0) {
+    console.log(`  ${TABLES.user}: preserved ${preservedCount}`);
+  }
 
   // Department (PK=companyId, SK=DEPT#...)
   const depts = await queryAll(client, TABLES.department, "companyId = :cid", { ":cid": companyId });
@@ -169,10 +187,11 @@ async function deleteCompany(client: DynamoDBDocumentClient, companyId: string):
     "gsi1pk = :gsi1pk",
     { ":gsi1pk": `COMPANY#${companyId}` },
   );
+  const deletableReports = reportsViaGsi.filter((r) => !isPreservedUser(companyId, r["userId"] as string | undefined));
   await batchDelete(
     client,
     TABLES.missionReport,
-    reportsViaGsi.map((r) => ({ pk: r["pk"], sk: r["sk"] })),
+    deletableReports.map((r) => ({ pk: r["pk"], sk: r["sk"] })),
   );
 
   // UserMonthlyStats (GSI gsi1pk = COMPANY#cid)
@@ -183,10 +202,11 @@ async function deleteCompany(client: DynamoDBDocumentClient, companyId: string):
     "gsi1pk = :gsi1pk",
     { ":gsi1pk": `COMPANY#${companyId}` },
   );
+  const deletableStats = statsViaGsi.filter((s) => !isPreservedUser(companyId, s["userId"] as string | undefined));
   await batchDelete(
     client,
     TABLES.userMonthlyStats,
-    statsViaGsi.map((s) => ({ pk: s["pk"], sk: s["sk"] })),
+    deletableStats.map((s) => ({ pk: s["pk"], sk: s["sk"] })),
   );
 
   // Company itself (PK=companyId only)
