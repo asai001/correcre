@@ -25,6 +25,7 @@ type TableNames = {
   missionHistory: string;
   missionReport: string;
   userMonthlyStats: string;
+  exchangeHistory: string;
 };
 
 type Pattern = "poor" | "good";
@@ -86,6 +87,7 @@ const TABLES: TableNames = {
   missionHistory: `correcre-mission-history-${STAGE}`,
   missionReport: `correcre-mission-report-${STAGE}`,
   userMonthlyStats: `correcre-user-monthly-stats-${STAGE}`,
+  exchangeHistory: `correcre-exchange-history-${STAGE}`,
 };
 
 const MONTHS_INCLUDING_CURRENT = 13;
@@ -324,6 +326,9 @@ function missionRateForMonth(mission: MissionTemplate, pattern: Pattern, monthIn
 type DynamoItem = Record<string, unknown>;
 
 function buildCompanyItem(spec: CompanySpec, now: string): DynamoItem {
+  // 1000〜10000 の範囲で会社ごとに決定論的な保有ポイント。
+  const balanceSeed = hashString(`${spec.companyId}:company-point-balance`);
+  const companyPointBalance = 1000 + (balanceSeed % 9001); // 1000〜10000
   return {
     companyId: spec.companyId,
     name: spec.name,
@@ -332,7 +337,7 @@ function buildCompanyItem(spec: CompanySpec, now: string): DynamoItem {
     status: "ACTIVE",
     plan: "STANDARD",
     perEmployeeMonthlyFee: 1000,
-    companyPointBalance: 100000,
+    companyPointBalance,
     totalEmployees: USERS.length,
     activeEmployees: USERS.length,
     pointUnitLabel: "pt",
@@ -687,9 +692,70 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
         }),
       );
     }
+
+    // 月次の交換履歴を 200pt 以上になるよう決定論的に生成。
+    const exchangeItems = buildMonthlyExchangeHistory(spec.companyId, users.map((u) => u.userId), ym, year, month, dim);
+    for (const item of exchangeItems) {
+      addItem(buckets, TABLES.exchangeHistory, item);
+    }
   });
 
   return buckets;
+}
+
+const EXCHANGE_MERCHANDISE_CATALOG: Array<{ id: string; name: string; point: number }> = [
+  { id: "gift-card-500", name: "Amazonギフトカード 500円分", point: 80 },
+  { id: "gift-card-1000", name: "Amazonギフトカード 1000円分", point: 150 },
+  { id: "coffee-ticket", name: "社内カフェチケット", point: 50 },
+  { id: "lunch-ticket", name: "ランチチケット", point: 100 },
+  { id: "book-voucher", name: "書籍購入補助 1000円", point: 120 },
+];
+
+function buildMonthlyExchangeHistory(
+  companyId: string,
+  userIds: string[],
+  yearMonth: string,
+  year: number,
+  monthIndexZeroBased: number,
+  dim: number,
+): DynamoItem[] {
+  const items: DynamoItem[] = [];
+  let total = 0;
+  let seq = 0;
+
+  // 200pt に達するまで決定論的に交換履歴を積む。
+  while (total < 200) {
+    const seed = hashString(`${companyId}:exchange:${yearMonth}:${seq}`);
+    const userId = userIds[seed % userIds.length] ?? userIds[0];
+    const catalog = EXCHANGE_MERCHANDISE_CATALOG[seed % EXCHANGE_MERCHANDISE_CATALOG.length];
+    const day = 1 + (seed % dim);
+    const hour = 10 + (seed % 8);
+    const minute = seed % 60;
+    const exchangedAt = new Date(Date.UTC(year, monthIndexZeroBased, day, hour - 9, minute, 0)).toISOString();
+    const exchangeId = `seed-${companyId}-${yearMonth}-ex${String(seq).padStart(3, "0")}`;
+    const pk = `COMPANY#${companyId}#USER#${userId}`;
+    const sk = `EXCHANGED_AT#${exchangedAt}#EXCHANGE#${exchangeId}`;
+    items.push({
+      pk,
+      sk,
+      exchangeId,
+      companyId,
+      userId,
+      merchandiseId: catalog.id,
+      merchandiseNameSnapshot: catalog.name,
+      usedPoint: catalog.point,
+      quantity: 1,
+      status: "COMPLETED",
+      exchangedAt,
+      createdAt: exchangedAt,
+      gsi1pk: `COMPANY#${companyId}`,
+      gsi1sk: `EXCHANGED_AT#${exchangedAt}#USER#${userId}#EXCHANGE#${exchangeId}`,
+    });
+    total += catalog.point;
+    seq += 1;
+  }
+
+  return items;
 }
 
 function hashString(s: string): number {

@@ -38,6 +38,7 @@ const TABLES = {
   missionHistory: `correcre-mission-history-${STAGE}`,
   missionReport: `correcre-mission-report-${STAGE}`,
   userMonthlyStats: `correcre-user-monthly-stats-${STAGE}`,
+  exchangeHistory: `correcre-exchange-history-${STAGE}`,
 };
 
 function buildClient() {
@@ -207,6 +208,21 @@ async function deleteCompany(client: DynamoDBDocumentClient, companyId: string):
     client,
     TABLES.userMonthlyStats,
     deletableStats.map((s) => ({ pk: s["pk"], sk: s["sk"] })),
+  );
+
+  // ExchangeHistory (GSI gsi1pk = COMPANY#cid)
+  const exchangesViaGsi = await queryAllByIndex(
+    client,
+    TABLES.exchangeHistory,
+    "ExchangeHistoryByCompanyExchangedAt",
+    "gsi1pk = :gsi1pk",
+    { ":gsi1pk": `COMPANY#${companyId}` },
+  );
+  const deletableExchanges = exchangesViaGsi.filter((e) => !isPreservedUser(companyId, e["userId"] as string | undefined));
+  await batchDelete(
+    client,
+    TABLES.exchangeHistory,
+    deletableExchanges.map((e) => ({ pk: e["pk"], sk: e["sk"] })),
   );
 
   // Company itself (PK=companyId only)
