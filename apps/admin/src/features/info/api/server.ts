@@ -7,7 +7,21 @@ import { joinNameParts } from "@correcre/lib/user-profile";
 import { toCompanySummary } from "@correcre/lib/company-management-server";
 import type { DBUserItem } from "@correcre/types";
 
-import type { AdminInfoAccountSummary, AdminInfoData, AdminInfoDepartmentItem } from "../model/types";
+import type {
+  AdminInfoAccountSummary,
+  AdminInfoData,
+  AdminInfoDepartmentItem,
+  AdminInfoUserCounts,
+} from "../model/types";
+
+function toUserCounts(users: DBUserItem[]): AdminInfoUserCounts {
+  const nonDeletedUsers = users.filter((user) => user.status !== "DELETED");
+  return {
+    registered: nonDeletedUsers.length,
+    active: nonDeletedUsers.filter((user) => user.status === "ACTIVE").length,
+    inactive: nonDeletedUsers.filter((user) => user.status === "INACTIVE").length,
+  };
+}
 
 function toDepartmentItems(
   companyId: string,
@@ -100,5 +114,6 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
     departments: toDepartmentItems(companyId, departments, users),
     missions,
     account: toAccountSummary(currentAdminUser),
+    userCounts: toUserCounts(users),
   };
 }

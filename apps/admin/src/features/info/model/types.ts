@@ -19,12 +19,19 @@ export type AdminInfoAccountSummary = {
   lastLoginAt?: string;
 };
 
+export type AdminInfoUserCounts = {
+  registered: number;
+  active: number;
+  inactive: number;
+};
+
 export type AdminInfoData = {
   company: Company;
   editableCompany: CompanySummary;
   departments: AdminInfoDepartmentItem[];
   missions: Mission[];
   account: AdminInfoAccountSummary;
+  userCounts: AdminInfoUserCounts;
 };
 
 export type UpdateAdminCompanyInfoInput = UpdateCompanyInput & {
@@ -36,4 +43,8 @@ export type UpdateAdminCompanyInfoInput = UpdateCompanyInput & {
   logoImageUrl?: string;
   primaryColor?: string;
   pointConversionRate?: number | null;
+  address?: string;
+  representativeName?: string;
+  representativePhone?: string;
+  representativeEmail?: string;
 };

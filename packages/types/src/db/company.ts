@@ -46,6 +46,12 @@ export type Company = {
   contactPhone?: string;
   billingEmail?: string;
 
+  // Company address and representative information.
+  address?: string;
+  representativeName?: string;
+  representativePhone?: string;
+  representativeEmail?: string;
+
   // Company point balance.
   companyPointBalance: number;
 

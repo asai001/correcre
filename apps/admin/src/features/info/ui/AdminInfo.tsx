@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, startTransition, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, MenuItem, TextField } from "@mui/material";
+import { Alert, Button, TextField } from "@mui/material";
 import {
   CompanyPhilosophyFields,
   Table,
@@ -21,8 +21,6 @@ import {
   createCompanyFormStateFromCompany,
   createEmptyCompanyPhilosophyItem,
   getCompanyFormState,
-  planOptions,
-  statusOptions,
   toUpdateCompanyInput,
   type CompanyFormState,
 } from "@correcre/lib/company-management-form";
@@ -35,11 +33,17 @@ import type { AdminInfoData } from "../model/types";
 
 type AdminInfoProps = {
   initialData: AdminInfoData;
-  canEdit: boolean;
 };
 
 type CompanyDetailsFormState = {
   shortName: string;
+  address: string;
+  representativeName: string;
+  representativePhone: string;
+  representativeEmail: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
 };
 
 function formatDateTime(value?: string) {
@@ -67,6 +71,13 @@ function normalizeOptionalText(value?: string) {
 function createCompanyDetailsFormState(data: AdminInfoData["company"]): CompanyDetailsFormState {
   return {
     shortName: data.shortName ?? "",
+    address: data.address ?? "",
+    representativeName: data.representativeName ?? "",
+    representativePhone: data.representativePhone ?? "",
+    representativeEmail: data.representativeEmail ?? "",
+    contactName: data.contactName ?? "",
+    contactPhone: data.contactPhone ?? "",
+    contactEmail: data.contactEmail ?? "",
   };
 }
 
@@ -90,7 +101,7 @@ function InfoCard({
   );
 }
 
-export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
+export default function AdminInfo({ initialData }: AdminInfoProps) {
   const router = useRouter();
   const [companyForm, setCompanyForm] = useState<CompanyFormState>(() =>
     createCompanyFormStateFromCompany(initialData.editableCompany),
@@ -98,7 +109,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFormState>(() =>
     createCompanyDetailsFormState(initialData.company),
   );
-  const [hasSubmittedCompanyInfo, setHasSubmittedCompanyInfo] = useState(false);
   const [hasSubmittedPhilosophy, setHasSubmittedPhilosophy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -111,30 +121,16 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   useEffect(() => {
     setCompanyForm(createCompanyFormStateFromCompany(initialData.editableCompany));
     setCompanyDetails(createCompanyDetailsFormState(initialData.company));
-    setHasSubmittedCompanyInfo(false);
     setHasSubmittedPhilosophy(false);
     setExpandedDepartmentIds({});
   }, [initialData]);
 
   const { validation } = useMemo(() => getCompanyFormState(companyForm), [companyForm]);
-  const hasCompanyInfoValidationError = validation.name;
   const hasPhilosophyValidationError = validation.philosophyItems.some((item) => item.label || item.content);
-  const readOnlyMessage =
-    "既存の権限制御に合わせ、この画面は現在閲覧のみです。編集が必要な場合は運用者権限のあるアカウントで操作してください。";
 
   const handleSaveCompanyInfo = async () => {
-    if (!canEdit) {
-      return;
-    }
-
-    setHasSubmittedCompanyInfo(true);
     setError(null);
     setNotice(null);
-
-    if (hasCompanyInfoValidationError) {
-      setError("入力内容を確認してください");
-      return;
-    }
 
     const baseCompanyForm = createCompanyFormStateFromCompany(initialData.editableCompany);
     const companyInfoForm: CompanyFormState = {
@@ -154,13 +150,17 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
           Number.parseInt(baseCompanyForm.companyPointBalance, 10),
         ),
         shortName: normalizeOptionalText(companyDetails.shortName),
-        contactName: initialData.company.contactName,
-        contactEmail: initialData.company.contactEmail,
-        contactPhone: initialData.company.contactPhone,
+        contactName: normalizeOptionalText(companyDetails.contactName),
+        contactEmail: normalizeOptionalText(companyDetails.contactEmail),
+        contactPhone: normalizeOptionalText(companyDetails.contactPhone),
         billingEmail: initialData.company.billingEmail,
         logoImageUrl: initialData.company.logoImageUrl,
         primaryColor: initialData.company.primaryColor,
         pointConversionRate: initialData.company.pointConversionRate ?? null,
+        address: normalizeOptionalText(companyDetails.address),
+        representativeName: normalizeOptionalText(companyDetails.representativeName),
+        representativePhone: normalizeOptionalText(companyDetails.representativePhone),
+        representativeEmail: normalizeOptionalText(companyDetails.representativeEmail),
       });
 
       setNotice("各種情報を更新しました");
@@ -175,10 +175,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   };
 
   const handleSavePhilosophy = async () => {
-    if (!canEdit) {
-      return;
-    }
-
     setHasSubmittedPhilosophy(true);
     setError(null);
     setNotice(null);
@@ -211,6 +207,10 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
         logoImageUrl: initialData.company.logoImageUrl,
         primaryColor: initialData.company.primaryColor,
         pointConversionRate: initialData.company.pointConversionRate ?? null,
+        address: initialData.company.address,
+        representativeName: initialData.company.representativeName,
+        representativePhone: initialData.company.representativePhone,
+        representativeEmail: initialData.company.representativeEmail,
       });
 
       setNotice("\u7406\u5ff5\u4f53\u7cfb\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f");
@@ -229,10 +229,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   };
 
   const handleAddPhilosophyItem = () => {
-    if (!canEdit) {
-      return;
-    }
-
     setCompanyForm((current) => ({
       ...current,
       philosophyItems: [...current.philosophyItems, createEmptyCompanyPhilosophyItem()],
@@ -243,10 +239,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
     itemId: string,
     nextItem: Partial<CompanyFormState["philosophyItems"][number]>,
   ) => {
-    if (!canEdit) {
-      return;
-    }
-
     setCompanyForm((current) => ({
       ...current,
       philosophyItems: current.philosophyItems.map((item) => (item.id === itemId ? { ...item, ...nextItem } : item)),
@@ -254,10 +246,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   };
 
   const handleRemovePhilosophyItem = (itemId: string) => {
-    if (!canEdit) {
-      return;
-    }
-
     setCompanyForm((current) => ({
       ...current,
       philosophyItems: current.philosophyItems.filter((item) => item.id !== itemId),
@@ -265,10 +253,6 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
   };
 
   const handleCreateDepartment = async () => {
-    if (!canEdit) {
-      return;
-    }
-
     const normalizedDepartmentName = departmentName.trim();
 
     if (!normalizedDepartmentName) {
@@ -310,10 +294,9 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
       <AdminPageHeader
         title="各種情報画面"
         adminName={initialData.account.name}
-        subtitle="理念体系、会社情報、ポイント設定、部署、ミッション定義をまとめて確認します。"
+        subtitle="理念体系、会社情報、登録情報、部署、ミッション定義をまとめて確認します。"
       />
 
-      {!canEdit ? <Alert severity="info">{readOnlyMessage}</Alert> : null}
       {notice ? <Alert severity="success">{notice}</Alert> : null}
       {error ? <Alert severity="error">{error}</Alert> : null}
 
@@ -332,10 +315,10 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
             会社情報
           </TabsTrigger>
           <TabsTrigger
-            value="points"
+            value="registration"
             className="data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(8,145,178,0.9)]"
           >
-            ポイント設定
+            登録情報
           </TabsTrigger>
           <TabsTrigger
             value="departments"
@@ -356,36 +339,28 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
             title="理念体系の編集"
             description="運用者画面と同じ理念体系コンポーネントを再利用しています。ミッション、ビジョン、バリュー、クレドなどを柔軟に管理できます。"
           >
-            {!canEdit ? <Alert severity="info">{readOnlyMessage}</Alert> : null}
+            <CompanyPhilosophyFields
+              items={companyForm.philosophyItems}
+              validation={validation.philosophyItems}
+              hasSubmitted={hasSubmittedPhilosophy}
+              onAdd={handleAddPhilosophyItem}
+              onChangeItem={handleChangePhilosophyItem}
+              onRemoveItem={handleRemovePhilosophyItem}
+            />
 
-            <div className={!canEdit ? "pointer-events-none opacity-70" : undefined}>
-              <CompanyPhilosophyFields
-                items={companyForm.philosophyItems}
-                validation={validation.philosophyItems}
-                hasSubmitted={hasSubmittedPhilosophy}
-                onAdd={handleAddPhilosophyItem}
-                onChangeItem={handleChangePhilosophyItem}
-                onRemoveItem={handleRemovePhilosophyItem}
-              />
+            <div className="mt-5 flex justify-end">
+              <Button variant="contained" onClick={handleSavePhilosophy} disabled={submitting}>
+                {submitting ? "保存中..." : "理念体系を保存"}
+              </Button>
             </div>
-
-            {canEdit ? (
-              <div className="mt-5 flex justify-end">
-                <Button variant="contained" onClick={handleSavePhilosophy} disabled={submitting}>
-                  {submitting ? "保存中..." : "理念体系を保存"}
-                </Button>
-              </div>
-            ) : null}
           </InfoCard>
         </TabsContent>
 
         <TabsContent value="company">
           <InfoCard
             title="会社情報"
-            description="会社名、表示名、契約状態などの基本情報を確認できます。必要な項目だけ段階的に運用へ載せられるよう、空欄のままでも保存できます。"
+            description="会社名は変更できません。住所、代表者および担当者の連絡先を編集できます。"
           >
-            {!canEdit ? <Alert severity="info">{readOnlyMessage}</Alert> : null}
-
             <div className="grid gap-4 md:grid-cols-2">
               <TextField
                 label="会社ID"
@@ -402,87 +377,112 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
               <TextField
                 label="会社名"
                 value={companyForm.name}
-                onChange={(event) => setCompanyForm((current) => ({ ...current, name: event.target.value }))}
-                required
-                disabled={!canEdit}
-                error={hasSubmittedCompanyInfo && validation.name}
-                helperText={hasSubmittedCompanyInfo && validation.name ? "会社名を入力してください" : " "}
                 fullWidth
+                slotProps={{ input: { readOnly: true } }}
               />
               <TextField
                 label="表示名"
                 value={companyDetails.shortName}
                 onChange={(event) => setCompanyDetails((current) => ({ ...current, shortName: event.target.value }))}
-                disabled={!canEdit}
+                fullWidth
                 helperText="ダッシュボードなどで表示する短い会社名です。未入力の場合は会社名を使用します。"
+              />
+              <TextField
+                label="住所"
+                value={companyDetails.address}
+                onChange={(event) => setCompanyDetails((current) => ({ ...current, address: event.target.value }))}
+                fullWidth
+                className="md:col-span-2"
+              />
+              <TextField
+                label="代表者名"
+                value={companyDetails.representativeName}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, representativeName: event.target.value }))
+                }
                 fullWidth
               />
               <TextField
-                select
-                label="ステータス"
-                value={companyForm.status}
-                disabled
+                label="代表電話番号"
+                value={companyDetails.representativePhone}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, representativePhone: event.target.value }))
+                }
                 fullWidth
-              >
-                {statusOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+              />
               <TextField
-                select
-                label="プラン"
-                value={companyForm.plan}
-                disabled
+                label="代表メールアドレス"
+                type="email"
+                value={companyDetails.representativeEmail}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, representativeEmail: event.target.value }))
+                }
                 fullWidth
-              >
-                {planOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </TextField>
+                className="md:col-span-2"
+              />
+              <TextField
+                label="担当者名"
+                value={companyDetails.contactName}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, contactName: event.target.value }))
+                }
+                fullWidth
+              />
+              <TextField
+                label="担当者電話番号"
+                value={companyDetails.contactPhone}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, contactPhone: event.target.value }))
+                }
+                fullWidth
+              />
+              <TextField
+                label="担当者メールアドレス"
+                type="email"
+                value={companyDetails.contactEmail}
+                onChange={(event) =>
+                  setCompanyDetails((current) => ({ ...current, contactEmail: event.target.value }))
+                }
+                fullWidth
+                className="md:col-span-2"
+              />
             </div>
 
-            {canEdit ? (
-              <div className="mt-5 flex justify-end">
-                <Button variant="contained" onClick={handleSaveCompanyInfo} disabled={submitting}>
-                  {submitting ? "保存中..." : "会社情報を保存"}
-                </Button>
-              </div>
-            ) : null}
+            <div className="mt-5 flex justify-end">
+              <Button variant="contained" onClick={handleSaveCompanyInfo} disabled={submitting}>
+                {submitting ? "保存中..." : "会社情報を保存"}
+              </Button>
+            </div>
           </InfoCard>
         </TabsContent>
 
-        <TabsContent value="points">
+        <TabsContent value="registration">
           <InfoCard
-            title="ポイント設定"
-            description="会社ポイント残高、ポイント単位、月額単価を確認できます。"
+            title="登録情報"
+            description="登録人数、利用人数、休止中人数を確認できます。"
           >
-            {!canEdit ? <Alert severity="info">{readOnlyMessage}</Alert> : null}
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <TextField
-                label="会社ポイント残高"
-                type="number"
-                value={companyForm.companyPointBalance}
-                disabled
-                fullWidth
-              />
-              <TextField
-                label="ポイント単位"
-                value={companyForm.pointUnitLabel}
-                disabled
-                fullWidth
-              />
-              <TextField
-                label="月額単価"
-                type="number"
-                value={companyForm.perEmployeeMonthlyFee}
-                disabled
-                fullWidth
-              />
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                <div className="text-sm font-medium text-slate-500">登録人数</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
+                  {initialData.userCounts.registered}
+                  <span className="ml-1 text-base font-medium text-slate-500">人</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                <div className="text-sm font-medium text-slate-500">利用人数</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
+                  {initialData.userCounts.active}
+                  <span className="ml-1 text-base font-medium text-slate-500">人</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                <div className="text-sm font-medium text-slate-500">休止中人数</div>
+                <div className="mt-2 text-3xl font-bold text-slate-900">
+                  {initialData.userCounts.inactive}
+                  <span className="ml-1 text-base font-medium text-slate-500">人</span>
+                </div>
+              </div>
             </div>
           </InfoCard>
         </TabsContent>
@@ -492,21 +492,17 @@ export default function AdminInfo({ initialData, canEdit }: AdminInfoProps) {
             title="部署一覧"
             description="部署マスタを一覧で確認できます。各行を開くと、その部署に所属する従業員一覧も確認できます。"
           >
-            {!canEdit ? <Alert severity="info">{readOnlyMessage}</Alert> : null}
-
-            {canEdit ? (
-              <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
-                <TextField
-                  label="新しい部署名"
-                  value={departmentName}
-                  onChange={(event) => setDepartmentName(event.target.value)}
-                  fullWidth
-                />
-                <Button variant="contained" onClick={handleCreateDepartment} disabled={departmentSubmitting}>
-                  {departmentSubmitting ? "追加中..." : "部署を追加"}
-                </Button>
-              </div>
-            ) : null}
+            <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+              <TextField
+                label="新しい部署名"
+                value={departmentName}
+                onChange={(event) => setDepartmentName(event.target.value)}
+                fullWidth
+              />
+              <Button variant="contained" onClick={handleCreateDepartment} disabled={departmentSubmitting}>
+                {departmentSubmitting ? "追加中..." : "部署を追加"}
+              </Button>
+            </div>
 
             {departmentError ? <Alert severity="error">{departmentError}</Alert> : null}
 

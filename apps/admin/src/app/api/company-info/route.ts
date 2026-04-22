@@ -69,6 +69,10 @@ export async function PATCH(req: Request) {
       logoImageUrl: normalizeOptionalText(body.logoImageUrl),
       primaryColor: normalizeOptionalText(body.primaryColor),
       pointConversionRate: normalizePointConversionRate(body.pointConversionRate),
+      address: normalizeOptionalText(body.address),
+      representativeName: normalizeOptionalText(body.representativeName),
+      representativePhone: normalizeOptionalText(body.representativePhone),
+      representativeEmail: normalizeOptionalText(body.representativeEmail),
       updatedAt,
     };
 
