@@ -19,6 +19,7 @@ export type CompanyFormState = {
   perEmployeeMonthlyFee: string;
   companyPointBalance: string;
   pointUnitLabel: string;
+  showPointExchangeLink: boolean;
   philosophyItems: CompanyPhilosophyItem[];
 };
 
@@ -76,6 +77,7 @@ export function createInitialCompanyFormState(): CompanyFormState {
     perEmployeeMonthlyFee: "3000",
     companyPointBalance: "0",
     pointUnitLabel: "pt",
+    showPointExchangeLink: false,
     philosophyItems: [],
   };
 }
@@ -92,6 +94,7 @@ export function createCompanyFormStateFromCompany(company: CompanySummary | null
     perEmployeeMonthlyFee: String(normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0)),
     companyPointBalance: String(normalizeNonNegativeInteger(company.companyPointBalance, 0)),
     pointUnitLabel: normalizePointUnitLabel(company.pointUnitLabel),
+    showPointExchangeLink: company.showPointExchangeLink === true,
     philosophyItems: company.philosophyItems.map((item) => ({ ...item })),
   };
 }
@@ -151,6 +154,7 @@ export function toCreateCompanyInput(
     perEmployeeMonthlyFee: parsedMonthlyFee,
     companyPointBalance: parsedCompanyPointBalance,
     pointUnitLabel: form.pointUnitLabel.trim(),
+    showPointExchangeLink: form.showPointExchangeLink,
     philosophyItems: toCompanyPhilosophyItems(form.philosophyItems),
   };
 }

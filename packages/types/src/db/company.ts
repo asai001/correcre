@@ -68,6 +68,7 @@ export type Company = {
   logoImageUrl?: string;
   primaryColor?: string;
   allowedEmailDomains?: string[];
+  showPointExchangeLink?: boolean;
   philosophy?: CompanyPhilosophy;
 
   createdAt: string;

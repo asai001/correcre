@@ -22,6 +22,7 @@ export type CompanySummary = {
   companyPointBalance: number;
   perEmployeeMonthlyFee: number;
   pointUnitLabel: string;
+  showPointExchangeLink: boolean;
   philosophyItems: CompanyPhilosophyItem[];
   updatedAt: string;
 };
@@ -33,6 +34,7 @@ export type CreateCompanyInput = {
   perEmployeeMonthlyFee: number;
   companyPointBalance: number;
   pointUnitLabel?: string;
+  showPointExchangeLink?: boolean;
   philosophyItems: CompanyPhilosophyItem[];
 };
 

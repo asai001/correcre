@@ -1,7 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 import type { OperatorCompanySummary, UpdateCompanyInput } from "../model/types";
 import CompanyPhilosophyFields from "./CompanyPhilosophyFields";
@@ -205,6 +218,23 @@ export default function CompanyEditDialog({
             error={hasSubmitted && validation.pointUnitLabel}
             helperText={hasSubmitted && validation.pointUnitLabel ? "ポイント単位を入力してください。" : "通常は pt のままで問題ありません。"}
           />
+
+          <div>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={form.showPointExchangeLink}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, showPointExchangeLink: event.target.checked }))
+                  }
+                />
+              }
+              label="従業員ダッシュボードに「ポイント交換」リンクを表示する"
+            />
+            <p className="ml-8 text-xs text-slate-500">
+              オフの場合、従業員ダッシュボードのリンクカードに「ポイント交換」は表示されません。
+            </p>
+          </div>
 
           <div className="pt-1">
             <CompanyPhilosophyFields

@@ -24,6 +24,7 @@ export default async function DashboardPage() {
     companyId,
   );
   const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
+  const showPointExchangeLink = company?.showPointExchangeLink === true;
 
   return (
     <div className="container mx-auto mb-10 px-6">
@@ -63,6 +64,7 @@ export default async function DashboardPage() {
             phoneNumber: currentUser.phoneNumber,
             address: currentUser.address,
           }}
+          showPointExchangeLink={showPointExchangeLink}
         />
       </div>
       <div className="mt-10">

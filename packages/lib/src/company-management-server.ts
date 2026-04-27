@@ -181,6 +181,7 @@ export function toCompanySummary(company: Company): CompanySummary {
     companyPointBalance: normalizeNonNegativeInteger(company.companyPointBalance, 0),
     perEmployeeMonthlyFee: normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0),
     pointUnitLabel: company.pointUnitLabel?.trim() || "pt",
+    showPointExchangeLink: company.showPointExchangeLink === true,
     philosophyItems: toCompanyPhilosophyItems(company),
     updatedAt: company.updatedAt,
   };
@@ -265,6 +266,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     totalEmployees: 0,
     activeEmployees: 0,
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
+    showPointExchangeLink: input.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, now),
     createdAt: now,
     updatedAt: now,
@@ -297,6 +299,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
     companyPointBalance: input.companyPointBalance,
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
+    showPointExchangeLink: input.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),
     updatedAt,
   };

@@ -34,6 +34,7 @@ type DashboardLinkCard =
 
 type DashboardLinksProps = {
   initialProfile: EditableEmployeeProfile;
+  showPointExchangeLink: boolean;
 };
 
 function DashboardLinkTile({ card }: { card: DashboardLinkCard }) {
@@ -48,7 +49,7 @@ function DashboardLinkTile({ card }: { card: DashboardLinkCard }) {
   );
 }
 
-export default function DashboardLinks({ initialProfile }: DashboardLinksProps) {
+export default function DashboardLinks({ initialProfile, showPointExchangeLink }: DashboardLinksProps) {
   const router = useRouter();
   const [profile, setProfile] = useState(initialProfile);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -93,16 +94,20 @@ export default function DashboardLinks({ initialProfile }: DashboardLinksProps) 
   };
 
   const dashboardLinkCards: DashboardLinkCard[] = [
-    {
-      kind: "link",
-      title: "ポイント交換",
-      description: "商品・サービスと交換",
-      href: "https://80462.co.jp/",
-      external: true,
-      icon: faGift,
-      iconColor: "#D97706",
-      iconBackgroundColor: "#FEF3C7",
-    },
+    ...(showPointExchangeLink
+      ? ([
+          {
+            kind: "link",
+            title: "ポイント交換",
+            description: "商品・サービスと交換",
+            href: "https://80462.co.jp/",
+            external: true,
+            icon: faGift,
+            iconColor: "#D97706",
+            iconBackgroundColor: "#FEF3C7",
+          },
+        ] satisfies DashboardLinkCard[])
+      : []),
     {
       kind: "link",
       title: "過去の実績",
