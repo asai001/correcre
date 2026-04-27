@@ -1,6 +1,11 @@
 import "server-only";
 
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { getS3Client } from "./client";
@@ -40,8 +45,56 @@ export function buildDraftImageKey(params: {
   return `drafts/${params.companyId}/${params.userId}/${params.uploadId}.${ext}`;
 }
 
+export function buildFinalImageKey(params: {
+  companyId: string;
+  userId: string;
+  reportId: string;
+  fieldKey: string;
+  extension: string;
+}): string {
+  const ext = params.extension.replace(/^\./, "").toLowerCase();
+  return `mission-reports/${params.companyId}/${params.userId}/${params.reportId}/${params.fieldKey}.${ext}`;
+}
+
 export function isDraftImageKey(s3Key: string): boolean {
   return s3Key.startsWith("drafts/");
+}
+
+export function getExtensionFromKey(s3Key: string): string {
+  const lastDot = s3Key.lastIndexOf(".");
+  return lastDot >= 0 ? s3Key.slice(lastDot + 1) : "";
+}
+
+// ベストエフォート: コピー成功後に元 draft を消す。
+// 失敗してもライフサイクルで 7 日後に消えるため例外は握りつぶしてログのみ。
+export async function promoteDraftImage(
+  config: MissionReportImageS3Config,
+  params: {
+    sourceKey: string;
+    destinationKey: string;
+  },
+): Promise<void> {
+  const client = getS3Client(config.region);
+
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: config.bucketName,
+      Key: params.destinationKey,
+      CopySource: `${config.bucketName}/${encodeURIComponent(params.sourceKey)}`,
+      MetadataDirective: "COPY",
+    }),
+  );
+
+  try {
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: config.bucketName,
+        Key: params.sourceKey,
+      }),
+    );
+  } catch (error) {
+    console.warn("failed to delete draft image after promotion", { sourceKey: params.sourceKey, error });
+  }
 }
 
 // 報告内のいずれかのフィールドに紐づく画像であることを担保するため

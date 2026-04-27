@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { nowYYYYMM } from "@correcre/lib";
 
-import { fetchMission } from "../api/client";
+import { fetchMission, submitMissionReport } from "../api/client";
 import type { Mission, MissionReport, SubmitPayload } from "../model/types";
 
 type UseMissionForDashboardOptions = {
@@ -96,8 +96,23 @@ export function useMissionReportForDashboard(
   };
 
   const handleSubmit = async (payload: SubmitPayload) => {
-    void payload;
     void yearMonth;
+    const result = await submitMissionReport(payload);
+
+    // 楽観的に画面側の missionReports を更新
+    setMissionReports((prev) => [
+      ...prev,
+      {
+        companyId: payload.companyId,
+        userId,
+        reportId: result.reportId,
+        missionId: payload.missionId,
+        reportedAt: result.reportedAt,
+        status: result.status,
+        pointGranted: 0,
+        comment: "",
+      },
+    ]);
   };
 
   return {

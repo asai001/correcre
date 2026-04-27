@@ -1,4 +1,4 @@
-import type { Mission, MissionReport, FormConfig, ImageFieldValue } from "../model/types";
+import type { Mission, MissionReport, FormConfig, ImageFieldValue, SubmitPayload } from "../model/types";
 
 // 将来 DynamoDB/API に置換する関数群（今はモック返却）
 
@@ -75,6 +75,33 @@ export async function fetchMission(
   const data = (await res.json()) as { mission: Mission[]; missionReports: MissionReport[] } | null;
 
   return data;
+}
+
+export type SubmitMissionReportResult = {
+  reportId: string;
+  reportedAt: string;
+  status: "PENDING" | "APPROVED";
+};
+
+export async function submitMissionReport(payload: SubmitPayload): Promise<SubmitMissionReportResult> {
+  const res = await fetch("/api/submit-mission-report", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      companyId: payload.companyId,
+      missionId: payload.missionId,
+      values: payload.values,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`failed to submit mission report: ${res.status} ${errorBody}`);
+  }
+
+  return (await res.json()) as SubmitMissionReportResult;
 }
 
 export async function fetchMissionFormConfig(companyId: string, missionId: string): Promise<FormConfig | null> {

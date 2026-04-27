@@ -62,7 +62,7 @@ export type MissionProgress = {
 export type SubmitPayload = {
   companyId: string;
   missionId: string;
-  values: Record<string, any>;
+  values: Record<string, string | ImageFieldValue>;
   score: number;
 };
 
