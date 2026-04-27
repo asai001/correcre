@@ -11,4 +11,5 @@ export const OPERATOR_PROTECTED_PATH_PREFIXES = [
   "/company-registration",
   "/user-registration",
   "/missions",
+  "/merchants",
 ] as const;

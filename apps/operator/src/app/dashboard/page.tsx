@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBuilding, faBullseye, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faBuilding, faBullseye, faStore, faUsers } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
@@ -34,6 +34,13 @@ const dashboardCards = [
     description: "対象企業を選択して、ミッション項目の編集・履歴管理を行います。",
     icon: faBullseye,
     accentClassName: "from-amber-500 to-orange-600",
+  },
+  {
+    href: "/merchants",
+    title: "提携企業管理",
+    description: "商品・サービスを提供する提携企業の登録と、ログインユーザーの招待を行います。",
+    icon: faStore,
+    accentClassName: "from-violet-500 to-fuchsia-600",
   },
 ] as const;
 

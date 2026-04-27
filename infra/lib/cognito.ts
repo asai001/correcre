@@ -5,7 +5,7 @@ import { Construct } from "constructs";
 
 import type { InfraStage } from "./infra-stack";
 
-export type CognitoAppType = "admin" | "employee" | "operator";
+export type CognitoAppType = "admin" | "employee" | "operator" | "merchant";
 
 export type SharedCognitoProps = {
   stage: InfraStage;
@@ -19,6 +19,7 @@ export type SharedCognitoResources = {
   adminUserPoolClient: cognito.UserPoolClient;
   employeeUserPoolClient: cognito.UserPoolClient;
   operatorUserPoolClient: cognito.UserPoolClient;
+  merchantUserPoolClient: cognito.UserPoolClient;
   issuer: string;
   domainPrefix: string;
 };
@@ -29,7 +30,7 @@ type CustomEmailSenderConfig = {
   sesVerifiedDomain: string;
 };
 
-type LoginAppName = "admin" | "employee";
+type LoginAppName = "admin" | "employee" | "merchant";
 
 const DEFAULT_CUSTOM_EMAIL_SENDER_CONFIG: CustomEmailSenderConfig = {
   fromEmail: "correcre-info@efficient-technology.com",
@@ -71,14 +72,17 @@ const LOGIN_URLS = {
   dev: {
     admin: "http://localhost:3000/login",
     employee: "http://localhost:3000/login",
+    merchant: "http://localhost:3003/login",
   },
   stg: {
     admin: "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
     employee: "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
+    merchant: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
   },
   prod: {
     admin: "https://correcre-admin.example.com/login",
     employee: "https://correcre-employee.example.com/login",
+    merchant: "https://correcre-merchant.example.com/login",
   },
 } satisfies Record<InfraStage, Record<LoginAppName, string>>;
 
@@ -106,6 +110,8 @@ function buildConstructPrefix(appType: CognitoAppType): string {
       return "Employee";
     case "operator":
       return "Operator";
+    case "merchant":
+      return "Merchant";
   }
 }
 
@@ -176,7 +182,11 @@ exports.handler = async (event) => {
   };
   const rawRoles = event.request?.clientMetadata?.roles ?? "";
   const roles = parseRoles(rawRoles);
-  const appName = roles.includes("EMPLOYEE") ? "employee" : "admin";
+  const appName = roles.includes("MERCHANT")
+    ? "merchant"
+    : roles.includes("EMPLOYEE")
+      ? "employee"
+      : "admin";
   const loginUrl = loginUrls[appName] ?? loginUrls.admin;
 
   if (event.triggerSource === "CustomMessage_AdminCreateUser") {
@@ -300,6 +310,7 @@ export function createSharedCognito(scope: Construct, props: SharedCognitoProps)
     adminUserPoolClient: addUserPoolClient(userPool, props.stage, "admin"),
     employeeUserPoolClient: addUserPoolClient(userPool, props.stage, "employee"),
     operatorUserPoolClient: addUserPoolClient(userPool, props.stage, "operator"),
+    merchantUserPoolClient: addUserPoolClient(userPool, props.stage, "merchant"),
     issuer: `https://cognito-idp.${cdk.Stack.of(scope).region}.amazonaws.com/${userPool.userPoolId}`,
     domainPrefix,
   };

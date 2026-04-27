@@ -9,10 +9,12 @@ export interface ApplicationS3BucketsProps {
   adminAppUrl: string;
   employeeAppUrl: string;
   operatorAppUrl?: string;
+  merchantAppUrl?: string;
 }
 
 export interface ApplicationS3Buckets {
   missionReportImageBucket: s3.Bucket;
+  merchandiseImageBucket: s3.Bucket;
 }
 
 function isProductionStage(stage: InfraStage): boolean {
@@ -40,8 +42,17 @@ function buildAllowedOrigins(props: ApplicationS3BucketsProps): string[] {
     origins.push(props.operatorAppUrl);
   }
 
+  if (props.merchantAppUrl) {
+    origins.push(props.merchantAppUrl);
+  }
+
   if (!isProductionStage(props.stage)) {
-    origins.push("http://localhost:3000", "http://localhost:3001", "http://localhost:3002");
+    origins.push(
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:3002",
+      "http://localhost:3003",
+    );
   }
 
   return origins.map(trimTrailingSlash);
@@ -91,5 +102,42 @@ export function createApplicationS3Buckets(
     ],
   });
 
-  return { missionReportImageBucket };
+  // MerchandiseImageBucket
+  // - 用途: 提携企業が登録する商品の一覧カード用画像と詳細ページ用画像
+  // - キー設計: merchandise/<merchantId>/<merchandiseId>/<uuid>.<ext>
+  //   下書き(submit前): drafts/<merchantId>/<uploadId>.<ext>
+  // - アクセス: BlockPublicAccess は完全有効。閲覧/アップロードは presigned URL のみ
+  const merchandiseImageBucket = new s3.Bucket(scope, "MerchandiseImageBucket", {
+    bucketName: buildBucketName("merchandise-image", props.stage, stack.account),
+    encryption: s3.BucketEncryption.S3_MANAGED,
+    blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+    enforceSSL: true,
+    versioned: false,
+    removalPolicy: resolveRemovalPolicy(props.stage),
+    autoDeleteObjects: !isProductionStage(props.stage),
+    cors: [
+      {
+        allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+        allowedOrigins,
+        allowedHeaders: ["*"],
+        exposedHeaders: ["ETag"],
+        maxAge: 3000,
+      },
+    ],
+    lifecycleRules: [
+      {
+        id: "expire-drafts-after-7-days",
+        prefix: "drafts/",
+        expiration: cdk.Duration.days(7),
+        enabled: true,
+      },
+      {
+        id: "abort-incomplete-multipart-after-1-day",
+        abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
+        enabled: true,
+      },
+    ],
+  });
+
+  return { missionReportImageBucket, merchandiseImageBucket };
 }

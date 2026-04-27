@@ -79,5 +79,6 @@ export const config = {
     "/company-registration/:path*",
     "/user-registration/:path*",
     "/missions/:path*",
+    "/merchants/:path*",
   ],
 };

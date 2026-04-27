@@ -5,3 +5,6 @@ export * from "./db/mission";
 export * from "./db/missionReport";
 export * from "./db/userMonthlyStats";
 export * from "./db/exchangeHistory";
+export * from "./db/merchant";
+export * from "./db/merchantUser";
+export * from "./db/merchandise";

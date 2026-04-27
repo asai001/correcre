@@ -10,6 +10,7 @@ type EnvironmentConfig = {
   adminUrl: string;
   employeeUrl: string;
   operatorUrl: string;
+  merchantUrl: string;
   sourceContext: string;
 };
 
@@ -21,6 +22,7 @@ const environments: EnvironmentConfig[] = [
     adminUrl: "https://dev.correcre-admin.vercel.app/",
     employeeUrl: "https://dev.correcre-employee.vercel.app/",
     operatorUrl: "https://dev.correcre-operator.vercel.app/",
+    merchantUrl: "https://dev.correcre-merchant.vercel.app/",
     sourceContext: "local",
   },
   {
@@ -30,6 +32,7 @@ const environments: EnvironmentConfig[] = [
     adminUrl: "https://stg.correcre-admin.vercel.app/",
     employeeUrl: "https://stg.correcre-employee.vercel.app/",
     operatorUrl: "https://stg.correcre-operator.vercel.app/",
+    merchantUrl: "https://stg.correcre-merchant.vercel.app/",
     sourceContext: "stage",
   },
   {
@@ -39,6 +42,7 @@ const environments: EnvironmentConfig[] = [
     adminUrl: "https://correcre-admin.vercel.app/",
     employeeUrl: "https://correcre-employee.vercel.app/",
     operatorUrl: "https://correcre-operator.vercel.app/",
+    merchantUrl: "https://correcre-merchant.vercel.app/",
     sourceContext: "main",
   },
 ];
@@ -56,6 +60,7 @@ for (const environment of environments) {
     adminAppUrl: environment.adminUrl,
     employeeAppUrl: environment.employeeUrl,
     operatorAppUrl: environment.operatorUrl,
+    merchantAppUrl: environment.merchantUrl,
     sourceContext: environment.sourceContext,
     description: `Correcre ${environment.stage} infrastructure stack`,
   });

@@ -24,7 +24,8 @@
       "@correcre/individual-analysis/*": ["./packages/features/individual-analysis/src/*"],
       "@admin/*": ["./apps/admin/src/*"],
       "@operator/*": ["./apps/operator/src/*"],
-      "@employee/*": ["./apps/employee/src/*"]
+      "@employee/*": ["./apps/employee/src/*"],
+      "@merchant/*": ["./apps/merchant/src/*"]
     },
 
     "esModuleInterop": true, // CJS ↔ ESM の相互運用を許可。Nextの要件でもあり基本ON。

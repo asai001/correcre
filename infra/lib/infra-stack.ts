@@ -13,6 +13,7 @@ export interface InfraStackProps extends cdk.StackProps {
   adminAppUrl: string;
   employeeAppUrl: string;
   operatorAppUrl?: string;
+  merchantAppUrl?: string;
   sourceContext: string;
 }
 
@@ -26,6 +27,7 @@ export class InfraStack extends cdk.Stack {
 
     const adminAppUrl = normalizeUrl(props.adminAppUrl);
     const employeeAppUrl = normalizeUrl(props.employeeAppUrl);
+    const merchantAppUrl = props.merchantAppUrl ? normalizeUrl(props.merchantAppUrl) : undefined;
     const sharedCognito = createSharedCognito(this, {
       stage: props.stage,
       account: props.env?.account,
@@ -39,6 +41,7 @@ export class InfraStack extends cdk.Stack {
       adminAppUrl: props.adminAppUrl,
       employeeAppUrl: props.employeeAppUrl,
       operatorAppUrl: props.operatorAppUrl,
+      merchantAppUrl: props.merchantAppUrl,
     });
     const vercelOidcAccess = createVercelOidcAccess(this, {
       stage: props.stage,
@@ -58,6 +61,12 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, "EmployeeAppUrl", {
       value: employeeAppUrl,
     });
+
+    if (merchantAppUrl) {
+      new cdk.CfnOutput(this, "MerchantAppUrl", {
+        value: merchantAppUrl,
+      });
+    }
 
     new cdk.CfnOutput(this, "SourceContext", {
       value: props.sourceContext,
@@ -183,6 +192,30 @@ export class InfraStack extends cdk.Stack {
       value: sharedCognito.domainPrefix,
     });
 
+    new cdk.CfnOutput(this, "MerchantCognitoRegion", {
+      value: cdk.Stack.of(this).region,
+    });
+
+    new cdk.CfnOutput(this, "MerchantCognitoUserPoolId", {
+      value: sharedCognito.userPool.userPoolId,
+    });
+
+    new cdk.CfnOutput(this, "MerchantCognitoUserPoolClientId", {
+      value: sharedCognito.merchantUserPoolClient.userPoolClientId,
+    });
+
+    new cdk.CfnOutput(this, "MerchantCognitoIssuer", {
+      value: sharedCognito.issuer,
+    });
+
+    new cdk.CfnOutput(this, "MerchantCognitoHostedUiBaseUrl", {
+      value: sharedCognito.userPoolDomain.baseUrl(),
+    });
+
+    new cdk.CfnOutput(this, "MerchantCognitoDomainPrefix", {
+      value: sharedCognito.domainPrefix,
+    });
+
     new cdk.CfnOutput(this, "CompanyTableName", {
       value: dynamoTables.companyTable.tableName,
     });
@@ -221,6 +254,22 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "MissionReportImageBucketName", {
       value: s3Buckets.missionReportImageBucket.bucketName,
+    });
+
+    new cdk.CfnOutput(this, "MerchantTableName", {
+      value: dynamoTables.merchantTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MerchantUserTableName", {
+      value: dynamoTables.merchantUserTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MerchandiseTableName", {
+      value: dynamoTables.merchandiseTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MerchandiseImageBucketName", {
+      value: s3Buckets.merchandiseImageBucket.bucketName,
     });
   }
 }

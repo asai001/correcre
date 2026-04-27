@@ -6,7 +6,7 @@ import type { ApplicationS3Buckets } from "./s3";
 import type { InfraStage } from "./infra-stack";
 
 const VERCEL_TEAM_SLUG = "asai001s-projects-3e71fbe6";
-const VERCEL_PROJECT_NAMES = ["correcre-admin", "correcre-employee", "correcre-operator"] as const;
+const VERCEL_PROJECT_NAMES = ["correcre-admin", "correcre-employee", "correcre-operator", "correcre-merchant"] as const;
 
 type VercelEnvironment = "development" | "preview" | "production";
 
@@ -71,6 +71,9 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.userMonthlyStatsTable,
     dynamoTables.exchangeHistoryTable,
     dynamoTables.pointTransactionTable,
+    dynamoTables.merchantTable,
+    dynamoTables.merchantUserTable,
+    dynamoTables.merchandiseTable,
   ];
 }
 
@@ -106,6 +109,7 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
   // 実際のオブジェクト読み書きはブラウザが presigned URL 経由で行うため、
   // S3 直アクセスの権限はオブジェクト単位で付与する。
   props.s3Buckets.missionReportImageBucket.grantReadWrite(role);
+  props.s3Buckets.merchandiseImageBucket.grantReadWrite(role);
 
   role.addToPolicy(
     new iam.PolicyStatement({

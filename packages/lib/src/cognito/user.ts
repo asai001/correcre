@@ -6,7 +6,7 @@ import {
   AdminDeleteUserCommand,
   type AttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
-import type { DBUserRole } from "@correcre/types";
+import type { DBUserRole, MerchantUserRole } from "@correcre/types";
 
 import { getCognitoIdentityProviderClient } from "./client";
 
@@ -15,12 +15,14 @@ export type CognitoUserPoolConfig = {
   userPoolId: string;
 };
 
+export type CognitoCreatableRole = DBUserRole | MerchantUserRole;
+
 export type CreateCognitoUserInput = {
   email: string;
   firstName: string;
   lastName: string;
   fullName: string;
-  roles: DBUserRole[];
+  roles: readonly CognitoCreatableRole[];
 };
 
 export type CreatedCognitoUser = {
@@ -40,7 +42,7 @@ function createTemporaryPassword() {
   return `Tmp${randomBytes(8).toString("hex")}A1`;
 }
 
-function serializeRoles(roles: DBUserRole[]) {
+function serializeRoles(roles: readonly CognitoCreatableRole[]) {
   return Array.from(new Set(roles)).join(",");
 }
 

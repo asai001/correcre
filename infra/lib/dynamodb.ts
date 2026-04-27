@@ -18,6 +18,9 @@ export interface ApplicationDynamoTables {
   userMonthlyStatsTable: dynamodb.Table;
   exchangeHistoryTable: dynamodb.Table;
   pointTransactionTable: dynamodb.Table;
+  merchantTable: dynamodb.Table;
+  merchantUserTable: dynamodb.Table;
+  merchandiseTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -197,6 +200,10 @@ function createUserMonthlyStatsTable(scope: Construct, stage: InfraStage): dynam
 // - sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
 // - gsi1pk = COMPANY#<companyId>
 // - gsi1sk = EXCHANGED_AT#<ISO8601>#USER#<userId>#EXCHANGE#<exchangeId>
+// - gsi2pk = MERCHANT#<merchantId>#STATUS#<status>
+// - gsi2sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
+// - gsi3pk = MERCHANT#<merchantId>
+// - gsi3sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
 function createExchangeHistoryTable(scope: Construct, stage: InfraStage): dynamodb.Table {
   const table = new dynamodb.Table(
     scope,
@@ -206,6 +213,72 @@ function createExchangeHistoryTable(scope: Construct, stage: InfraStage): dynamo
 
   table.addGlobalSecondaryIndex({
     indexName: "ExchangeHistoryByCompanyExchangedAt",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "ExchangeHistoryByMerchantStatusExchangedAt",
+    partitionKey: stringAttribute("gsi2pk"),
+    sortKey: stringAttribute("gsi2sk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "ExchangeHistoryByMerchantExchangedAt",
+    partitionKey: stringAttribute("gsi3pk"),
+    sortKey: stringAttribute("gsi3sk"),
+  });
+
+  return table;
+}
+
+// Merchant
+// - merchantId = <merchantId>
+// - no sort key
+// - no GSIs
+function createMerchantTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(scope, "MerchantTable", buildTableProps(stage, buildTableName("merchant", stage), "merchantId"));
+}
+
+// MerchantUser
+// - merchantId = <merchantId>
+// - sk = USER#<userId>
+// - gsi1pk = COGNITO_SUB#<cognitoSub>
+// - gsi2pk = EMAIL#<email>
+function createMerchantUserTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "MerchantUserTable",
+    buildTableProps(stage, buildTableName("merchant-user", stage), "merchantId", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchantUserByCognitoSub",
+    partitionKey: stringAttribute("gsi1pk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchantUserByEmail",
+    partitionKey: stringAttribute("gsi2pk"),
+  });
+
+  return table;
+}
+
+// Merchandise
+// - merchantId = <merchantId>
+// - sk = MERCHANDISE#<merchandiseId>
+// - gsi1pk = STATUS#<status>
+// - gsi1sk = MERCHANT#<merchantId>#MERCHANDISE#<merchandiseId>
+function createMerchandiseTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "MerchandiseTable",
+    buildTableProps(stage, buildTableName("merchandise", stage), "merchantId", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchandiseByStatus",
     partitionKey: stringAttribute("gsi1pk"),
     sortKey: stringAttribute("gsi1sk"),
   });
@@ -249,5 +322,8 @@ export function createApplicationDynamoTables(
     userMonthlyStatsTable: createUserMonthlyStatsTable(scope, props.stage),
     exchangeHistoryTable: createExchangeHistoryTable(scope, props.stage),
     pointTransactionTable: createPointTransactionTable(scope, props.stage),
+    merchantTable: createMerchantTable(scope, props.stage),
+    merchantUserTable: createMerchantUserTable(scope, props.stage),
+    merchandiseTable: createMerchandiseTable(scope, props.stage),
   };
 }
