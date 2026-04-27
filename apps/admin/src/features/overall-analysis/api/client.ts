@@ -4,6 +4,7 @@ export async function fetchOverallAnalysisSummary(
   companyId: string,
   startDate: string,
   endDate: string,
+  departmentId: string | undefined,
   signal?: AbortSignal
 ): Promise<OverallAnalysisSummary | null> {
   const params = new URLSearchParams({
@@ -11,6 +12,10 @@ export async function fetchOverallAnalysisSummary(
     startDate,
     endDate,
   });
+
+  if (departmentId) {
+    params.set("departmentId", departmentId);
+  }
 
   const res = await fetch(`/api/overall-analysis?${params.toString()}`, {
     method: "GET",

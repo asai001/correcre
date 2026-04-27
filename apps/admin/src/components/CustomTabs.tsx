@@ -31,7 +31,7 @@ export default function CustomTabs({ tabs, defaultIndex = 0 }: CustomTabsProps) 
   return (
     <div className="mt-5">
       <div className="mb-2 rounded-md bg-slate-100 p-1">
-        <div role="tablist" aria-label="分析レポートの切り替え" className="flex flex-wrap gap-2">
+        <div role="tablist" aria-label="分析・レポートの切り替え" className="flex flex-wrap gap-2">
           {tabs.map((tab, index) => {
             const selected = value === index;
 

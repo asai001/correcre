@@ -7,7 +7,7 @@ import MissionAnalysisSection from "@admin/features/individual-analysis/ui/Missi
 import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
 
 import { useOverallAnalysisSummary } from "../hooks/useOverallAnalysisSummary";
-import type { OverallAnalysisSummary } from "../model/types";
+import type { OverallAnalysisDepartmentOption, OverallAnalysisSummary } from "../model/types";
 import OverallAchievementChart from "./OverallAchievementChart";
 import OverallAnalysisFilterSection from "./OverallAnalysisFilterSection";
 import OverallAnalysisStatsCards from "./OverallAnalysisStatsCards";
@@ -16,6 +16,7 @@ import OverallScoreTrendChart from "./OverallScoreTrendChart";
 
 type OverallAnalysisProps = {
   companyId: string;
+  departments: OverallAnalysisDepartmentOption[];
 };
 
 const emptySummary: OverallAnalysisSummary = {
@@ -29,7 +30,7 @@ const emptySummary: OverallAnalysisSummary = {
   exchangeHistory: [],
 };
 
-export default function OverallAnalysis({ companyId }: OverallAnalysisProps) {
+export default function OverallAnalysis({ companyId, departments }: OverallAnalysisProps) {
   const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const exchangeHistoryPagination = useMemo(
     () => ({
@@ -40,7 +41,13 @@ export default function OverallAnalysis({ companyId }: OverallAnalysisProps) {
   );
   const [selectedStartDate, setSelectedStartDate] = useState(initialDateRange.startDate);
   const [selectedEndDate, setSelectedEndDate] = useState(initialDateRange.endDate);
-  const { summary, loading, error } = useOverallAnalysisSummary(companyId, selectedStartDate, selectedEndDate);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
+  const { summary, loading, error } = useOverallAnalysisSummary(
+    companyId,
+    selectedStartDate,
+    selectedEndDate,
+    selectedDepartmentId,
+  );
   const currentSummary = summary ?? emptySummary;
   const showSkeleton = loading || (!summary && !error);
 
@@ -67,6 +74,9 @@ export default function OverallAnalysis({ companyId }: OverallAnalysisProps) {
         selectedEndDate={selectedEndDate}
         onStartDateChange={handleStartDateChange}
         onEndDateChange={handleEndDateChange}
+        departments={departments}
+        selectedDepartmentId={selectedDepartmentId}
+        onDepartmentChange={setSelectedDepartmentId}
       />
 
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}

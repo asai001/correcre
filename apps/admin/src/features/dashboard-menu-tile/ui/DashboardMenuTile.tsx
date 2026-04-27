@@ -19,7 +19,7 @@ export default function DashboardMenuTile() {
         className="md:min-w-0"
         icon={faChartBar}
         iconColor="#2563EB"
-        menuName="分析レポート"
+        menuName="分析・レポート"
         desc="全社傾向と個人分析を見ながら、日々の運用状況を確認できます。"
       />
       <MenuTile

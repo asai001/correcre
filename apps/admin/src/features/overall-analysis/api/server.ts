@@ -161,10 +161,13 @@ function buildEmptySummary(): OverallAnalysisSummary {
   };
 }
 
+export const UNASSIGNED_DEPARTMENT_FILTER = "__UNASSIGNED__";
+
 export async function getOverallAnalysisSummaryFromDynamo(
   companyId: string,
   startDate: string,
   endDate: string,
+  departmentId?: string,
 ): Promise<OverallAnalysisSummary> {
   const region = readRequiredServerEnv("AWS_REGION");
   const [company, users, monthlyStatsAll, missions, missionReportsAll, exchangeHistoryAll] = await Promise.all([
@@ -213,7 +216,22 @@ export async function getOverallAnalysisSummaryFromDynamo(
     ),
   ]);
 
-  const currentUsers = users.filter((item) => item.status !== "DELETED");
+  const allCurrentUsers = users.filter((item) => item.status !== "DELETED");
+  const currentUsers = departmentId
+    ? allCurrentUsers.filter((item) =>
+        departmentId === UNASSIGNED_DEPARTMENT_FILTER ? !item.departmentId : item.departmentId === departmentId,
+      )
+    : allCurrentUsers;
+  const targetUserIds = new Set(currentUsers.map((item) => item.userId));
+  const filteredMonthlyStatsAll = departmentId
+    ? monthlyStatsAll.filter((item) => targetUserIds.has(item.userId))
+    : monthlyStatsAll;
+  const filteredMissionReportsAll = departmentId
+    ? missionReportsAll.filter((item) => targetUserIds.has(item.userId))
+    : missionReportsAll;
+  const filteredExchangeHistoryAll = departmentId
+    ? exchangeHistoryAll.filter((item) => targetUserIds.has(item.userId))
+    : exchangeHistoryAll;
   const displayMonths = listYearMonthsBetween(startDate, endDate);
 
   if (!company) {
@@ -227,9 +245,9 @@ export async function getOverallAnalysisSummaryFromDynamo(
   }
 
   const availableRange = mergeDateRanges([
-    getMonthlyStatsDateRange(monthlyStatsAll),
-    getDateRangeFromDateTimes(missionReportsAll.map((item) => item.reportedAt)),
-    getDateRangeFromDateTimes(exchangeHistoryAll.map((item) => item.exchangedAt)),
+    getMonthlyStatsDateRange(filteredMonthlyStatsAll),
+    getDateRangeFromDateTimes(filteredMissionReportsAll.map((item) => item.reportedAt)),
+    getDateRangeFromDateTimes(filteredExchangeHistoryAll.map((item) => item.exchangedAt)),
   ]);
   const effectiveRange = clampDateRange({ startDate, endDate }, availableRange);
 
@@ -244,7 +262,7 @@ export async function getOverallAnalysisSummaryFromDynamo(
   }
 
   const months = listYearMonthsBetween(effectiveRange.startDate, effectiveRange.endDate);
-  const monthlyStats = monthlyStatsAll.filter((item) => months.includes(item.yearMonth));
+  const monthlyStats = filteredMonthlyStatsAll.filter((item) => months.includes(item.yearMonth));
   const monthlyStatsByMonth = new Map<string, UserMonthlyStats[]>();
   for (const item of monthlyStats) {
     const rows = monthlyStatsByMonth.get(item.yearMonth) ?? [];
@@ -273,8 +291,9 @@ export async function getOverallAnalysisSummaryFromDynamo(
   const averageScore =
     monthlyStats.length > 0 ? round(monthlyStats.reduce((sum, item) => sum + item.earnedScore, 0) / monthlyStats.length, 1) : 0;
   const totalEarnedPoints = monthlyStats.reduce((sum, item) => sum + item.earnedPoints, 0);
-  const userCount = currentUsers.length > 0 ? currentUsers.length : new Set(monthlyStatsAll.map((item) => item.userId)).size;
-  const approvedReportsInRange = missionReportsAll.filter((item) =>
+  const userCount =
+    currentUsers.length > 0 ? currentUsers.length : new Set(filteredMonthlyStatsAll.map((item) => item.userId)).size;
+  const approvedReportsInRange = filteredMissionReportsAll.filter((item) =>
     isWithinDateRange(item.reportedAt, effectiveRange.startDate, effectiveRange.endDate),
   );
   const reportCountByMissionId = new Map<string, number>();
@@ -318,8 +337,8 @@ export async function getOverallAnalysisSummaryFromDynamo(
       percentage: item.percentage,
     }));
 
-  const userNameById = new Map(currentUsers.map((item) => [item.userId, joinNameParts(item.lastName, item.firstName)]));
-  const exchangeHistory: OverallExchangeHistoryItem[] = exchangeHistoryAll
+  const userNameById = new Map(allCurrentUsers.map((item) => [item.userId, joinNameParts(item.lastName, item.firstName)]));
+  const exchangeHistory: OverallExchangeHistoryItem[] = filteredExchangeHistoryAll
     .filter((item) => isWithinDateRange(item.exchangedAt, effectiveRange.startDate, effectiveRange.endDate))
     .sort((a, b) => new Date(b.exchangedAt).getTime() - new Date(a.exchangedAt).getTime())
     .map((item) => ({

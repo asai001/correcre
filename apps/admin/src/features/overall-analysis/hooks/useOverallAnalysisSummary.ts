@@ -13,7 +13,8 @@ type UseOverallAnalysisSummaryResult = {
 export function useOverallAnalysisSummary(
   companyId: string | undefined,
   startDate: string | undefined,
-  endDate: string | undefined
+  endDate: string | undefined,
+  departmentId: string | undefined
 ): UseOverallAnalysisSummaryResult {
   const [summary, setSummary] = useState<OverallAnalysisSummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +35,7 @@ export function useOverallAnalysisSummary(
       setError(null);
 
       try {
-        const data = await fetchOverallAnalysisSummary(companyId, startDate, endDate, ac.signal);
+        const data = await fetchOverallAnalysisSummary(companyId, startDate, endDate, departmentId, ac.signal);
 
         if (ac.signal.aborted) {
           return;
@@ -59,7 +60,7 @@ export function useOverallAnalysisSummary(
     return () => {
       ac.abort();
     };
-  }, [companyId, startDate, endDate]);
+  }, [companyId, startDate, endDate, departmentId]);
 
   return { summary, loading, error };
 }
