@@ -49,7 +49,9 @@ export default function IndividualAnalysis({ companyId, employees }: IndividualA
     [],
   );
 
-  const [selectedUserId, setSelectedUserId] = useState(employees[0]?.userId ?? "");
+  const [selectedUserId, setSelectedUserId] = useState(
+    employees.find((employee) => !employee.isInactive && !employee.isInvited)?.userId ?? employees[0]?.userId ?? "",
+  );
   const [selectedStartDate, setSelectedStartDate] = useState(initialDateRange.startDate);
   const [selectedEndDate, setSelectedEndDate] = useState(initialDateRange.endDate);
 

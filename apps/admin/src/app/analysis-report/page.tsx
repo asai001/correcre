@@ -33,6 +33,8 @@ export default async function AnalysisReportPage() {
       userId: user.userId,
       name: joinNameParts(user.lastName, user.firstName),
       department: user.departmentName?.trim() || "部門未設定",
+      isInactive: user.status === "INACTIVE",
+      isInvited: user.status === "INVITED",
     }));
   const departmentOptions = departments
     .slice()

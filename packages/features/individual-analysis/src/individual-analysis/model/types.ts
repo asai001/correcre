@@ -10,6 +10,8 @@ export type EmployeeOption = {
   userId: string;
   name: string;
   department: string;
+  isInactive: boolean;
+  isInvited: boolean;
 };
 
 export type AnalysisMissionItem = {
