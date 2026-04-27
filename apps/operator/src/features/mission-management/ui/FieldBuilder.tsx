@@ -213,6 +213,7 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
               onChange={(e) => handleUpdate(index, { label: e.target.value })}
               size="small"
               fullWidth
+              required
             />
             <FormControl size="small" fullWidth>
               <InputLabel>タイプ</InputLabel>
@@ -303,7 +304,9 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
           {/* セレクト系の選択肢 */}
           {(field.type === "select" || field.type === "multiSelect") ? (
             <div className="space-y-2">
-              <div className="text-sm font-semibold text-slate-600">選択肢</div>
+              <div className="text-sm font-semibold text-slate-600">
+                選択肢<span className="text-red-600"> *</span>
+              </div>
               {(field.options ?? []).map((option, optIdx) => (
                 <div key={optIdx} className="flex items-center gap-2">
                   <TextField
@@ -312,6 +315,7 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
                     size="small"
                     fullWidth
                     placeholder={`選択肢 ${optIdx + 1}`}
+                    required
                   />
                   <IconButton
                     size="small"

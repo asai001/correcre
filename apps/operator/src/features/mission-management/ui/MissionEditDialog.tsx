@@ -16,6 +16,7 @@ import {
 import type { MissionField } from "@correcre/types";
 import { updateMission } from "../api/client";
 import type { OperatorMissionSummary, UpdateMissionInput } from "../model/types";
+import { validateMissionInput } from "../model/validation";
 import FieldBuilder from "./FieldBuilder";
 
 type MissionEditDialogProps = {
@@ -74,27 +75,35 @@ export default function MissionEditDialog({
     setConfirmOpen(false);
   }, [mission]);
 
+  const buildInput = (): UpdateMissionInput => ({
+    title: form.title,
+    description: form.description,
+    category: form.category,
+    monthlyCount: parseInt(form.monthlyCount, 10),
+    score: parseInt(form.score, 10),
+    enabled: form.enabled,
+    fields: form.fields,
+  });
+
   const handleSave = () => {
+    const validationError = validateMissionInput(buildInput());
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
     setConfirmOpen(true);
   };
 
   const handleConfirm = async () => {
     setConfirmOpen(false);
 
-    const input: UpdateMissionInput = {
-      title: form.title,
-      description: form.description,
-      category: form.category,
-      monthlyCount: parseInt(form.monthlyCount, 10),
-      score: parseInt(form.score, 10),
-      enabled: form.enabled,
-      fields: form.fields,
-    };
-
     try {
       setSubmitting(true);
       setError(null);
-      const updated = await updateMission(companyId, mission.slotIndex, input);
+      const updated = await updateMission(companyId, mission.slotIndex, buildInput());
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ミッションの保存に失敗しました。");
