@@ -11,9 +11,22 @@ import { BatchWriteCommand, DynamoDBDocumentClient, QueryCommand, ScanCommand, D
 
 type Stage = "dev" | "stg" | "prod";
 
+function readProfileArg(): string | undefined {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === "--profile" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+    if (args[i].startsWith("--profile=")) {
+      return args[i].slice("--profile=".length);
+    }
+  }
+  return undefined;
+}
+
 const STAGE = (process.env.STAGE ?? "stg") as Stage;
 const REGION = process.env.AWS_REGION ?? "ap-northeast-1";
-const PROFILE = process.env.AWS_PROFILE;
+const PROFILE = readProfileArg() ?? process.env.AWS_PROFILE;
 
 const TARGET_COMPANY_IDS = ["seed-poor-company", "seed-good-company"];
 

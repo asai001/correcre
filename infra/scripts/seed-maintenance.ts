@@ -75,9 +75,22 @@ type DepartmentTemplate = {
   sortOrder: number;
 };
 
+function readProfileArg(): string | undefined {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === "--profile" && i + 1 < args.length) {
+      return args[i + 1];
+    }
+    if (args[i].startsWith("--profile=")) {
+      return args[i].slice("--profile=".length);
+    }
+  }
+  return undefined;
+}
+
 const STAGE = (process.env.STAGE ?? "stg") as Stage;
 const REGION = process.env.AWS_REGION ?? "ap-northeast-1";
-const PROFILE = process.env.AWS_PROFILE;
+const PROFILE = readProfileArg() ?? process.env.AWS_PROFILE;
 
 const TABLES: TableNames = {
   company: `correcre-company-${STAGE}`,
@@ -91,6 +104,13 @@ const TABLES: TableNames = {
 };
 
 const MONTHS_INCLUDING_CURRENT = 13;
+
+// アカマツ商会の田中一郎 (u-001) は確認用に「過去1年分で75→35の右肩下がり」を描く。
+// シード対象 (MONTHS_INCLUDING_CURRENT ヶ月) 全体で線形に下降させ、月ごとに
+// 決定論的ノイズで上下させて自然な揺らぎを出す。両端 (最古月=75, 最新月=35) は固定。
+const TANAKA_USER_ID = "u-001";
+const TANAKA_START_SCORE = 75;
+const TANAKA_END_SCORE = 35;
 
 const COMPANIES: CompanySpec[] = [
   {
@@ -622,6 +642,27 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
       }
     }
 
+    // 田中一郎は確認用に決め打ちの右肩下がりトレンドで上書きする。
+    // 各ミッションの件数を目標スコア比で割り当て、score=1 の日報ミッションで端数を吸収する。
+    if (spec.pattern === "poor") {
+      const tanakaBucket = perUserReportCounts.get(TANAKA_USER_ID);
+      if (tanakaBucket) {
+        const target = tanakaTargetScore(monthIndex, yearMonths.length);
+        let achieved = 0;
+        for (const mission of missions) {
+          if (mission.slotIndex === 5) continue;
+          const count = clamp(Math.round((target / 100) * mission.monthlyCount), 0, mission.monthlyCount);
+          tanakaBucket.set(mission.slotIndex, count);
+          achieved += count * mission.score;
+        }
+        const m5 = missions.find((m) => m.slotIndex === 5);
+        if (m5) {
+          const m5Count = clamp(Math.round(target - achieved), 0, m5.monthlyCount);
+          tanakaBucket.set(m5.slotIndex, m5Count);
+        }
+      }
+    }
+
     for (const user of users) {
       let monthReportCount = 0;
       let monthTargetTotal = 0;
@@ -669,7 +710,11 @@ function generateCompany(company: PreparedCompany, now: Date, nowIso: string, ye
         // 70 → 30 の線形傾向にノイズ ±5。
         const targetMean = 64 * scoreFactor; // 係数 1.10 → 0.47 を 70→30 に写像
         const noise = (rng() - 0.5) * 10;
-        baseEarned = clamp(targetMean + noise, 0, 100);
+        // 田中一郎は確認用に決め打ちの右肩下がりトレンド (75→35) を使う。
+        // rng() は他ユーザーの決定論を保つため通常通り消費する。
+        baseEarned = user.userId === TANAKA_USER_ID
+          ? tanakaTargetScore(monthIndex, yearMonths.length)
+          : clamp(targetMean + noise, 0, 100);
       } else {
         // 80 〜 95 を維持。
         const targetMean = 80 + 15 * rng();
@@ -772,6 +817,21 @@ function hashString(s: string): number {
 function userMissionBiasPct(userId: string, slotIndex: number): number {
   const h = hashString(`${userId}:mission-bias:${slotIndex}`);
   return (h % 71) - 35;
+}
+
+// 田中一郎の月次目標スコア。シード対象期間全体で 75→35 の右肩下がりを線形に描き、
+// 月ごとに決定論的なノイズを乗せて上下しながら下がる見た目にする。
+// 開始月と最終月は値を固定して 75→35 の振れ幅を保証する。
+function tanakaTargetScore(monthIndex: number, totalMonths: number): number {
+  const span = Math.max(1, totalMonths - 1);
+  const t = clamp(monthIndex / span, 0, 1);
+  const base = TANAKA_START_SCORE + (TANAKA_END_SCORE - TANAKA_START_SCORE) * t;
+  if (monthIndex === 0 || monthIndex === totalMonths - 1) {
+    return base;
+  }
+  // 月ごとに ±7pt の決定論的ノイズで上下させる。
+  const noise = ((hashString(`tanaka-trend:${monthIndex}`) % 1401) / 100) - 7;
+  return clamp(base + noise, 0, 100);
 }
 
 async function main(): Promise<void> {

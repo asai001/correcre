@@ -12,8 +12,8 @@
     "deploy:dev": "cdk deploy CorrecreDevInfraStack --profile CorreCre-Dev-Account",
     "deploy:stg": "cdk deploy CorrecreStgInfraStack --profile CorreCre-Stg-Account --require-approval never",
     "deploy:prod": "cdk deploy CorrecreProdInfraStack --profile CorreCre-Prod-Account --require-approval never",
-    "seed:maintenance": "ts-node --transpile-only scripts/seed-maintenance.ts",
-    "seed:maintenance:reset": "ts-node --transpile-only scripts/reset-maintenance-seed.ts"
+    "seed:maintenance": "ts-node --transpile-only scripts/seed-maintenance.ts --profile CorreCre-Stg-Account",
+    "seed:maintenance:reset": "ts-node --transpile-only scripts/reset-maintenance-seed.ts --profile CorreCre-Stg-Account"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
