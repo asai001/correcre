@@ -30,6 +30,7 @@ const FIELD_TYPE_OPTIONS: { value: MissionFieldType; label: string }[] = [
   { value: "date", label: "日付" },
   { value: "datetime", label: "日時" },
   { value: "number", label: "数値" },
+  { value: "image", label: "画像" },
 ];
 
 const AUTO_FIELD_KEY_PATTERN = /^field_(\d+)$/;

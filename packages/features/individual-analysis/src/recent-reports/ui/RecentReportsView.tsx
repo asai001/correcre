@@ -1,10 +1,104 @@
 import * as React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { IconDefinition } from "@fortawesome/free-solid-svg-icons";
-import { TablePagination } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Link as MuiLink,
+  TablePagination,
+  Typography,
+} from "@mui/material";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
 import Table, { ColumnDef } from "../../components/Table";
-import type { RecentReport } from "../model/types";
+import type { RecentReport, RecentReportImageRef } from "../model/types";
+
+const IMAGE_PLACEHOLDER_PATTERN = /<image:([^>]+)>/g;
+
+type SelectedImage = {
+  fieldKey: string;
+  label: string;
+  s3Key: string;
+  originalFileName: string;
+  contentType: string;
+};
+
+async function fetchMissionReportImageViewUrl(s3Key: string): Promise<string> {
+  const params = new URLSearchParams({ s3Key }).toString();
+  const res = await fetch(`/api/mission-report-image-view-url?${params}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`failed to issue view url: ${res.status} ${errorBody}`);
+  }
+
+  const data = (await res.json()) as { url: string };
+  return data.url;
+}
+
+function renderInputContent(
+  inputContent: string,
+  images: RecentReportImageRef[] | undefined,
+  onClickImage: (image: SelectedImage) => void,
+): React.ReactNode {
+  if (!inputContent) {
+    return null;
+  }
+
+  const imagesByKey = new Map((images ?? []).map((image) => [image.fieldKey, image]));
+
+  return inputContent.split("\n").map((line, lineIdx) => {
+    const parts: React.ReactNode[] = [];
+    let cursor = 0;
+    let match: RegExpExecArray | null;
+
+    IMAGE_PLACEHOLDER_PATTERN.lastIndex = 0;
+    while ((match = IMAGE_PLACEHOLDER_PATTERN.exec(line)) !== null) {
+      if (match.index > cursor) {
+        parts.push(line.slice(cursor, match.index));
+      }
+
+      const fieldKey = match[1];
+      const image = imagesByKey.get(fieldKey);
+
+      if (image) {
+        parts.push(
+          <MuiLink
+            key={`${lineIdx}-${match.index}`}
+            component="button"
+            type="button"
+            onClick={() => onClickImage(image)}
+            sx={{ textDecoration: "underline", cursor: "pointer", verticalAlign: "baseline" }}
+          >
+            アップロード写真
+          </MuiLink>,
+        );
+      } else {
+        parts.push("(画像なし)");
+      }
+
+      cursor = match.index + match[0].length;
+    }
+
+    if (cursor < line.length) {
+      parts.push(line.slice(cursor));
+    }
+
+    return (
+      <React.Fragment key={lineIdx}>
+        {parts.length > 0 ? parts : line}
+        {"\n"}
+      </React.Fragment>
+    );
+  });
+}
 
 export type RecentReportsPagination = {
   rowsPerPageOptions?: number[];
@@ -20,7 +114,10 @@ type RecentReportsViewProps = {
   showEmployeeName?: boolean;
 };
 
-function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
+function getColumns(
+  showEmployeeName: boolean,
+  onClickImage: (image: SelectedImage) => void,
+): ColumnDef<RecentReport>[] {
   const columns: ColumnDef<RecentReport>[] = [
     {
       id: "date",
@@ -53,6 +150,7 @@ function getColumns(showEmployeeName: boolean): ColumnDef<RecentReport>[] {
       id: "inputContent",
       label: "入力内容",
       align: "left",
+      render: (row) => renderInputContent(row.inputContent, row.images, onClickImage),
     }
   );
 
@@ -67,7 +165,55 @@ export default function RecentReportsView({
   pagination,
   showEmployeeName = true,
 }: RecentReportsViewProps) {
-  const columns = React.useMemo(() => getColumns(showEmployeeName), [showEmployeeName]);
+  const [selectedImage, setSelectedImage] = React.useState<SelectedImage | null>(null);
+  const [imageUrl, setImageUrl] = React.useState<string | null>(null);
+  const [imageLoading, setImageLoading] = React.useState(false);
+  const [imageError, setImageError] = React.useState<string | null>(null);
+
+  const handleClickImage = React.useCallback((image: SelectedImage) => {
+    setSelectedImage(image);
+  }, []);
+
+  const handleCloseImage = React.useCallback(() => {
+    setSelectedImage(null);
+    setImageUrl(null);
+    setImageError(null);
+  }, []);
+
+  React.useEffect(() => {
+    if (!selectedImage) {
+      return;
+    }
+
+    let cancelled = false;
+    setImageLoading(true);
+    setImageError(null);
+    setImageUrl(null);
+
+    fetchMissionReportImageViewUrl(selectedImage.s3Key)
+      .then((url) => {
+        if (!cancelled) {
+          setImageUrl(url);
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setImageError("画像の表示用URLの取得に失敗しました。");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setImageLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedImage]);
+
+  const columns = React.useMemo(() => getColumns(showEmployeeName, handleClickImage), [showEmployeeName, handleClickImage]);
   const hasPagination = Boolean(pagination);
   const rowsPerPageOptions = React.useMemo(
     () => (pagination?.rowsPerPageOptions?.length ? pagination.rowsPerPageOptions : [5, 10, 25, 50]),
@@ -135,6 +281,36 @@ export default function RecentReportsView({
       </div>
 
       <Table columns={columns} rows={displayedReports} footer={footer} />
+
+      <Dialog open={Boolean(selectedImage)} onClose={handleCloseImage} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 1 }}>
+          <Box sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selectedImage?.label}
+            {selectedImage?.originalFileName ? (
+              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                {selectedImage.originalFileName}
+              </Typography>
+            ) : null}
+          </Box>
+          <IconButton onClick={handleCloseImage} aria-label="閉じる">
+            <FontAwesomeIcon icon={faXmark} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 240 }}>
+          {imageLoading ? (
+            <CircularProgress />
+          ) : imageError ? (
+            <Typography color="error">{imageError}</Typography>
+          ) : imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt={selectedImage?.originalFileName ?? "アップロード写真"}
+              style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain" }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

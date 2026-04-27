@@ -1,12 +1,22 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box, MenuItem } from "@mui/material";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box, MenuItem, IconButton } from "@mui/material";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faImage, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog";
-import { fetchMissionFormConfig } from "../api/client";
-import type { Mission, SubmitPayload, FieldConfig } from "../model/types";
+import { fetchMissionFormConfig, uploadMissionReportImage } from "../api/client";
+import type { Mission, SubmitPayload, FieldConfig, ImageFieldValue } from "../model/types";
 import { useMissionReportDialog } from "../hooks/useMissionReportDialog";
+
+function isImageFieldValue(value: unknown): value is ImageFieldValue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ImageFieldValue).s3Key === "string"
+  );
+}
 
 type MissionReportDialogProps = {
   /** ダイアログの開閉制御（アンマウントはせず open で出し入れ推奨） */
@@ -72,13 +82,17 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     };
   }, [open, companyId, missionId, missionConfig.missionId]);
 
-  const { values, submitting, error, successOpen, successMessage, setSuccessOpen, handleChange, handleSubmit } = useMissionReportDialog({
+  const { values, submitting, error, successOpen, successMessage, setSuccessOpen, handleChange, setImageValue, handleSubmit } = useMissionReportDialog({
     companyId,
     missionId,
     missionConfig: resolvedMissionConfig,
     onSubmit,
     onClose,
   });
+
+  const [imageUploadingByField, setImageUploadingByField] = useState<Record<string, boolean>>({});
+  const [imageErrorByField, setImageErrorByField] = useState<Record<string, string | null>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); // 自動でページリロードされないようにする
@@ -94,8 +108,36 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     await handleSubmit();
   };
 
+  const handleImageFileChange = (field: FieldConfig) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImageUploadingByField((prev) => ({ ...prev, [field.id]: true }));
+    setImageErrorByField((prev) => ({ ...prev, [field.id]: null }));
+
+    try {
+      const uploaded = await uploadMissionReportImage(file);
+      setImageValue(field.id, uploaded);
+    } catch (uploadError) {
+      console.error("image upload failed", uploadError);
+      setImageErrorByField((prev) => ({
+        ...prev,
+        [field.id]: "画像のアップロードに失敗しました。時間をおいて再度お試しください。",
+      }));
+    } finally {
+      setImageUploadingByField((prev) => ({ ...prev, [field.id]: false }));
+      const input = fileInputRefs.current[field.id];
+      if (input) {
+        input.value = "";
+      }
+    }
+  };
+
   const renderField = (field: FieldConfig) => {
-    const value = values[field.id] ?? "";
+    const rawValue = values[field.id] ?? "";
+    const value: string = isImageFieldValue(rawValue) ? "" : rawValue;
 
     // 共通 props
     const commonProps = {
@@ -108,6 +150,91 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
       helperText: field.helpText,
       required: field.required,
     };
+
+    if (field.type === "image") {
+      const imageValue = isImageFieldValue(rawValue) ? rawValue : null;
+      const uploading = imageUploadingByField[field.id] ?? false;
+      const fieldError = imageErrorByField[field.id] ?? null;
+
+      return (
+        <Box key={field.id} sx={{ mt: 2 }}>
+          <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+            {field.label}
+            {field.required ? <span style={{ color: "#d32f2f" }}> *</span> : null}
+          </Typography>
+
+          {imageValue ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                p: 1.5,
+                border: "1px solid",
+                borderColor: "grey.300",
+                borderRadius: 2,
+                bgcolor: "action.hover",
+              }}
+            >
+              <FontAwesomeIcon icon={faImage} />
+              <Typography variant="body2" sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {imageValue.originalFileName}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setImageValue(field.id, null)}
+                aria-label="削除"
+                disabled={uploading}
+              >
+                <FontAwesomeIcon icon={faXmark} />
+              </IconButton>
+            </Box>
+          ) : (
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<FontAwesomeIcon icon={faImage} />}
+              disabled={uploading}
+              sx={{ textTransform: "none" }}
+            >
+              {uploading ? "アップロード中..." : "画像を選択"}
+              <input
+                ref={(el) => {
+                  fileInputRefs.current[field.id] = el;
+                }}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+                hidden
+                onChange={handleImageFileChange(field)}
+              />
+            </Button>
+          )}
+
+          {/* required な image フィールド未選択時のネイティブバリデーション用 */}
+          {field.required ? (
+            <input
+              tabIndex={-1}
+              required
+              value={imageValue ? imageValue.s3Key : ""}
+              onChange={() => undefined}
+              style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+            />
+          ) : null}
+
+          {field.helpText ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              {field.helpText}
+            </Typography>
+          ) : null}
+
+          {fieldError ? (
+            <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.5 }}>
+              {fieldError}
+            </Typography>
+          ) : null}
+        </Box>
+      );
+    }
 
     if (field.type === "textarea") {
       return (

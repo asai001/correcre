@@ -6,7 +6,17 @@ export type MissionFieldType =
   | "multiSelect"
   | "date"
   | "datetime"
-  | "number";
+  | "number"
+  | "image";
+
+// image フィールドの fieldValues に保存する形
+export type MissionImageFieldValue = {
+  s3Key: string;
+  contentType: string;
+  originalFileName: string;
+  size: number;
+  uploadedAt: string; // ISO 8601
+};
 
 export type MissionField = {
   key: string; // fieldValues のキー。英数字+アンダースコア。ミッション内で unique

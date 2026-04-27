@@ -7,11 +7,17 @@ import type { Mission as DBMission, MissionField } from "@correcre/types";
 
 import type { FieldConfig, Mission, MissionReport } from "../model/types";
 
+function mapMissionFieldType(type: MissionField["type"]): FieldConfig["type"] {
+  if (type === "multiSelect") return "select";
+  if (type === "datetime") return "datetime-local";
+  return type as FieldConfig["type"];
+}
+
 function toFieldConfig(field: MissionField): FieldConfig {
   return {
     id: field.key,
     label: field.label,
-    type: field.type === "multiSelect" ? "select" : field.type === "datetime" ? "datetime-local" : field.type as FieldConfig["type"],
+    type: mapMissionFieldType(field.type),
     placeholder: field.placeholder,
     helpText: field.helpText,
     required: field.required,

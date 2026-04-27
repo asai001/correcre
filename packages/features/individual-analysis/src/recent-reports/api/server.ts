@@ -4,9 +4,17 @@ import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
-import type { Mission, MissionField, MissionReport } from "@correcre/types";
+import type { Mission, MissionField, MissionImageFieldValue, MissionReport } from "@correcre/types";
 
-import type { RecentReport } from "../model/types";
+import type { RecentReport, RecentReportImageRef } from "../model/types";
+
+function isImageFieldValue(value: unknown): value is MissionImageFieldValue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as MissionImageFieldValue).s3Key === "string"
+  );
+}
 
 type RuntimeConfig = {
   region: string;
@@ -146,18 +154,31 @@ export async function getRecentReportsFromDynamo(
     const fieldValues = report.fieldValues;
 
     let inputContent = "";
-    if (fieldValues && mission?.fields?.length) {
-      inputContent = mission.fields
-        .map((field: { key: string; label: string }) => {
-          const value = fieldValues[field.key];
-          if (value === undefined || value === null || value === "") {
-            return null;
-          }
+    const images: RecentReportImageRef[] = [];
 
-          return `${field.label}: ${formatFieldValue(value)}`;
-        })
-        .filter(Boolean)
-        .join("\n");
+    if (fieldValues && mission?.fields?.length) {
+      const lines: string[] = [];
+      for (const field of mission.fields as MissionField[]) {
+        const value = fieldValues[field.key];
+        if (value === undefined || value === null || value === "") {
+          continue;
+        }
+
+        if (field.type === "image" && isImageFieldValue(value)) {
+          images.push({
+            fieldKey: field.key,
+            label: field.label,
+            s3Key: value.s3Key,
+            originalFileName: value.originalFileName,
+            contentType: value.contentType,
+          });
+          lines.push(`${field.label}: <image:${field.key}>`);
+          continue;
+        }
+
+        lines.push(`${field.label}: ${formatFieldValue(value)}`);
+      }
+      inputContent = lines.join("\n");
     } else if (report.comment) {
       inputContent = report.comment;
     }
@@ -170,6 +191,7 @@ export async function getRecentReportsFromDynamo(
       itemName: getMissionTitle(report, mission),
       progress: `${progressCount}/${getMissionMonthlyCount(mission)}`,
       inputContent,
+      images: images.length > 0 ? images : undefined,
     };
   });
 }

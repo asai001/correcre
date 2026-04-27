@@ -1,4 +1,8 @@
+import type { MissionImageFieldValue } from "./mission";
+
 export type MissionReportStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type MissionReportFieldValue = string | number | boolean | MissionImageFieldValue;
 
 export type MissionReport = {
   companyId: string;
@@ -10,7 +14,7 @@ export type MissionReport = {
   scoreSnapshot?: number;
   reportedAt: string; // ISO 8601
   status: MissionReportStatus;
-  fieldValues?: Record<string, string | number | boolean>;
+  fieldValues?: Record<string, MissionReportFieldValue>;
   scoreGranted?: number;
   pointGranted?: number;
   reviewComment?: string;

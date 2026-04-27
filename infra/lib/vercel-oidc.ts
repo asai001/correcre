@@ -2,6 +2,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
 import type { ApplicationDynamoTables } from "./dynamodb";
+import type { ApplicationS3Buckets } from "./s3";
 import type { InfraStage } from "./infra-stack";
 
 const VERCEL_TEAM_SLUG = "asai001s-projects-3e71fbe6";
@@ -12,6 +13,7 @@ type VercelEnvironment = "development" | "preview" | "production";
 export interface VercelOidcAccessProps {
   stage: InfraStage;
   dynamoTables: ApplicationDynamoTables;
+  s3Buckets: ApplicationS3Buckets;
   cognitoUserPoolArn: string;
 }
 
@@ -99,6 +101,11 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
   for (const table of getApplicationTables(props.dynamoTables)) {
     table.grantReadWriteData(role);
   }
+
+  // Mission report image bucket: Vercel ランタイムは presigned URL の発行 (PUT/GET) のみ
+  // 実際のオブジェクト読み書きはブラウザが presigned URL 経由で行うため、
+  // S3 直アクセスの権限はオブジェクト単位で付与する。
+  props.s3Buckets.missionReportImageBucket.grantReadWrite(role);
 
   role.addToPolicy(
     new iam.PolicyStatement({

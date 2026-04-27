@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
-import type { FieldConfig, Mission, SubmitPayload } from "../model/types";
+import type { FieldConfig, ImageFieldValue, Mission, SubmitPayload } from "../model/types";
 import { nowYYYYMMDD, nowYYYYMMDDHHmm } from "@correcre/lib";
 
 type Args = {
@@ -14,7 +14,8 @@ type Args = {
   onClose: () => void;
 };
 
-type FormValues = Record<string, string>;
+type FormValue = string | ImageFieldValue;
+type FormValues = Record<string, FormValue>;
 
 const makeDraftKey = (companyId: string, missionId?: string) => (missionId ? `missionReport:${companyId}:${missionId}` : "");
 
@@ -80,6 +81,17 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
 
     return base;
   });
+
+  const setImageValue = (fieldId: string, value: ImageFieldValue | null) => {
+    setValues((prev) => {
+      if (value === null) {
+        const { [fieldId]: _, ...rest } = prev;
+        void _;
+        return rest;
+      }
+      return { ...prev, [fieldId]: value };
+    });
+  };
 
   useEffect(() => {
     if (!draftKey) {
@@ -152,6 +164,7 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
     successMessage,
     setSuccessOpen,
     handleChange,
+    setImageValue,
     handleSubmit,
   };
 }

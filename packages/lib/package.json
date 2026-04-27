@@ -13,8 +13,10 @@
   "sideEffects": false,
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1019.0",
+    "@aws-sdk/client-s3": "^3.1019.0",
     "@aws-sdk/credential-provider-ini": "^3.972.27",
     "@aws-sdk/lib-dynamodb": "^3.1019.0",
+    "@aws-sdk/s3-request-presigner": "^3.1019.0",
     "@vercel/oidc-aws-credentials-provider": "^3.0.7",
     "server-only": "^0.0.1"
   },

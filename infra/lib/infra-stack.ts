@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 
 import { createSharedCognito } from "./cognito";
 import { createApplicationDynamoTables } from "./dynamodb";
+import { createApplicationS3Buckets } from "./s3";
 import { createVercelOidcAccess } from "./vercel-oidc";
 
 export type InfraStage = "dev" | "stg" | "prod";
@@ -11,6 +12,7 @@ export interface InfraStackProps extends cdk.StackProps {
   stage: InfraStage;
   adminAppUrl: string;
   employeeAppUrl: string;
+  operatorAppUrl?: string;
   sourceContext: string;
 }
 
@@ -32,9 +34,16 @@ export class InfraStack extends cdk.Stack {
     const dynamoTables = createApplicationDynamoTables(this, {
       stage: props.stage,
     });
+    const s3Buckets = createApplicationS3Buckets(this, {
+      stage: props.stage,
+      adminAppUrl: props.adminAppUrl,
+      employeeAppUrl: props.employeeAppUrl,
+      operatorAppUrl: props.operatorAppUrl,
+    });
     const vercelOidcAccess = createVercelOidcAccess(this, {
       stage: props.stage,
       dynamoTables,
+      s3Buckets,
       cognitoUserPoolArn: sharedCognito.userPool.userPoolArn,
     });
 
@@ -208,6 +217,10 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "PointTransactionTableName", {
       value: dynamoTables.pointTransactionTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "MissionReportImageBucketName", {
+      value: s3Buckets.missionReportImageBucket.bucketName,
     });
   }
 }
