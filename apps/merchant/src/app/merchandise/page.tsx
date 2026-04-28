@@ -1,23 +1,13 @@
-import AdminPageHeader from "@merchant/components/AdminPageHeader";
+import { MerchandiseList } from "@merchant/features/merchandise";
+import { listMerchandiseForMerchant } from "@merchant/features/merchandise/api/server";
 import { getMerchantDisplayName } from "@merchant/lib/auth/display-name";
-import { requireMerchantSession } from "@merchant/lib/auth/merchant";
+import { requireCurrentMerchantUser, requireMerchantSession } from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
 export default async function MerchandisePage() {
-  const session = await requireMerchantSession();
+  const [session, user] = await Promise.all([requireMerchantSession(), requireCurrentMerchantUser()]);
+  const items = await listMerchandiseForMerchant(user.merchantId);
 
-  return (
-    <div className="space-y-6 pb-10">
-      <AdminPageHeader
-        title="商品・サービス管理"
-        adminName={getMerchantDisplayName(session)}
-        subtitle="掲載商品・サービスの登録、編集、公開状態の管理"
-        backHref="/dashboard"
-      />
-      <div className="rounded-[28px] bg-white p-10 text-center text-slate-500 shadow-lg shadow-slate-200/70">
-        この画面は次のフェーズで実装します。
-      </div>
-    </div>
-  );
+  return <MerchandiseList initialItems={items} merchantName={getMerchantDisplayName(session)} />;
 }
