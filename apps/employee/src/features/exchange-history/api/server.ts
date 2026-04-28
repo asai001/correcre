@@ -33,5 +33,6 @@ export async function getExchangeHistoryFromDynamo(
     date: item.exchangedAt.slice(0, 10),
     merchandiseName: item.merchandiseNameSnapshot,
     usedPoint: item.usedPoint,
+    status: item.status,
   }));
 }

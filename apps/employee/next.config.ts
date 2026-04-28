@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
     "@correcre/theme",
     "@correcre/lib",
     "@correcre/individual-analysis",
+    "@correcre/merchandise-public",
   ],
   experimental: {
     // apps/employee の外にある TS を読むため

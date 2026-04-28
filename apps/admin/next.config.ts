@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
     "@correcre/theme",
     "@correcre/lib",
     "@correcre/individual-analysis",
+    "@correcre/merchandise-public",
   ],
   experimental: {
     externalDir: true,

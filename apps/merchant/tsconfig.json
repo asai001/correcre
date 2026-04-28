@@ -9,6 +9,6 @@
     ],
     "allowJs": true
   },
-  "include": ["src", ".next/types/**/*.ts", ".next-build/types/**/*.ts"],
+  "include": ["src", ".next/types/**/*.ts", ".next-build/types/**/*.ts", "../employee/src/app/exchange/page.jsx"],
   "exclude": ["node_modules"]
 }

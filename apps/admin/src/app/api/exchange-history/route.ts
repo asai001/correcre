@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 
 import { listExchangeHistoryByCompanyAndUser } from "@correcre/lib/dynamodb/exchange-history";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import type { ExchangeHistoryStatus } from "@correcre/types";
 
 type ExchangeHistoryResponse = {
   date: string;
   merchandiseName: string;
   usedPoint: number;
+  status?: ExchangeHistoryStatus;
 };
 
 function isWithinDateRange(dateTime: string, startDate?: string, endDate?: string) {
@@ -47,6 +49,7 @@ export async function GET(req: Request) {
       date: item.exchangedAt.slice(0, 10).replaceAll("-", "/"),
       merchandiseName: item.merchandiseNameSnapshot,
       usedPoint: item.usedPoint,
+      status: item.status,
     }));
 
     return NextResponse.json(response);

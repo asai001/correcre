@@ -8,6 +8,7 @@ import { TablePagination } from "@mui/material";
 
 import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
 import Table, { type ColumnDef } from "@employee/components/Table";
+import { getExchangeStatusBadge } from "@correcre/merchandise-public";
 
 import { fetchExchangeHistory } from "../api/client";
 import type { ExchangeHistory as ExchangeHistoryRow } from "../model/types";
@@ -45,6 +46,19 @@ export default function ExchangeHistory({
       {
         id: "merchandiseName",
         label: "景品・サービス",
+      },
+      {
+        id: "status",
+        label: "状態",
+        width: "15%",
+        render: (row) => {
+          const badge = getExchangeStatusBadge(row.status);
+          return (
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.className}`}>
+              {badge.label}
+            </span>
+          );
+        },
       },
       {
         id: "usedPoint",
