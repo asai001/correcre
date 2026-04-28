@@ -3,8 +3,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faBoxesStacked, faRightLeft } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
+import { DashboardCards, getMerchantDashboardData } from "@merchant/features/dashboard";
 import { getMerchantDisplayName } from "@merchant/lib/auth/display-name";
-import { requireMerchantSession } from "@merchant/lib/auth/merchant";
+import { requireCurrentMerchantUser, requireMerchantSession } from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -26,15 +27,21 @@ const dashboardCards = [
 ];
 
 export default async function DashboardPage() {
-  const session = await requireMerchantSession();
+  const [session, currentUser] = await Promise.all([
+    requireMerchantSession(),
+    requireCurrentMerchantUser(),
+  ]);
+  const dashboard = await getMerchantDashboardData(currentUser.merchantId);
 
   return (
     <div className="space-y-6 pb-5">
       <AdminPageHeader
         title="提携企業ダッシュボード"
         adminName={getMerchantDisplayName(session)}
-        subtitle="商品・サービスの掲載と交換管理の入口です。"
+        subtitle="商品・サービスの掲載状況と直近の交換申請を集約します。"
       />
+
+      <DashboardCards data={dashboard} />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {dashboardCards.map((card) => (

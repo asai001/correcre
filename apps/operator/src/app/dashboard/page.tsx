@@ -11,6 +11,7 @@ import {
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
+import { MerchantKpiCards, getOperatorDashboardData } from "@operator/features/dashboard";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
 
@@ -60,7 +61,10 @@ const dashboardCards = [
 
 export default async function DashboardPage() {
   const session = await requireOperatorSession();
-  const companies = await listOperatorCompaniesFromDynamo();
+  const [companies, merchantDashboard] = await Promise.all([
+    listOperatorCompaniesFromDynamo(),
+    getOperatorDashboardData(),
+  ]);
   const totalUsers = companies.reduce((sum, company) => sum + company.employeeCount, 0);
 
   return (
@@ -103,6 +107,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <MerchantKpiCards data={merchantDashboard} />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {dashboardCards.map((card) => (

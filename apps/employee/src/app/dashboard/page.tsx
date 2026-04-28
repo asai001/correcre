@@ -3,6 +3,10 @@ import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import DashboardLinks from "@employee/features/dashboard-links";
 import DashboardSummary from "@employee/features/dashboard-summary";
+import {
+  RecommendedMerchandise,
+  listRecommendedMerchandiseForDashboard,
+} from "@employee/features/dashboard-recommended";
 import ExchangeHistory from "@employee/features/exchange-history/";
 import LoginInfo from "@employee/features/login-info";
 import { MissionReport } from "@employee/features/mission-report";
@@ -25,6 +29,9 @@ export default async function DashboardPage() {
   );
   const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
   const showPointExchangeLink = company?.showPointExchangeLink === true;
+  const recommendedItems = showPointExchangeLink
+    ? await listRecommendedMerchandiseForDashboard(4)
+    : [];
 
   return (
     <div className="container mx-auto mb-10 px-6">
@@ -67,6 +74,7 @@ export default async function DashboardPage() {
           showPointExchangeLink={showPointExchangeLink}
         />
       </div>
+      <RecommendedMerchandise items={recommendedItems} showSection={showPointExchangeLink} />
       <div className="mt-10">
         <MonthlyPointsHistory icon={faChartLine} companyId={companyId} userId={userId} />
       </div>
