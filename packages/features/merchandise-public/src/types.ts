@@ -3,6 +3,7 @@ import type {
   Merchandise,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
+  MerchandiseTag,
 } from "@correcre/types";
 
 export type PublicMerchandiseSummary = {
@@ -21,6 +22,12 @@ export type PublicMerchandiseSummary = {
   publishDate?: string;
   cardImageViewUrl?: string;
   detailImageViewUrl?: string;
+  tags?: MerchandiseTag[];
+  productCode?: string;
+  contentVolume?: string;
+  expiration?: string;
+  deliverySchedule?: string;
+  notes?: string;
 };
 
 export type PublicMerchandiseDetail = PublicMerchandiseSummary;
@@ -46,6 +53,12 @@ export function toPublicMerchandiseSummary(
     publishDate: merchandise.publishDate,
     cardImageViewUrl: imageUrls.cardImageViewUrl,
     detailImageViewUrl: imageUrls.detailImageViewUrl,
+    tags: merchandise.tags,
+    productCode: merchandise.productCode,
+    contentVolume: merchandise.contentVolume,
+    expiration: merchandise.expiration,
+    deliverySchedule: merchandise.deliverySchedule,
+    notes: merchandise.notes,
   };
 }
 

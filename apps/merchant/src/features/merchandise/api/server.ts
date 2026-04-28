@@ -32,7 +32,9 @@ import type {
   MerchandiseGenre,
   MerchandiseImageRef,
   MerchandiseStatus,
+  MerchandiseTag,
 } from "@correcre/types";
+import { MERCHANDISE_TAG_VALUES } from "@correcre/types";
 
 import type {
   CreateMerchandiseRequest,
@@ -135,6 +137,17 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     throw new Error("ジャンル（その他）を入力してください");
   }
 
+  const tags = (input.tags ?? []).filter((tag): tag is MerchandiseTag =>
+    MERCHANDISE_TAG_VALUES.includes(tag),
+  );
+  const uniqueTags = Array.from(new Set(tags));
+
+  const productCode = input.productCode?.trim() || undefined;
+  const contentVolume = input.contentVolume?.trim() || undefined;
+  const expiration = input.expiration?.trim() || undefined;
+  const deliverySchedule = input.deliverySchedule?.trim() || undefined;
+  const notes = input.notes?.trim() || undefined;
+
   return {
     heading,
     merchandiseName,
@@ -146,6 +159,12 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     genre: input.genre,
     genreOther,
     publishDate: input.publishDate?.trim() || undefined,
+    tags: uniqueTags.length > 0 ? uniqueTags : undefined,
+    productCode,
+    contentVolume,
+    expiration,
+    deliverySchedule,
+    notes,
   };
 }
 
@@ -309,6 +328,12 @@ export async function createMerchandiseForMerchant(
     cardImage,
     detailImage,
     publishDate: normalized.publishDate,
+    tags: normalized.tags,
+    productCode: normalized.productCode,
+    contentVolume: normalized.contentVolume,
+    expiration: normalized.expiration,
+    deliverySchedule: normalized.deliverySchedule,
+    notes: normalized.notes,
     createdAt: now,
     updatedAt: now,
     gsi1pk: buildMerchandiseByStatusGsiPk(status),
@@ -377,6 +402,12 @@ export async function updateMerchandiseForMerchant(
     genre: normalized.genre,
     genreOther: normalized.genreOther,
     publishDate: normalized.publishDate,
+    tags: normalized.tags,
+    productCode: normalized.productCode,
+    contentVolume: normalized.contentVolume,
+    expiration: normalized.expiration,
+    deliverySchedule: normalized.deliverySchedule,
+    notes: normalized.notes,
     cardImage,
     detailImage,
     updatedAt: now,

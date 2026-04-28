@@ -3,6 +3,7 @@ import type {
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
   MerchandiseStatus,
+  MerchandiseTag,
 } from "@correcre/types";
 
 export type MerchandiseSummary = Merchandise & {
@@ -29,6 +30,12 @@ export type MerchandiseFormPayload = {
     s3Key: string;
     contentType: string;
   };
+  tags?: MerchandiseTag[];
+  productCode?: string;
+  contentVolume?: string;
+  expiration?: string;
+  deliverySchedule?: string;
+  notes?: string;
 };
 
 export type CreateMerchandiseRequest = MerchandiseFormPayload;

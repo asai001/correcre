@@ -78,6 +78,7 @@ export default function MerchandiseDetail({ item }: Props) {
         <PreviewRow label="商品・サービス内容">
           <p className="whitespace-pre-line">{item.serviceDescription || "(説明なし)"}</p>
         </PreviewRow>
+        {item.productCode ? <PreviewRow label="商品コード">{item.productCode}</PreviewRow> : null}
         <PreviewRow label="必要ポイント数">{requiredPointLabel}</PreviewRow>
         <PreviewRow label="対応エリア">
           <ul className="list-disc pl-5">
@@ -98,11 +99,19 @@ export default function MerchandiseDetail({ item }: Props) {
             <li>{genreLabel}</li>
           </ul>
         </PreviewRow>
+        {item.contentVolume ? <PreviewRow label="内容量">{item.contentVolume}</PreviewRow> : null}
+        {item.expiration ? <PreviewRow label="賞味期限">{item.expiration}</PreviewRow> : null}
+        {item.deliverySchedule ? <PreviewRow label="お届け予定">{item.deliverySchedule}</PreviewRow> : null}
         <PreviewRow label="価格（参考）">
           {Number.isFinite(item.priceYen) && item.priceYen > 0
             ? `${new Intl.NumberFormat("ja-JP").format(item.priceYen)}円`
             : "未設定"}
         </PreviewRow>
+        {item.notes ? (
+          <PreviewRow label="注意事項">
+            <p className="whitespace-pre-line">{item.notes}</p>
+          </PreviewRow>
+        ) : null}
       </div>
     </Paper>
   );

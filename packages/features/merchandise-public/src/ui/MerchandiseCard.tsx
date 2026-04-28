@@ -54,6 +54,14 @@ export default function MerchandiseCard({ item }: Props) {
         ) : null}
 
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {item.tags?.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+            >
+              {tag}
+            </span>
+          ))}
           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${palette.chip}`}>
             {genreLabel}
           </span>

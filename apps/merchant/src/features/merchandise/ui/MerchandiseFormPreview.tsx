@@ -2,6 +2,8 @@
 
 import { Box, Paper, Typography } from "@mui/material";
 
+import type { MerchandiseTag } from "@correcre/types";
+
 type Props = {
   heading: string;
   merchandiseName: string;
@@ -16,6 +18,12 @@ type Props = {
   cardImagePreviewUrl?: string;
   detailImagePreviewUrl?: string;
   merchantCompanyName: string;
+  tags?: MerchandiseTag[];
+  productCode?: string;
+  contentVolume?: string;
+  expiration?: string;
+  deliverySchedule?: string;
+  notes?: string;
 };
 
 function PreviewRow({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
@@ -179,6 +187,26 @@ export default function MerchandiseFormPreview(props: Props) {
                 ? `${new Intl.NumberFormat("ja-JP").format(props.priceYen)}円`
                 : "未設定"}
             </PreviewRow>
+            {props.productCode ? <PreviewRow label="商品コード">{props.productCode}</PreviewRow> : null}
+            {props.contentVolume ? <PreviewRow label="内容量">{props.contentVolume}</PreviewRow> : null}
+            {props.expiration ? <PreviewRow label="賞味期限">{props.expiration}</PreviewRow> : null}
+            {props.deliverySchedule ? <PreviewRow label="お届け予定">{props.deliverySchedule}</PreviewRow> : null}
+            {props.notes ? (
+              <PreviewRow label="注意事項">
+                <p className="whitespace-pre-line">{props.notes}</p>
+              </PreviewRow>
+            ) : null}
+            {props.tags && props.tags.length > 0 ? (
+              <PreviewRow label="カテゴリーバッジ">
+                <div className="flex flex-wrap gap-2">
+                  {props.tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </PreviewRow>
+            ) : null}
           </div>
         </Paper>
       </div>

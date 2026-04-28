@@ -19,6 +19,8 @@ import {
   Typography,
 } from "@mui/material";
 
+import { MERCHANDISE_TAG_VALUES, type MerchandiseTag } from "@correcre/types";
+
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
 import {
   createMerchandise,
@@ -56,6 +58,12 @@ type FormState = {
   genre: (typeof genreOptions)[number];
   genreOther: string;
   publishDate: string;
+  tags: MerchandiseTag[];
+  productCode: string;
+  contentVolume: string;
+  expiration: string;
+  deliverySchedule: string;
+  notes: string;
 };
 
 type Props = {
@@ -90,6 +98,12 @@ function getInitialFormState(initial: MerchandiseSummary | undefined): FormState
       genre: "食品",
       genreOther: "",
       publishDate: localDate,
+      tags: [],
+      productCode: "",
+      contentVolume: "",
+      expiration: "",
+      deliverySchedule: "",
+      notes: "",
     };
   }
 
@@ -104,6 +118,12 @@ function getInitialFormState(initial: MerchandiseSummary | undefined): FormState
     genre: initial.genre,
     genreOther: initial.genreOther ?? "",
     publishDate: initial.publishDate ?? "",
+    tags: [...(initial.tags ?? [])],
+    productCode: initial.productCode ?? "",
+    contentVolume: initial.contentVolume ?? "",
+    expiration: initial.expiration ?? "",
+    deliverySchedule: initial.deliverySchedule ?? "",
+    notes: initial.notes ?? "",
   };
 }
 
@@ -155,6 +175,15 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
       deliveryMethods: checked
         ? Array.from(new Set([...prev.deliveryMethods, method]))
         : prev.deliveryMethods.filter((entry) => entry !== method),
+    }));
+  };
+
+  const handleTagToggle = (tag: MerchandiseTag) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setForm((prev) => ({
+      ...prev,
+      tags: checked
+        ? Array.from(new Set([...prev.tags, tag]))
+        : prev.tags.filter((entry) => entry !== tag),
     }));
   };
 
@@ -224,6 +253,12 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           detailImage.s3Key && detailImage.contentType
             ? { s3Key: detailImage.s3Key, contentType: detailImage.contentType }
             : undefined,
+        tags: form.tags.length > 0 ? form.tags : undefined,
+        productCode: form.productCode || undefined,
+        contentVolume: form.contentVolume || undefined,
+        expiration: form.expiration || undefined,
+        deliverySchedule: form.deliverySchedule || undefined,
+        notes: form.notes || undefined,
       };
 
       if (mode === "create") {
@@ -364,6 +399,81 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
             onChange={handleField("publishDate")}
             InputLabelProps={{ shrink: true }}
           />
+          <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
+            <Typography variant="subtitle2" className="text-slate-800">
+              カテゴリーバッジ（任意）
+            </Typography>
+            <Typography variant="caption" className="text-slate-500">
+              一覧カードの目立つ位置に表示されます。
+            </Typography>
+            <FormGroup className="mt-3 grid gap-1 sm:grid-cols-3">
+              {MERCHANDISE_TAG_VALUES.map((tag) => (
+                <FormControlLabel
+                  key={tag}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={form.tags.includes(tag)}
+                      onChange={handleTagToggle(tag)}
+                    />
+                  }
+                  label={tag}
+                />
+              ))}
+            </FormGroup>
+          </FormControl>
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <Typography variant="h6" className="font-semibold text-slate-900">
+          詳細メタ情報（任意）
+        </Typography>
+        <Typography variant="body2" className="!mt-1 text-slate-500">
+          詳細ページで「商品詳細情報」テーブルに表示されます。
+        </Typography>
+        <Stack spacing={2.5} className="!mt-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextField
+              label="商品コード"
+              fullWidth
+              value={form.productCode}
+              onChange={handleField("productCode")}
+              placeholder="F001-2024 など"
+            />
+            <TextField
+              label="内容量"
+              fullWidth
+              value={form.contentVolume}
+              onChange={handleField("contentVolume")}
+              placeholder="6個入り（個包装） など"
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextField
+              label="賞味期限 / 有効期限"
+              fullWidth
+              value={form.expiration}
+              onChange={handleField("expiration")}
+              placeholder="製造日より冷蔵で5日間 など"
+            />
+            <TextField
+              label="お届け予定 / 提供までの目安"
+              fullWidth
+              value={form.deliverySchedule}
+              onChange={handleField("deliverySchedule")}
+              placeholder="申込みから7〜10営業日 など"
+            />
+          </div>
+          <TextField
+            label="注意事項"
+            fullWidth
+            multiline
+            minRows={3}
+            value={form.notes}
+            onChange={handleField("notes")}
+            placeholder="要冷蔵保存 / アレルギー表示 など"
+          />
         </Stack>
       </Paper>
 
@@ -452,6 +562,12 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           cardImagePreviewUrl={cardImage.previewUrl}
           detailImagePreviewUrl={detailImage.previewUrl}
           merchantCompanyName={merchantCompanyName}
+          tags={form.tags}
+          productCode={form.productCode}
+          contentVolume={form.contentVolume}
+          expiration={form.expiration}
+          deliverySchedule={form.deliverySchedule}
+          notes={form.notes}
         />
       </div>
     </div>
