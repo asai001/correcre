@@ -157,6 +157,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_field_value", field: field.key }, { status: 400 });
     }
 
+    // レビューフローは廃止。提出時点で即承認扱いとし、スコア/ポイントを確定させる。
     const report: MissionReport = {
       companyId,
       userId: user.userId,
@@ -166,8 +167,10 @@ export async function POST(req: Request) {
       missionTitleSnapshot: mission.title,
       scoreSnapshot: mission.score,
       reportedAt,
-      status: "PENDING",
+      status: "APPROVED",
       fieldValues: finalizedFieldValues,
+      scoreGranted: mission.score,
+      pointGranted: mission.score,
       createdAt: reportedAt,
       updatedAt: reportedAt,
     };
