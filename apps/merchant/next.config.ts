@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
     "@correcre/ui",
     "@correcre/theme",
     "@correcre/lib",
+    "@correcre/merchandise-public",
   ],
 };
 export default nextConfig;

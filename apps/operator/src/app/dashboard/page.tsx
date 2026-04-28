@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBuilding, faBullseye, faStore, faUsers } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowRight,
+  faBuilding,
+  faBullseye,
+  faRightLeft,
+  faStore,
+  faUsers,
+} from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
@@ -41,6 +48,13 @@ const dashboardCards = [
     description: "商品・サービスを提供する提携企業の登録と、ログインユーザーの招待を行います。",
     icon: faStore,
     accentClassName: "from-violet-500 to-fuchsia-600",
+  },
+  {
+    href: "/exchanges",
+    title: "交換管理",
+    description: "全提携企業の交換申請を俯瞰し、状態確認と必要に応じた代理操作・強制キャンセルを行います。",
+    icon: faRightLeft,
+    accentClassName: "from-rose-500 to-pink-600",
   },
 ] as const;
 

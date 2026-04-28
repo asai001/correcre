@@ -1,6 +1,11 @@
 import "server-only";
 
-import { QueryCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  QueryCommand,
+  TransactWriteCommand,
+  type TransactWriteCommandInput,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 import type {
   ExchangeHistoryActorType,
@@ -12,6 +17,43 @@ import type {
 import { buildUserSk } from "./user";
 
 import { getDynamoDocumentClient } from "./client";
+
+const ALLOWED_TRANSITIONS: Record<
+  ExchangeHistoryStatus,
+  Partial<Record<ExchangeHistoryActorType, ExchangeHistoryStatus[]>>
+> = {
+  REQUESTED: {
+    MERCHANT: ["PREPARING", "REJECTED"],
+    OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
+  },
+  PREPARING: {
+    MERCHANT: ["IN_PROGRESS"],
+    OPERATOR: ["IN_PROGRESS", "CANCELED"],
+  },
+  IN_PROGRESS: {
+    MERCHANT: ["COMPLETED"],
+    OPERATOR: ["COMPLETED"],
+  },
+  COMPLETED: {},
+  REJECTED: {},
+  CANCELED: {},
+  CANCELLED: {},
+};
+
+export function getAllowedNextExchangeStatuses(
+  from: ExchangeHistoryStatus,
+  actor: ExchangeHistoryActorType,
+): ExchangeHistoryStatus[] {
+  return ALLOWED_TRANSITIONS[from]?.[actor] ?? [];
+}
+
+export function canTransitionExchangeStatus(
+  from: ExchangeHistoryStatus,
+  to: ExchangeHistoryStatus,
+  actor: ExchangeHistoryActorType,
+): boolean {
+  return getAllowedNextExchangeStatuses(from, actor).includes(to);
+}
 
 export type ExchangeHistoryTableConfig = {
   region: string;
@@ -143,6 +185,42 @@ export async function listExchangeHistoryByMerchant(
   return exchanges;
 }
 
+export async function findExchangeHistoryByMerchantAndExchangeId(
+  config: ExchangeHistoryTableConfig,
+  merchantId: string,
+  exchangeId: string,
+): Promise<ExchangeHistoryItem | null> {
+  const client = getDynamoDocumentClient(config.region);
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: EXCHANGE_HISTORY_BY_MERCHANT_INDEX,
+        KeyConditionExpression: "gsi3pk = :gsi3pk",
+        FilterExpression: "exchangeId = :exchangeId",
+        ExpressionAttributeValues: {
+          ":gsi3pk": buildExchangeHistoryByMerchantGsiPk(merchantId),
+          ":exchangeId": exchangeId,
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      const found = (Items as ExchangeHistoryItem[]).find((item) => item.exchangeId === exchangeId);
+      if (found) {
+        return found;
+      }
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return null;
+}
+
 export async function listExchangeHistoryByMerchantAndStatus(
   config: ExchangeHistoryTableConfig,
   merchantId: string,
@@ -191,6 +269,17 @@ export class InsufficientPointBalanceError extends Error {
   constructor(message = "ポイント残高が不足しています") {
     super(message);
     this.name = "InsufficientPointBalanceError";
+  }
+}
+
+export class InvalidExchangeStatusTransitionError extends Error {
+  constructor(
+    public readonly from: ExchangeHistoryStatus,
+    public readonly to: ExchangeHistoryStatus,
+    public readonly actor: ExchangeHistoryActorType,
+  ) {
+    super(`Status transition ${from} -> ${to} is not allowed for actor ${actor}`);
+    this.name = "InvalidExchangeStatusTransitionError";
   }
 }
 
@@ -325,6 +414,132 @@ export async function updateExchangeHistoryStatus(
   } else if (params.nextStatus === "REJECTED" || params.nextStatus === "CANCELED") {
     updated.canceledAt = occurredAt;
     updated.pointHeld = 0;
+  }
+
+  return updated;
+}
+
+export type TransitionExchangeStatusInput = {
+  item: ExchangeHistoryItem;
+  nextStatus: ExchangeHistoryStatus;
+  actorType: ExchangeHistoryActorType;
+  actorId?: string;
+  comment?: string;
+  occurredAt?: string;
+  userTableName: string;
+};
+
+export async function transitionExchangeStatus(
+  config: ExchangeHistoryTableConfig,
+  input: TransitionExchangeStatusInput,
+): Promise<ExchangeHistoryItem> {
+  const fromStatus = input.item.status ?? "REQUESTED";
+
+  if (!canTransitionExchangeStatus(fromStatus, input.nextStatus, input.actorType)) {
+    throw new InvalidExchangeStatusTransitionError(fromStatus, input.nextStatus, input.actorType);
+  }
+
+  const isRefund = input.nextStatus === "REJECTED" || input.nextStatus === "CANCELED";
+
+  if (!isRefund) {
+    return updateExchangeHistoryStatus(config, {
+      item: input.item,
+      nextStatus: input.nextStatus,
+      actorType: input.actorType,
+      actorId: input.actorId,
+      comment: input.comment,
+      occurredAt: input.occurredAt,
+    });
+  }
+
+  const refundAmount = input.item.pointHeld ?? 0;
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
+  const event: ExchangeHistoryStatusEvent = {
+    status: input.nextStatus,
+    occurredAt,
+    actorType: input.actorType,
+    actorId: input.actorId,
+    comment: input.comment,
+  };
+
+  const setExpressions: string[] = [
+    "#status = :status",
+    "#history = list_append(if_not_exists(#history, :emptyList), :event)",
+    "updatedAt = :updatedAt",
+    "canceledAt = :canceledAt",
+    "pointHeld = :zero",
+  ];
+  const expressionAttributeNames: Record<string, string> = {
+    "#status": "status",
+    "#history": "history",
+  };
+  const expressionAttributeValues: Record<string, unknown> = {
+    ":status": input.nextStatus,
+    ":event": [event],
+    ":emptyList": [],
+    ":updatedAt": occurredAt,
+    ":canceledAt": occurredAt,
+    ":zero": 0,
+    ":expectedFromStatus": fromStatus,
+  };
+
+  if (input.item.merchantId) {
+    setExpressions.push("gsi2pk = :gsi2pk");
+    expressionAttributeValues[":gsi2pk"] = buildExchangeHistoryByMerchantStatusGsiPk(
+      input.item.merchantId,
+      input.nextStatus,
+    );
+  }
+
+  const client = getDynamoDocumentClient(config.region);
+
+  const transactItems: NonNullable<TransactWriteCommandInput["TransactItems"]> = [
+    {
+      Update: {
+        TableName: config.tableName,
+        Key: {
+          pk: input.item.pk,
+          sk: input.item.sk,
+        },
+        ConditionExpression: "#status = :expectedFromStatus",
+        UpdateExpression: `SET ${setExpressions.join(", ")}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+      },
+    },
+  ];
+
+  if (refundAmount > 0) {
+    transactItems.push({
+      Update: {
+        TableName: input.userTableName,
+        Key: {
+          companyId: input.item.companyId,
+          sk: buildUserSk(input.item.userId),
+        },
+        UpdateExpression: "SET currentPointBalance = currentPointBalance + :refund, updatedAt = :updatedAt",
+        ExpressionAttributeValues: {
+          ":refund": refundAmount,
+          ":updatedAt": occurredAt,
+        },
+      },
+    });
+  }
+
+  await client.send(new TransactWriteCommand({ TransactItems: transactItems }));
+
+  const nextHistory = [...(input.item.history ?? []), event];
+  const updated: ExchangeHistoryItem = {
+    ...input.item,
+    status: input.nextStatus,
+    history: nextHistory,
+    updatedAt: occurredAt,
+    canceledAt: occurredAt,
+    pointHeld: 0,
+  };
+
+  if (input.item.merchantId) {
+    updated.gsi2pk = buildExchangeHistoryByMerchantStatusGsiPk(input.item.merchantId, input.nextStatus);
   }
 
   return updated;
