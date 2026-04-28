@@ -271,5 +271,9 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, "MerchandiseImageBucketName", {
       value: s3Buckets.merchandiseImageBucket.bucketName,
     });
+
+    new cdk.CfnOutput(this, "ExchangeFavoriteTableName", {
+      value: dynamoTables.exchangeFavoriteTable.tableName,
+    });
   }
 }

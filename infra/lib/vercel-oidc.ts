@@ -74,6 +74,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.merchantTable,
     dynamoTables.merchantUserTable,
     dynamoTables.merchandiseTable,
+    dynamoTables.exchangeFavoriteTable,
   ];
 }
 

@@ -21,6 +21,7 @@ export interface ApplicationDynamoTables {
   merchantTable: dynamodb.Table;
   merchantUserTable: dynamodb.Table;
   merchandiseTable: dynamodb.Table;
+  exchangeFavoriteTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -286,6 +287,18 @@ function createMerchandiseTable(scope: Construct, stage: InfraStage): dynamodb.T
   return table;
 }
 
+// ExchangeFavorite
+// - pk = COMPANY#<companyId>#USER#<userId>
+// - sk = FAVORITE#<merchantId>#<merchandiseId>  または  SAVED_FILTER#<filterId>
+// - GSI なし（PK ごとの Query で十分）
+function createExchangeFavoriteTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "ExchangeFavoriteTable",
+    buildTableProps(stage, buildTableName("exchange-favorite", stage), "pk", "sk"),
+  );
+}
+
 // PointTransaction is the source of truth for point history, so a company-wide
 // chronological GSI is worth having for audit and backoffice review.
 // - pk = COMPANY#<companyId>#USER#<userId>
@@ -325,5 +338,6 @@ export function createApplicationDynamoTables(
     merchantTable: createMerchantTable(scope, props.stage),
     merchantUserTable: createMerchantUserTable(scope, props.stage),
     merchandiseTable: createMerchandiseTable(scope, props.stage),
+    exchangeFavoriteTable: createExchangeFavoriteTable(scope, props.stage),
   };
 }

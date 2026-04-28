@@ -4,16 +4,26 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
 
-import { faChevronDown, faSearch, faSliders } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faSearch, faSliders, faTrashCan } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { MerchandiseCard, type PublicMerchandiseSummary } from "@correcre/merchandise-public";
+
+import {
+  createSavedFilter as createSavedFilterApi,
+  deleteSavedFilter as deleteSavedFilterApi,
+  FavoriteButton,
+  type FavoriteSummary,
+  type SavedFilter,
+} from "@employee/features/exchange-favorite";
 
 import ExchangePageHeader from "./ExchangePageHeader";
 
 type Props = {
   items: PublicMerchandiseSummary[];
   currentPointBalance: number;
+  initialFavorites: FavoriteSummary[];
+  initialSavedFilters: SavedFilter[];
 };
 
 type SortKey = "recommended" | "newest" | "lowestPoint";
@@ -40,6 +50,10 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 function buildDetailHref(item: PublicMerchandiseSummary): Route {
   const search = new URLSearchParams({ merchantId: item.merchantId }).toString();
   return `/exchange/${encodeURIComponent(item.merchandiseId)}?${search}` as Route;
+}
+
+function favoriteKey(merchantId: string, merchandiseId: string) {
+  return `${merchantId}/${merchandiseId}`;
 }
 
 function uniqueValues<T>(values: (T | undefined | null)[]): T[] {
@@ -132,6 +146,11 @@ function FilterBox({
   onChange,
   onApply,
   onReset,
+  onSave,
+  onLoadSaved,
+  onDeleteSaved,
+  savedFilters,
+  saving,
   genres,
   deliveries,
   areas,
@@ -140,19 +159,33 @@ function FilterBox({
   onChange: (next: FilterState) => void;
   onApply: () => void;
   onReset: () => void;
+  onSave: (name: string) => Promise<void>;
+  onLoadSaved: (filter: SavedFilter) => void;
+  onDeleteSaved: (filterId: string) => Promise<void>;
+  savedFilters: SavedFilter[];
+  saving: boolean;
   genres: string[];
   deliveries: string[];
   areas: string[];
 }) {
   const [open, setOpen] = useState(true);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const [draftName, setDraftName] = useState("");
 
   const update = <K extends keyof FilterState>(key: K, next: FilterState[K]) => {
     onChange({ ...value, [key]: next });
   };
 
+  const handleSave = async () => {
+    const name = draftName.trim();
+    if (!name) return;
+    await onSave(name);
+    setDraftName("");
+  };
+
   return (
     <section className="rounded-[4px] border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <button
           type="button"
           onClick={() => setOpen((prev) => !prev)}
@@ -165,7 +198,45 @@ function FilterBox({
             className={`text-xs text-slate-500 transition-transform ${open ? "rotate-180" : "rotate-0"}`}
           />
         </button>
+        <button
+          type="button"
+          onClick={() => setSavedOpen((prev) => !prev)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+        >
+          保存条件 {savedFilters.length}件
+          <FontAwesomeIcon icon={faChevronDown} className={`text-[10px] transition-transform ${savedOpen ? "rotate-180" : "rotate-0"}`} />
+        </button>
       </div>
+
+      {savedOpen ? (
+        <div className="border-t border-slate-200 px-5 py-4">
+          {savedFilters.length === 0 ? (
+            <p className="text-xs text-slate-500">保存された条件はまだありません。</p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {savedFilters.map((filter) => (
+                <li
+                  key={filter.filterId}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1 py-1 text-xs font-semibold text-slate-700"
+                >
+                  <button type="button" onClick={() => onLoadSaved(filter)} className="hover:text-slate-900">
+                    {filter.name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteSaved(filter.filterId)}
+                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                    aria-label="保存条件を削除"
+                  >
+                    <FontAwesomeIcon icon={faTrashCan} className="text-[10px]" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
       {open ? (
         <div className="space-y-3 border-t border-slate-200 px-5 py-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -240,6 +311,23 @@ function FilterBox({
             >
               条件をリセット
             </button>
+            <div className="ml-auto flex items-center gap-2">
+              <input
+                type="text"
+                value={draftName}
+                onChange={(event) => setDraftName(event.target.value)}
+                placeholder="保存名（例: 食品・全国）"
+                className="h-9 rounded-[2px] border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+              />
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !draftName.trim()}
+                className="inline-flex items-center rounded-[2px] border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? "保存中…" : "条件を保存"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -253,12 +341,16 @@ function SortAndCount({
   total,
   page,
   totalPages,
+  onlyFavorites,
+  onToggleOnlyFavorites,
 }: {
   sort: SortKey;
   onSort: (next: SortKey) => void;
   total: number;
   page: number;
   totalPages: number;
+  onlyFavorites: boolean;
+  onToggleOnlyFavorites: () => void;
 }) {
   const startIdx = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIdx = Math.min(page * PAGE_SIZE, total);
@@ -283,6 +375,17 @@ function SortAndCount({
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={onToggleOnlyFavorites}
+          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition ${
+            onlyFavorites
+              ? "bg-rose-500 text-white"
+              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          お気に入りのみ
+        </button>
       </div>
       <div className="text-xs text-slate-500">
         {total === 0 ? "0件" : `${total}件中 ${startIdx}-${endIdx}件 / ${totalPages}ページ`}
@@ -413,11 +516,22 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
   }
 }
 
-export default function ExchangeList({ items, currentPointBalance }: Props) {
+export default function ExchangeList({
+  items,
+  currentPointBalance,
+  initialFavorites,
+  initialSavedFilters,
+}: Props) {
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortKey>("recommended");
   const [page, setPage] = useState(1);
+  const [favorites, setFavorites] = useState<Set<string>>(
+    () => new Set(initialFavorites.map((f) => favoriteKey(f.merchantId, f.merchandiseId))),
+  );
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(initialSavedFilters);
+  const [savingFilter, setSavingFilter] = useState(false);
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
 
   const genres = useMemo(
     () => uniqueValues(items.map((item) => (item.genre === "その他" ? item.genreOther || "その他" : item.genre))),
@@ -434,7 +548,14 @@ export default function ExchangeList({ items, currentPointBalance }: Props) {
     return tagged ?? items[0];
   }, [items]);
 
-  const filtered = useMemo(() => applyFilters(items, filter), [items, filter]);
+  const filtered = useMemo(() => {
+    let next = applyFilters(items, filter);
+    if (onlyFavorites) {
+      next = next.filter((item) => favorites.has(favoriteKey(item.merchantId, item.merchandiseId)));
+    }
+    return next;
+  }, [items, filter, onlyFavorites, favorites]);
+
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
@@ -452,6 +573,52 @@ export default function ExchangeList({ items, currentPointBalance }: Props) {
     setPage(1);
   };
 
+  const handleSaveFilter = async (name: string) => {
+    setSavingFilter(true);
+    try {
+      const created = await createSavedFilterApi({ name, criteria: filterDraft });
+      setSavedFilters((prev) => [created, ...prev]);
+    } catch (err) {
+      console.error("createSavedFilter failed", err);
+    } finally {
+      setSavingFilter(false);
+    }
+  };
+
+  const handleLoadSavedFilter = (saved: SavedFilter) => {
+    const next: FilterState = {
+      keyword: saved.criteria.keyword ?? "",
+      genre: saved.criteria.genre ?? "",
+      delivery: saved.criteria.delivery ?? "",
+      area: saved.criteria.area ?? "",
+      pointRange: saved.criteria.pointRange ?? "any",
+    };
+    setFilterDraft(next);
+    setFilter(next);
+    setPage(1);
+  };
+
+  const handleDeleteSavedFilter = async (filterId: string) => {
+    const previous = savedFilters;
+    setSavedFilters((prev) => prev.filter((f) => f.filterId !== filterId));
+    try {
+      await deleteSavedFilterApi(filterId);
+    } catch (err) {
+      console.error("deleteSavedFilter failed", err);
+      setSavedFilters(previous);
+    }
+  };
+
+  const handleFavoriteToggle = (merchantId: string, merchandiseId: string) => (next: boolean) => {
+    setFavorites((prev) => {
+      const updated = new Set(prev);
+      const key = favoriteKey(merchantId, merchandiseId);
+      if (next) updated.add(key);
+      else updated.delete(key);
+      return updated;
+    });
+  };
+
   return (
     <div className="-mt-px pb-12">
       <ExchangePageHeader currentPointBalance={currentPointBalance} />
@@ -464,6 +631,11 @@ export default function ExchangeList({ items, currentPointBalance }: Props) {
           onChange={setFilterDraft}
           onApply={handleApply}
           onReset={handleReset}
+          onSave={handleSaveFilter}
+          onLoadSaved={handleLoadSavedFilter}
+          onDeleteSaved={handleDeleteSavedFilter}
+          savedFilters={savedFilters}
+          saving={savingFilter}
           genres={genres}
           deliveries={deliveries}
           areas={areas}
@@ -478,21 +650,40 @@ export default function ExchangeList({ items, currentPointBalance }: Props) {
           total={sorted.length}
           page={safePage}
           totalPages={totalPages}
+          onlyFavorites={onlyFavorites}
+          onToggleOnlyFavorites={() => {
+            setOnlyFavorites((prev) => !prev);
+            setPage(1);
+          }}
         />
 
         {pageItems.length === 0 ? (
           <div className="rounded-[4px] border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-            条件に合致する商品はありません。
+            {onlyFavorites ? "お気に入りの商品はまだありません。" : "条件に合致する商品はありません。"}
           </div>
         ) : (
           <ul className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {pageItems.map((item) => (
-              <li key={`${item.merchantId}/${item.merchandiseId}`} className="h-full">
-                <Link href={buildDetailHref(item)} className="group block h-full">
-                  <MerchandiseCard item={item} />
-                </Link>
-              </li>
-            ))}
+            {pageItems.map((item) => {
+              const key = favoriteKey(item.merchantId, item.merchandiseId);
+              const isFavorite = favorites.has(key);
+              return (
+                <li key={key} className="h-full">
+                  <Link href={buildDetailHref(item)} className="group block h-full">
+                    <MerchandiseCard
+                      item={item}
+                      favoriteSlot={
+                        <FavoriteButton
+                          merchantId={item.merchantId}
+                          merchandiseId={item.merchandiseId}
+                          isFavorite={isFavorite}
+                          onToggle={handleFavoriteToggle(item.merchantId, item.merchandiseId)}
+                        />
+                      }
+                    />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
 

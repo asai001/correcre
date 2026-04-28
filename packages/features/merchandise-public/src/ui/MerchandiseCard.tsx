@@ -7,6 +7,7 @@ import type { PublicMerchandiseSummary } from "../types";
 
 type Props = {
   item: PublicMerchandiseSummary;
+  favoriteSlot?: React.ReactNode;
 };
 
 function formatRequiredPoint(value: number) {
@@ -33,7 +34,7 @@ function getGenrePalette(genre: string): { background: string; chip: string } {
   }
 }
 
-export default function MerchandiseCard({ item }: Props) {
+export default function MerchandiseCard({ item, favoriteSlot }: Props) {
   const palette = getGenrePalette(item.genre);
   const merchantName = item.merchantName || "提供会社";
   const merchandiseName = item.merchandiseName || item.heading || "商品・サービス";
@@ -71,6 +72,8 @@ export default function MerchandiseCard({ item }: Props) {
           <FontAwesomeIcon icon={faShoppingCart} className="text-slate-500" />
           {requiredPointLabel}
         </div>
+
+        {favoriteSlot ? <div className="absolute right-3 top-3 z-20">{favoriteSlot}</div> : null}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">

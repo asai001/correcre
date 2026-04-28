@@ -11,19 +11,22 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { MerchandiseDetail, type PublicMerchandiseDetail } from "@correcre/merchandise-public";
 
+import { FavoriteButton } from "@employee/features/exchange-favorite";
+
 import { requestExchange } from "../api/client";
 import ExchangePageHeader from "./ExchangePageHeader";
 
 type Props = {
   item: PublicMerchandiseDetail;
   initialPointBalance: number;
+  initialIsFavorite: boolean;
 };
 
 function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
-export default function ExchangeDetail({ item, initialPointBalance }: Props) {
+export default function ExchangeDetail({ item, initialPointBalance, initialIsFavorite }: Props) {
   const router = useRouter();
   const [pointBalance, setPointBalance] = useState(initialPointBalance);
   const [submitting, setSubmitting] = useState(false);
@@ -90,15 +93,23 @@ export default function ExchangeDetail({ item, initialPointBalance }: Props) {
               ) : null}
             </div>
 
-            <Button
-              variant="contained"
-              size="large"
-              disabled={buttonDisabled}
-              onClick={handleRequest}
-              className="!rounded-full !px-6"
-            >
-              {submitted ? "申請済み" : submitting ? "申請中…" : "交換を申請する"}
-            </Button>
+            <div className="flex items-center gap-3">
+              <FavoriteButton
+                merchantId={item.merchantId}
+                merchandiseId={item.merchandiseId}
+                isFavorite={initialIsFavorite}
+                variant="detail"
+              />
+              <Button
+                variant="contained"
+                size="large"
+                disabled={buttonDisabled}
+                onClick={handleRequest}
+                className="!rounded-full !px-6"
+              >
+                {submitted ? "申請済み" : submitting ? "申請中…" : "交換を申請する"}
+              </Button>
+            </div>
           </div>
 
           {error ? (
