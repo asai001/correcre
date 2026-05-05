@@ -41,13 +41,16 @@ export default function MerchandiseCard({ item, favoriteSlot }: Props) {
   const requiredPointLabel = formatRequiredPoint(item.requiredPoint);
   const areaSummary = item.serviceArea.trim() || "未設定";
   const deliveryMethodSummary = item.deliveryMethods.length > 0 ? item.deliveryMethods.join("、") : "未設定";
-  const genreLabel = item.genre === "その他" ? (item.genreOther?.trim() || "その他") : item.genre;
+  const genreLabel = item.genre === "その他" ? item.genreOther?.trim() || "その他" : item.genre;
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition group-hover:border-slate-300 group-hover:shadow-md">
       <div
-        className="relative flex aspect-[16/10] w-full items-end overflow-hidden border-b border-slate-200"
-        style={{ background: item.cardImageViewUrl ? undefined : palette.background }}
+        className="relative block w-full shrink-0 overflow-hidden border-b border-slate-200"
+        style={{
+          background: item.cardImageViewUrl ? undefined : palette.background,
+          aspectRatio: "16 / 10",
+        }}
       >
         {item.cardImageViewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -63,12 +66,10 @@ export default function MerchandiseCard({ item, favoriteSlot }: Props) {
               {tag}
             </span>
           ))}
-          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${palette.chip}`}>
-            {genreLabel}
-          </span>
+          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${palette.chip}`}>{genreLabel}</span>
         </div>
 
-        <div className="relative z-10 m-3 inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+        <div className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
           <FontAwesomeIcon icon={faShoppingCart} className="text-slate-500" />
           {requiredPointLabel}
         </div>
@@ -99,7 +100,7 @@ export default function MerchandiseCard({ item, favoriteSlot }: Props) {
           </li>
         </ul>
 
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-100 pt-3">
+        <div className="mt-auto flex items-end justify-between gap-3 border-t border-slate-200 pt-[12px]">
           <div>
             <p className="text-[11px] text-slate-500">交換ポイント</p>
             <p className="text-2xl font-bold leading-none text-slate-900">

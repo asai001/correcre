@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { ExchangeDetail } from "@employee/features/exchange";
-import { getPublishedMerchandiseDetail } from "@employee/features/exchange/api/server";
+import {
+  getPublishedMerchandiseDetail,
+  listPublishedMerchandiseForEmployee,
+} from "@employee/features/exchange/api/server";
 import { listExchangeFavoritesForEmployee } from "@employee/features/exchange-favorite/api/server";
 import { requireCurrentEmployeeUser } from "@employee/lib/auth/current-user";
 
@@ -24,27 +27,35 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
     notFound();
   }
 
-  const [item, favoritesResult] = await Promise.all([
+  const [item, favoritesResult, allItems] = await Promise.all([
     getPublishedMerchandiseDetail(merchantId, merchandiseId),
     listExchangeFavoritesForEmployee({
       companyId: currentUser.companyId,
       userId: currentUser.userId,
     }),
+    listPublishedMerchandiseForEmployee(),
   ]);
 
   if (!item) {
     notFound();
   }
 
-  const isFavorite = favoritesResult.favorites.some(
-    (f) => f.merchantId === merchantId && f.merchandiseId === merchandiseId,
+  const favoriteKeySet = new Set(
+    favoritesResult.favorites.map((f) => `${f.merchantId}/${f.merchandiseId}`),
   );
+  const isFavorite = favoriteKeySet.has(`${merchantId}/${merchandiseId}`);
+
+  const relatedItems = allItems
+    .filter((m) => !(m.merchantId === merchantId && m.merchandiseId === merchandiseId))
+    .slice(0, 8);
 
   return (
     <ExchangeDetail
       item={item}
       initialPointBalance={currentUser.currentPointBalance ?? 0}
       initialIsFavorite={isFavorite}
+      relatedItems={relatedItems}
+      relatedFavoriteKeys={Array.from(favoriteKeySet)}
     />
   );
 }
