@@ -58,11 +58,13 @@ export default function CompanyEditDialog({
     setHasSubmitted(false);
   }, [company, open]);
 
-  const { parsedMonthlyFee, parsedCompanyPointBalance, validation } = useMemo(
+  const { parsedMonthlyFee, parsedCompanyPointBalance, parsedPointAdjustment, nextCompanyPointBalance, validation } = useMemo(
     () => getCompanyFormState(form),
     [form],
   );
   const hasValidationError = hasCompanyFormError(validation);
+  const pointUnitLabel = form.pointUnitLabel.trim() || company?.pointUnitLabel || "pt";
+  const currentCompanyPointBalance = company?.companyPointBalance ?? 0;
 
   const handleSubmit = async () => {
     setHasSubmitted(true);
@@ -71,7 +73,15 @@ export default function CompanyEditDialog({
       return;
     }
 
-    await onSubmit(toUpdateCompanyInput(company.companyId, form, parsedMonthlyFee, parsedCompanyPointBalance));
+    await onSubmit(
+      toUpdateCompanyInput(
+        company.companyId,
+        form,
+        parsedMonthlyFee,
+        parsedCompanyPointBalance,
+        parsedPointAdjustment,
+      ),
+    );
   };
 
   const handleChangePhilosophyItem = (
@@ -207,6 +217,43 @@ export default function CompanyEditDialog({
                   : "現在の企業保有ポイント残高です。"
               }
             />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 text-sm font-semibold text-slate-700">ポイント調整</div>
+            <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_180px]">
+              <TextField
+                label="現在ポイント"
+                value={`${currentCompanyPointBalance.toLocaleString("ja-JP")}${pointUnitLabel}`}
+                fullWidth
+                slotProps={{ input: { readOnly: true } }}
+              />
+              <TextField
+                label="調整値"
+                type="number"
+                value={form.pointAdjustment}
+                onChange={(event) => setForm((current) => ({ ...current, pointAdjustment: event.target.value }))}
+                fullWidth
+                slotProps={{ htmlInput: { step: 1 } }}
+                error={hasSubmitted && (validation.pointAdjustment || validation.nextCompanyPointBalance)}
+                helperText={
+                  hasSubmitted && validation.pointAdjustment
+                    ? "整数で入力してください"
+                    : hasSubmitted && validation.nextCompanyPointBalance
+                      ? "調整後のポイントが 0 未満になります"
+                      : "加算は正の数、減算は負の数で入力してください"
+                }
+              />
+              <TextField
+                label="調整後ポイント"
+                value={`${Math.max(nextCompanyPointBalance, 0).toLocaleString("ja-JP")}${pointUnitLabel}`}
+                fullWidth
+                slotProps={{ input: { readOnly: true } }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              「保有ポイント」の値に対してこの調整値が加減算され、最終的な残高として保存されます。
+            </p>
           </div>
 
           <TextField

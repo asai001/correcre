@@ -18,6 +18,7 @@ export type CompanyFormState = {
   plan: CompanyPlan;
   perEmployeeMonthlyFee: string;
   companyPointBalance: string;
+  pointAdjustment: string;
   pointUnitLabel: string;
   showPointExchangeLink: boolean;
   philosophyItems: CompanyPhilosophyItem[];
@@ -27,6 +28,8 @@ export type CompanyFormValidation = {
   name: boolean;
   perEmployeeMonthlyFee: boolean;
   companyPointBalance: boolean;
+  pointAdjustment: boolean;
+  nextCompanyPointBalance: boolean;
   pointUnitLabel: boolean;
   philosophyItems: CompanyPhilosophyItemValidation[];
 };
@@ -76,6 +79,7 @@ export function createInitialCompanyFormState(): CompanyFormState {
     plan: "STANDARD",
     perEmployeeMonthlyFee: "3000",
     companyPointBalance: "0",
+    pointAdjustment: "0",
     pointUnitLabel: "pt",
     showPointExchangeLink: false,
     philosophyItems: [],
@@ -93,6 +97,7 @@ export function createCompanyFormStateFromCompany(company: CompanySummary | null
     plan: company.plan,
     perEmployeeMonthlyFee: String(normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0)),
     companyPointBalance: String(normalizeNonNegativeInteger(company.companyPointBalance, 0)),
+    pointAdjustment: "0",
     pointUnitLabel: normalizePointUnitLabel(company.pointUnitLabel),
     showPointExchangeLink: company.showPointExchangeLink === true,
     philosophyItems: company.philosophyItems.map((item) => ({ ...item })),
@@ -102,18 +107,35 @@ export function createCompanyFormStateFromCompany(company: CompanySummary | null
 export function getCompanyFormState(form: CompanyFormState): {
   parsedMonthlyFee: number;
   parsedCompanyPointBalance: number;
+  parsedPointAdjustment: number;
+  nextCompanyPointBalance: number;
   validation: CompanyFormValidation;
 } {
   const parsedMonthlyFee = Number.parseInt(form.perEmployeeMonthlyFee, 10);
   const parsedCompanyPointBalance = Number.parseInt(form.companyPointBalance, 10);
+  const pointAdjustmentValue = form.pointAdjustment.trim();
+  const isValidPointAdjustment = /^-?\d+$/.test(pointAdjustmentValue);
+  const parsedPointAdjustment = isValidPointAdjustment ? Number.parseInt(pointAdjustmentValue, 10) : Number.NaN;
+  const isCompanyPointBalanceValid = Number.isInteger(parsedCompanyPointBalance) && parsedCompanyPointBalance >= 0;
+  const nextCompanyPointBalance =
+    isCompanyPointBalanceValid && Number.isInteger(parsedPointAdjustment)
+      ? parsedCompanyPointBalance + parsedPointAdjustment
+      : Number.NaN;
 
   return {
     parsedMonthlyFee,
     parsedCompanyPointBalance,
+    parsedPointAdjustment: Number.isInteger(parsedPointAdjustment) ? parsedPointAdjustment : 0,
+    nextCompanyPointBalance: Number.isInteger(nextCompanyPointBalance) ? nextCompanyPointBalance : parsedCompanyPointBalance,
     validation: {
       name: !form.name.trim(),
       perEmployeeMonthlyFee: !Number.isInteger(parsedMonthlyFee) || parsedMonthlyFee < 0,
-      companyPointBalance: !Number.isInteger(parsedCompanyPointBalance) || parsedCompanyPointBalance < 0,
+      companyPointBalance: !isCompanyPointBalanceValid,
+      pointAdjustment: !Number.isInteger(parsedPointAdjustment),
+      nextCompanyPointBalance:
+        Number.isInteger(parsedPointAdjustment) &&
+        isCompanyPointBalanceValid &&
+        nextCompanyPointBalance < 0,
       pointUnitLabel: !form.pointUnitLabel.trim(),
       philosophyItems: form.philosophyItems.map((item) => ({
         label: !item.label.trim(),
@@ -128,6 +150,8 @@ export function hasCompanyFormError(validation: CompanyFormValidation) {
     validation.name ||
     validation.perEmployeeMonthlyFee ||
     validation.companyPointBalance ||
+    validation.pointAdjustment ||
+    validation.nextCompanyPointBalance ||
     validation.pointUnitLabel ||
     validation.philosophyItems.some((item) => item.label || item.content)
   );
@@ -164,9 +188,11 @@ export function toUpdateCompanyInput(
   form: CompanyFormState,
   parsedMonthlyFee: number,
   parsedCompanyPointBalance: number,
+  parsedPointAdjustment = 0,
 ): UpdateCompanyInput {
   return {
     companyId,
     ...toCreateCompanyInput(form, parsedMonthlyFee, parsedCompanyPointBalance),
+    pointAdjustment: parsedPointAdjustment,
   };
 }

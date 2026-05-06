@@ -32,13 +32,17 @@ export default function OverallAnalysisFilterSection({
       <h3 className="mb-4 text-lg font-bold">分析条件設定</h3>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <FormControl sx={{ width: "100%" }}>
-          <InputLabel id="overall-department-select-label">部署</InputLabel>
+          <InputLabel id="overall-department-select-label" shrink>
+            部署
+          </InputLabel>
           <Select
             labelId="overall-department-select-label"
             id="overall-department-select"
             value={selectedDepartmentId}
             label="部署"
             onChange={handleDepartmentChange}
+            displayEmpty
+            notched
           >
             <MenuItem value="">すべての部署</MenuItem>
             {departments.map((department) => (

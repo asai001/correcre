@@ -40,6 +40,7 @@ export type CreateCompanyInput = {
 
 export type UpdateCompanyInput = CreateCompanyInput & {
   companyId: string;
+  pointAdjustment?: number;
 };
 
 export type OperatorCompanyStatus = CompanyStatus;

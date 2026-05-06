@@ -290,6 +290,16 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
 
   validateCreateCompanyInput(input);
 
+  const pointAdjustment = input.pointAdjustment ?? 0;
+  if (!Number.isInteger(pointAdjustment)) {
+    throw new Error("ポイント調整は整数で入力してください");
+  }
+
+  const nextCompanyPointBalance = input.companyPointBalance + pointAdjustment;
+  if (nextCompanyPointBalance < 0) {
+    throw new Error("調整後のポイントが 0 未満になるため更新できません");
+  }
+
   const updatedAt = new Date().toISOString();
   const updatedCompany: Company = {
     ...company,
@@ -297,7 +307,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     status: input.status,
     plan: input.plan,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
-    companyPointBalance: input.companyPointBalance,
+    companyPointBalance: nextCompanyPointBalance,
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
     showPointExchangeLink: input.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),
