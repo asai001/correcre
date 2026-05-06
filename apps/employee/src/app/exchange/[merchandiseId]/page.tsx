@@ -1,4 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import { ExchangeDetail } from "@employee/features/exchange";
 import {
@@ -21,6 +24,18 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
     params,
     searchParams,
   ]);
+
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    currentUser.companyId,
+  );
+
+  if (company?.showPointExchangeLink !== true) {
+    redirect("/dashboard");
+  }
 
   const merchantId = search.merchantId?.trim();
   if (!merchantId) {

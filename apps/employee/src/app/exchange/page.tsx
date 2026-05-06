@@ -1,3 +1,8 @@
+import { redirect } from "next/navigation";
+
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import { ExchangeList } from "@employee/features/exchange";
 import { listPublishedMerchandiseForEmployee } from "@employee/features/exchange/api/server";
 import { listExchangeFavoritesForEmployee } from "@employee/features/exchange-favorite/api/server";
@@ -7,6 +12,18 @@ export const dynamic = "force-dynamic";
 
 export default async function ExchangePage() {
   const currentUser = await requireCurrentEmployeeUser();
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    currentUser.companyId,
+  );
+
+  if (company?.showPointExchangeLink !== true) {
+    redirect("/dashboard");
+  }
+
   const [items, favoritesResult] = await Promise.all([
     listPublishedMerchandiseForEmployee(),
     listExchangeFavoritesForEmployee({
