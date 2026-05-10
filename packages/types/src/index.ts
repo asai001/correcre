@@ -9,3 +9,4 @@ export * from "./db/merchant";
 export * from "./db/merchantUser";
 export * from "./db/merchandise";
 export * from "./db/exchangeFavorite";
+export * from "./db/operatorAuditLog";

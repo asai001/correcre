@@ -22,6 +22,7 @@ export interface ApplicationDynamoTables {
   merchantUserTable: dynamodb.Table;
   merchandiseTable: dynamodb.Table;
   exchangeFavoriteTable: dynamodb.Table;
+  operatorAuditLogTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -321,6 +322,27 @@ function createPointTransactionTable(scope: Construct, stage: InfraStage): dynam
   return table;
 }
 
+// OperatorAuditLog
+// - pk = OPERATOR#<operatorUserId>
+// - sk = OCCURRED_AT#<ISO8601>#EVENT#<eventId>
+// - gsi1pk = MERCHANT#<merchantId>
+// - gsi1sk = OCCURRED_AT#<ISO8601>#EVENT#<eventId>
+function createOperatorAuditLogTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "OperatorAuditLogTable",
+    buildTableProps(stage, buildTableName("operator-audit-log", stage), "pk", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "OperatorAuditLogByMerchantOccurredAt",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  return table;
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -339,5 +361,6 @@ export function createApplicationDynamoTables(
     merchantUserTable: createMerchantUserTable(scope, props.stage),
     merchandiseTable: createMerchandiseTable(scope, props.stage),
     exchangeFavoriteTable: createExchangeFavoriteTable(scope, props.stage),
+    operatorAuditLogTable: createOperatorAuditLogTable(scope, props.stage),
   };
 }
