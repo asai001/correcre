@@ -127,6 +127,21 @@ export default function LoginForm({
             から再設定してください。
           </p>
 
+          <p className="mt-2 text-sm text-neutral-600">
+            メールアドレスを忘れた方は運営までお問い合わせください。
+          </p>
+
+          <p className="mt-2 text-sm text-neutral-600">
+            初めてご利用の方は{" "}
+            <Link
+              href={"/register" as Route}
+              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+            >
+              こちら
+            </Link>{" "}
+            から新規会員登録をお願いします。
+          </p>
+
           <SubmitButton />
         </form>
       </div>

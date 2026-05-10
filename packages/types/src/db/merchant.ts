@@ -1,4 +1,4 @@
-export type MerchantStatus = "ACTIVE" | "INACTIVE";
+export type MerchantStatus = "PENDING" | "ACTIVE" | "INACTIVE" | "REJECTED";
 
 export type StoreAddressMode = "same_company" | "no_store" | "other";
 

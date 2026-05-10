@@ -1,6 +1,6 @@
 export type MerchantUserRole = "MERCHANT";
 
-export type MerchantUserStatus = "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
+export type MerchantUserStatus = "PENDING" | "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
 
 export type MerchantUserItem = {
   merchantId: string;
