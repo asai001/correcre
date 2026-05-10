@@ -50,4 +50,33 @@ export type CreateMerchantUserInput = {
   phoneNumber?: string;
 };
 
+export type ResetMerchantUserEmailInput = {
+  merchantId: string;
+  userId: string;
+  newEmail: string;
+};
+
+export type ResetMerchantUserPasswordInput = {
+  merchantId: string;
+  userId: string;
+};
+
+export type MerchantApplicationDecisionInput = {
+  merchantId: string;
+};
+
+export type MerchantApplicationDetail = {
+  merchant: Merchant;
+  contactUser: {
+    userId: string;
+    lastName: string;
+    firstName: string;
+    lastNameKana?: string;
+    firstNameKana?: string;
+    email: string;
+    phoneNumber?: string;
+    status: MerchantUserStatus;
+  } | null;
+};
+
 export type MerchantUser = MerchantUserItem;

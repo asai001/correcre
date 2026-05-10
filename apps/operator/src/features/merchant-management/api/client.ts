@@ -1,8 +1,11 @@
 import type {
   CreateMerchantInput,
   CreateMerchantUserInput,
+  MerchantApplicationDecisionInput,
   MerchantSummary,
   MerchantUserSummary,
+  ResetMerchantUserEmailInput,
+  ResetMerchantUserPasswordInput,
   UpdateMerchantInput,
 } from "../model/types";
 
@@ -76,4 +79,75 @@ export async function inviteMerchantUser(input: CreateMerchantUserInput): Promis
   }
 
   return (await res.json()) as MerchantUserSummary;
+}
+
+export async function resetMerchantUserEmail(input: ResetMerchantUserEmailInput): Promise<MerchantUserSummary> {
+  const res = await fetch(
+    `/api/merchants/${encodeURIComponent(input.merchantId)}/users/${encodeURIComponent(input.userId)}/email`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newEmail: input.newEmail }),
+    },
+  );
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "メールアドレスのリセットに失敗しました。");
+  }
+
+  return (await res.json()) as MerchantUserSummary;
+}
+
+export async function resetMerchantUserPassword(
+  input: ResetMerchantUserPasswordInput,
+): Promise<MerchantUserSummary> {
+  const res = await fetch(
+    `/api/merchants/${encodeURIComponent(input.merchantId)}/users/${encodeURIComponent(input.userId)}/password`,
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "パスワードリセットに失敗しました。");
+  }
+
+  return (await res.json()) as MerchantUserSummary;
+}
+
+export async function approveMerchantApplication(
+  input: MerchantApplicationDecisionInput,
+): Promise<MerchantSummary> {
+  const res = await fetch(`/api/merchants/${encodeURIComponent(input.merchantId)}/approve`, {
+    method: "POST",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "提携企業の承認に失敗しました。");
+  }
+
+  return (await res.json()) as MerchantSummary;
+}
+
+export async function rejectMerchantApplication(
+  input: MerchantApplicationDecisionInput,
+): Promise<MerchantSummary> {
+  const res = await fetch(`/api/merchants/${encodeURIComponent(input.merchantId)}/reject`, {
+    method: "POST",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "提携企業の却下に失敗しました。");
+  }
+
+  return (await res.json()) as MerchantSummary;
 }

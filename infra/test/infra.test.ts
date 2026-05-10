@@ -353,20 +353,36 @@ describe("InfraStack", () => {
   test("grants the Vercel OIDC role Cognito admin user provisioning permissions", () => {
     const template = Template.fromStack(createStack("stg"));
 
-    template.hasResourceProperties(
-      "AWS::IAM::Policy",
-      Match.objectLike({
+    const inlinePolicies = template.findResources("AWS::IAM::Policy");
+    const managedPolicies = template.findResources("AWS::IAM::ManagedPolicy");
+
+    type PolicyResource = {
+      Properties: {
         PolicyDocument: {
-          Statement: Match.arrayWith([
-            Match.objectLike({
-              Action: Match.arrayWith(["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"]),
-              Effect: "Allow",
-              Resource: Match.anyValue(),
-            }),
-          ]),
-        },
-      }),
+          Statement: Array<{ Action?: unknown; Effect?: string }>;
+        };
+      };
+    };
+
+    const allStatements = [...Object.values(inlinePolicies), ...Object.values(managedPolicies)].flatMap(
+      (resource) => (resource as PolicyResource).Properties.PolicyDocument.Statement ?? [],
     );
+
+    const cognitoStatement = allStatements.find((stmt) => {
+      const action = stmt.Action;
+      if (!Array.isArray(action)) {
+        return false;
+      }
+      return (
+        action.includes("cognito-idp:AdminCreateUser") &&
+        action.includes("cognito-idp:AdminDeleteUser") &&
+        action.includes("cognito-idp:AdminResetUserPassword") &&
+        action.includes("cognito-idp:AdminUpdateUserAttributes") &&
+        stmt.Effect === "Allow"
+      );
+    });
+
+    expect(cognitoStatement).toBeDefined();
   });
 
   test("scopes the dev AWS account to development subjects only", () => {

@@ -189,6 +189,46 @@ export async function updateMerchantUserLastLoginAtByCognitoSub(
   };
 }
 
+export async function updateMerchantUserEmail(
+  config: MerchantUserTableConfig,
+  merchantId: string,
+  userId: string,
+  newEmail: string,
+  updatedAt: string = new Date().toISOString(),
+): Promise<MerchantUserItem | null> {
+  const user = await getMerchantUserByMerchantAndUserId(config, merchantId, userId);
+
+  if (!user) {
+    return null;
+  }
+
+  const normalizedEmail = newEmail.trim().toLowerCase();
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: {
+        merchantId,
+        sk: buildMerchantUserSk(userId),
+      },
+      UpdateExpression: "SET email = :email, gsi2pk = :gsi2pk, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":email": normalizedEmail,
+        ":gsi2pk": buildMerchantUserByEmailGsiPk(normalizedEmail),
+        ":updatedAt": updatedAt,
+      },
+    }),
+  );
+
+  return {
+    ...user,
+    email: normalizedEmail,
+    gsi2pk: buildMerchantUserByEmailGsiPk(normalizedEmail),
+    updatedAt,
+  };
+}
+
 export async function updateMerchantUserStatus(
   config: MerchantUserTableConfig,
   merchantId: string,

@@ -75,6 +75,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.merchantUserTable,
     dynamoTables.merchandiseTable,
     dynamoTables.exchangeFavoriteTable,
+    dynamoTables.operatorAuditLogTable,
   ];
 }
 
@@ -114,7 +115,12 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
 
   role.addToPolicy(
     new iam.PolicyStatement({
-      actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminDeleteUser"],
+      actions: [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:AdminResetUserPassword",
+      ],
       resources: [props.cognitoUserPoolArn],
     }),
   );

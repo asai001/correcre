@@ -1,6 +1,13 @@
 import "server-only";
 
-import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
+import { randomUUID } from "node:crypto";
+
+import {
+  createCognitoUser,
+  deleteCognitoUser,
+  resetCognitoUserPassword,
+  updateCognitoUserEmail,
+} from "@correcre/lib/cognito/user";
 import {
   getMerchantById,
   listMerchants,
@@ -10,20 +17,40 @@ import {
   buildMerchantUserByCognitoSubGsiPk,
   buildMerchantUserByEmailGsiPk,
   buildMerchantUserSk,
+  getMerchantUserByMerchantAndUserId,
   listMerchantUsersByEmail,
   listMerchantUsersByMerchant,
   putMerchantUser,
+  updateMerchantUserEmail,
 } from "@correcre/lib/dynamodb/merchant-user";
+import {
+  buildOperatorAuditLogByMerchantGsiPk,
+  buildOperatorAuditLogPk,
+  buildOperatorAuditLogSk,
+  putOperatorAuditLog,
+} from "@correcre/lib/dynamodb/operator-audit-log";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
-import type { Merchant, MerchantUserItem } from "@correcre/types";
+import type {
+  DBUserItem,
+  Merchant,
+  MerchantUserItem,
+  OperatorAuditEventResult,
+  OperatorAuditEventType,
+  OperatorAuditLogItem,
+  OperatorAuditLogTarget,
+} from "@correcre/types";
 
 import { getOperatorCognitoConfig } from "@operator/lib/auth/config";
 import type {
   CreateMerchantInput,
   CreateMerchantUserInput,
+  MerchantApplicationDecisionInput,
+  MerchantApplicationDetail,
   MerchantSummary,
   MerchantUserSummary,
+  ResetMerchantUserEmailInput,
+  ResetMerchantUserPasswordInput,
   UpdateMerchantInput,
 } from "../model/types";
 
@@ -31,6 +58,7 @@ type RuntimeConfig = {
   region: string;
   merchantTableName: string;
   merchantUserTableName: string;
+  operatorAuditLogTableName: string;
   cognitoRegion: string;
   cognitoUserPoolId: string;
 };
@@ -42,9 +70,55 @@ function getRuntimeConfig(): RuntimeConfig {
     region: readRequiredServerEnv("AWS_REGION"),
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchantUserTableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
+    operatorAuditLogTableName: readRequiredServerEnv("DDB_OPERATOR_AUDIT_LOG_TABLE_NAME"),
     cognitoRegion: cognitoConfig.region,
     cognitoUserPoolId: cognitoConfig.userPoolId,
   };
+}
+
+async function recordOperatorAuditLog(
+  config: RuntimeConfig,
+  params: {
+    eventType: OperatorAuditEventType;
+    result: OperatorAuditEventResult;
+    actor: DBUserItem;
+    target: OperatorAuditLogTarget;
+    errorMessage?: string;
+  },
+): Promise<void> {
+  const occurredAt = new Date().toISOString();
+  const eventId = randomUUID();
+
+  const item: OperatorAuditLogItem = {
+    pk: buildOperatorAuditLogPk(params.actor.userId),
+    sk: buildOperatorAuditLogSk(occurredAt, eventId),
+    eventId,
+    eventType: params.eventType,
+    occurredAt,
+    result: params.result,
+    actor: {
+      userId: params.actor.userId,
+      email: params.actor.email,
+      cognitoSub: params.actor.cognitoSub,
+      displayName: joinNameParts(params.actor.lastName, params.actor.firstName),
+    },
+    target: params.target,
+    errorMessage: params.errorMessage,
+    gsi1pk: buildOperatorAuditLogByMerchantGsiPk(params.target.merchantId),
+    gsi1sk: buildOperatorAuditLogSk(occurredAt, eventId),
+  };
+
+  try {
+    await putOperatorAuditLog(
+      {
+        region: config.region,
+        tableName: config.operatorAuditLogTableName,
+      },
+      item,
+    );
+  } catch (error) {
+    console.error("Failed to write operator audit log", error, item);
+  }
 }
 
 function isValidEmail(email: string) {
@@ -149,6 +223,50 @@ export async function listMerchantsForOperator(): Promise<MerchantSummary[]> {
   });
 
   return merchants.sort((left, right) => left.createdAt.localeCompare(right.createdAt) * -1);
+}
+
+export async function listPendingMerchantApplicationsForOperator(): Promise<MerchantApplicationDetail[]> {
+  const config = getRuntimeConfig();
+  const merchants = await listMerchants({
+    region: config.region,
+    tableName: config.merchantTableName,
+  });
+
+  const pendingMerchants = merchants
+    .filter((merchant) => merchant.status === "PENDING")
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt) * -1);
+
+  const applications = await Promise.all(
+    pendingMerchants.map(async (merchant): Promise<MerchantApplicationDetail> => {
+      const users = await listMerchantUsersByMerchant(
+        {
+          region: config.region,
+          tableName: config.merchantUserTableName,
+        },
+        merchant.merchantId,
+      );
+
+      const contactUser = users.find((user) => user.status === "PENDING") ?? null;
+
+      return {
+        merchant,
+        contactUser: contactUser
+          ? {
+              userId: contactUser.userId,
+              lastName: contactUser.lastName,
+              firstName: contactUser.firstName,
+              lastNameKana: contactUser.lastNameKana,
+              firstNameKana: contactUser.firstNameKana,
+              email: contactUser.email,
+              phoneNumber: contactUser.phoneNumber,
+              status: contactUser.status,
+            }
+          : null,
+      };
+    }),
+  );
+
+  return applications;
 }
 
 export async function createMerchantForOperator(input: CreateMerchantInput): Promise<MerchantSummary> {
@@ -377,4 +495,502 @@ export async function createMerchantUserForOperator(
 
     throw error;
   }
+}
+
+export async function resetMerchantUserEmailForOperator(
+  input: ResetMerchantUserEmailInput,
+  operator: DBUserItem,
+): Promise<MerchantUserSummary> {
+  const config = getRuntimeConfig();
+  const newEmail = input.newEmail.trim().toLowerCase();
+
+  if (!newEmail) {
+    throw new Error("新しいメールアドレスを入力してください");
+  }
+
+  if (!isValidEmail(newEmail)) {
+    throw new Error("メールアドレスの形式が正しくありません");
+  }
+
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    input.merchantId,
+  );
+
+  if (!merchant) {
+    throw new Error("Merchant not found");
+  }
+
+  const user = await getMerchantUserByMerchantAndUserId(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+    input.userId,
+  );
+
+  if (!user || user.status === "DELETED") {
+    throw new Error("対象のユーザーが見つかりません");
+  }
+
+  if (user.email === newEmail) {
+    throw new Error("現在のメールアドレスと同じです");
+  }
+
+  const existingByEmail = await listMerchantUsersByEmail(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    newEmail,
+  );
+
+  const conflict = existingByEmail.find(
+    (other) =>
+      other.status !== "DELETED" &&
+      !(other.merchantId === user.merchantId && other.userId === user.userId),
+  );
+
+  if (conflict) {
+    throw new Error("同じメールアドレスのユーザーがすでに登録されています");
+  }
+
+  const beforeEmail = user.email;
+  const auditTarget: OperatorAuditLogTarget = {
+    merchantId: merchant.merchantId,
+    merchantName: merchant.name,
+    merchantUserId: user.userId,
+    merchantUserName: joinNameParts(user.lastName, user.firstName),
+    beforeEmail,
+    afterEmail: newEmail,
+  };
+
+  const updatedUser = await updateMerchantUserEmail(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+    input.userId,
+    newEmail,
+  );
+
+  if (!updatedUser) {
+    throw new Error("対象のユーザーが見つかりません");
+  }
+
+  try {
+    await updateCognitoUserEmail(
+      {
+        region: config.cognitoRegion,
+        userPoolId: config.cognitoUserPoolId,
+      },
+      {
+        username: user.cognitoSub ?? user.email,
+        newEmail,
+      },
+    );
+  } catch (error) {
+    try {
+      await updateMerchantUserEmail(
+        {
+          region: config.region,
+          tableName: config.merchantUserTableName,
+        },
+        input.merchantId,
+        input.userId,
+        beforeEmail,
+      );
+    } catch (rollbackError) {
+      console.error("Failed to roll back MerchantUser email after Cognito update failure", rollbackError);
+      await recordOperatorAuditLog(config, {
+        eventType: "MERCHANT_USER_EMAIL_RESET",
+        result: "FAILURE",
+        actor: operator,
+        target: auditTarget,
+        errorMessage:
+          error instanceof Error
+            ? `Cognito 更新失敗 + DB ロールバック失敗: ${error.message}`
+            : "Cognito 更新失敗 + DB ロールバック失敗",
+      });
+      throw new Error("Cognito 更新失敗後の DB ロールバックに失敗しました。手動確認が必要です。");
+    }
+
+    await recordOperatorAuditLog(config, {
+      eventType: "MERCHANT_USER_EMAIL_RESET",
+      result: "ROLLED_BACK",
+      actor: operator,
+      target: auditTarget,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    if (error instanceof Error && (error.name === "AliasExistsException" || error.name === "UsernameExistsException")) {
+      throw new Error("同じメールアドレスの Cognito ユーザーが既に存在します");
+    }
+
+    throw new Error("Cognito のメールアドレス更新に失敗したため変更を元に戻しました。");
+  }
+
+  await recordOperatorAuditLog(config, {
+    eventType: "MERCHANT_USER_EMAIL_RESET",
+    result: "SUCCESS",
+    actor: operator,
+    target: auditTarget,
+  });
+
+  return toMerchantUserSummary(updatedUser);
+}
+
+export async function resetMerchantUserPasswordForOperator(
+  input: ResetMerchantUserPasswordInput,
+  operator: DBUserItem,
+): Promise<MerchantUserSummary> {
+  const config = getRuntimeConfig();
+
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    input.merchantId,
+  );
+
+  if (!merchant) {
+    throw new Error("Merchant not found");
+  }
+
+  const user = await getMerchantUserByMerchantAndUserId(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+    input.userId,
+  );
+
+  if (!user || user.status === "DELETED") {
+    throw new Error("対象のユーザーが見つかりません");
+  }
+
+  const auditTarget: OperatorAuditLogTarget = {
+    merchantId: merchant.merchantId,
+    merchantName: merchant.name,
+    merchantUserId: user.userId,
+    merchantUserName: joinNameParts(user.lastName, user.firstName),
+    beforeEmail: user.email,
+    afterEmail: user.email,
+  };
+
+  try {
+    await resetCognitoUserPassword(
+      {
+        region: config.cognitoRegion,
+        userPoolId: config.cognitoUserPoolId,
+      },
+      { username: user.cognitoSub ?? user.email },
+    );
+  } catch (error) {
+    await recordOperatorAuditLog(config, {
+      eventType: "MERCHANT_USER_PASSWORD_RESET",
+      result: "FAILURE",
+      actor: operator,
+      target: auditTarget,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    throw new Error("Cognito のパスワードリセットに失敗しました。");
+  }
+
+  await recordOperatorAuditLog(config, {
+    eventType: "MERCHANT_USER_PASSWORD_RESET",
+    result: "SUCCESS",
+    actor: operator,
+    target: auditTarget,
+  });
+
+  return toMerchantUserSummary(user);
+}
+
+export async function getMerchantApplicationDetail(merchantId: string): Promise<MerchantApplicationDetail | null> {
+  const config = getRuntimeConfig();
+
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    merchantId,
+  );
+
+  if (!merchant) {
+    return null;
+  }
+
+  const users = await listMerchantUsersByMerchant(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    merchantId,
+  );
+
+  const contactUser = users.find((user) => user.status !== "DELETED") ?? null;
+
+  return {
+    merchant,
+    contactUser: contactUser
+      ? {
+          userId: contactUser.userId,
+          lastName: contactUser.lastName,
+          firstName: contactUser.firstName,
+          lastNameKana: contactUser.lastNameKana,
+          firstNameKana: contactUser.firstNameKana,
+          email: contactUser.email,
+          phoneNumber: contactUser.phoneNumber,
+          status: contactUser.status,
+        }
+      : null,
+  };
+}
+
+export async function approveMerchantApplicationForOperator(
+  input: MerchantApplicationDecisionInput,
+  operator: DBUserItem,
+): Promise<MerchantSummary> {
+  const config = getRuntimeConfig();
+
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    input.merchantId,
+  );
+
+  if (!merchant) {
+    throw new Error("Merchant not found");
+  }
+
+  if (merchant.status !== "PENDING") {
+    throw new Error("申請ステータスが PENDING ではないため承認できません");
+  }
+
+  const users = await listMerchantUsersByMerchant(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+  );
+
+  const pendingUser = users.find((user) => user.status === "PENDING");
+
+  if (!pendingUser) {
+    throw new Error("申請に紐づく担当者ユーザーが見つかりません");
+  }
+
+  const auditTarget: OperatorAuditLogTarget = {
+    merchantId: merchant.merchantId,
+    merchantName: merchant.name,
+    merchantUserId: pendingUser.userId,
+    merchantUserName: joinNameParts(pendingUser.lastName, pendingUser.firstName),
+    beforeEmail: pendingUser.email,
+    afterEmail: pendingUser.email,
+  };
+
+  let createdCognitoUser: { cognitoSub: string; username: string } | null = null;
+
+  try {
+    createdCognitoUser = await createCognitoUser(
+      {
+        region: config.cognitoRegion,
+        userPoolId: config.cognitoUserPoolId,
+      },
+      {
+        email: pendingUser.email,
+        firstName: pendingUser.firstName,
+        lastName: pendingUser.lastName,
+        fullName: joinNameParts(pendingUser.lastName, pendingUser.firstName),
+        roles: ["MERCHANT"],
+      },
+    );
+  } catch (error) {
+    await recordOperatorAuditLog(config, {
+      eventType: "MERCHANT_REGISTRATION_APPROVED",
+      result: "FAILURE",
+      actor: operator,
+      target: auditTarget,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    if (error instanceof Error && (error.name === "UsernameExistsException" || error.name === "AliasExistsException")) {
+      throw new Error("同じメールアドレスの Cognito ユーザーが既に存在します");
+    }
+
+    throw error;
+  }
+
+  const now = new Date().toISOString();
+
+  const activatedMerchant: Merchant = {
+    ...merchant,
+    status: "ACTIVE",
+    updatedAt: now,
+  };
+
+  const invitedUser: MerchantUserItem = {
+    ...pendingUser,
+    cognitoSub: createdCognitoUser.cognitoSub,
+    status: "INVITED",
+    invitedAt: now,
+    updatedAt: now,
+    gsi1pk: buildMerchantUserByCognitoSubGsiPk(createdCognitoUser.cognitoSub),
+  };
+
+  try {
+    await putMerchant(
+      {
+        region: config.region,
+        tableName: config.merchantTableName,
+      },
+      activatedMerchant,
+    );
+
+    await putMerchantUser(
+      {
+        region: config.region,
+        tableName: config.merchantUserTableName,
+      },
+      invitedUser,
+    );
+  } catch (error) {
+    try {
+      await deleteCognitoUser(
+        {
+          region: config.cognitoRegion,
+          userPoolId: config.cognitoUserPoolId,
+        },
+        createdCognitoUser.username,
+      );
+    } catch (rollbackError) {
+      console.error("Failed to roll back Cognito user after approval DB failure", rollbackError);
+      await recordOperatorAuditLog(config, {
+        eventType: "MERCHANT_REGISTRATION_APPROVED",
+        result: "FAILURE",
+        actor: operator,
+        target: auditTarget,
+        errorMessage:
+          error instanceof Error
+            ? `DB 更新失敗 + Cognito ロールバック失敗: ${error.message}`
+            : "DB 更新失敗 + Cognito ロールバック失敗",
+      });
+      throw new Error("承認処理の DB 更新失敗後の Cognito ロールバックに失敗しました。手動確認が必要です。");
+    }
+
+    await recordOperatorAuditLog(config, {
+      eventType: "MERCHANT_REGISTRATION_APPROVED",
+      result: "ROLLED_BACK",
+      actor: operator,
+      target: auditTarget,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    throw new Error("DB の更新に失敗したため Cognito ユーザーをロールバックしました。再度お試しください。");
+  }
+
+  await recordOperatorAuditLog(config, {
+    eventType: "MERCHANT_REGISTRATION_APPROVED",
+    result: "SUCCESS",
+    actor: operator,
+    target: auditTarget,
+  });
+
+  return activatedMerchant;
+}
+
+export async function rejectMerchantApplicationForOperator(
+  input: MerchantApplicationDecisionInput,
+  operator: DBUserItem,
+): Promise<MerchantSummary> {
+  const config = getRuntimeConfig();
+
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    input.merchantId,
+  );
+
+  if (!merchant) {
+    throw new Error("Merchant not found");
+  }
+
+  if (merchant.status !== "PENDING") {
+    throw new Error("申請ステータスが PENDING ではないため却下できません");
+  }
+
+  const users = await listMerchantUsersByMerchant(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+  );
+
+  const pendingUser = users.find((user) => user.status === "PENDING") ?? null;
+
+  const auditTarget: OperatorAuditLogTarget = {
+    merchantId: merchant.merchantId,
+    merchantName: merchant.name,
+    merchantUserId: pendingUser?.userId ?? "",
+    merchantUserName: pendingUser ? joinNameParts(pendingUser.lastName, pendingUser.firstName) : undefined,
+    beforeEmail: pendingUser?.email,
+    afterEmail: pendingUser?.email,
+  };
+
+  const now = new Date().toISOString();
+
+  const rejectedMerchant: Merchant = {
+    ...merchant,
+    status: "REJECTED",
+    updatedAt: now,
+  };
+
+  await putMerchant(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    rejectedMerchant,
+  );
+
+  if (pendingUser) {
+    const deletedUser: MerchantUserItem = {
+      ...pendingUser,
+      status: "DELETED",
+      updatedAt: now,
+    };
+
+    await putMerchantUser(
+      {
+        region: config.region,
+        tableName: config.merchantUserTableName,
+      },
+      deletedUser,
+    );
+  }
+
+  await recordOperatorAuditLog(config, {
+    eventType: "MERCHANT_REGISTRATION_REJECTED",
+    result: "SUCCESS",
+    actor: operator,
+    target: auditTarget,
+  });
+
+  return rejectedMerchant;
 }

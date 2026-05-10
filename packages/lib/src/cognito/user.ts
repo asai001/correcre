@@ -4,6 +4,8 @@ import { randomBytes } from "node:crypto";
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminResetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   type AttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import type { DBUserRole, MerchantUserRole } from "@correcre/types";
@@ -94,6 +96,38 @@ export async function deleteCognitoUser(config: CognitoUserPoolConfig, username:
     new AdminDeleteUserCommand({
       UserPoolId: config.userPoolId,
       Username: username,
+    }),
+  );
+}
+
+export async function updateCognitoUserEmail(
+  config: CognitoUserPoolConfig,
+  input: { username: string; newEmail: string },
+): Promise<void> {
+  const client = getCognitoClient(config.region);
+
+  await client.send(
+    new AdminUpdateUserAttributesCommand({
+      UserPoolId: config.userPoolId,
+      Username: input.username,
+      UserAttributes: [
+        { Name: "email", Value: input.newEmail },
+        { Name: "email_verified", Value: "true" },
+      ],
+    }),
+  );
+}
+
+export async function resetCognitoUserPassword(
+  config: CognitoUserPoolConfig,
+  input: { username: string },
+): Promise<void> {
+  const client = getCognitoClient(config.region);
+
+  await client.send(
+    new AdminResetUserPasswordCommand({
+      UserPoolId: config.userPoolId,
+      Username: input.username,
     }),
   );
 }

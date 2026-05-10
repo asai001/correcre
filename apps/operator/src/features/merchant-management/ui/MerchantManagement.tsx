@@ -4,11 +4,25 @@ import Link from "next/link";
 import { useState } from "react";
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowUpRightFromSquare, faCirclePlus, faStore } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowUpRightFromSquare,
+  faCirclePlus,
+  faClipboardCheck,
+  faStore,
+} from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { createMerchant } from "../api/client";
-import type { CreateMerchantInput, MerchantSummary } from "../model/types";
+import {
+  approveMerchantApplication,
+  createMerchant,
+  rejectMerchantApplication,
+} from "../api/client";
+import type {
+  CreateMerchantInput,
+  MerchantApplicationDetail,
+  MerchantSummary,
+} from "../model/types";
+import ApplicationDecisionDialog from "./ApplicationDecisionDialog";
 
 const storeAddressModeOptions = [
   { value: "same_company", label: "会社と同じ" },
@@ -48,15 +62,35 @@ function createInitialFormState(): FormState {
 
 type MerchantManagementProps = {
   initialMerchants: MerchantSummary[];
+  initialPendingApplications: MerchantApplicationDetail[];
   operatorName: string;
 };
 
-export default function MerchantManagement({ initialMerchants, operatorName }: MerchantManagementProps) {
+const STATUS_LABELS: Record<MerchantSummary["status"], string> = {
+  PENDING: "申請中",
+  ACTIVE: "登録済",
+  INACTIVE: "停止中",
+  REJECTED: "却下済",
+};
+
+export default function MerchantManagement({
+  initialMerchants,
+  initialPendingApplications,
+  operatorName,
+}: MerchantManagementProps) {
   const [merchants, setMerchants] = useState(initialMerchants);
+  const [pendingApplications, setPendingApplications] = useState(initialPendingApplications);
   const [form, setForm] = useState<FormState>(() => createInitialFormState());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [decisionDialog, setDecisionDialog] = useState<{
+    application: MerchantApplicationDetail;
+    decision: "approve" | "reject";
+  } | null>(null);
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const handleChange =
     (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -97,9 +131,117 @@ export default function MerchantManagement({ initialMerchants, operatorName }: M
     }
   };
 
+  const handleOpenDecision = (
+    application: MerchantApplicationDetail,
+    decision: "approve" | "reject",
+  ) => {
+    setDecisionDialog({ application, decision });
+    setDecisionError(null);
+  };
+
+  const handleCloseDecision = () => {
+    if (decisionSubmitting) return;
+    setDecisionDialog(null);
+    setDecisionError(null);
+  };
+
+  const handleSubmitDecision = async () => {
+    if (!decisionDialog) return;
+
+    setDecisionSubmitting(true);
+    setDecisionError(null);
+
+    try {
+      const { application, decision } = decisionDialog;
+      const updated =
+        decision === "approve"
+          ? await approveMerchantApplication({ merchantId: application.merchant.merchantId })
+          : await rejectMerchantApplication({ merchantId: application.merchant.merchantId });
+
+      setPendingApplications((current) =>
+        current.filter((item) => item.merchant.merchantId !== updated.merchantId),
+      );
+      setMerchants((current) => {
+        const filtered = current.filter((item) => item.merchantId !== updated.merchantId);
+        return [updated, ...filtered];
+      });
+      setDecisionDialog(null);
+      setNotice(
+        decision === "approve"
+          ? `「${application.merchant.name}」を承認しました。担当者に仮パスワードメールを送信しました。`
+          : `「${application.merchant.name}」の申請を却下しました。`,
+      );
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : "申請の処理に失敗しました。");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <AdminPageHeader title="提携企業管理" adminName={operatorName} subtitle="商品・サービスを提供する提携企業の登録と管理" />
+
+      <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
+        <div className="flex items-center gap-3">
+          <FontAwesomeIcon icon={faClipboardCheck} className="text-amber-600" />
+          <h2 className="text-xl font-bold text-slate-900">承認待ちの申請</h2>
+          {pendingApplications.length > 0 ? (
+            <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800">
+              {pendingApplications.length}件
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-2 text-sm text-slate-500">
+          提携企業アプリから自己登録された申請が表示されます。内容を確認のうえ「承認」または「却下」してください。
+        </p>
+
+        {pendingApplications.length === 0 ? (
+          <p className="mt-6 text-sm text-slate-500">承認待ちの申請はありません。</p>
+        ) : (
+          <ul className="mt-5 divide-y divide-slate-200">
+            {pendingApplications.map((application) => (
+              <li key={application.merchant.merchantId} className="flex flex-wrap items-start justify-between gap-4 py-4">
+                <div className="flex-1 min-w-[260px] space-y-1">
+                  <div className="text-base font-semibold text-slate-900">{application.merchant.name}</div>
+                  <div className="text-xs text-slate-500">
+                    merchantId: {application.merchant.merchantId} ／ 申請日: {application.merchant.createdAt.slice(0, 10)}
+                  </div>
+                  <div className="text-sm text-slate-700">
+                    所在地: {application.merchant.companyLocation}
+                  </div>
+                  {application.contactUser ? (
+                    <div className="text-sm text-slate-700">
+                      担当者: {application.contactUser.lastName} {application.contactUser.firstName} ／{" "}
+                      {application.contactUser.email}
+                      {application.contactUser.phoneNumber ? ` ／ ${application.contactUser.phoneNumber}` : null}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => handleOpenDecision(application, "approve")}
+                    sx={{ borderRadius: "999px", textTransform: "none", backgroundColor: "#2563EB" }}
+                  >
+                    承認
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    onClick={() => handleOpenDecision(application, "reject")}
+                    sx={{ borderRadius: "999px", textTransform: "none" }}
+                  >
+                    却下
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <div className="flex items-center gap-3">
@@ -219,26 +361,38 @@ export default function MerchantManagement({ initialMerchants, operatorName }: M
           <p className="mt-6 text-sm text-slate-500">まだ提携企業は登録されていません。</p>
         ) : (
           <ul className="mt-5 divide-y divide-slate-200">
-            {merchants.map((merchant) => (
-              <li key={merchant.merchantId} className="flex items-center justify-between gap-4 py-4">
-                <div>
-                  <div className="text-base font-semibold text-slate-900">{merchant.name}</div>
-                  <div className="text-xs text-slate-500">
-                    merchantId: {merchant.merchantId} ／ 状態: {merchant.status}
+            {merchants
+              .filter((merchant) => merchant.status !== "PENDING")
+              .map((merchant) => (
+                <li key={merchant.merchantId} className="flex items-center justify-between gap-4 py-4">
+                  <div>
+                    <div className="text-base font-semibold text-slate-900">{merchant.name}</div>
+                    <div className="text-xs text-slate-500">
+                      merchantId: {merchant.merchantId} ／ 状態: {STATUS_LABELS[merchant.status]}
+                    </div>
                   </div>
-                </div>
-                <Link
-                  href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-                >
-                  ユーザー招待
-                  <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                </Link>
-              </li>
-            ))}
+                  <Link
+                    href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                  >
+                    ユーザー招待
+                    <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                  </Link>
+                </li>
+              ))}
           </ul>
         )}
       </section>
+
+      <ApplicationDecisionDialog
+        open={decisionDialog !== null}
+        decision={decisionDialog?.decision ?? "approve"}
+        application={decisionDialog?.application ?? null}
+        submitting={decisionSubmitting}
+        error={decisionError}
+        onClose={handleCloseDecision}
+        onSubmit={handleSubmitDecision}
+      />
     </div>
   );
 }

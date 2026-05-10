@@ -7,8 +7,14 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faPaperPlane, faUsers } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { inviteMerchantUser } from "../api/client";
+import {
+  inviteMerchantUser,
+  resetMerchantUserEmail,
+  resetMerchantUserPassword,
+} from "../api/client";
 import type { MerchantSummary, MerchantUserSummary } from "../model/types";
+import ResetMerchantUserEmailDialog from "./ResetMerchantUserEmailDialog";
+import ResetMerchantUserPasswordDialog from "./ResetMerchantUserPasswordDialog";
 
 type Props = {
   merchant: MerchantSummary;
@@ -37,6 +43,7 @@ function createInitialInviteFormState(): InviteFormState {
 }
 
 const STATUS_LABELS: Record<MerchantUserSummary["status"], string> = {
+  PENDING: "申請中",
   INVITED: "招待中",
   ACTIVE: "ログイン済み",
   INACTIVE: "休止中",
@@ -49,6 +56,14 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [emailDialogUser, setEmailDialogUser] = useState<MerchantUserSummary | null>(null);
+  const [emailDialogSubmitting, setEmailDialogSubmitting] = useState(false);
+  const [emailDialogError, setEmailDialogError] = useState<string | null>(null);
+
+  const [passwordDialogUser, setPasswordDialogUser] = useState<MerchantUserSummary | null>(null);
+  const [passwordDialogSubmitting, setPasswordDialogSubmitting] = useState(false);
+  const [passwordDialogError, setPasswordDialogError] = useState<string | null>(null);
 
   const handleChange = (field: keyof InviteFormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
@@ -79,6 +94,78 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
       setError(err instanceof Error ? err.message : "提携企業ユーザーの招待に失敗しました。");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenEmailDialog = (user: MerchantUserSummary) => {
+    setEmailDialogUser(user);
+    setEmailDialogError(null);
+  };
+
+  const handleCloseEmailDialog = () => {
+    if (emailDialogSubmitting) return;
+    setEmailDialogUser(null);
+    setEmailDialogError(null);
+  };
+
+  const handleSubmitEmailDialog = async (newEmail: string) => {
+    if (!emailDialogUser) return;
+
+    setEmailDialogSubmitting(true);
+    setEmailDialogError(null);
+
+    try {
+      const updated = await resetMerchantUserEmail({
+        merchantId: emailDialogUser.merchantId,
+        userId: emailDialogUser.userId,
+        newEmail,
+      });
+
+      setUsers((current) =>
+        current.map((user) => (user.userId === updated.userId ? updated : user)),
+      );
+      setEmailDialogUser(null);
+      setNotice(
+        `${updated.lastName} ${updated.firstName} さんのメールアドレスを ${updated.email} にリセットしました。`,
+      );
+    } catch (err) {
+      setEmailDialogError(err instanceof Error ? err.message : "メールアドレスのリセットに失敗しました。");
+    } finally {
+      setEmailDialogSubmitting(false);
+    }
+  };
+
+  const handleOpenPasswordDialog = (user: MerchantUserSummary) => {
+    setPasswordDialogUser(user);
+    setPasswordDialogError(null);
+  };
+
+  const handleClosePasswordDialog = () => {
+    if (passwordDialogSubmitting) return;
+    setPasswordDialogUser(null);
+    setPasswordDialogError(null);
+  };
+
+  const handleSubmitPasswordDialog = async () => {
+    if (!passwordDialogUser) return;
+
+    setPasswordDialogSubmitting(true);
+    setPasswordDialogError(null);
+
+    try {
+      await resetMerchantUserPassword({
+        merchantId: passwordDialogUser.merchantId,
+        userId: passwordDialogUser.userId,
+      });
+
+      setNotice(
+        `${passwordDialogUser.lastName} ${passwordDialogUser.firstName} さんのパスワードをリセットしました。`,
+      );
+      setPasswordDialogUser(null);
+    } catch (err) {
+      setPasswordDialogError(err instanceof Error ? err.message : "パスワードリセットに失敗しました。");
+    } finally {
+      setPasswordDialogSubmitting(false);
     }
   };
 
@@ -155,14 +242,54 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
                     {user.phoneNumber ? ` ／ ${user.phoneNumber}` : null}
                   </div>
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                  {STATUS_LABELS[user.status]}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {STATUS_LABELS[user.status]}
+                  </span>
+                  {user.status !== "DELETED" ? (
+                    <>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleOpenEmailDialog(user)}
+                        sx={{ borderRadius: "999px", textTransform: "none" }}
+                      >
+                        メアドリセット
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => handleOpenPasswordDialog(user)}
+                        sx={{ borderRadius: "999px", textTransform: "none" }}
+                      >
+                        パスワードリセット
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      <ResetMerchantUserEmailDialog
+        open={emailDialogUser !== null}
+        user={emailDialogUser}
+        submitting={emailDialogSubmitting}
+        error={emailDialogError}
+        onClose={handleCloseEmailDialog}
+        onSubmit={handleSubmitEmailDialog}
+      />
+
+      <ResetMerchantUserPasswordDialog
+        open={passwordDialogUser !== null}
+        user={passwordDialogUser}
+        submitting={passwordDialogSubmitting}
+        error={passwordDialogError}
+        onClose={handleClosePasswordDialog}
+        onSubmit={handleSubmitPasswordDialog}
+      />
     </div>
   );
 }
