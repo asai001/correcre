@@ -122,7 +122,7 @@ export default function ExchangeDetail({ item, initialPointBalance, initialIsFav
           </Link>
         </div>
 
-        <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5.5fr)_minmax(0,4.5fr)]">
           <div className="lg:sticky lg:top-6 lg:self-start">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex w-full items-center justify-center overflow-hidden rounded-xl bg-slate-50">
