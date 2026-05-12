@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { maybeTouchSessionToken } from "@correcre/lib/auth/session-validate";
+
 import {
   ADMIN_DEFAULT_REDIRECT_PATH,
   ADMIN_LOGIN_PATH,
@@ -7,7 +9,7 @@ import {
   ADMIN_SESSION_COOKIE_NAME,
 } from "@admin/lib/auth/constants";
 import { sanitizeRedirectTo } from "@admin/lib/auth/redirect";
-import { verifyAdminIdToken } from "@admin/lib/auth/verify-token";
+import { verifyAdminSessionToken } from "@admin/lib/auth/verify-token";
 
 function isProtectedPath(pathname: string) {
   return ADMIN_PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -59,7 +61,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(buildLoginRedirect(request));
   }
 
-  const session = await verifyAdminIdToken(sessionToken);
+  const session = await verifyAdminSessionToken(sessionToken);
 
   if (!session) {
     const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
@@ -72,7 +74,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(redirectTo, request.url));
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const touched = await maybeTouchSessionToken(session.payload);
+
+  if (touched) {
+    response.cookies.set({
+      name: ADMIN_SESSION_COOKIE_NAME,
+      value: touched.token,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      expires: touched.cookieExpiresAt,
+    });
+  }
+
+  return response;
 }
 
 export const config = {

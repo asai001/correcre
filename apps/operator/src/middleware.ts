@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { maybeTouchSessionToken } from "@correcre/lib/auth/session-validate";
+
 import {
   OPERATOR_DEFAULT_REDIRECT_PATH,
   OPERATOR_LOGIN_PATH,
@@ -7,7 +9,7 @@ import {
   OPERATOR_SESSION_COOKIE_NAME,
 } from "@operator/lib/auth/constants";
 import { sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { verifyOperatorIdToken } from "@operator/lib/auth/verify-token";
+import { verifyOperatorSessionToken } from "@operator/lib/auth/verify-token";
 
 function isProtectedPath(pathname: string) {
   return OPERATOR_PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -42,7 +44,8 @@ function expireSession(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLoginPage = pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password" || pathname === "/login/forgot-password";
+  const isLoginPage =
+    pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password" || pathname === "/login/forgot-password";
   const shouldCheckSession = isLoginPage || isProtectedPath(pathname);
 
   if (!shouldCheckSession) {
@@ -59,7 +62,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(buildLoginRedirect(request));
   }
 
-  const session = await verifyOperatorIdToken(sessionToken);
+  const session = await verifyOperatorSessionToken(sessionToken);
 
   if (!session) {
     const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
@@ -67,7 +70,26 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  return NextResponse.next();
+  if (isLoginPage) {
+    return NextResponse.next();
+  }
+
+  const response = NextResponse.next();
+  const touched = await maybeTouchSessionToken(session.payload);
+
+  if (touched) {
+    response.cookies.set({
+      name: OPERATOR_SESSION_COOKIE_NAME,
+      value: touched.token,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      expires: touched.cookieExpiresAt,
+    });
+  }
+
+  return response;
 }
 
 export const config = {

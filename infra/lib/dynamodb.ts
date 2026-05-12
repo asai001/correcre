@@ -23,6 +23,7 @@ export interface ApplicationDynamoTables {
   merchandiseTable: dynamodb.Table;
   exchangeFavoriteTable: dynamodb.Table;
   operatorAuditLogTable: dynamodb.Table;
+  sessionTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -343,6 +344,27 @@ function createOperatorAuditLogTable(scope: Construct, stage: InfraStage): dynam
   return table;
 }
 
+// Session
+// - pk = SESSION#<sessionId>
+// - sort key なし（1 セッション = 1 アイテム）
+// - gsi1pk = COGNITO_SUB#<cognitoSub>
+// - gsi1sk = CREATED_AT#<ISO8601>
+// - TTL は `ttl`（UNIX 秒）。DynamoDB の TTL で期限切れセッションを自動削除する。
+function createSessionTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(scope, "SessionTable", {
+    ...buildTableProps(stage, buildTableName("session", stage), "pk"),
+    timeToLiveAttribute: "ttl",
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "SessionByCognitoSub",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  return table;
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -362,5 +384,6 @@ export function createApplicationDynamoTables(
     merchandiseTable: createMerchandiseTable(scope, props.stage),
     exchangeFavoriteTable: createExchangeFavoriteTable(scope, props.stage),
     operatorAuditLogTable: createOperatorAuditLogTable(scope, props.stage),
+    sessionTable: createSessionTable(scope, props.stage),
   };
 }

@@ -1,56 +1,23 @@
-import type { JWTPayload } from "jose";
-import { createRemoteJWKSet } from "jose/jwks/remote";
-import { jwtVerify } from "jose/jwt/verify";
+import { evaluateSessionToken, type ValidatedSession } from "@correcre/lib/auth/session-validate";
+import { verifySessionToken } from "@correcre/lib/auth/session-token";
 
-import { getAdminCognitoConfig } from "./config";
+export type AdminSession = ValidatedSession;
 
-export type AdminIdTokenPayload = JWTPayload & {
-  token_use?: string;
-  email?: string;
-  name?: string;
-  "cognito:username"?: string;
-};
+export async function verifyAdminSessionToken(
+  token: string,
+  options?: { now?: Date },
+): Promise<AdminSession | null> {
+  const payload = await verifySessionToken(token);
 
-export type AdminSession = {
-  token: string;
-  payload: AdminIdTokenPayload;
-  expiresAt: Date;
-};
-
-const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
-
-function getJwks(jwksUri: string) {
-  const cached = jwksCache.get(jwksUri);
-
-  if (cached) {
-    return cached;
-  }
-
-  const jwks = createRemoteJWKSet(new URL(jwksUri));
-  jwksCache.set(jwksUri, jwks);
-  return jwks;
-}
-
-export async function verifyAdminIdToken(idToken: string): Promise<AdminSession | null> {
-  try {
-    const { clientId, issuer } = getAdminCognitoConfig();
-    const jwks = getJwks(`${issuer}/.well-known/jwks.json`);
-    const { payload } = await jwtVerify(idToken, jwks, {
-      issuer,
-      audience: clientId,
-      algorithms: ["RS256"],
-    });
-
-    if (payload.token_use !== "id" || typeof payload.exp !== "number") {
-      return null;
-    }
-
-    return {
-      token: idToken,
-      payload: payload as AdminIdTokenPayload,
-      expiresAt: new Date(payload.exp * 1000),
-    };
-  } catch {
+  if (!payload || payload.role !== "ADMIN") {
     return null;
   }
+
+  const result = evaluateSessionToken(payload, options);
+
+  if (result.status === "expired") {
+    return null;
+  }
+
+  return result.session;
 }

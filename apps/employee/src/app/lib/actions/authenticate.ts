@@ -111,12 +111,21 @@ function buildForgotPasswordRedirect(params: {
   return query ? `${EMPLOYEE_FORGOT_PASSWORD_PATH}?${query}` : EMPLOYEE_FORGOT_PASSWORD_PATH;
 }
 
+function getCheckboxValue(value: FormDataEntryValue | null): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return value === "on" || value === "true" || value === "1";
+}
+
 export async function authenticate(
   _previousState: LoginActionState,
   formData: FormData,
 ): Promise<LoginActionState> {
   const email = getFormValue(formData.get("email")).trim();
   const password = getFormValue(formData.get("password"));
+  const rememberMe = getCheckboxValue(formData.get("login-info"));
   const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
   let result: Awaited<ReturnType<typeof signInEmployee>>;
 
@@ -127,7 +136,7 @@ export async function authenticate(
   }
 
   try {
-    result = await signInEmployee({ email, password });
+    result = await signInEmployee({ email, password, rememberMe });
   } catch (error) {
     console.error("Employee login failed", error);
     await clearEmployeeSession();

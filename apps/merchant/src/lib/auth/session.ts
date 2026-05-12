@@ -9,12 +9,22 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import {
+  createSession,
+  extractUserClaims,
+  loadActiveSessionRecord,
+  terminateSession,
+  verifyCognitoIdToken,
+  type CreatedSession,
+} from "@correcre/lib/auth/session-store";
+import { evaluateSessionToken } from "@correcre/lib/auth/session-validate";
+import { verifySessionToken } from "@correcre/lib/auth/session-token";
 import { updateMerchantUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/merchant-user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import { MERCHANT_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, MERCHANT_SESSION_COOKIE_NAME } from "./constants";
 import { getMerchantCognitoConfig } from "./config";
-import { type MerchantSession, verifyMerchantIdToken } from "./verify-token";
+import type { MerchantSession } from "./verify-token";
 
 const cognitoClientCache = new Map<string, CognitoIdentityProviderClient>();
 const NEW_PASSWORD_CHALLENGE_COOKIE_TTL_MS = 10 * 60 * 1000;
@@ -46,10 +56,10 @@ function getCognitoClient(region: string) {
   return client;
 }
 
-async function syncMerchantLastLoginAt(session: MerchantSession) {
-  const cognitoSub = session.payload.sub?.trim();
+async function syncMerchantLastLoginAt(cognitoSub: string) {
+  const trimmed = cognitoSub.trim();
 
-  if (!cognitoSub) {
+  if (!trimmed) {
     return;
   }
 
@@ -58,7 +68,7 @@ async function syncMerchantLastLoginAt(session: MerchantSession) {
       region: readRequiredServerEnv("AWS_REGION"),
       tableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
     },
-    cognitoSub,
+    trimmed,
   );
 
   if (!updatedUser) {
@@ -66,17 +76,17 @@ async function syncMerchantLastLoginAt(session: MerchantSession) {
   }
 }
 
-async function setMerchantSessionCookie(session: MerchantSession) {
+async function setMerchantSessionCookie(created: CreatedSession) {
   const cookieStore = await cookies();
 
   cookieStore.set({
     name: MERCHANT_SESSION_COOKIE_NAME,
-    value: session.token,
+    value: created.token,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: session.expiresAt,
+    expires: created.cookieExpiresAt,
   });
 }
 
@@ -141,7 +151,7 @@ export async function getPendingNewPasswordChallenge(): Promise<PendingNewPasswo
   return decodePendingNewPasswordChallenge(encodedChallenge);
 }
 
-export async function clearMerchantSession() {
+async function clearMerchantSessionCookie() {
   const cookieStore = await cookies();
 
   cookieStore.set({
@@ -153,11 +163,73 @@ export async function clearMerchantSession() {
     path: "/",
     expires: new Date(0),
   });
+}
 
+export async function clearMerchantSession() {
+  const cookieStore = await cookies();
+  const existingToken = cookieStore.get(MERCHANT_SESSION_COOKIE_NAME)?.value;
+
+  if (existingToken) {
+    const payload = await verifySessionToken(existingToken);
+
+    if (payload?.sid) {
+      try {
+        await terminateSession(payload.sid);
+      } catch (error) {
+        console.warn("Failed to delete merchant session record on logout.", error);
+      }
+    }
+  }
+
+  await clearMerchantSessionCookie();
   await clearPendingNewPasswordChallenge();
 }
 
-export async function signInMerchant(params: { email: string; password: string }): Promise<SignInMerchantResult> {
+async function establishMerchantSession(params: { idToken: string; rememberMe: boolean }): Promise<MerchantSession> {
+  const { clientId, issuer } = getMerchantCognitoConfig();
+  const verification = await verifyCognitoIdToken({
+    idToken: params.idToken,
+    issuer,
+    audience: clientId,
+  });
+
+  if (!verification) {
+    const error = new Error("Failed to verify the ID token returned by Cognito.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const userClaims = extractUserClaims(verification.claims);
+
+  if (!userClaims) {
+    const error = new Error("Cognito ID token did not contain a usable subject claim.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const created = await createSession({
+    role: "MERCHANT",
+    claims: userClaims,
+    rememberMe: params.rememberMe,
+  });
+
+  await setMerchantSessionCookie(created);
+  await syncMerchantLastLoginAt(userClaims.cognitoSub);
+
+  const evaluation = evaluateSessionToken(created.payload);
+
+  if (evaluation.status === "expired") {
+    throw new Error(`Newly issued session was already considered expired (${evaluation.reason}).`);
+  }
+
+  return evaluation.session;
+}
+
+export async function signInMerchant(params: {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}): Promise<SignInMerchantResult> {
   const { region, clientId } = getMerchantCognitoConfig();
   const cognitoClient = getCognitoClient(region);
   await clearPendingNewPasswordChallenge();
@@ -199,29 +271,37 @@ export async function signInMerchant(params: { email: string; password: string }
     throw error;
   }
 
-  const session = await verifyMerchantIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setMerchantSessionCookie(session);
-  await syncMerchantLastLoginAt(session);
-
+  const session = await establishMerchantSession({ idToken, rememberMe: params.rememberMe ?? false });
   return { status: "authenticated", session };
 }
 
 export async function getMerchantSession(): Promise<MerchantSession | null> {
   const cookieStore = await cookies();
-  const idToken = cookieStore.get(MERCHANT_SESSION_COOKIE_NAME)?.value;
+  const token = cookieStore.get(MERCHANT_SESSION_COOKIE_NAME)?.value;
 
-  if (!idToken) {
+  if (!token) {
     return null;
   }
 
-  return verifyMerchantIdToken(idToken);
+  const payload = await verifySessionToken(token);
+
+  if (!payload || payload.role !== "MERCHANT") {
+    return null;
+  }
+
+  const evaluation = evaluateSessionToken(payload);
+
+  if (evaluation.status === "expired") {
+    return null;
+  }
+
+  const record = await loadActiveSessionRecord(payload.sid);
+
+  if (!record) {
+    return null;
+  }
+
+  return evaluation.session;
 }
 
 export async function requestMerchantPasswordReset(params: { email: string }) {
@@ -250,7 +330,10 @@ export async function confirmMerchantPasswordReset(params: { email: string; conf
   );
 }
 
-export async function completeMerchantNewPassword(params: { newPassword: string }) {
+export async function completeMerchantNewPassword(params: {
+  newPassword: string;
+  rememberMe?: boolean;
+}) {
   const challenge = await getPendingNewPasswordChallenge();
 
   if (!challenge) {
@@ -282,16 +365,7 @@ export async function completeMerchantNewPassword(params: { newPassword: string 
     throw error;
   }
 
-  const session = await verifyMerchantIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setMerchantSessionCookie(session);
-  await syncMerchantLastLoginAt(session);
+  const session = await establishMerchantSession({ idToken, rememberMe: params.rememberMe ?? false });
   await clearPendingNewPasswordChallenge();
 
   return session;

@@ -279,5 +279,9 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, "OperatorAuditLogTableName", {
       value: dynamoTables.operatorAuditLogTable.tableName,
     });
+
+    new cdk.CfnOutput(this, "SessionTableName", {
+      value: dynamoTables.sessionTable.tableName,
+    });
   }
 }

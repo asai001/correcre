@@ -35,6 +35,14 @@ function getFormValue(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
 }
 
+function getCheckboxValue(value: FormDataEntryValue | null): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return value === "on" || value === "true" || value === "1";
+}
+
 type LoginActionState = {
   errorCode?: LoginErrorCode;
 };
@@ -117,6 +125,7 @@ export async function authenticate(
 ): Promise<LoginActionState> {
   const email = getFormValue(formData.get("email")).trim();
   const password = getFormValue(formData.get("password"));
+  const rememberMe = getCheckboxValue(formData.get("login-info"));
   const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
   let result: Awaited<ReturnType<typeof signInMerchant>>;
 
@@ -127,7 +136,7 @@ export async function authenticate(
   }
 
   try {
-    result = await signInMerchant({ email, password });
+    result = await signInMerchant({ email, password, rememberMe });
   } catch (error) {
     console.error("Merchant login failed", error);
     await clearMerchantSession();

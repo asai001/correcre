@@ -9,12 +9,22 @@ import {
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import {
+  createSession,
+  extractUserClaims,
+  loadActiveSessionRecord,
+  terminateSession,
+  verifyCognitoIdToken,
+  type CreatedSession,
+} from "@correcre/lib/auth/session-store";
+import { evaluateSessionToken } from "@correcre/lib/auth/session-validate";
+import { verifySessionToken } from "@correcre/lib/auth/session-token";
 import { updateUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import { ADMIN_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, ADMIN_SESSION_COOKIE_NAME } from "./constants";
 import { getAdminCognitoConfig } from "./config";
-import { type AdminSession, verifyAdminIdToken } from "./verify-token";
+import type { AdminSession } from "./verify-token";
 
 const cognitoClientCache = new Map<string, CognitoIdentityProviderClient>();
 const NEW_PASSWORD_CHALLENGE_COOKIE_TTL_MS = 10 * 60 * 1000;
@@ -46,24 +56,24 @@ function getCognitoClient(region: string) {
   return client;
 }
 
-async function setAdminSessionCookie(session: AdminSession) {
+async function setAdminSessionCookie(created: CreatedSession) {
   const cookieStore = await cookies();
 
   cookieStore.set({
     name: ADMIN_SESSION_COOKIE_NAME,
-    value: session.token,
+    value: created.token,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: session.expiresAt,
+    expires: created.cookieExpiresAt,
   });
 }
 
-async function syncAdminLastLoginAt(session: AdminSession) {
-  const cognitoSub = session.payload.sub?.trim();
+async function syncAdminLastLoginAt(cognitoSub: string) {
+  const trimmed = cognitoSub.trim();
 
-  if (!cognitoSub) {
+  if (!trimmed) {
     return;
   }
 
@@ -72,7 +82,7 @@ async function syncAdminLastLoginAt(session: AdminSession) {
       region: readRequiredServerEnv("AWS_REGION"),
       tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     },
-    cognitoSub,
+    trimmed,
   );
 
   if (!updatedUser) {
@@ -141,7 +151,7 @@ export async function getPendingNewPasswordChallenge(): Promise<PendingNewPasswo
   return decodePendingNewPasswordChallenge(encodedChallenge);
 }
 
-export async function clearAdminSession() {
+async function clearAdminSessionCookie() {
   const cookieStore = await cookies();
 
   cookieStore.set({
@@ -153,11 +163,73 @@ export async function clearAdminSession() {
     path: "/",
     expires: new Date(0),
   });
+}
 
+export async function clearAdminSession() {
+  const cookieStore = await cookies();
+  const existingToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+
+  if (existingToken) {
+    const payload = await verifySessionToken(existingToken);
+
+    if (payload?.sid) {
+      try {
+        await terminateSession(payload.sid);
+      } catch (error) {
+        console.warn("Failed to delete admin session record on logout.", error);
+      }
+    }
+  }
+
+  await clearAdminSessionCookie();
   await clearPendingNewPasswordChallenge();
 }
 
-export async function signInAdmin(params: { email: string; password: string }): Promise<SignInAdminResult> {
+async function establishAdminSession(params: { idToken: string; rememberMe: boolean }): Promise<AdminSession> {
+  const { clientId, issuer } = getAdminCognitoConfig();
+  const verification = await verifyCognitoIdToken({
+    idToken: params.idToken,
+    issuer,
+    audience: clientId,
+  });
+
+  if (!verification) {
+    const error = new Error("Failed to verify the ID token returned by Cognito.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const userClaims = extractUserClaims(verification.claims);
+
+  if (!userClaims) {
+    const error = new Error("Cognito ID token did not contain a usable subject claim.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const created = await createSession({
+    role: "ADMIN",
+    claims: userClaims,
+    rememberMe: params.rememberMe,
+  });
+
+  await setAdminSessionCookie(created);
+  await syncAdminLastLoginAt(userClaims.cognitoSub);
+
+  const evaluation = evaluateSessionToken(created.payload);
+
+  if (evaluation.status === "expired") {
+    throw new Error(`Newly issued session was already considered expired (${evaluation.reason}).`);
+  }
+
+  return evaluation.session;
+}
+
+export async function signInAdmin(params: {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}): Promise<SignInAdminResult> {
   const { region, clientId } = getAdminCognitoConfig();
   const cognitoClient = getCognitoClient(region);
   await clearPendingNewPasswordChallenge();
@@ -199,17 +271,7 @@ export async function signInAdmin(params: { email: string; password: string }): 
     throw error;
   }
 
-  const session = await verifyAdminIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setAdminSessionCookie(session);
-  await syncAdminLastLoginAt(session);
-
+  const session = await establishAdminSession({ idToken, rememberMe: params.rememberMe ?? false });
   return { status: "authenticated", session };
 }
 
@@ -227,13 +289,31 @@ export async function requestAdminPasswordReset(params: { email: string }) {
 
 export async function getAdminSession(): Promise<AdminSession | null> {
   const cookieStore = await cookies();
-  const idToken = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE_NAME)?.value;
 
-  if (!idToken) {
+  if (!token) {
     return null;
   }
 
-  return verifyAdminIdToken(idToken);
+  const payload = await verifySessionToken(token);
+
+  if (!payload || payload.role !== "ADMIN") {
+    return null;
+  }
+
+  const evaluation = evaluateSessionToken(payload);
+
+  if (evaluation.status === "expired") {
+    return null;
+  }
+
+  const record = await loadActiveSessionRecord(payload.sid);
+
+  if (!record) {
+    return null;
+  }
+
+  return evaluation.session;
 }
 
 export async function confirmAdminPasswordReset(params: { email: string; confirmationCode: string; newPassword: string }) {
@@ -250,7 +330,10 @@ export async function confirmAdminPasswordReset(params: { email: string; confirm
   );
 }
 
-export async function completeAdminNewPassword(params: { newPassword: string }) {
+export async function completeAdminNewPassword(params: {
+  newPassword: string;
+  rememberMe?: boolean;
+}) {
   const challenge = await getPendingNewPasswordChallenge();
 
   if (!challenge) {
@@ -282,16 +365,7 @@ export async function completeAdminNewPassword(params: { newPassword: string }) 
     throw error;
   }
 
-  const session = await verifyAdminIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setAdminSessionCookie(session);
-  await syncAdminLastLoginAt(session);
+  const session = await establishAdminSession({ idToken, rememberMe: params.rememberMe ?? false });
   await clearPendingNewPasswordChallenge();
 
   return session;
