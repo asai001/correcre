@@ -60,9 +60,14 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
   );
   const isFavorite = favoriteKeySet.has(`${merchantId}/${merchandiseId}`);
 
-  const relatedItems = allItems
-    .filter((m) => !(m.merchantId === merchantId && m.merchandiseId === merchandiseId))
-    .slice(0, 8);
+  const relatedCandidates = allItems.filter(
+    (m) => !(m.merchantId === merchantId && m.merchandiseId === merchandiseId),
+  );
+  for (let i = relatedCandidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [relatedCandidates[i], relatedCandidates[j]] = [relatedCandidates[j], relatedCandidates[i]];
+  }
+  const relatedItems = relatedCandidates.slice(0, 8);
 
   return (
     <ExchangeDetail

@@ -55,6 +55,8 @@ export type Merchandise = {
   deliverySchedule?: string;
   notes?: string;
 
+  favoriteCount?: number;
+
   createdAt: string;
   updatedAt: string;
 

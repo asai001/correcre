@@ -28,6 +28,7 @@ export type PublicMerchandiseSummary = {
   expiration?: string;
   deliverySchedule?: string;
   notes?: string;
+  favoriteCount?: number;
 };
 
 export type PublicMerchandiseDetail = PublicMerchandiseSummary;
@@ -59,6 +60,7 @@ export function toPublicMerchandiseSummary(
     expiration: merchandise.expiration,
     deliverySchedule: merchandise.deliverySchedule,
     notes: merchandise.notes,
+    favoriteCount: merchandise.favoriteCount,
   };
 }
 

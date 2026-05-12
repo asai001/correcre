@@ -36,7 +36,7 @@ type Props = {
   initialSavedFilters: SavedFilter[];
 };
 
-type SortKey = "recommended" | "newest" | "lowestPoint";
+type SortKey = "popular" | "newest" | "lowestPoint";
 
 type PointRange = { min: number; max?: number };
 
@@ -52,7 +52,7 @@ const POINT_RANGES: { value: string; label: string; range: PointRange }[] = [
 ];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recommended", label: "おすすめ順" },
+  { value: "popular", label: "人気順" },
   { value: "newest", label: "新着順" },
   { value: "lowestPoint", label: "ポイントが低い順" },
 ];
@@ -138,10 +138,7 @@ function PickupBanner({
             backgroundPosition: "center",
           }}
         >
-          <span className="inline-flex w-fit items-center rounded-[2px] bg-slate-900 px-2.5 py-1 text-xs font-semibold tracking-wider text-white">
-            PICK UP
-          </span>
-          <h2 className="mt-5 text-3xl font-bold leading-tight tracking-tight text-slate-950 sm:text-4xl">がんばったジブンにご褒美を</h2>
+          <h2 className="text-3xl font-bold leading-tight tracking-tight text-slate-950 sm:text-4xl">がんばったジブンにご褒美を</h2>
           <p className="mt-5 max-w-xl text-sm leading-7 text-slate-700">
             いつもがんばっているあなたへ。ほっとひと息つけるご褒美を見つけて、少しだけ気分が軽くなる時間をお届けします。
           </p>
@@ -573,12 +570,12 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
     case "lowestPoint":
       sorted.sort((a, b) => a.requiredPoint - b.requiredPoint);
       return sorted;
-    case "recommended":
+    case "popular":
     default:
       sorted.sort((a, b) => {
-        const aPick = a.tags?.length ?? 0;
-        const bPick = b.tags?.length ?? 0;
-        if (aPick !== bPick) return bPick - aPick;
+        const aFav = a.favoriteCount ?? 0;
+        const bFav = b.favoriteCount ?? 0;
+        if (aFav !== bFav) return bFav - aFav;
         const ad = a.publishDate ?? "";
         const bd = b.publishDate ?? "";
         if (ad !== bd) return ad < bd ? 1 : -1;
@@ -591,7 +588,7 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
 export default function ExchangeList({ items, currentPointBalance, initialFavorites, initialSavedFilters }: Props) {
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
-  const [sort, setSort] = useState<SortKey>("recommended");
+  const [sort, setSort] = useState<SortKey>("popular");
   const [page, setPage] = useState(1);
   const [favorites, setFavorites] = useState<Set<string>>(
     () => new Set(initialFavorites.map((f) => favoriteKey(f.merchantId, f.merchandiseId))),
@@ -602,7 +599,7 @@ export default function ExchangeList({ items, currentPointBalance, initialFavori
   const listSectionRef = useRef<HTMLDivElement | null>(null);
 
   const handleShowFeatured = () => {
-    setSort("recommended");
+    setSort("popular");
     setPage(1);
     listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };

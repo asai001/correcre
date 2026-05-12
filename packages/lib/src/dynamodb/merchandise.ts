@@ -115,6 +115,30 @@ export async function putMerchandise(config: MerchandiseTableConfig, item: Merch
   );
 }
 
+export async function adjustMerchandiseFavoriteCount(
+  config: MerchandiseTableConfig,
+  merchantId: string,
+  merchandiseId: string,
+  delta: number,
+): Promise<void> {
+  const client = getDynamoDocumentClient(config.region);
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: {
+        merchantId,
+        sk: buildMerchandiseSk(merchandiseId),
+      },
+      UpdateExpression: "SET favoriteCount = if_not_exists(favoriteCount, :zero) + :delta",
+      ConditionExpression: "attribute_exists(merchantId)",
+      ExpressionAttributeValues: {
+        ":zero": 0,
+        ":delta": delta,
+      },
+    }),
+  );
+}
+
 export async function updateMerchandiseStatus(
   config: MerchandiseTableConfig,
   merchantId: string,

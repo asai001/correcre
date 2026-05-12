@@ -2,8 +2,6 @@
 
 import { Box, Paper, Typography } from "@mui/material";
 
-import type { MerchandiseTag } from "@correcre/types";
-
 type Props = {
   heading: string;
   merchandiseName: string;
@@ -14,12 +12,9 @@ type Props = {
   serviceArea: string;
   genre: string;
   genreOther: string;
-  publishDate: string;
   cardImagePreviewUrl?: string;
   detailImagePreviewUrl?: string;
   merchantCompanyName: string;
-  tags?: MerchandiseTag[];
-  productCode?: string;
   contentVolume?: string;
   expiration?: string;
   deliverySchedule?: string;
@@ -49,11 +44,6 @@ export default function MerchandiseFormPreview(props: Props) {
   const descriptionPreview =
     props.serviceDescription.trim() || "商品の特徴や利用シーンが伝わる説明文を入力してください。";
   const genreLabel = props.genre === "その他" ? props.genreOther.trim() || "その他" : props.genre;
-  const publishYear = props.publishDate ? props.publishDate.slice(0, 4) : "----";
-  const publishMonthDay = props.publishDate ? props.publishDate.slice(5).replace("-", "/") : "--/--";
-  const publishFullDate = props.publishDate
-    ? `${props.publishDate.slice(0, 4)}年${Number(props.publishDate.slice(5, 7))}月${Number(props.publishDate.slice(8, 10))}日`
-    : "未設定";
 
   return (
     <div className="xl:sticky xl:top-6 xl:self-start">
@@ -121,22 +111,12 @@ export default function MerchandiseFormPreview(props: Props) {
             個別商品の説明ページでの見え方です。
           </Typography>
 
-          <div className="mt-5 grid grid-cols-[72px_minmax(0,1fr)] gap-5">
-            <div className="border-r border-slate-300 text-center">
-              <Typography variant="body2" className="text-sm leading-6 text-slate-500">
-                {publishYear}
-              </Typography>
-              <div className="mt-1 text-lg leading-none text-slate-800">{publishMonthDay}</div>
-            </div>
-
-            <div>
-              <Typography variant="h6" className="text-[1.2rem] font-bold leading-10 text-slate-900 sm:text-[2rem]">
-                {previewTitle}
-              </Typography>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
-                <span>{genreLabel}</span>
-                <span>{publishFullDate}</span>
-              </div>
+          <div className="mt-5">
+            <Typography variant="h6" className="text-[1.2rem] font-bold leading-10 text-slate-900 sm:text-[2rem]">
+              {previewTitle}
+            </Typography>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+              <span>{genreLabel}</span>
             </div>
           </div>
 
@@ -187,24 +167,12 @@ export default function MerchandiseFormPreview(props: Props) {
                 ? `${new Intl.NumberFormat("ja-JP").format(props.priceYen)}円`
                 : "未設定"}
             </PreviewRow>
-            {props.productCode ? <PreviewRow label="商品コード">{props.productCode}</PreviewRow> : null}
             {props.contentVolume ? <PreviewRow label="内容量">{props.contentVolume}</PreviewRow> : null}
             {props.expiration ? <PreviewRow label="賞味期限">{props.expiration}</PreviewRow> : null}
             {props.deliverySchedule ? <PreviewRow label="お届け予定">{props.deliverySchedule}</PreviewRow> : null}
             {props.notes ? (
               <PreviewRow label="注意事項">
                 <p className="whitespace-pre-line">{props.notes}</p>
-              </PreviewRow>
-            ) : null}
-            {props.tags && props.tags.length > 0 ? (
-              <PreviewRow label="カテゴリーバッジ">
-                <div className="flex flex-wrap gap-2">
-                  {props.tags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
               </PreviewRow>
             ) : null}
           </div>

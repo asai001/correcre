@@ -32,9 +32,7 @@ import type {
   MerchandiseGenre,
   MerchandiseImageRef,
   MerchandiseStatus,
-  MerchandiseTag,
 } from "@correcre/types";
-import { MERCHANDISE_TAG_VALUES } from "@correcre/types";
 
 import type {
   CreateMerchandiseRequest,
@@ -115,9 +113,8 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     throw new Error("価格は正の数で入力してください");
   }
 
-  if (!Number.isFinite(input.requiredPoint) || input.requiredPoint <= 0) {
-    throw new Error("必要ポイント数は正の数で入力してください");
-  }
+  const priceYen = Math.floor(input.priceYen);
+  const requiredPoint = Math.ceil(priceYen / 5);
 
   const deliveryMethods = (input.deliveryMethods ?? []).filter((method): method is MerchandiseDeliveryMethod =>
     ALLOWED_DELIVERY_METHODS.includes(method),
@@ -137,12 +134,6 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     throw new Error("ジャンル（その他）を入力してください");
   }
 
-  const tags = (input.tags ?? []).filter((tag): tag is MerchandiseTag =>
-    MERCHANDISE_TAG_VALUES.includes(tag),
-  );
-  const uniqueTags = Array.from(new Set(tags));
-
-  const productCode = input.productCode?.trim() || undefined;
   const contentVolume = input.contentVolume?.trim() || undefined;
   const expiration = input.expiration?.trim() || undefined;
   const deliverySchedule = input.deliverySchedule?.trim() || undefined;
@@ -152,15 +143,12 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     heading,
     merchandiseName,
     serviceDescription,
-    priceYen: Math.floor(input.priceYen),
-    requiredPoint: Math.floor(input.requiredPoint),
+    priceYen,
+    requiredPoint,
     deliveryMethods,
     serviceArea,
     genre: input.genre,
     genreOther,
-    publishDate: input.publishDate?.trim() || undefined,
-    tags: uniqueTags.length > 0 ? uniqueTags : undefined,
-    productCode,
     contentVolume,
     expiration,
     deliverySchedule,
@@ -327,9 +315,7 @@ export async function createMerchandiseForMerchant(
     genreOther: normalized.genreOther,
     cardImage,
     detailImage,
-    publishDate: normalized.publishDate,
-    tags: normalized.tags,
-    productCode: normalized.productCode,
+    productCode: merchandiseId,
     contentVolume: normalized.contentVolume,
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
@@ -401,9 +387,7 @@ export async function updateMerchandiseForMerchant(
     serviceArea: normalized.serviceArea,
     genre: normalized.genre,
     genreOther: normalized.genreOther,
-    publishDate: normalized.publishDate,
-    tags: normalized.tags,
-    productCode: normalized.productCode,
+    productCode: existing.productCode ?? merchandiseId,
     contentVolume: normalized.contentVolume,
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,

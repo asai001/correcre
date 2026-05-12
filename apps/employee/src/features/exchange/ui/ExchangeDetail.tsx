@@ -28,13 +28,6 @@ function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
-function formatPriceYen(value: number) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "未設定";
-  }
-  return `${new Intl.NumberFormat("ja-JP").format(value)}円`;
-}
-
 function buildDetailHref(item: PublicMerchandiseSummary): Route {
   const search = new URLSearchParams({ merchantId: item.merchantId }).toString();
   return `/exchange/${encodeURIComponent(item.merchandiseId)}?${search}` as Route;
@@ -70,9 +63,6 @@ export default function ExchangeDetail({ item, initialPointBalance, initialIsFav
   const genreLabel = item.genre === "その他" ? item.genreOther?.trim() || "その他" : item.genre;
   const areaLabel = item.serviceArea.trim() || "未設定";
   const deliveryLabel = item.deliveryMethods.length > 0 ? item.deliveryMethods.join("、") : "未設定";
-  const publishFullDate = item.publishDate
-    ? `${item.publishDate.slice(0, 4)}年${Number(item.publishDate.slice(5, 7))}月${Number(item.publishDate.slice(8, 10))}日`
-    : "未設定";
 
   const handleRequest = async () => {
     setError(null);
@@ -215,8 +205,6 @@ export default function ExchangeDetail({ item, initialPointBalance, initialIsFav
                 {item.contentVolume ? <DetailRow label="内容量">{item.contentVolume}</DetailRow> : null}
                 {item.expiration ? <DetailRow label="賞味期限">{item.expiration}</DetailRow> : null}
                 {item.deliverySchedule ? <DetailRow label="お届け予定">{item.deliverySchedule}</DetailRow> : null}
-                <DetailRow label="提供日">{publishFullDate}</DetailRow>
-                <DetailRow label="価格（参考）">{formatPriceYen(item.priceYen)}</DetailRow>
                 {item.notes ? (
                   <DetailRow label="注意事項">
                     <p className="whitespace-pre-line">{item.notes}</p>

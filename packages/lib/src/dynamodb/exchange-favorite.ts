@@ -78,7 +78,7 @@ export async function putFavorite(
     merchantId: string;
     merchandiseId: string;
   },
-): Promise<ExchangeFavoriteItem> {
+): Promise<{ item: ExchangeFavoriteItem; created: boolean }> {
   const now = new Date().toISOString();
   const item: ExchangeFavoriteItem = {
     pk: buildExchangeFavoritePk(params.companyId, params.userId),
@@ -92,14 +92,21 @@ export async function putFavorite(
   };
 
   const client = getDynamoDocumentClient(config.region);
-  await client.send(
-    new PutCommand({
-      TableName: config.tableName,
-      Item: item,
-    }),
-  );
-
-  return item;
+  try {
+    await client.send(
+      new PutCommand({
+        TableName: config.tableName,
+        Item: item,
+        ConditionExpression: "attribute_not_exists(pk)",
+      }),
+    );
+    return { item, created: true };
+  } catch (err) {
+    if (err instanceof Error && err.name === "ConditionalCheckFailedException") {
+      return { item, created: false };
+    }
+    throw err;
+  }
 }
 
 export async function deleteFavorite(
@@ -110,17 +117,26 @@ export async function deleteFavorite(
     merchantId: string;
     merchandiseId: string;
   },
-): Promise<void> {
+): Promise<{ deleted: boolean }> {
   const client = getDynamoDocumentClient(config.region);
-  await client.send(
-    new DeleteCommand({
-      TableName: config.tableName,
-      Key: {
-        pk: buildExchangeFavoritePk(params.companyId, params.userId),
-        sk: buildExchangeFavoriteSk(params.merchantId, params.merchandiseId),
-      },
-    }),
-  );
+  try {
+    await client.send(
+      new DeleteCommand({
+        TableName: config.tableName,
+        Key: {
+          pk: buildExchangeFavoritePk(params.companyId, params.userId),
+          sk: buildExchangeFavoriteSk(params.merchantId, params.merchandiseId),
+        },
+        ConditionExpression: "attribute_exists(pk)",
+      }),
+    );
+    return { deleted: true };
+  } catch (err) {
+    if (err instanceof Error && err.name === "ConditionalCheckFailedException") {
+      return { deleted: false };
+    }
+    throw err;
+  }
 }
 
 export async function putSavedFilter(

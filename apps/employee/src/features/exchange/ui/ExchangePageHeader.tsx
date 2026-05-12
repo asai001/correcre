@@ -14,7 +14,6 @@ export default function ExchangePageHeader({ currentPointBalance }: Props) {
       <div className="container mx-auto flex items-center justify-between gap-6 px-6 py-6">
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">商品・サービス交換</h1>
-          <p className="mt-1 text-xs text-slate-300 sm:text-sm">コレクレ管理システム</p>
         </div>
         <div className="shrink-0 text-right">
           <p className="text-xs text-slate-300 sm:text-sm">保有ポイント</p>

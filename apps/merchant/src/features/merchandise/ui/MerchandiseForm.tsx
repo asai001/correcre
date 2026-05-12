@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
   Alert,
@@ -18,8 +18,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
-import { MERCHANDISE_TAG_VALUES, type MerchandiseTag } from "@correcre/types";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
 import {
@@ -52,14 +50,10 @@ type FormState = {
   merchandiseName: string;
   serviceDescription: string;
   priceYen: string;
-  requiredPoint: string;
   deliveryMethods: string[];
   serviceArea: string;
   genre: (typeof genreOptions)[number];
   genreOther: string;
-  publishDate: string;
-  tags: MerchandiseTag[];
-  productCode: string;
   contentVolume: string;
   expiration: string;
   deliverySchedule: string;
@@ -83,23 +77,15 @@ function calculateRequiredPoint(priceYen: number) {
 
 function getInitialFormState(initial: MerchandiseSummary | undefined): FormState {
   if (!initial) {
-    const today = new Date();
-    const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000)
-      .toISOString()
-      .slice(0, 10);
     return {
       heading: "",
       merchandiseName: "",
       serviceDescription: "",
       priceYen: "",
-      requiredPoint: "",
       deliveryMethods: ["発送"],
       serviceArea: "",
       genre: "食品",
       genreOther: "",
-      publishDate: localDate,
-      tags: [],
-      productCode: "",
       contentVolume: "",
       expiration: "",
       deliverySchedule: "",
@@ -112,14 +98,10 @@ function getInitialFormState(initial: MerchandiseSummary | undefined): FormState
     merchandiseName: initial.merchandiseName,
     serviceDescription: initial.serviceDescription,
     priceYen: formatNumberInput(initial.priceYen),
-    requiredPoint: formatNumberInput(initial.requiredPoint),
     deliveryMethods: [...initial.deliveryMethods],
     serviceArea: initial.serviceArea,
     genre: initial.genre,
     genreOther: initial.genreOther ?? "",
-    publishDate: initial.publishDate ?? "",
-    tags: [...(initial.tags ?? [])],
-    productCode: initial.productCode ?? "",
     contentVolume: initial.contentVolume ?? "",
     expiration: initial.expiration ?? "",
     deliverySchedule: initial.deliverySchedule ?? "",
@@ -156,14 +138,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
   const priceYen = Number(form.priceYen);
   const autoRequiredPoint = Number.isFinite(priceYen) && priceYen > 0 ? calculateRequiredPoint(priceYen) : 0;
 
-  useEffect(() => {
-    if (!form.requiredPoint && autoRequiredPoint > 0) {
-      setForm((prev) => ({ ...prev, requiredPoint: String(autoRequiredPoint) }));
-    }
-    // We only want to seed required point once on mount or when price first becomes valid.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRequiredPoint]);
-
   const handleField = (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -175,15 +149,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
       deliveryMethods: checked
         ? Array.from(new Set([...prev.deliveryMethods, method]))
         : prev.deliveryMethods.filter((entry) => entry !== method),
-    }));
-  };
-
-  const handleTagToggle = (tag: MerchandiseTag) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
-    setForm((prev) => ({
-      ...prev,
-      tags: checked
-        ? Array.from(new Set([...prev.tags, tag]))
-        : prev.tags.filter((entry) => entry !== tag),
     }));
   };
 
@@ -239,12 +204,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
         merchandiseName: form.merchandiseName,
         serviceDescription: form.serviceDescription,
         priceYen: Number(form.priceYen),
-        requiredPoint: Number(form.requiredPoint || form.priceYen ? calculateRequiredPoint(Number(form.priceYen)) : 0),
         deliveryMethods: form.deliveryMethods as MerchandiseFormPayload["deliveryMethods"],
         serviceArea: form.serviceArea,
         genre: form.genre,
         genreOther: form.genre === "その他" ? form.genreOther : undefined,
-        publishDate: form.publishDate || undefined,
         cardImage:
           cardImage.s3Key && cardImage.contentType
             ? { s3Key: cardImage.s3Key, contentType: cardImage.contentType }
@@ -253,8 +216,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           detailImage.s3Key && detailImage.contentType
             ? { s3Key: detailImage.s3Key, contentType: detailImage.contentType }
             : undefined,
-        tags: form.tags.length > 0 ? form.tags : undefined,
-        productCode: form.productCode || undefined,
         contentVolume: form.contentVolume || undefined,
         expiration: form.expiration || undefined,
         deliverySchedule: form.deliverySchedule || undefined,
@@ -262,13 +223,12 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
       };
 
       if (mode === "create") {
-        const created = await createMerchandise(payload);
-        setNotice(`「${created.merchandiseName}」を登録しました。`);
-        router.push(`/merchandise/${encodeURIComponent(created.merchandiseId)}`);
+        await createMerchandise(payload);
+        router.push("/merchandise");
         router.refresh();
       } else if (initial) {
-        const updated = await updateMerchandise(initial.merchandiseId, payload);
-        setNotice(`「${updated.merchandiseName}」を更新しました。`);
+        await updateMerchandise(initial.merchandiseId, payload);
+        router.push("/merchandise");
         router.refresh();
       }
     } catch (err) {
@@ -331,14 +291,17 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
               slotProps={{ input: { endAdornment: <InputAdornment position="end">円</InputAdornment> } }}
             />
             <TextField
-              label="必要ポイント数（自動: 価格÷5）"
-              type="number"
-              required
+              label="必要ポイント数（自動算出: 価格÷5）"
               fullWidth
-              value={form.requiredPoint}
-              onChange={handleField("requiredPoint")}
-              slotProps={{ input: { endAdornment: <InputAdornment position="end">pt</InputAdornment> } }}
-              helperText={autoRequiredPoint ? `推奨: ${autoRequiredPoint}pt` : undefined}
+              value={autoRequiredPoint > 0 ? autoRequiredPoint.toLocaleString("ja-JP") : ""}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  endAdornment: <InputAdornment position="end">pt</InputAdornment>,
+                },
+                inputLabel: { shrink: true },
+              }}
+              placeholder="価格を入力すると自動で算出されます"
             />
           </div>
           <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
@@ -391,37 +354,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
               <div />
             )}
           </div>
-          <TextField
-            label="掲載日"
-            type="date"
-            fullWidth
-            value={form.publishDate}
-            onChange={handleField("publishDate")}
-            InputLabelProps={{ shrink: true }}
-          />
-          <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
-            <Typography variant="subtitle2" className="text-slate-800">
-              カテゴリーバッジ（任意）
-            </Typography>
-            <Typography variant="caption" className="text-slate-500">
-              一覧カードの目立つ位置に表示されます。
-            </Typography>
-            <FormGroup className="mt-3 grid gap-1 sm:grid-cols-3">
-              {MERCHANDISE_TAG_VALUES.map((tag) => (
-                <FormControlLabel
-                  key={tag}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={form.tags.includes(tag)}
-                      onChange={handleTagToggle(tag)}
-                    />
-                  }
-                  label={tag}
-                />
-              ))}
-            </FormGroup>
-          </FormControl>
         </Stack>
       </Paper>
 
@@ -433,22 +365,24 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           詳細ページで「商品詳細情報」テーブルに表示されます。
         </Typography>
         <Stack spacing={2.5} className="!mt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              label="商品コード"
-              fullWidth
-              value={form.productCode}
-              onChange={handleField("productCode")}
-              placeholder="F001-2024 など"
-            />
-            <TextField
-              label="内容量"
-              fullWidth
-              value={form.contentVolume}
-              onChange={handleField("contentVolume")}
-              placeholder="6個入り（個包装） など"
-            />
-          </div>
+          <TextField
+            label="商品コード（登録時に自動採番）"
+            fullWidth
+            value={initial?.productCode ?? ""}
+            slotProps={{
+              input: { readOnly: true },
+              inputLabel: { shrink: true },
+            }}
+            placeholder={mode === "create" ? "登録後に自動で採番されます" : ""}
+            helperText={mode === "create" ? "登録時に商品コードが自動付与されます。" : undefined}
+          />
+          <TextField
+            label="内容量"
+            fullWidth
+            value={form.contentVolume}
+            onChange={handleField("contentVolume")}
+            placeholder="6個入り（個包装） など"
+          />
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
               label="賞味期限 / 有効期限"
@@ -553,17 +487,14 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           merchandiseName={form.merchandiseName}
           serviceDescription={form.serviceDescription}
           priceYen={Number(form.priceYen)}
-          requiredPoint={Number(form.requiredPoint)}
+          requiredPoint={autoRequiredPoint}
           deliveryMethods={form.deliveryMethods}
           serviceArea={form.serviceArea}
           genre={form.genre}
           genreOther={form.genreOther}
-          publishDate={form.publishDate}
           cardImagePreviewUrl={cardImage.previewUrl}
           detailImagePreviewUrl={detailImage.previewUrl}
           merchantCompanyName={merchantCompanyName}
-          tags={form.tags}
-          productCode={form.productCode}
           contentVolume={form.contentVolume}
           expiration={form.expiration}
           deliverySchedule={form.deliverySchedule}

@@ -9,6 +9,7 @@ import {
   putFavorite,
   putSavedFilter,
 } from "@correcre/lib/dynamodb/exchange-favorite";
+import { adjustMerchandiseFavoriteCount } from "@correcre/lib/dynamodb/merchandise";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type {
   ExchangeFavoriteItem,
@@ -25,6 +26,13 @@ function getRuntimeConfig(): RuntimeConfig {
   return {
     region: readRequiredServerEnv("AWS_REGION"),
     tableName: readRequiredServerEnv("DDB_EXCHANGE_FAVORITE_TABLE_NAME"),
+  };
+}
+
+function getMerchandiseTableConfig() {
+  return {
+    region: readRequiredServerEnv("AWS_REGION"),
+    tableName: readRequiredServerEnv("DDB_MERCHANDISE_TABLE_NAME"),
   };
 }
 
@@ -78,7 +86,19 @@ export async function addExchangeFavoriteForEmployee(params: {
   merchandiseId: string;
 }): Promise<ExchangeFavoriteSummary> {
   const config = getRuntimeConfig();
-  const item = await putFavorite(config, params);
+  const { item, created } = await putFavorite(config, params);
+  if (created) {
+    try {
+      await adjustMerchandiseFavoriteCount(
+        getMerchandiseTableConfig(),
+        params.merchantId,
+        params.merchandiseId,
+        1,
+      );
+    } catch (err) {
+      console.error("favoriteCount increment failed", err);
+    }
+  }
   return {
     merchantId: item.merchantId,
     merchandiseId: item.merchandiseId,
@@ -93,7 +113,19 @@ export async function removeExchangeFavoriteForEmployee(params: {
   merchandiseId: string;
 }): Promise<void> {
   const config = getRuntimeConfig();
-  await deleteFavorite(config, params);
+  const { deleted } = await deleteFavorite(config, params);
+  if (deleted) {
+    try {
+      await adjustMerchandiseFavoriteCount(
+        getMerchandiseTableConfig(),
+        params.merchantId,
+        params.merchandiseId,
+        -1,
+      );
+    } catch (err) {
+      console.error("favoriteCount decrement failed", err);
+    }
+  }
 }
 
 export async function createSavedFilterForEmployee(params: {
