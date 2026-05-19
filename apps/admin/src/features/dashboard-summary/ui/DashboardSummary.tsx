@@ -1,6 +1,8 @@
 "use client";
 
+import { SkeletonBlock } from "@admin/components/LoadingSkeleton";
 import ScoreTile from "@admin/components/dashboard/ScoreTile";
+
 import { useDashboardSummary } from "../hooks/useDashboardSummary";
 
 type Props = {
@@ -12,11 +14,14 @@ type Props = {
 export default function DashboardSummary({ companyId, userId, targetYearMonth }: Props) {
   const { summary, loading, error } = useDashboardSummary(companyId, userId, targetYearMonth);
 
-  console.log("summary", summary);
-
-  if (loading) {
-    // 将来スケルトンに差し替え
-    return null;
+  if (loading || (!summary && !error)) {
+    return (
+      <div className="-mx-6 flex gap-4 overflow-x-auto overflow-y-visible px-6 py-4 md:grid md:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <SkeletonBlock key={index} className="h-36 min-w-[220px] rounded-2xl md:min-w-0" />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
@@ -24,12 +29,11 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
   }
 
   if (!summary) {
-    // データはないけどエラーではないケース（ユーザー登録直後など）
     return null;
   }
 
   return (
-    <div className="-mx-6 px-6 flex gap-4 overflow-x-auto overflow-y-visible py-4 md:grid md:grid-cols-3">
+    <div className="-mx-6 flex gap-4 overflow-x-auto overflow-y-visible px-6 py-4 md:grid md:grid-cols-3">
       <ScoreTile
         className="min-w-[220px] md:min-w-0"
         label="先月総獲得ポイント"

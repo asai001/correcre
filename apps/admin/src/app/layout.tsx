@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import "./globals.css";
 import Providers from "./providers";
+import LayoutShell from "./layout-shell";
 
 // グローバル CSS と自動 CSS 追加の無効化（FOUC防止）
 // Font Awesome 関連
@@ -22,6 +24,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "コレクレ - 理念を行動に、行動をポイントに",
   description: "コレクレ - 理念を行動に、行動をポイントに",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
@@ -32,11 +37,11 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh !bg-gray-50`}>
-        {/* <ThemeProvider theme={theme}>{children}</ThemeProvider> */}
-        {/* {children} */}
-        <Providers>
-          <div className="container mb-10 mx-auto px-6">{children}</div>
-        </Providers>
+        <AppRouterCacheProvider options={{ enableCssLayer: true }}>
+          <Providers>
+            <LayoutShell>{children}</LayoutShell>
+          </Providers>
+        </AppRouterCacheProvider>
       </body>
     </html>
   );

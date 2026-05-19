@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { Alert, Button, TextField } from "@mui/material";
+import { Alert, Button } from "@mui/material";
+import { PasswordTextField } from "@correcre/theme";
 
 import { completeNewPassword } from "@operator/app/lib/actions/authenticate";
 import { OPERATOR_DEFAULT_REDIRECT_PATH } from "@operator/lib/auth/constants";
+import { COGNITO_PASSWORD_RULE_TEXT, isValidCognitoPassword } from "@correcre/lib/auth/password";
+import { operatorAuthCardClassName } from "./styles";
 
 type NewPasswordFormProps = {
   email: string;
@@ -46,11 +49,11 @@ export default function NewPasswordForm({
 
   const isMissingNewPassword = !newPassword.trim();
   const isMissingConfirmPassword = !confirmPassword.trim();
-  const isPasswordTooShort = !!newPassword && newPassword.length < 8;
+  const isPasswordInvalid = !!newPassword && !isValidCognitoPassword(newPassword);
   const isPasswordMismatch = !!newPassword && !!confirmPassword && newPassword !== confirmPassword;
 
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className={operatorAuthCardClassName}>
       <div className="mx-auto w-4/5 pb-8">
         <form
           action={completeNewPassword}
@@ -74,10 +77,9 @@ export default function NewPasswordForm({
 
           <div>
             <span className="text-neutral-600">新しいパスワード</span>
-            <TextField
+            <PasswordTextField
               fullWidth
               id="newPassword"
-              type="password"
               name="newPassword"
               autoComplete="new-password"
               required
@@ -85,24 +87,24 @@ export default function NewPasswordForm({
               size="small"
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
-              error={hasSubmitted && (isMissingNewPassword || isPasswordTooShort)}
+              error={hasSubmitted && (isMissingNewPassword || isPasswordInvalid)}
               sx={passwordFieldSx}
               helperText={
                 hasSubmitted && isMissingNewPassword
                   ? "新しいパスワードを入力してください"
-                  : hasSubmitted && isPasswordTooShort
-                    ? "8文字以上で入力してください"
-                    : "8文字以上で入力してください"
+                  : hasSubmitted && isPasswordInvalid
+                    ? `${COGNITO_PASSWORD_RULE_TEXT}で入力してください`
+                    : `${COGNITO_PASSWORD_RULE_TEXT}で入力してください`
               }
+              slotProps={{ htmlInput: { pattern: "[A-Za-z0-9]{8,}", minLength: 8 } }}
             />
           </div>
 
           <div className="mt-5">
             <span className="text-neutral-600">確認用パスワード</span>
-            <TextField
+            <PasswordTextField
               fullWidth
               id="confirmPassword"
-              type="password"
               name="confirmPassword"
               autoComplete="new-password"
               required

@@ -1,5 +1,6 @@
 "use client";
 
+import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 
 import { useMonthlyPointsHistory } from "../hooks/useMonthlyPointsHistory";
@@ -18,19 +19,12 @@ export default function MonthlyPointsHistory({ icon, iconColor = "#2563EB", clas
   const { labels, data, loading, error } = useMonthlyPointsHistory(companyId, userId, months);
 
   if (loading) {
-    // とりあえず null。のちにスケルトンに差し替えやすい
+    return <SkeletonBlock className={`h-[440px] ${className ?? ""}`} />;
+  }
+
+  if (error || !labels || !data) {
     return null;
   }
 
-  if (error) {
-    // 将来的に別コンポーネントにしても良い
-    return null;
-  }
-
-  if (!labels || !data) {
-    return null;
-  }
-
-  // loading 中でもとりあえず Chart 自体は出しておく（必要ならローディング表示を足す）
   return <MonthlyPointsHistoryView icon={icon} iconColor={iconColor} className={className} labels={labels} values={data} />;
 }

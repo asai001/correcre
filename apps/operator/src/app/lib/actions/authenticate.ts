@@ -1,39 +1,79 @@
 "use server";
 
 import type { Route } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import {
   OPERATOR_DEFAULT_REDIRECT_PATH,
+  OPERATOR_FORGOT_PASSWORD_PATH,
+  OPERATOR_LOGIN_NOTICE_COOKIE_NAME,
   OPERATOR_LOGIN_PATH,
   OPERATOR_NEW_PASSWORD_PATH,
 } from "@operator/lib/auth/constants";
-import { isOperatorAllowlistConfigured, isOperatorEmailAllowed } from "@operator/lib/auth/allowlist";
 import {
   mapAuthenticationErrorToCode,
+  mapForgotPasswordConfirmErrorToCode,
+  mapForgotPasswordRequestErrorToCode,
   mapNewPasswordErrorToCode,
   type LoginErrorCode,
+  type LoginNoticeCode,
 } from "@operator/lib/auth/errors";
+import { getOperatorUserForSession } from "@operator/lib/auth/operator";
 import { sanitizeRedirectTo } from "@operator/lib/auth/redirect";
 import {
   clearOperatorSession,
   clearPendingNewPasswordChallenge,
   completeOperatorNewPassword,
+  confirmOperatorPasswordReset,
+  requestOperatorPasswordReset,
   signInOperator,
 } from "@operator/lib/auth/session";
+import { isValidCognitoPassword } from "@correcre/lib/auth/password";
 
 function getFormValue(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
 }
 
-function buildLoginRedirect(errorCode: LoginErrorCode, redirectTo: string) {
-  const params = new URLSearchParams({ error: errorCode });
+function getCheckboxValue(value: FormDataEntryValue | null): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  return value === "on" || value === "true" || value === "1";
+}
+
+type LoginActionState = {
+  errorCode?: LoginErrorCode;
+};
+
+async function setLoginNoticeCookie(code: LoginNoticeCode) {
+  const cookieStore = await cookies();
+
+  cookieStore.set({
+    name: OPERATOR_LOGIN_NOTICE_COOKIE_NAME,
+    value: code,
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60,
+  });
+}
+
+function buildLoginRedirect(redirectTo: string, options?: { email?: string }) {
+  const params = new URLSearchParams();
 
   if (redirectTo !== OPERATOR_DEFAULT_REDIRECT_PATH) {
     params.set("from", redirectTo);
   }
 
-  return `${OPERATOR_LOGIN_PATH}?${params.toString()}`;
+  if (options?.email) {
+    params.set("email", options.email);
+  }
+
+  const query = params.toString();
+  return query ? `${OPERATOR_LOGIN_PATH}?${query}` : OPERATOR_LOGIN_PATH;
 }
 
 function buildNewPasswordRedirect(errorCode: LoginErrorCode | undefined, redirectTo: string) {
@@ -51,41 +91,71 @@ function buildNewPasswordRedirect(errorCode: LoginErrorCode | undefined, redirec
   return query ? `${OPERATOR_NEW_PASSWORD_PATH}?${query}` : OPERATOR_NEW_PASSWORD_PATH;
 }
 
-export async function authenticate(formData: FormData) {
+function buildForgotPasswordRedirect(params: {
+  redirectTo: string;
+  email?: string;
+  errorCode?: LoginErrorCode;
+  sent?: boolean;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (params.errorCode) {
+    searchParams.set("error", params.errorCode);
+  }
+
+  if (params.email) {
+    searchParams.set("email", params.email);
+  }
+
+  if (params.sent) {
+    searchParams.set("sent", "1");
+  }
+
+  if (params.redirectTo !== OPERATOR_DEFAULT_REDIRECT_PATH) {
+    searchParams.set("from", params.redirectTo);
+  }
+
+  const query = searchParams.toString();
+  return query ? `${OPERATOR_FORGOT_PASSWORD_PATH}?${query}` : OPERATOR_FORGOT_PASSWORD_PATH;
+}
+
+export async function authenticate(
+  _previousState: LoginActionState,
+  formData: FormData,
+): Promise<LoginActionState> {
   const email = getFormValue(formData.get("email")).trim();
   const password = getFormValue(formData.get("password"));
+  const rememberMe = getCheckboxValue(formData.get("login-info"));
   const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
   let result: Awaited<ReturnType<typeof signInOperator>>;
 
   if (!email || !password) {
-    redirect(buildLoginRedirect("missing_fields", redirectTo) as Route);
-  }
-
-  if (!isOperatorAllowlistConfigured()) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_allowlist_not_configured", redirectTo) as Route);
-  }
-
-  if (!isOperatorEmailAllowed(email)) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+    return {
+      errorCode: "missing_fields",
+    };
   }
 
   try {
-    result = await signInOperator({ email, password });
+    result = await signInOperator({ email, password, rememberMe });
   } catch (error) {
     console.error("Operator login failed", error);
     await clearOperatorSession();
-    redirect(buildLoginRedirect(mapAuthenticationErrorToCode(error), redirectTo) as Route);
+
+    return {
+      errorCode: mapAuthenticationErrorToCode(error),
+    };
   }
 
   if (result.status === "new_password_required") {
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
-  if (!isOperatorEmailAllowed(result.session.payload.email as string | undefined)) {
+  if (!(await getOperatorUserForSession(result.session))) {
     await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+
+    return {
+      errorCode: "operator_role_not_allowed",
+    };
   }
 
   redirect(redirectTo as Route);
@@ -100,21 +170,20 @@ export async function completeNewPassword(formData: FormData) {
     redirect(buildNewPasswordRedirect("missing_fields", redirectTo) as Route);
   }
 
-  if (newPassword !== confirmPassword) {
-    redirect(buildNewPasswordRedirect("password_confirmation_mismatch", redirectTo) as Route);
+  if (!isValidCognitoPassword(newPassword)) {
+    redirect(buildNewPasswordRedirect("invalid_new_password", redirectTo) as Route);
   }
 
-  if (!isOperatorAllowlistConfigured()) {
-    await clearOperatorSession();
-    redirect(buildLoginRedirect("operator_allowlist_not_configured", redirectTo) as Route);
+  if (newPassword !== confirmPassword) {
+    redirect(buildNewPasswordRedirect("password_confirmation_mismatch", redirectTo) as Route);
   }
 
   try {
     const session = await completeOperatorNewPassword({ newPassword });
 
-    if (!isOperatorEmailAllowed(session.payload.email as string | undefined)) {
+    if (!(await getOperatorUserForSession(session))) {
       await clearOperatorSession();
-      redirect(buildLoginRedirect("operator_email_not_allowed", redirectTo) as Route);
+      redirect(buildLoginRedirect(redirectTo) as Route);
     }
   } catch (error) {
     console.error("Operator new password setup failed", error);
@@ -122,13 +191,91 @@ export async function completeNewPassword(formData: FormData) {
 
     if (errorCode === "new_password_session_expired") {
       await clearPendingNewPasswordChallenge();
-      redirect(buildLoginRedirect(errorCode, redirectTo) as Route);
+      redirect(buildLoginRedirect(redirectTo) as Route);
     }
 
     redirect(buildNewPasswordRedirect(errorCode, redirectTo) as Route);
   }
 
   redirect(redirectTo as Route);
+}
+
+export async function requestPasswordReset(formData: FormData) {
+  const email = getFormValue(formData.get("email")).trim();
+  const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
+
+  if (!email) {
+    redirect(buildForgotPasswordRedirect({ redirectTo, errorCode: "missing_email" }) as Route);
+  }
+
+  try {
+    await requestOperatorPasswordReset({ email });
+  } catch (error) {
+    console.error("Operator password reset request failed", error);
+
+    if (error instanceof Error && error.name === "UserNotFoundException") {
+      redirect(buildForgotPasswordRedirect({ redirectTo, email, sent: true }) as Route);
+    }
+
+    redirect(
+      buildForgotPasswordRedirect({
+        redirectTo,
+        email,
+        errorCode: mapForgotPasswordRequestErrorToCode(error),
+      }) as Route,
+    );
+  }
+
+  redirect(buildForgotPasswordRedirect({ redirectTo, email, sent: true }) as Route);
+}
+
+export async function confirmPasswordReset(formData: FormData) {
+  const email = getFormValue(formData.get("email")).trim();
+  const confirmationCode = getFormValue(formData.get("confirmationCode")).trim();
+  const newPassword = getFormValue(formData.get("newPassword"));
+  const confirmPassword = getFormValue(formData.get("confirmPassword"));
+  const redirectTo = sanitizeRedirectTo(getFormValue(formData.get("redirectTo")));
+
+  if (!email) {
+    redirect(buildForgotPasswordRedirect({ redirectTo, errorCode: "missing_email" }) as Route);
+  }
+
+  if (!confirmationCode || !newPassword || !confirmPassword) {
+    redirect(buildForgotPasswordRedirect({ redirectTo, email, sent: true, errorCode: "missing_reset_fields" }) as Route);
+  }
+
+  if (!isValidCognitoPassword(newPassword)) {
+    redirect(buildForgotPasswordRedirect({ redirectTo, email, sent: true, errorCode: "invalid_new_password" }) as Route);
+  }
+
+  if (newPassword !== confirmPassword) {
+    redirect(
+      buildForgotPasswordRedirect({
+        redirectTo,
+        email,
+        sent: true,
+        errorCode: "password_confirmation_mismatch",
+      }) as Route,
+    );
+  }
+
+  try {
+    await confirmOperatorPasswordReset({ email, confirmationCode, newPassword });
+  } catch (error) {
+    console.error("Operator password reset confirmation failed", error);
+
+    redirect(
+      buildForgotPasswordRedirect({
+        redirectTo,
+        email,
+        sent: true,
+        errorCode: mapForgotPasswordConfirmErrorToCode(error),
+      }) as Route,
+    );
+  }
+
+  await setLoginNoticeCookie("password_reset_success");
+  redirect(buildLoginRedirect(redirectTo, { email }) as Route);
 }
 
 export async function logout() {

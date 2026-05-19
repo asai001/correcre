@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getIndividualAnalysisSummaryFromDynamoMock } from "@correcre/individual-analysis/server";
+import { getIndividualAnalysisSummaryFromDynamo } from "@correcre/individual-analysis/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await getIndividualAnalysisSummaryFromDynamoMock(companyId, userId, startDate, endDate);
+    const summary = await getIndividualAnalysisSummaryFromDynamo(companyId, userId, startDate, endDate);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/individual-analysis error", err);

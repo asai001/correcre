@@ -1,6 +1,12 @@
+export type PhilosophyDashboardItem = {
+  id: string;
+  label: string;
+  content: string;
+};
+
 export type Philosophy = {
-  corporatePhilosophy?: string;
-  purpose?: string;
+  items: PhilosophyDashboardItem[];
+  updatedAt?: string;
 };
 
 export type ValueItem = {

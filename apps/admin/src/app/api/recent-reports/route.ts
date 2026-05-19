@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRecentReportsFromDynamoMock } from "@correcre/individual-analysis/server";
+import { getRecentReportsFromDynamo } from "@correcre/individual-analysis/server";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const limit = typeof parsedLimit === "number" && Number.isFinite(parsedLimit) ? parsedLimit : undefined;
 
   try {
-    const reports = await getRecentReportsFromDynamoMock(companyId, limit, userId, startDate, endDate);
+    const reports = await getRecentReportsFromDynamo(companyId, limit, userId, startDate, endDate);
     return NextResponse.json(reports);
   } catch (err) {
     console.error("GET /api/recent-reports error", err);

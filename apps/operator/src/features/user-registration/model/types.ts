@@ -1,5 +1,6 @@
-export type EmployeeManagementRole = "EMPLOYEE" | "MANAGER" | "ADMIN";
-export type EmployeeManagementStatus = "INVITED" | "ACTIVE" | "SUSPENDED";
+export type EmployeeManagementRole = "EMPLOYEE" | "MANAGER" | "ADMIN" | "OPERATOR";
+export type EmployeeAssignableRole = "EMPLOYEE" | "ADMIN" | "OPERATOR";
+export type EmployeeManagementStatus = "INVITED" | "ACTIVE" | "INACTIVE";
 export type EmployeeAuthLinkStatus = "UNLINKED" | "LINKED";
 
 export type MutationResult =
@@ -14,44 +15,56 @@ export type EmployeeDepartmentOption = {
   employeeCount: number;
 };
 
+export type EmployeeAddress = {
+  postalCode?: string;
+  prefecture?: string;
+  city?: string;
+  building?: string;
+};
+
 export type EmployeeManagementEmployee = {
   userId: string;
   name: string;
-  loginId: string;
-  departments: string[];
+  nameKana?: string;
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  departmentName?: string;
   roles: EmployeeManagementRole[];
   status: EmployeeManagementStatus;
   authLinkStatus: EmployeeAuthLinkStatus;
   email: string;
-  phone: string;
-  address: string;
+  phoneNumber?: string;
+  address?: EmployeeAddress;
   pointBalance: number;
   completionRate: number;
   joinedAt?: string;
   lastLoginAt?: string;
 };
 
-export type CreateEmployeeInput = {
-  name: string;
-  loginId: string;
-  departments: string[];
+type EmployeeFormFields = {
+  lastName: string;
+  firstName: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  departmentName: string;
   email: string;
-  phone: string;
-  address: string;
-  role: EmployeeManagementRole;
+  phoneNumber?: string;
+  postalCodeFirstHalf?: string;
+  postalCodeSecondHalf?: string;
+  prefecture?: string;
+  city?: string;
+  building?: string;
+  roles: EmployeeAssignableRole[];
   joinedAt: string;
 };
 
-export type UpdateEmployeeInput = {
+export type CreateEmployeeInput = EmployeeFormFields;
+
+export type UpdateEmployeeInput = EmployeeFormFields & {
   userId: string;
-  name: string;
-  loginId: string;
-  departments: string[];
-  email: string;
-  phone: string;
-  address: string;
-  role: EmployeeManagementRole;
-  joinedAt: string;
+  status: EmployeeManagementStatus;
   pointAdjustment: number;
 };
 

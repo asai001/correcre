@@ -13,10 +13,17 @@ export interface ApplicationDynamoTables {
   userTable: dynamodb.Table;
   departmentTable: dynamodb.Table;
   missionTable: dynamodb.Table;
+  missionHistoryTable: dynamodb.Table;
   missionReportTable: dynamodb.Table;
   userMonthlyStatsTable: dynamodb.Table;
   exchangeHistoryTable: dynamodb.Table;
   pointTransactionTable: dynamodb.Table;
+  merchantTable: dynamodb.Table;
+  merchantUserTable: dynamodb.Table;
+  merchandiseTable: dynamodb.Table;
+  exchangeFavoriteTable: dynamodb.Table;
+  operatorAuditLogTable: dynamodb.Table;
+  sessionTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -127,19 +134,18 @@ function createDepartmentTable(scope: Construct, stage: InfraStage): dynamodb.Ta
 
 // Mission
 // - companyId = <companyId>
-// - sk = MISSION#<missionId>#VER#<version>
-// - gsi1pk = COMPANY#<companyId>
-// - gsi1sk = ENABLED#<0|1>#ORDER#<order>#MISSION#<missionId>#VER#<version>
+// - sk = MISSION#<slotIndex>
+// - 5 スロット固定のため GSI 不要（PK の Query で最大 5 件）
 function createMissionTable(scope: Construct, stage: InfraStage): dynamodb.Table {
-  const table = new dynamodb.Table(scope, "MissionTable", buildTableProps(stage, buildTableName("mission", stage), "companyId", "sk"));
+  return new dynamodb.Table(scope, "MissionTable", buildTableProps(stage, buildTableName("mission", stage), "companyId", "sk"));
+}
 
-  table.addGlobalSecondaryIndex({
-    indexName: "MissionByCompanyAndEnabledOrder",
-    partitionKey: stringAttribute("gsi1pk"),
-    sortKey: stringAttribute("gsi1sk"),
-  });
-
-  return table;
+// MissionHistory
+// - pk = COMPANY#<companyId>#MISSION#<missionId>
+// - sk = VER#<version>
+// - GSI なし
+function createMissionHistoryTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(scope, "MissionHistoryTable", buildTableProps(stage, buildTableName("mission-history", stage), "pk", "sk"));
 }
 
 // MissionReport
@@ -197,6 +203,10 @@ function createUserMonthlyStatsTable(scope: Construct, stage: InfraStage): dynam
 // - sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
 // - gsi1pk = COMPANY#<companyId>
 // - gsi1sk = EXCHANGED_AT#<ISO8601>#USER#<userId>#EXCHANGE#<exchangeId>
+// - gsi2pk = MERCHANT#<merchantId>#STATUS#<status>
+// - gsi2sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
+// - gsi3pk = MERCHANT#<merchantId>
+// - gsi3sk = EXCHANGED_AT#<ISO8601>#EXCHANGE#<exchangeId>
 function createExchangeHistoryTable(scope: Construct, stage: InfraStage): dynamodb.Table {
   const table = new dynamodb.Table(
     scope,
@@ -210,7 +220,85 @@ function createExchangeHistoryTable(scope: Construct, stage: InfraStage): dynamo
     sortKey: stringAttribute("gsi1sk"),
   });
 
+  table.addGlobalSecondaryIndex({
+    indexName: "ExchangeHistoryByMerchantStatusExchangedAt",
+    partitionKey: stringAttribute("gsi2pk"),
+    sortKey: stringAttribute("gsi2sk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "ExchangeHistoryByMerchantExchangedAt",
+    partitionKey: stringAttribute("gsi3pk"),
+    sortKey: stringAttribute("gsi3sk"),
+  });
+
   return table;
+}
+
+// Merchant
+// - merchantId = <merchantId>
+// - no sort key
+// - no GSIs
+function createMerchantTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(scope, "MerchantTable", buildTableProps(stage, buildTableName("merchant", stage), "merchantId"));
+}
+
+// MerchantUser
+// - merchantId = <merchantId>
+// - sk = USER#<userId>
+// - gsi1pk = COGNITO_SUB#<cognitoSub>
+// - gsi2pk = EMAIL#<email>
+function createMerchantUserTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "MerchantUserTable",
+    buildTableProps(stage, buildTableName("merchant-user", stage), "merchantId", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchantUserByCognitoSub",
+    partitionKey: stringAttribute("gsi1pk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchantUserByEmail",
+    partitionKey: stringAttribute("gsi2pk"),
+  });
+
+  return table;
+}
+
+// Merchandise
+// - merchantId = <merchantId>
+// - sk = MERCHANDISE#<merchandiseId>
+// - gsi1pk = STATUS#<status>
+// - gsi1sk = MERCHANT#<merchantId>#MERCHANDISE#<merchandiseId>
+function createMerchandiseTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "MerchandiseTable",
+    buildTableProps(stage, buildTableName("merchandise", stage), "merchantId", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "MerchandiseByStatus",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  return table;
+}
+
+// ExchangeFavorite
+// - pk = COMPANY#<companyId>#USER#<userId>
+// - sk = FAVORITE#<merchantId>#<merchandiseId>  または  SAVED_FILTER#<filterId>
+// - GSI なし（PK ごとの Query で十分）
+function createExchangeFavoriteTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "ExchangeFavoriteTable",
+    buildTableProps(stage, buildTableName("exchange-favorite", stage), "pk", "sk"),
+  );
 }
 
 // PointTransaction is the source of truth for point history, so a company-wide
@@ -235,6 +323,48 @@ function createPointTransactionTable(scope: Construct, stage: InfraStage): dynam
   return table;
 }
 
+// OperatorAuditLog
+// - pk = OPERATOR#<operatorUserId>
+// - sk = OCCURRED_AT#<ISO8601>#EVENT#<eventId>
+// - gsi1pk = MERCHANT#<merchantId>
+// - gsi1sk = OCCURRED_AT#<ISO8601>#EVENT#<eventId>
+function createOperatorAuditLogTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "OperatorAuditLogTable",
+    buildTableProps(stage, buildTableName("operator-audit-log", stage), "pk", "sk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "OperatorAuditLogByMerchantOccurredAt",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  return table;
+}
+
+// Session
+// - pk = SESSION#<sessionId>
+// - sort key なし（1 セッション = 1 アイテム）
+// - gsi1pk = COGNITO_SUB#<cognitoSub>
+// - gsi1sk = CREATED_AT#<ISO8601>
+// - TTL は `ttl`（UNIX 秒）。DynamoDB の TTL で期限切れセッションを自動削除する。
+function createSessionTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(scope, "SessionTable", {
+    ...buildTableProps(stage, buildTableName("session", stage), "pk"),
+    timeToLiveAttribute: "ttl",
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "SessionByCognitoSub",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  return table;
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -244,9 +374,16 @@ export function createApplicationDynamoTables(
     userTable: createUserTable(scope, props.stage),
     departmentTable: createDepartmentTable(scope, props.stage),
     missionTable: createMissionTable(scope, props.stage),
+    missionHistoryTable: createMissionHistoryTable(scope, props.stage),
     missionReportTable: createMissionReportTable(scope, props.stage),
     userMonthlyStatsTable: createUserMonthlyStatsTable(scope, props.stage),
     exchangeHistoryTable: createExchangeHistoryTable(scope, props.stage),
     pointTransactionTable: createPointTransactionTable(scope, props.stage),
+    merchantTable: createMerchantTable(scope, props.stage),
+    merchantUserTable: createMerchantUserTable(scope, props.stage),
+    merchandiseTable: createMerchandiseTable(scope, props.stage),
+    exchangeFavoriteTable: createExchangeFavoriteTable(scope, props.stage),
+    operatorAuditLogTable: createOperatorAuditLogTable(scope, props.stage),
+    sessionTable: createSessionTable(scope, props.stage),
   };
 }

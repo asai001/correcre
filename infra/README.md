@@ -24,11 +24,12 @@
 
 - 1 環境につき 1 つの共有 User Pool を使います
 - ログインはメールアドレス + パスワードです
-- パスワードは 8 文字以上です
-- 大文字、小文字、数字、記号の必須条件はありません
+- パスワードは半角英数字 8 文字以上です
+- 大文字、小文字はどちらでも構いません
 
 補足:
-Cognito 単体では「半角英数字のみ」を厳密に強制できません。
+Cognito の password policy 単体では「半角英数字のみ」を厳密に強制できません。  
+そのため User Pool 側は `minLength = 8` かつ文字種必須条件なしにし、アプリ側の新規パスワード設定画面で `^[A-Za-z0-9]{8,}$` を検証します。
 
 ## DynamoDB の方針
 
@@ -96,7 +97,7 @@ CDK の定義は [`lib/dynamodb.ts`](./lib/dynamodb.ts) に集約し、[`lib/inf
 | --- | --- |
 | PK | `companyId = <companyId>` |
 | SK | `sk = USER#<userId>` |
-| 主な属性 | `userId`, `companyId`, `cognitoSub`, `name`, `email`, `loginId`, `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
+| 主な属性 | `userId`, `companyId`, `cognitoSub`, `lastName`, `firstName`, `lastNameKana`, `firstNameKana`, `email`, `phoneNumber`, `address` (Map: `postalCode`, `prefecture`, `city`, `building`), `departmentId`, `departmentName`, `roles`, `status`, `joinedAt`, `lastLoginAt`, `currentPointBalance`, `currentMonthCompletionRate`, `createdAt`, `updatedAt` |
 
 GSI:
 
@@ -109,6 +110,7 @@ GSI:
 認可方針:
 
 - 管理者画面へのアクセス可否は `roles` に `ADMIN` を含むかで判定します
+- 運用者画面へのアクセス可否は `roles` に `OPERATOR` を含むかで判定します
 - Cognito Groups は使わず、User テーブル側を認可の正とします
 
 ### 3. Department
@@ -231,7 +233,7 @@ GSI:
 事前招待型を前提にします。
 
 - 管理者が先に User テーブルへユーザーを登録します
-- `email` や `loginId` は事前登録しておきます
+- `email` や氏名、所属部署、必要に応じて電話番号・住所を事前登録しておきます
 - 初回ログイン後に該当ユーザーへ `cognitoSub` を紐付けます
 - 以後は `cognitoSub` を主キー的な識別子として利用します
 
@@ -258,9 +260,10 @@ GSI:
 
 ## ブランチ対応
 
-- `develop -> dev`
+- `local -> dev`
 - `stage -> stg`
 - `main -> prod`
+- `feature/*` / `fix/*` は `stage` から切ってローカルで開発し、`stage` にマージした内容を Vercel Preview / AWS stg で確認します
 
 ## よく使うコマンド
 
@@ -288,3 +291,43 @@ GSI:
 - `deploy:stg` は `CorreCre-Stg-Account` プロファイルを使います
 - `deploy:prod` は `CorreCre-Prod-Account` プロファイルを使います
 - 事前に `aws sso login --profile <profile>` が必要になる場合があります
+
+## 保守環境向けシードデータ投入
+
+分析・レポート画面の確認用に、ミッション達成傾向が対照的な 2 社（`seed-poor-company` / `seed-good-company`）をシード投入するスクリプトを用意しています。
+
+実行:
+
+```bash
+# infra ディレクトリで
+STAGE=stg AWS_PROFILE=CorreCre-Stg-Account npm run seed:maintenance
+```
+
+既存のシードデータを削除したい場合:
+
+```bash
+STAGE=stg AWS_PROFILE=CorreCre-Stg-Account npm run seed:maintenance:reset
+```
+
+`reportId` などは決定論的に採番しているため、同じデータ構成で再実行する場合はリセット不要（上書きされる）です。  
+一方で投入後にミッション件数や期間を変更する場合は、件数が減る側で旧行が残ってしまうため、先にリセットを実行してください。
+
+生成される内容:
+
+- 企業 × 2（`seed-poor-company`: 株式会社アカマツ商会 / `seed-good-company`: 株式会社シラカワエンジニアリング）
+- 部門 × 2（営業部 / 開発部）
+- ユーザー × 6（ADMIN 1 / MANAGER 1 / EMPLOYEE 4、Cognito は使わずダミー `cognitoSub` で登録）
+- ミッション × 5（各 `score × monthlyCount = 20`、合計 100）
+- 過去 13 ヶ月分の `MissionReport`（全て `APPROVED`）と `UserMonthlyStats`
+
+会社 ID・ユーザー ID・部門 ID は決定論的なため再実行で上書きされます。
+
+データ傾向:
+
+- `seed-poor-company`: 各項目達成割合は左から順に 85 / 80 / 30 / 50 / 75 ％周辺、平均獲得点数は 70 点付近から 30 点付近へ緩やかに低下。
+- `seed-good-company`: 各項目達成割合はいずれも 95 ％前後、平均獲得点数は 80〜95 点を維持。
+
+注意:
+
+- Cognito ユーザーは作成しないため、これらのアカウントでログインはできません（画面表示確認専用）。
+- `prod` ステージでの実行は想定していません。`STAGE=prod` を指定しないでください。

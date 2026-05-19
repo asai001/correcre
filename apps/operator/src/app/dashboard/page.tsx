@@ -1,11 +1,21 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBuilding, faUsers } from "@fortawesome/free-solid-svg-icons";
+import {
+  faArrowRight,
+  faBuilding,
+  faBullseye,
+  faRightLeft,
+  faStore,
+  faUsers,
+} from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
-import { listOperatorCompaniesFromDynamoMock } from "@operator/features/user-registration/api/server.mock";
+import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
+import { MerchantKpiCards, getOperatorDashboardData } from "@operator/features/dashboard";
 import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
 import { requireOperatorSession } from "@operator/lib/auth/operator";
+
+export const dynamic = "force-dynamic";
 
 function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
@@ -15,7 +25,7 @@ const dashboardCards = [
   {
     href: "/company-registration",
     title: "企業登録",
-    description: "新しい企業を追加し、companyId を発行して運用対象を増やします。",
+    description: "新しい企業を追加し、自動採番された companyId で運用対象を増やします。",
     icon: faBuilding,
     accentClassName: "from-cyan-500 to-sky-600",
   },
@@ -26,11 +36,35 @@ const dashboardCards = [
     icon: faUsers,
     accentClassName: "from-emerald-500 to-teal-600",
   },
+  {
+    href: "/missions",
+    title: "ミッション管理",
+    description: "対象企業を選択して、ミッション項目の編集・履歴管理を行います。",
+    icon: faBullseye,
+    accentClassName: "from-amber-500 to-orange-600",
+  },
+  {
+    href: "/merchants",
+    title: "提携企業管理",
+    description: "商品・サービスを提供する提携企業の登録と、ログインユーザーの招待を行います。",
+    icon: faStore,
+    accentClassName: "from-violet-500 to-fuchsia-600",
+  },
+  {
+    href: "/exchanges",
+    title: "交換管理",
+    description: "全提携企業の交換申請を俯瞰し、状態確認と必要に応じた代理操作・強制キャンセルを行います。",
+    icon: faRightLeft,
+    accentClassName: "from-rose-500 to-pink-600",
+  },
 ] as const;
 
 export default async function DashboardPage() {
   const session = await requireOperatorSession();
-  const companies = await listOperatorCompaniesFromDynamoMock();
+  const [companies, merchantDashboard] = await Promise.all([
+    listOperatorCompaniesFromDynamo(),
+    getOperatorDashboardData(),
+  ]);
   const totalUsers = companies.reduce((sum, company) => sum + company.employeeCount, 0);
 
   return (
@@ -73,6 +107,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <MerchantKpiCards data={merchantDashboard} />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {dashboardCards.map((card) => (

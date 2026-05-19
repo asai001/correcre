@@ -22,8 +22,14 @@
     "inlineSources": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
+    "isolatedModules": true,
+    "types": [
+      "node",
+      "jest"
+    ],
     "typeRoots": [
-      "./node_modules/@types"
+      "./node_modules/@types",
+      "../node_modules/@types"
     ]
   },
   "exclude": [

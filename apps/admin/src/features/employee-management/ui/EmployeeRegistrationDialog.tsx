@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { JAPAN_PREFECTURES } from "@correcre/lib/user-profile";
 import {
   Alert,
   Button,
   Checkbox,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,14 +15,18 @@ import {
   InputLabel,
   ListItemText,
   MenuItem,
-  OutlinedInput,
   Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
+import { DepartmentAutocompleteField } from "@correcre/ui";
 
-import type { CreateEmployeeInput, EmployeeDepartmentOption, EmployeeManagementRole } from "../model/types";
+import type {
+  CreateEmployeeInput,
+  EmployeeAssignableRole,
+  EmployeeDepartmentOption,
+} from "../model/types";
 
 type EmployeeRegistrationDialogProps = {
   open: boolean;
@@ -35,10 +39,23 @@ type EmployeeRegistrationDialogProps = {
 
 type FormState = CreateEmployeeInput;
 
-const roleOptions: Array<{ value: EmployeeManagementRole; label: string }> = [
-  { value: "EMPLOYEE", label: "一般" },
-  { value: "MANAGER", label: "マネージャー" },
+type ValidationState = {
+  lastName: boolean;
+  firstName: boolean;
+  lastNameKana: boolean;
+  firstNameKana: boolean;
+  departmentName: boolean;
+  roles: boolean;
+  email: boolean;
+  phoneNumber: boolean;
+  joinedAt: boolean;
+  postalCode: boolean;
+};
+
+const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
+  { value: "EMPLOYEE", label: "従業員" },
   { value: "ADMIN", label: "管理者" },
+  { value: "OPERATOR", label: "運用者" },
 ];
 
 function getToday() {
@@ -47,19 +64,39 @@ function getToday() {
 
 function createInitialFormState(): FormState {
   return {
-    name: "",
-    loginId: "",
-    departments: [],
+    lastName: "",
+    firstName: "",
+    lastNameKana: "",
+    firstNameKana: "",
+    departmentName: "",
     email: "",
-    phone: "",
-    address: "",
-    role: "EMPLOYEE",
+    phoneNumber: "",
+    postalCodeFirstHalf: "",
+    postalCodeSecondHalf: "",
+    prefecture: "",
+    city: "",
+    building: "",
+    roles: ["EMPLOYEE"],
     joinedAt: getToday(),
   };
 }
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidKana(value: string) {
+  return /^[ァ-ヶー－\s　]+$/.test(value);
+}
+
+function isValidPhoneNumber(phoneNumber: string) {
+  const digits = phoneNumber.replace(/\D/g, "");
+  return /^[0-9-]+$/.test(phoneNumber) && digits.length >= 10 && digits.length <= 11;
+}
+
+function normalizeOptionalText(value?: string) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
 }
 
 export default function EmployeeRegistrationDialog({
@@ -82,22 +119,25 @@ export default function EmployeeRegistrationDialog({
     setHasSubmitted(false);
   }, [open]);
 
-  const validation = useMemo(() => {
-    const name = form.name.trim();
-    const loginId = form.loginId.trim();
+  const validation = useMemo<ValidationState>(() => {
     const email = form.email.trim();
-    const phone = form.phone.trim();
-    const address = form.address.trim();
-    const joinedAt = form.joinedAt.trim();
+    const phoneNumber = form.phoneNumber?.trim() ?? "";
+    const postalCodeFirstHalf = form.postalCodeFirstHalf?.trim() ?? "";
+    const postalCodeSecondHalf = form.postalCodeSecondHalf?.trim() ?? "";
+    const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
 
     return {
-      name: !name,
-      loginId: !loginId,
-      departments: form.departments.length === 0,
+      lastName: !form.lastName.trim(),
+      firstName: !form.firstName.trim(),
+      lastNameKana: !form.lastNameKana.trim() || !isValidKana(form.lastNameKana.trim()),
+      firstNameKana: !form.firstNameKana.trim() || !isValidKana(form.firstNameKana.trim()),
+      departmentName: !form.departmentName.trim(),
+      roles: form.roles.length === 0,
       email: !email || !isValidEmail(email),
-      phone: !phone,
-      address: !address,
-      joinedAt: !joinedAt,
+      phoneNumber: Boolean(phoneNumber) && !isValidPhoneNumber(phoneNumber),
+      joinedAt: !form.joinedAt.trim(),
+      postalCode:
+        hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
     };
   }, [form]);
 
@@ -111,13 +151,19 @@ export default function EmployeeRegistrationDialog({
     }
 
     await onSubmit({
-      name: form.name.trim(),
-      loginId: form.loginId.trim(),
-      departments: form.departments,
+      lastName: form.lastName.trim(),
+      firstName: form.firstName.trim(),
+      lastNameKana: form.lastNameKana.trim(),
+      firstNameKana: form.firstNameKana.trim(),
+      departmentName: form.departmentName.trim(),
       email: form.email.trim(),
-      phone: form.phone.trim(),
-      address: form.address.trim(),
-      role: form.role,
+      phoneNumber: normalizeOptionalText(form.phoneNumber),
+      postalCodeFirstHalf: normalizeOptionalText(form.postalCodeFirstHalf),
+      postalCodeSecondHalf: normalizeOptionalText(form.postalCodeSecondHalf),
+      prefecture: normalizeOptionalText(form.prefecture),
+      city: normalizeOptionalText(form.city),
+      building: normalizeOptionalText(form.building),
+      roles: form.roles,
       joinedAt: form.joinedAt.trim(),
     });
   };
@@ -127,7 +173,7 @@ export default function EmployeeRegistrationDialog({
       open={open}
       onClose={submitting ? undefined : onClose}
       fullWidth
-      maxWidth="md"
+      maxWidth="lg"
       PaperProps={{
         sx: {
           borderRadius: "24px",
@@ -136,9 +182,9 @@ export default function EmployeeRegistrationDialog({
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <div className="text-2xl font-bold text-slate-900">運営用ユーザー登録</div>
+        <div className="text-2xl font-bold text-slate-900">ユーザー登録</div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          事前招待型のユーザー登録です。ここでは認証連携IDを手入力せず、初回ログイン後に連携する前提でユーザーを作成します。
+          氏名、所属部署、連絡先、住所を登録します。ログイン時の認証はメールアドレスで行います。
         </Typography>
       </DialogTitle>
 
@@ -146,65 +192,118 @@ export default function EmployeeRegistrationDialog({
         <Stack spacing={2.5}>
           {error && <Alert severity="error">{error}</Alert>}
           <Alert severity="info">
-            認証連携IDはこの画面では登録しません。運営は `loginId` / `email` / 権限 / 部署を事前登録し、
-            認証連携は初回ログイン後に行う想定です。
+            ユーザー登録後も Cognito 連携は未完了です。本人の初回ログイン時に認証情報が紐づきます。
           </Alert>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-4">
             <TextField
-              label="氏名"
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              label="姓"
+              value={form.lastName}
+              onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))}
               fullWidth
               required
-              error={hasSubmitted && validation.name}
-              helperText={hasSubmitted && validation.name ? "氏名を入力してください" : " "}
+              error={hasSubmitted && validation.lastName}
+              helperText={hasSubmitted && validation.lastName ? "姓を入力してください" : " "}
             />
-            <FormControl fullWidth error={hasSubmitted && validation.departments}>
-              <InputLabel id="department-select-label">所属部署</InputLabel>
+            <TextField
+              label="名"
+              value={form.firstName}
+              onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.firstName}
+              helperText={hasSubmitted && validation.firstName ? "名を入力してください" : " "}
+            />
+            <TextField
+              label="姓フリガナ"
+              value={form.lastNameKana}
+              onChange={(event) => setForm((current) => ({ ...current, lastNameKana: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.lastNameKana}
+              helperText={
+                hasSubmitted && validation.lastNameKana ? "姓フリガナは全角カタカナで入力してください" : " "
+              }
+            />
+            <TextField
+              label="名フリガナ"
+              value={form.firstNameKana}
+              onChange={(event) => setForm((current) => ({ ...current, firstNameKana: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.firstNameKana}
+              helperText={
+                hasSubmitted && validation.firstNameKana ? "名フリガナは全角カタカナで入力してください" : " "
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+            <DepartmentAutocompleteField
+              departmentOptions={departmentOptions}
+              value={form.departmentName}
+              error={hasSubmitted && validation.departmentName}
+              helperText={
+                hasSubmitted && validation.departmentName
+                  ? "所属部署を入力してください"
+                  : "既存部署を選択、または新しい部署名を入力すると登録時に追加されます"
+              }
+              label="所属部署"
+              onChange={(departmentName) =>
+                setForm((current) => ({
+                  ...current,
+                  departmentName,
+                }))
+              }
+            />
+
+            <FormControl fullWidth required error={hasSubmitted && validation.roles}>
+              <InputLabel id="admin-employee-registration-roles-label" required>
+                権限
+              </InputLabel>
               <Select
-                labelId="department-select-label"
+                labelId="admin-employee-registration-roles-label"
                 multiple
-                value={form.departments}
+                value={form.roles}
+                label="権限 *"
+                renderValue={(selected) =>
+                  (selected as EmployeeAssignableRole[])
+                    .map((role) => roleOptions.find((option) => option.value === role)?.label ?? role)
+                    .join(" / ")
+                }
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    departments: typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value,
+                    roles: event.target.value as EmployeeAssignableRole[],
                   }))
                 }
-                input={<OutlinedInput label="所属部署" />}
-                renderValue={(selected) => (
-                  <div className="flex flex-wrap gap-1">
-                    {(selected as string[]).map((department) => (
-                      <Chip key={department} label={department} size="small" />
-                    ))}
-                  </div>
-                )}
               >
-                {departmentOptions.map((departmentOption) => (
-                  <MenuItem key={departmentOption.name} value={departmentOption.name}>
-                    <Checkbox checked={form.departments.includes(departmentOption.name)} />
-                    <ListItemText primary={departmentOption.name} secondary={`${departmentOption.employeeCount}名`} />
+                {roleOptions.map((roleOption) => (
+                  <MenuItem key={roleOption.value} value={roleOption.value}>
+                    <Checkbox checked={form.roles.includes(roleOption.value)} />
+                    <ListItemText primary={roleOption.label} />
                   </MenuItem>
                 ))}
               </Select>
               <FormHelperText>
-                {hasSubmitted && validation.departments ? "所属部署を1つ以上選択してください" : " "}
+                {hasSubmitted && validation.roles ? "権限を 1 つ以上選択してください" : " "}
               </FormHelperText>
             </FormControl>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
             <TextField
-              label="ログインID"
-              value={form.loginId}
-              onChange={(event) => setForm((current) => ({ ...current, loginId: event.target.value }))}
+              label="入社日"
+              type="date"
+              value={form.joinedAt}
+              onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
               fullWidth
               required
-              placeholder="taro.yamada"
-              error={hasSubmitted && validation.loginId}
-              helperText={hasSubmitted && validation.loginId ? "ログインIDを入力してください" : "英小文字・数字・._- を推奨"}
+              slotProps={{ inputLabel: { shrink: true } }}
+              error={hasSubmitted && validation.joinedAt}
+              helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
             />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
             <TextField
               label="メールアドレス"
               type="email"
@@ -213,63 +312,82 @@ export default function EmployeeRegistrationDialog({
               fullWidth
               required
               error={hasSubmitted && validation.email}
-              helperText={
-                hasSubmitted && validation.email
-                  ? "メールアドレスを正しく入力してください"
-                  : "初回ログイン時の本人確認に使います"
-              }
+              helperText={hasSubmitted && validation.email ? "有効なメールアドレスを入力してください" : " "}
             />
-          </div>
-
-          <TextField
-            label="連絡先"
-            value={form.phone}
-            onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-            fullWidth
-            required
-            placeholder="090-1234-5678"
-            error={hasSubmitted && validation.phone}
-            helperText={hasSubmitted && validation.phone ? "連絡先を入力してください" : " "}
-          />
-
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
             <TextField
-              label="住所"
-              value={form.address}
-              onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+              label="電話番号"
+              value={form.phoneNumber}
+              onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
               fullWidth
-              required
-              error={hasSubmitted && validation.address}
-              helperText={hasSubmitted && validation.address ? "住所を入力してください" : " "}
+              error={hasSubmitted && validation.phoneNumber}
+              helperText={
+                hasSubmitted && validation.phoneNumber
+                  ? "電話番号は 10 桁または 11 桁の数字で入力してください"
+                  : " "
+              }
             />
             <TextField
               select
-              label="権限"
-              value={form.role}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, role: event.target.value as EmployeeManagementRole }))
-              }
+              label="都道府県"
+              value={form.prefecture}
+              onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
               fullWidth
+              helperText=" "
             >
-              {roleOptions.map((roleOption) => (
-                <MenuItem key={roleOption.value} value={roleOption.value}>
-                  {roleOption.label}
+              <MenuItem value="">未選択</MenuItem>
+              {JAPAN_PREFECTURES.map((prefecture) => (
+                <MenuItem key={prefecture} value={prefecture}>
+                  {prefecture}
                 </MenuItem>
               ))}
             </TextField>
           </div>
 
-          <TextField
-            label="入社日"
-            type="date"
-            value={form.joinedAt}
-            onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
-            fullWidth
-            required
-            slotProps={{ inputLabel: { shrink: true } }}
-            error={hasSubmitted && validation.joinedAt}
-            helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
-          />
+          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_minmax(0,1.4fr)_minmax(0,1fr)] md:items-start">
+            <TextField
+              label="郵便番号(前半)"
+              value={form.postalCodeFirstHalf}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  postalCodeFirstHalf: event.target.value.replace(/\D/g, "").slice(0, 3),
+                }))
+              }
+              fullWidth
+              error={hasSubmitted && validation.postalCode}
+              helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
+            />
+            <div aria-hidden="true" className="hidden self-start text-lg text-slate-500 md:flex md:h-14 md:items-center md:justify-center">
+              -
+            </div>
+            <TextField
+              label="郵便番号(後半)"
+              value={form.postalCodeSecondHalf}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  postalCodeSecondHalf: event.target.value.replace(/\D/g, "").slice(0, 4),
+                }))
+              }
+              fullWidth
+              error={hasSubmitted && validation.postalCode}
+              helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
+            />
+            <TextField
+              label="市区町村・丁目・番地"
+              value={form.city}
+              onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
+              fullWidth
+              helperText=" "
+            />
+            <TextField
+              label="建物名・部屋番号"
+              value={form.building}
+              onChange={(event) => setForm((current) => ({ ...current, building: event.target.value }))}
+              fullWidth
+              helperText=" "
+            />
+          </div>
         </Stack>
       </DialogContent>
 

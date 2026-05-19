@@ -1,11 +1,14 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import {
-  createDepartmentInDynamoMock,
-  deleteDepartmentInDynamoMock,
-  renameDepartmentInDynamoMock,
-} from "@operator/features/user-registration/api/server.mock";
+  createDepartmentInDynamo,
+  deleteDepartmentInDynamo,
+  renameDepartmentInDynamo,
+} from "@operator/features/user-registration/api/server";
 import type { CreateDepartmentInput, RenameDepartmentInput } from "@operator/features/user-registration/model/types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
+
+const DEPARTMENT_MUTATION_FAILED_MESSAGE = "部署の更新に失敗しました。時間をおいて再度お試しください。";
 
 async function authorizeOperator() {
   const access = await getOperatorAccessStatus();
@@ -50,10 +53,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    await createDepartmentInDynamoMock(body.companyId, { name: body.name });
+    await createDepartmentInDynamo(body.companyId, { name: body.name });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
     console.error("POST /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -84,13 +91,17 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    await renameDepartmentInDynamoMock(body.companyId, {
+    await renameDepartmentInDynamo(body.companyId, {
       currentName: body.currentName,
       nextName: body.nextName,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("PATCH /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -125,10 +136,14 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    await deleteDepartmentInDynamoMock(body.companyId, body.name);
+    await deleteDepartmentInDynamo(body.companyId, body.name);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -138,4 +153,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
-

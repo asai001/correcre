@@ -1,16 +1,20 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
+
 import {
-  createEmployeeInDynamoMock,
-  deleteEmployeeInDynamoMock,
-  getEmployeeManagementSummaryFromDynamoMock,
-  updateEmployeeInDynamoMock,
-} from "@operator/features/user-registration/api/server.mock";
+  createEmployeeInDynamo,
+  deleteEmployeeInDynamo,
+  getEmployeeManagementSummaryFromDynamo,
+  updateEmployeeInDynamo,
+} from "@operator/features/user-registration/api/server";
 import type {
   CreateEmployeeInput,
   DeleteEmployeeInput,
   UpdateEmployeeInput,
 } from "@operator/features/user-registration/model/types";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
+
+const USER_REGISTRATION_FAILED_MESSAGE = "ユーザー登録に失敗しました。時間をおいて再度お試しください。";
 
 async function authorizeOperator() {
   const access = await getOperatorAccessStatus();
@@ -40,7 +44,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await getEmployeeManagementSummaryFromDynamoMock(companyId, adminUserId);
+    const summary = await getEmployeeManagementSummaryFromDynamo(companyId, adminUserId);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/employee-management error", err);
@@ -80,10 +84,14 @@ export async function POST(req: Request) {
   }
 
   try {
-    const employee = await createEmployeeInDynamoMock(body.companyId, body);
+    const employee = await createEmployeeInDynamo(body.companyId, body);
     return NextResponse.json(employee, { status: 201 });
   } catch (err) {
     console.error("POST /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -114,10 +122,14 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const employee = await updateEmployeeInDynamoMock(body.companyId, body);
+    const employee = await updateEmployeeInDynamo(body.companyId, body);
     return NextResponse.json(employee);
   } catch (err) {
     console.error("PATCH /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: USER_REGISTRATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" || err.message === "Employee not found" ? 404 : 400;
@@ -148,7 +160,7 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    await deleteEmployeeInDynamoMock(body.companyId, body);
+    await deleteEmployeeInDynamo(body.companyId, body);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/employee-management error", err);
@@ -161,4 +173,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
-

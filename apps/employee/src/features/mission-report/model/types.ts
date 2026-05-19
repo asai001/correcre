@@ -1,4 +1,12 @@
-export type FieldType = "text" | "textarea" | "number" | "datetime-local" | "date" | "select" | "url";
+export type FieldType = "text" | "textarea" | "number" | "datetime-local" | "date" | "select" | "url" | "image";
+
+export type ImageFieldValue = {
+  s3Key: string;
+  contentType: string;
+  originalFileName: string;
+  size: number;
+  uploadedAt: string;
+};
 
 export type Mission = {
   companyId: string;
@@ -19,6 +27,7 @@ export type FieldConfig = {
   label: string;
   type: FieldType;
   placeholder?: string;
+  helpText?: string;
   required?: boolean;
   rows?: number; // textarea
   min?: number;
@@ -53,7 +62,7 @@ export type MissionProgress = {
 export type SubmitPayload = {
   companyId: string;
   missionId: string;
-  values: Record<string, any>;
+  values: Record<string, string | ImageFieldValue>;
   score: number;
 };
 

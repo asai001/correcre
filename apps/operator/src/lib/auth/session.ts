@@ -1,15 +1,30 @@
 import "server-only";
 
 import {
+  ConfirmForgotPasswordCommand,
   CognitoIdentityProviderClient,
+  ForgotPasswordCommand,
   InitiateAuthCommand,
   RespondToAuthChallengeCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { cookies } from "next/headers";
 
+import {
+  createSession,
+  extractUserClaims,
+  loadActiveSessionRecord,
+  terminateSession,
+  verifyCognitoIdToken,
+  type CreatedSession,
+} from "@correcre/lib/auth/session-store";
+import { evaluateSessionToken } from "@correcre/lib/auth/session-validate";
+import { verifySessionToken } from "@correcre/lib/auth/session-token";
+import { updateUserLastLoginAtByCognitoSub } from "@correcre/lib/dynamodb/user";
+import { readRequiredServerEnv } from "@correcre/lib/env/server";
+
 import { OPERATOR_NEW_PASSWORD_CHALLENGE_COOKIE_NAME, OPERATOR_SESSION_COOKIE_NAME } from "./constants";
 import { getOperatorCognitoConfig } from "./config";
-import { type OperatorSession, verifyOperatorIdToken } from "./verify-token";
+import type { OperatorSession } from "./verify-token";
 
 const cognitoClientCache = new Map<string, CognitoIdentityProviderClient>();
 const NEW_PASSWORD_CHALLENGE_COOKIE_TTL_MS = 10 * 60 * 1000;
@@ -41,17 +56,37 @@ function getCognitoClient(region: string) {
   return client;
 }
 
-async function setOperatorSessionCookie(session: OperatorSession) {
+async function syncOperatorLastLoginAt(cognitoSub: string) {
+  const trimmed = cognitoSub.trim();
+
+  if (!trimmed) {
+    return;
+  }
+
+  const updatedUser = await updateUserLastLoginAtByCognitoSub(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    },
+    trimmed,
+  );
+
+  if (!updatedUser) {
+    console.warn("Operator sign-in completed but no matching User record was found for Cognito sub.");
+  }
+}
+
+async function setOperatorSessionCookie(created: CreatedSession) {
   const cookieStore = await cookies();
 
   cookieStore.set({
     name: OPERATOR_SESSION_COOKIE_NAME,
-    value: session.token,
+    value: created.token,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    expires: session.expiresAt,
+    expires: created.cookieExpiresAt,
   });
 }
 
@@ -116,7 +151,7 @@ export async function getPendingNewPasswordChallenge(): Promise<PendingNewPasswo
   return decodePendingNewPasswordChallenge(encodedChallenge);
 }
 
-export async function clearOperatorSession() {
+async function clearOperatorSessionCookie() {
   const cookieStore = await cookies();
 
   cookieStore.set({
@@ -128,11 +163,73 @@ export async function clearOperatorSession() {
     path: "/",
     expires: new Date(0),
   });
+}
 
+export async function clearOperatorSession() {
+  const cookieStore = await cookies();
+  const existingToken = cookieStore.get(OPERATOR_SESSION_COOKIE_NAME)?.value;
+
+  if (existingToken) {
+    const payload = await verifySessionToken(existingToken);
+
+    if (payload?.sid) {
+      try {
+        await terminateSession(payload.sid);
+      } catch (error) {
+        console.warn("Failed to delete operator session record on logout.", error);
+      }
+    }
+  }
+
+  await clearOperatorSessionCookie();
   await clearPendingNewPasswordChallenge();
 }
 
-export async function signInOperator(params: { email: string; password: string }): Promise<SignInOperatorResult> {
+async function establishOperatorSession(params: { idToken: string; rememberMe: boolean }): Promise<OperatorSession> {
+  const { clientId, issuer } = getOperatorCognitoConfig();
+  const verification = await verifyCognitoIdToken({
+    idToken: params.idToken,
+    issuer,
+    audience: clientId,
+  });
+
+  if (!verification) {
+    const error = new Error("Failed to verify the ID token returned by Cognito.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const userClaims = extractUserClaims(verification.claims);
+
+  if (!userClaims) {
+    const error = new Error("Cognito ID token did not contain a usable subject claim.");
+    error.name = "InvalidIdToken";
+    throw error;
+  }
+
+  const created = await createSession({
+    role: "OPERATOR",
+    claims: userClaims,
+    rememberMe: params.rememberMe,
+  });
+
+  await setOperatorSessionCookie(created);
+  await syncOperatorLastLoginAt(userClaims.cognitoSub);
+
+  const evaluation = evaluateSessionToken(created.payload);
+
+  if (evaluation.status === "expired") {
+    throw new Error(`Newly issued session was already considered expired (${evaluation.reason}).`);
+  }
+
+  return evaluation.session;
+}
+
+export async function signInOperator(params: {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}): Promise<SignInOperatorResult> {
   const { region, clientId } = getOperatorCognitoConfig();
   const cognitoClient = getCognitoClient(region);
   await clearPendingNewPasswordChallenge();
@@ -174,31 +271,69 @@ export async function signInOperator(params: { email: string; password: string }
     throw error;
   }
 
-  const session = await verifyOperatorIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setOperatorSessionCookie(session);
-
+  const session = await establishOperatorSession({ idToken, rememberMe: params.rememberMe ?? false });
   return { status: "authenticated", session };
 }
 
 export async function getOperatorSession(): Promise<OperatorSession | null> {
   const cookieStore = await cookies();
-  const idToken = cookieStore.get(OPERATOR_SESSION_COOKIE_NAME)?.value;
+  const token = cookieStore.get(OPERATOR_SESSION_COOKIE_NAME)?.value;
 
-  if (!idToken) {
+  if (!token) {
     return null;
   }
 
-  return verifyOperatorIdToken(idToken);
+  const payload = await verifySessionToken(token);
+
+  if (!payload || payload.role !== "OPERATOR") {
+    return null;
+  }
+
+  const evaluation = evaluateSessionToken(payload);
+
+  if (evaluation.status === "expired") {
+    return null;
+  }
+
+  const record = await loadActiveSessionRecord(payload.sid);
+
+  if (!record) {
+    return null;
+  }
+
+  return evaluation.session;
 }
 
-export async function completeOperatorNewPassword(params: { newPassword: string }) {
+export async function requestOperatorPasswordReset(params: { email: string }) {
+  const { region, clientId } = getOperatorCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+    }),
+  );
+}
+
+export async function confirmOperatorPasswordReset(params: { email: string; confirmationCode: string; newPassword: string }) {
+  const { region, clientId } = getOperatorCognitoConfig();
+  const cognitoClient = getCognitoClient(region);
+
+  await cognitoClient.send(
+    new ConfirmForgotPasswordCommand({
+      ClientId: clientId,
+      Username: params.email,
+      ConfirmationCode: params.confirmationCode,
+      Password: params.newPassword,
+    }),
+  );
+}
+
+export async function completeOperatorNewPassword(params: {
+  newPassword: string;
+  rememberMe?: boolean;
+}) {
   const challenge = await getPendingNewPasswordChallenge();
 
   if (!challenge) {
@@ -230,15 +365,7 @@ export async function completeOperatorNewPassword(params: { newPassword: string 
     throw error;
   }
 
-  const session = await verifyOperatorIdToken(idToken);
-
-  if (!session) {
-    const error = new Error("Failed to verify the ID token returned by Cognito.");
-    error.name = "InvalidIdToken";
-    throw error;
-  }
-
-  await setOperatorSessionCookie(session);
+  const session = await establishOperatorSession({ idToken, rememberMe: params.rememberMe ?? false });
   await clearPendingNewPasswordChallenge();
 
   return session;

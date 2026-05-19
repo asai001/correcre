@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { maybeTouchSessionToken } from "@correcre/lib/auth/session-validate";
+
 import {
   OPERATOR_DEFAULT_REDIRECT_PATH,
   OPERATOR_LOGIN_PATH,
   OPERATOR_PROTECTED_PATH_PREFIXES,
   OPERATOR_SESSION_COOKIE_NAME,
 } from "@operator/lib/auth/constants";
-import { isOperatorAllowlistConfigured, isOperatorEmailAllowed } from "@operator/lib/auth/allowlist";
 import { sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { verifyOperatorIdToken } from "@operator/lib/auth/verify-token";
+import { verifyOperatorSessionToken } from "@operator/lib/auth/verify-token";
 
 function isProtectedPath(pathname: string) {
   return OPERATOR_PROTECTED_PATH_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -43,17 +44,12 @@ function expireSession(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLoginPage = pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password";
+  const isLoginPage =
+    pathname === OPERATOR_LOGIN_PATH || pathname === "/login/new-password" || pathname === "/login/forgot-password";
   const shouldCheckSession = isLoginPage || isProtectedPath(pathname);
 
   if (!shouldCheckSession) {
     return NextResponse.next();
-  }
-
-  if (!isOperatorAllowlistConfigured()) {
-    const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
-    expireSession(response);
-    return response;
   }
 
   const sessionToken = request.cookies.get(OPERATOR_SESSION_COOKIE_NAME)?.value;
@@ -66,7 +62,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(buildLoginRedirect(request));
   }
 
-  const session = await verifyOperatorIdToken(sessionToken);
+  const session = await verifyOperatorSessionToken(sessionToken);
 
   if (!session) {
     const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
@@ -74,26 +70,37 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (!isOperatorEmailAllowed(session.payload.email as string | undefined)) {
-    const response = isLoginPage ? NextResponse.next() : NextResponse.redirect(buildLoginRedirect(request));
-    expireSession(response);
-    return response;
-  }
-
   if (isLoginPage) {
-    const redirectTo = sanitizeRedirectTo(request.nextUrl.searchParams.get("from"));
-    return NextResponse.redirect(new URL(redirectTo, request.url));
+    return NextResponse.next();
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const touched = await maybeTouchSessionToken(session.payload);
+
+  if (touched) {
+    response.cookies.set({
+      name: OPERATOR_SESSION_COOKIE_NAME,
+      value: touched.token,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      expires: touched.cookieExpiresAt,
+    });
+  }
+
+  return response;
 }
 
 export const config = {
   matcher: [
     "/login",
     "/login/new-password",
+    "/login/forgot-password",
     "/dashboard/:path*",
     "/company-registration/:path*",
     "/user-registration/:path*",
+    "/missions/:path*",
+    "/merchants/:path*",
   ],
 };

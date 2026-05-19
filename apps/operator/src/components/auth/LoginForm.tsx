@@ -1,16 +1,36 @@
 "use client";
 
+import Link from "next/link";
+import type { Route } from "next";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Alert, Button, Checkbox, TextField } from "@mui/material";
+import { PasswordTextField } from "@correcre/theme";
 
 import { authenticate } from "@operator/app/lib/actions/authenticate";
-import { OPERATOR_DEFAULT_REDIRECT_PATH } from "@operator/lib/auth/constants";
+import {
+  OPERATOR_DEFAULT_REDIRECT_PATH,
+  OPERATOR_FORGOT_PASSWORD_PATH,
+  OPERATOR_LOGIN_NOTICE_COOKIE_NAME,
+} from "@operator/lib/auth/constants";
+import { getLoginErrorMessage, type LoginErrorCode } from "@operator/lib/auth/errors";
+import { operatorAuthCardClassName } from "./styles";
 
 type LoginFormProps = {
-  errorMessage?: string;
+  defaultEmail?: string;
+  noticeMessage?: string;
   redirectTo?: string;
 };
+
+function buildForgotPasswordHref(redirectTo: string) {
+  if (redirectTo === OPERATOR_DEFAULT_REDIRECT_PATH) {
+    return OPERATOR_FORGOT_PASSWORD_PATH;
+  }
+
+  const params = new URLSearchParams({ from: redirectTo });
+  return `${OPERATOR_FORGOT_PASSWORD_PATH}?${params.toString()}`;
+}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -22,12 +42,36 @@ function SubmitButton() {
   );
 }
 
-export default function LoginForm({ errorMessage, redirectTo = OPERATOR_DEFAULT_REDIRECT_PATH }: LoginFormProps) {
+export default function LoginForm({
+  defaultEmail = "",
+  noticeMessage,
+  redirectTo = OPERATOR_DEFAULT_REDIRECT_PATH,
+}: LoginFormProps) {
+  const [state, formAction] = useActionState(authenticate, {
+    errorCode: undefined as LoginErrorCode | undefined,
+  });
+  const errorMessage = getLoginErrorMessage(state.errorCode);
+  const forgotPasswordHref = buildForgotPasswordHref(redirectTo);
+
+  useEffect(() => {
+    if (!noticeMessage) {
+      return;
+    }
+
+    document.cookie = `${OPERATOR_LOGIN_NOTICE_COOKIE_NAME}=; Max-Age=0; Path=/; SameSite=Lax`;
+  }, [noticeMessage]);
+
   return (
-    <div className="w-full rounded bg-[#D8FAFF]/40 pt-15">
+    <div className={operatorAuthCardClassName}>
       <div className="mx-auto w-4/5">
-        <form action={authenticate}>
+        <form action={formAction}>
           <input type="hidden" name="redirectTo" value={redirectTo} />
+
+          {noticeMessage ? (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              {noticeMessage}
+            </Alert>
+          ) : null}
 
           {errorMessage ? (
             <Alert severity="error" sx={{ mb: 3 }}>
@@ -44,6 +88,7 @@ export default function LoginForm({ errorMessage, redirectTo = OPERATOR_DEFAULT_
               type="email"
               name="email"
               autoComplete="email"
+              defaultValue={defaultEmail}
               required
               variant="outlined"
               size="small"
@@ -52,11 +97,10 @@ export default function LoginForm({ errorMessage, redirectTo = OPERATOR_DEFAULT_
 
           <div className="mt-5">
             <span className="text-neutral-600">パスワード</span>
-            <TextField
+            <PasswordTextField
               className="bg-white"
               fullWidth
               id="password"
-              type="password"
               name="password"
               autoComplete="current-password"
               required
@@ -68,11 +112,20 @@ export default function LoginForm({ errorMessage, redirectTo = OPERATOR_DEFAULT_
           <div className="mt-5">
             <Checkbox id="login-info" name="login-info" size="small" sx={{ p: 0, pr: 1 }} />
             <label htmlFor="login-info" className="text-neutral-600">
-              ログイン情報を記憶する
+              ログイン情報を保存
             </label>
           </div>
 
-          <p className="mt-2 text-sm text-neutral-600">パスワードを忘れた場合は、運用担当者へお問い合わせください。</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            パスワードを忘れた方は{" "}
+            <Link
+              href={forgotPasswordHref as Route}
+              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+            >
+              こちら
+            </Link>{" "}
+            から再設定してください。
+          </p>
 
           <SubmitButton />
         </form>

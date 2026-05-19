@@ -39,11 +39,14 @@ export default function AnalysisFilterSection({
             label={"社員を選択"}
             onChange={handleUserChange}
           >
-            {employees.map((emp) => (
-              <MenuItem key={emp.userId} value={emp.userId}>
-                {emp.name} ({emp.department})
-              </MenuItem>
-            ))}
+            {employees.map((emp) => {
+              const suffix = emp.isInactive ? "（休止中）" : emp.isInvited ? "（招待中）" : "";
+              return (
+                <MenuItem key={emp.userId} value={emp.userId} disabled={emp.isInactive || emp.isInvited}>
+                  {emp.name} ({emp.department}){suffix}
+                </MenuItem>
+              );
+            })}
           </Select>
         </FormControl>
         <TextField

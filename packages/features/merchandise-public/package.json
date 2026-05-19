@@ -1,0 +1,19 @@
+{
+  "name": "@correcre/merchandise-public",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "dependencies": {
+    "@correcre/types": "0.0.1"
+  },
+  "peerDependencies": {
+    "@mui/material": "^7",
+    "react": "^19",
+    "react-dom": "^19"
+  }
+}

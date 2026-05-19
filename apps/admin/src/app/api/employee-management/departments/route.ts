@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import {
-  createDepartmentInDynamoMock,
-  deleteDepartmentInDynamoMock,
-  renameDepartmentInDynamoMock,
-} from "@admin/features/employee-management/api/server.mock";
+  createDepartmentInDynamo,
+  deleteDepartmentInDynamo,
+  renameDepartmentInDynamo,
+} from "@admin/features/employee-management/api/server";
 import type { CreateDepartmentInput, RenameDepartmentInput } from "@admin/features/employee-management/model/types";
+import { authorizeEmployeeManagementRequest } from "../authorize";
 
 type DepartmentRequestBase = {
   companyId?: string;
@@ -15,26 +17,31 @@ type RenameDepartmentRequest = DepartmentRequestBase & RenameDepartmentInput;
 type DeleteDepartmentRequest = DepartmentRequestBase & {
   name?: string;
 };
+const DEPARTMENT_MUTATION_FAILED_MESSAGE = "部署の更新に失敗しました。時間をおいて再度お試しください。";
 
 export async function POST(req: Request) {
   let body: CreateDepartmentRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as CreateDepartmentRequest;
-  } catch (err) {
-    console.error("POST /api/employee-management/departments invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  try {
-    await createDepartmentInDynamoMock(body.companyId, { name: body.name });
+    await createDepartmentInDynamo(currentAdminUser.companyId, { name: body.name });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("POST /api/employee-management/departments invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("POST /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -49,24 +56,28 @@ export async function PATCH(req: Request) {
   let body: RenameDepartmentRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as RenameDepartmentRequest;
-  } catch (err) {
-    console.error("PATCH /api/employee-management/departments invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  try {
-    await renameDepartmentInDynamoMock(body.companyId, {
+    await renameDepartmentInDynamo(currentAdminUser.companyId, {
       currentName: body.currentName,
       nextName: body.nextName,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("PATCH /api/employee-management/departments invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("PATCH /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;
@@ -81,25 +92,29 @@ export async function DELETE(req: Request) {
   let body: DeleteDepartmentRequest | null = null;
 
   try {
+    const { unauthorized, currentAdminUser } = await authorizeEmployeeManagementRequest();
+    if (unauthorized || !currentAdminUser) {
+      return unauthorized;
+    }
+
     body = (await req.json()) as DeleteDepartmentRequest;
-  } catch (err) {
-    console.error("DELETE /api/employee-management/departments invalid json", err);
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
+    if (!body.name) {
+      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    }
 
-  if (!body?.companyId) {
-    return NextResponse.json({ error: "companyId is required" }, { status: 400 });
-  }
-
-  if (!body.name) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
-  }
-
-  try {
-    await deleteDepartmentInDynamoMock(body.companyId, body.name);
+    await deleteDepartmentInDynamo(currentAdminUser.companyId, body.name);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof SyntaxError) {
+      console.error("DELETE /api/employee-management/departments invalid json", err);
+      return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+    }
+
     console.error("DELETE /api/employee-management/departments error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: DEPARTMENT_MUTATION_FAILED_MESSAGE }, { status: 500 });
+    }
 
     if (err instanceof Error) {
       const status = err.message === "Company not found" ? 404 : 400;

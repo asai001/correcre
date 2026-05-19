@@ -1,16 +1,20 @@
-"use client";
+﻿"use client";
 
+import { SkeletonBlock } from "@employee/components/LoadingSkeleton";
 import { useEffect, useMemo, useState } from "react";
 import { Button, TablePagination } from "@mui/material";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { downloadCsv } from "@correcre/individual-analysis";
+import { getExchangeStatusBadge, isPointConsumed } from "@correcre/merchandise-public";
+import type { ExchangeHistoryStatus } from "@correcre/types";
 
 type PointExchangeHistoryItem = {
   date: string;
   merchandiseName: string;
   usedPoint: number;
+  status?: ExchangeHistoryStatus;
 };
 
 type PastPerformancePointExchangeHistoryCardProps = {
@@ -185,7 +189,14 @@ export default function PastPerformancePointExchangeHistoryCard({
       </div>
 
       <div className="mt-8">
-        {loading && <div className="text-sm text-slate-400">読み込み中...</div>}
+        {loading && (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <SkeletonBlock key={index} className="h-16 rounded-2xl" />
+            ))}
+          </div>
+        )}
+        {false && loading && <div className="text-sm text-slate-400">読み込み中...</div>}
 
         {!loading && error && <div className="text-sm text-red-500">{error}</div>}
 
@@ -198,24 +209,36 @@ export default function PastPerformancePointExchangeHistoryCard({
         {!loading && !error && items.length > 0 && (
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="space-y-4 p-4">
-              {displayedItems.map((item, index) => (
-                <div
-                  key={`${item.date}-${item.merchandiseName}-${page}-${index}`}
-                  className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-base font-semibold text-slate-900">{item.merchandiseName}</p>
-                      <p className="mt-1 text-sm text-slate-500">{item.date}</p>
-                    </div>
+              {displayedItems.map((item, index) => {
+                const badge = getExchangeStatusBadge(item.status);
+                const consumed = isPointConsumed(item.status);
+                return (
+                  <div
+                    key={`${item.date}-${item.merchandiseName}-${page}-${index}`}
+                    className="border-b border-slate-200 pb-4 last:border-b-0 last:pb-0"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-slate-900">{item.merchandiseName}</p>
+                        <p className="mt-1 text-sm text-slate-500">{item.date}</p>
+                      </div>
 
-                    <div className="shrink-0 sm:text-right">
-                      <p className="text-lg font-semibold text-red-500">-{item.usedPoint.toLocaleString()}pt</p>
-                      <p className="mt-1 text-sm font-medium text-emerald-500">交換済み</p>
+                      <div className="shrink-0 sm:text-right">
+                        <p
+                          className={`text-lg font-semibold ${consumed ? "text-red-500" : "text-slate-400 line-through"}`}
+                        >
+                          -{item.usedPoint.toLocaleString()}pt
+                        </p>
+                        <span
+                          className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${badge.className}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <TablePagination
@@ -242,3 +265,4 @@ export default function PastPerformancePointExchangeHistoryCard({
     </section>
   );
 }
+

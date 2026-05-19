@@ -1,10 +1,10 @@
 "use client";
 
-import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
-
 import { useMemo } from "react";
-import type { Mission, MissionReport } from "../model/types";
+import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+import type { Mission, MissionReport } from "../model/types";
 
 type MissionReportCardsProps = {
   icon: IconDefinition;
@@ -12,6 +12,7 @@ type MissionReportCardsProps = {
   missions: Mission[];
   missionReports: MissionReport[];
   onClickMission: (missionId: string) => void;
+  onOpenMissionList: () => void;
 };
 
 export default function MissionReportCards({
@@ -20,40 +21,41 @@ export default function MissionReportCards({
   missions,
   missionReports,
   onClickMission,
+  onOpenMissionList,
 }: MissionReportCardsProps) {
-  // missionId ごとの「今月何回報告したか」を集計
   const reportsCountByMissionId = useMemo(() => {
     const map = new Map<string, number>();
-    for (const r of missionReports) {
-      const key = r.missionId;
-      if (!key) continue;
-      map.set(key, (map.get(key) ?? 0) + 1);
+    for (const report of missionReports) {
+      if (!report.missionId) {
+        continue;
+      }
+
+      map.set(report.missionId, (map.get(report.missionId) ?? 0) + 1);
     }
     return map;
   }, [missionReports]);
 
   return (
-    <section className="bg-white rounded-2xl shadow-lg p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <FontAwesomeIcon icon={icon} className="text-xl lg:text-2xl mr-3" style={{ color: iconColor }} />
-        <div className="text-lg lg:text-2xl font-bold">ミッション報告</div>
+    <section className="rounded-2xl bg-white p-5 shadow-lg">
+      <div className="mb-4 flex items-center gap-2">
+        <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
+        <div className="text-lg font-bold lg:text-2xl">ミッション報告</div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {missions.map((m) => {
-          const doneCount = reportsCountByMissionId.get(m.missionId) ?? 0;
-          const targetCount = m.monthlyCount ?? 0;
-
+        {missions.map((mission) => {
+          const doneCount = reportsCountByMissionId.get(mission.missionId) ?? 0;
+          const targetCount = mission.monthlyCount ?? 0;
           const { done, progressTextClass, buttonClass } = getMissionClasses(doneCount, targetCount);
 
           return (
             <MissionCard
-              key={m.missionId}
-              title={m.title}
-              description={m.description}
+              key={mission.missionId}
+              title={mission.title}
+              description={mission.description}
               monthlyCount={targetCount}
               doneCount={doneCount}
-              onClick={() => onClickMission(m.missionId)}
+              onClick={() => onClickMission(mission.missionId)}
               done={done}
               progressTextClass={progressTextClass}
               buttonClass={buttonClass}
@@ -61,8 +63,7 @@ export default function MissionReportCards({
           );
         })}
 
-        {/* 右端の「各ミッション項目の詳細はこちら」 */}
-        <InfoCard />
+        <InfoCard onOpen={onOpenMissionList} />
       </div>
     </section>
   );
@@ -79,23 +80,32 @@ type MissionCardProps = {
   onClick: () => void;
 };
 
-function MissionCard({ title, description, monthlyCount, doneCount, done, progressTextClass, buttonClass, onClick }: MissionCardProps) {
+function MissionCard({
+  title,
+  description,
+  monthlyCount,
+  doneCount,
+  done,
+  progressTextClass,
+  buttonClass,
+  onClick,
+}: MissionCardProps) {
   const target = monthlyCount;
   const hasTarget = target > 0;
 
   return (
-    <div className="relative bg-white rounded-2xl shadow-[0_5px_15px_rgba(0,0,0,0.10)] p-5 flex flex-col justify-between min-w-0">
+    <div className="relative flex min-w-0 flex-col justify-between rounded-2xl bg-white p-5 shadow-[0_5px_15px_rgba(0,0,0,0.10)]">
       <div>
         <div className="flex items-baseline justify-between gap-2">
-          <div className="text-base font-semibold text-gray-800 truncate">{title}</div>
-          {hasTarget && (
-            <span className={`text-sm font-semibold whitespace-nowrap ${progressTextClass}`}>
+          <div className="truncate text-base font-semibold text-gray-800">{title}</div>
+          {hasTarget ? (
+            <span className={`whitespace-nowrap text-sm font-semibold ${progressTextClass}`}>
               ({doneCount}/{target})
             </span>
-          )}
+          ) : null}
         </div>
 
-        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{description}</p>
+        <p className="mt-1 line-clamp-2 text-sm text-gray-500">{description}</p>
       </div>
 
       <button
@@ -103,26 +113,19 @@ function MissionCard({ title, description, monthlyCount, doneCount, done, progre
         disabled={done}
         onClick={onClick}
         className={
-          "mt-4 h-10 rounded-md text-sm font-medium w-full transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-lg " +
-          (done ? "bg-gray-200 text-gray-400 cursor-not-allowed" : buttonClass)
+          "mt-4 h-10 w-full rounded-md text-sm font-medium transition-all duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-lg " +
+          (done ? "cursor-not-allowed bg-gray-200 text-gray-400" : buttonClass)
         }
       >
-        {done ? "完了" : "報告する"}
+        {done ? "達成済み" : "報告する"}
       </button>
     </div>
   );
 }
 
-/**
- * 進捗に応じて色を決める
- * - ratio >= 1.0        → グレー（完了）
- * - 0.8 <= ratio < 1.0  → 緑（あとちょっと）
- * - 0.3 <= ratio < 0.8  → 黄（そこそこ）
- * - ratio < 0.3         → 赤（要がんばり）
- */
 function getMissionClasses(
   doneCount: number,
-  targetCount: number
+  targetCount: number,
 ): {
   done: boolean;
   progressTextClass: string;
@@ -143,12 +146,11 @@ function getMissionClasses(
     return {
       done: true,
       progressTextClass: "text-emerald-500",
-      buttonClass: "bg-gray-200 text-gray-400", // 実際の色は disabled 側で上書き
+      buttonClass: "bg-gray-200 text-gray-400",
     };
   }
 
   if (ratio >= 0.8) {
-    // グリーン
     return {
       done: false,
       progressTextClass: "text-green-500",
@@ -157,7 +159,6 @@ function getMissionClasses(
   }
 
   if (ratio >= 0.3) {
-    // オレンジ
     return {
       done: false,
       progressTextClass: "text-amber-500",
@@ -165,7 +166,6 @@ function getMissionClasses(
     };
   }
 
-  // 赤
   return {
     done: false,
     progressTextClass: "text-rose-500",
@@ -173,13 +173,21 @@ function getMissionClasses(
   };
 }
 
-function InfoCard() {
+type InfoCardProps = {
+  onOpen: () => void;
+};
+
+function InfoCard({ onOpen }: InfoCardProps) {
   return (
-    <div className="relative bg-white rounded-2xl shadow-lg p-5 flex flex-col justify-between h-full min-w-0">
-      <div className="text-base font-bold text-gray-800">各ミッション項目の詳細はこちら</div>
-      <p className="text-sm text-gray-500 mt-1">配点やルール、報告方法のガイドを確認できます</p>
-      <button className="mt-4 h-10 rounded-md text-sm font-medium transition w-full bg-gray-200 hover:bg-gray-300 text-gray-700">
-        詳細
+    <div className="relative flex h-full min-w-0 flex-col justify-between rounded-2xl bg-white p-5 shadow-lg">
+      <div className="text-base font-bold text-gray-800">各ミッションの詳細はこちら</div>
+      <p className="mt-1 text-sm text-gray-500">点数、回数、提出内容の目安を一覧で確認できます。</p>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-4 h-10 w-full rounded-md bg-gray-200 text-sm font-medium text-gray-700 transition hover:bg-gray-300"
+      >
+        ミッション一覧を見る
       </button>
     </div>
   );

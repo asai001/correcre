@@ -16,12 +16,11 @@ type NewPasswordPageProps = {
 };
 
 function buildLoginRedirect(redirectTo: string) {
-  const params = new URLSearchParams({ error: "new_password_session_expired" });
-
-  if (redirectTo !== ADMIN_DEFAULT_REDIRECT_PATH) {
-    params.set("from", redirectTo);
+  if (redirectTo === ADMIN_DEFAULT_REDIRECT_PATH) {
+    return ADMIN_LOGIN_PATH;
   }
 
+  const params = new URLSearchParams({ from: redirectTo });
   return `${ADMIN_LOGIN_PATH}?${params.toString()}`;
 }
 
@@ -43,18 +42,18 @@ export default async function NewPasswordPage({ searchParams }: NewPasswordPageP
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center bg-white">
+    <>
       <Image className="mt-12 lg:mt-24" src="/correcre-logo.svg" alt="" width={160} height={37} />
-      <div className="mt-12 w-9/10 max-w-[440px]">
+      <div className="mt-12 mb-16 w-9/10 max-w-[440px] lg:mb-20">
         <NewPasswordForm email={challenge.email} errorMessage={errorMessage} redirectTo={redirectTo} />
       </div>
       <Image
         className="absolute bottom-5 right-7.5 h-auto w-16 lg:bottom-15 lg:right-20 lg:w-[110px]"
-        src="/correcre-icon.svg"
+        src="/favicon.png"
         alt=""
         width={110}
-        height={66}
+        height={110}
       />
-    </div>
+    </>
   );
 }

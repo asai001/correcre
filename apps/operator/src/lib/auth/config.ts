@@ -5,6 +5,11 @@ type OperatorCognitoConfig = {
   issuer: string;
 };
 
+type MerchantUserPoolAdminConfig = {
+  region: string;
+  userPoolId: string;
+};
+
 function readRequiredEnv(name: string): string {
   const value = process.env[name]?.trim();
 
@@ -25,5 +30,12 @@ export function getOperatorCognitoConfig(): OperatorCognitoConfig {
     userPoolId,
     clientId,
     issuer: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`,
+  };
+}
+
+export function getMerchantUserPoolAdminConfig(): MerchantUserPoolAdminConfig {
+  return {
+    region: readRequiredEnv("MERCHANT_COGNITO_REGION"),
+    userPoolId: readRequiredEnv("MERCHANT_COGNITO_USER_POOL_ID"),
   };
 }

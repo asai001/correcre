@@ -14,7 +14,7 @@ function createStack(stage: InfraStage): InfraStack {
     stage,
     adminAppUrl: "https://admin.example.com/",
     employeeAppUrl: "https://employee.example.com/",
-    sourceBranch: "test",
+    sourceContext: "test",
   });
 }
 
@@ -31,12 +31,63 @@ function getSingleTableResource(template: Template, tableName: string): Record<s
   return matchedResources[0] as Record<string, unknown>;
 }
 
+const INTERNAL_CUSTOM_MESSAGE_DESCRIPTION = "Customize Cognito forgot-password and admin-create-user emails.";
+const MERCHANT_CUSTOM_MESSAGE_DESCRIPTION =
+  "Customize Cognito forgot-password and admin-create-user emails (merchant pool).";
+
+function getCustomMessageLambdaCode(template: Template, description: string) {
+  const resources = template.findResources("AWS::Lambda::Function", {
+    Properties: {
+      Description: description,
+      Handler: "index.handler",
+    },
+  });
+  const matchedResources = Object.values(resources);
+
+  expect(matchedResources).toHaveLength(1);
+
+  return (
+    ((matchedResources[0] as { Properties?: { Code?: { ZipFile?: string } } }).Properties?.Code?.ZipFile as string) ?? ""
+  );
+}
+
+function expectCustomMessageEmailCustomization(template: Template, fromEmail: string) {
+  template.hasResourceProperties(
+    "AWS::Lambda::Function",
+    Match.objectLike({
+      Description: INTERNAL_CUSTOM_MESSAGE_DESCRIPTION,
+      Handler: "index.handler",
+    }),
+  );
+
+  template.hasResourceProperties(
+    "AWS::Lambda::Function",
+    Match.objectLike({
+      Description: MERCHANT_CUSTOM_MESSAGE_DESCRIPTION,
+      Handler: "index.handler",
+    }),
+  );
+
+  template.hasResourceProperties(
+    "AWS::Cognito::UserPool",
+    Match.objectLike({
+      EmailConfiguration: Match.objectLike({
+        EmailSendingAccount: "DEVELOPER",
+        From: `=?UTF-8?B?44Kz44Os44Kv44Os?= <${fromEmail}>`,
+      }),
+      LambdaConfig: Match.objectLike({
+        CustomMessage: Match.anyValue(),
+      }),
+    }),
+  );
+}
+
 describe("InfraStack", () => {
   test("provisions the requested multi-table DynamoDB design", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 8);
+    template.resourceCountIs("AWS::DynamoDB::Table", 15);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -101,6 +152,42 @@ describe("InfraStack", () => {
       }),
     );
 
+    // Mission テーブル: slotIndex 方式（GSI なし）
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-mission-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "companyId",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
+      }),
+    );
+
+    // MissionHistory テーブル
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-mission-history-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
+      }),
+    );
+
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
       Match.objectLike({
@@ -153,5 +240,227 @@ describe("InfraStack", () => {
     expect(
       (stgCompanyTable.Properties as { PointInTimeRecoverySpecification?: unknown }).PointInTimeRecoverySpecification,
     ).toBeUndefined();
+  });
+
+  test("configures Cognito with 8+ character passwords and no required character classes", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        Policies: {
+          PasswordPolicy: Match.objectLike({
+            MinimumLength: 8,
+            RequireLowercase: false,
+            RequireNumbers: false,
+            RequireSymbols: false,
+            RequireUppercase: false,
+            TemporaryPasswordValidityDays: 7,
+          }),
+        },
+      }),
+    );
+  });
+
+  test("uses SES-backed forgot-password email customization in development", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
+
+  test("uses SES-backed forgot-password email customization in staging", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
+
+  test("uses SES-backed forgot-password email customization in production", () => {
+    const template = Template.fromStack(createStack("prod"));
+
+    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
+  });
+
+  test("embeds development admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("dev"));
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
+
+    expect(internalCode).toContain("CustomMessage_AdminCreateUser");
+    expect(internalCode).toContain("http://localhost:3000/login");
+    expect(merchantCode).toContain("CustomMessage_AdminCreateUser");
+    expect(merchantCode).toContain("http://localhost:3003/login");
+  });
+
+  test("embeds staging admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("stg"));
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
+
+    expect(internalCode).toContain("https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(internalCode).toContain("https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(merchantCode).toContain("https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+  });
+
+  test("embeds production admin-create-user routing in the custom message lambda", () => {
+    const template = Template.fromStack(createStack("prod"));
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
+
+    expect(internalCode).toContain("https://correcre-admin.example.com/login");
+    expect(internalCode).toContain("https://correcre-employee.example.com/login");
+    expect(merchantCode).toContain("https://correcre-merchant.example.com/login");
+  });
+
+  test("separates the merchant user pool from the internal admin/employee/operator pool", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.resourceCountIs("AWS::Cognito::UserPool", 2);
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        UserPoolName: "correcre-users-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        UserPoolName: "correcre-merchant-users-dev",
+      }),
+    );
+  });
+
+  test("creates one app client per app across the two pools", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.resourceCountIs("AWS::Cognito::UserPoolClient", 4);
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-admin-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-employee-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-operator-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-merchant-web-dev",
+      }),
+    );
+  });
+
+  test("creates a Vercel OIDC role scoped to the expected projects and environment", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    template.hasResourceProperties(
+      "AWS::IAM::Role",
+      Match.objectLike({
+        RoleName: "correcre-vercel-dynamodb-stg",
+        AssumeRolePolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sts:AssumeRoleWithWebIdentity",
+              Condition: {
+                StringEquals: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:aud":
+                    "https://vercel.com/asai001s-projects-3e71fbe6",
+                },
+                StringLike: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:sub": [
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-merchant:environment:preview",
+                  ],
+                },
+              },
+            }),
+          ]),
+        },
+      }),
+    );
+  });
+
+  test("grants the Vercel OIDC role Cognito admin user provisioning permissions", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    const inlinePolicies = template.findResources("AWS::IAM::Policy");
+    const managedPolicies = template.findResources("AWS::IAM::ManagedPolicy");
+
+    type PolicyResource = {
+      Properties: {
+        PolicyDocument: {
+          Statement: Array<{ Action?: unknown; Effect?: string }>;
+        };
+      };
+    };
+
+    const allStatements = [...Object.values(inlinePolicies), ...Object.values(managedPolicies)].flatMap(
+      (resource) => (resource as PolicyResource).Properties.PolicyDocument.Statement ?? [],
+    );
+
+    const cognitoStatement = allStatements.find((stmt) => {
+      const action = stmt.Action;
+      if (!Array.isArray(action)) {
+        return false;
+      }
+      return (
+        action.includes("cognito-idp:AdminCreateUser") &&
+        action.includes("cognito-idp:AdminDeleteUser") &&
+        action.includes("cognito-idp:AdminResetUserPassword") &&
+        action.includes("cognito-idp:AdminUpdateUserAttributes") &&
+        stmt.Effect === "Allow"
+      );
+    });
+
+    expect(cognitoStatement).toBeDefined();
+  });
+
+  test("scopes the dev AWS account to development subjects only", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.hasResourceProperties(
+      "AWS::IAM::Role",
+      Match.objectLike({
+        RoleName: "correcre-vercel-dynamodb-dev",
+        AssumeRolePolicyDocument: {
+          Statement: Match.arrayWith([
+            Match.objectLike({
+              Action: "sts:AssumeRoleWithWebIdentity",
+              Condition: {
+                StringEquals: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:aud":
+                    "https://vercel.com/asai001s-projects-3e71fbe6",
+                },
+                StringLike: {
+                  "oidc.vercel.com/asai001s-projects-3e71fbe6:sub": [
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-merchant:environment:development",
+                  ],
+                },
+              },
+            }),
+          ]),
+        },
+      }),
+    );
   });
 });

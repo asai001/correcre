@@ -1,4 +1,4 @@
-import { getPhilosophyFromDynamoMock } from "@employee/features/philosophy/api/server.mock";
+import { getPhilosophyFromDynamo } from "@employee/features/philosophy/api/server";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const summary = await getPhilosophyFromDynamoMock(companyId);
+    const summary = await getPhilosophyFromDynamo(companyId);
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/philosophy error", err);

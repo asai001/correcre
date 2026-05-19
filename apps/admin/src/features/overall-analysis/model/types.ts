@@ -21,6 +21,11 @@ export type OverallExchangeHistoryItem = {
   status: "完了";
 };
 
+export type OverallAnalysisDepartmentOption = {
+  departmentId: string;
+  name: string;
+};
+
 export type OverallAnalysisSummary = {
   averageScore: number;
   totalEarnedPoints: number;
