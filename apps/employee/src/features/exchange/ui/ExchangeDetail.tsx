@@ -19,6 +19,7 @@ import ExchangePageHeader from "./ExchangePageHeader";
 type Props = {
   item: PublicMerchandiseDetail;
   initialPointBalance: number;
+  userName: string;
   initialIsFavorite: boolean;
   relatedItems: PublicMerchandiseSummary[];
   relatedFavoriteKeys: string[];
@@ -46,7 +47,7 @@ function DetailRow({ label, children }: Readonly<{ label: string; children: Reac
   );
 }
 
-export default function ExchangeDetail({ item, initialPointBalance, initialIsFavorite, relatedItems, relatedFavoriteKeys }: Props) {
+export default function ExchangeDetail({ item, initialPointBalance, userName, initialIsFavorite, relatedItems, relatedFavoriteKeys }: Props) {
   const router = useRouter();
   const [pointBalance, setPointBalance] = useState(initialPointBalance);
   const [submitting, setSubmitting] = useState(false);
@@ -99,7 +100,7 @@ export default function ExchangeDetail({ item, initialPointBalance, initialIsFav
 
   return (
     <div className="-mt-px pb-12">
-      <ExchangePageHeader currentPointBalance={pointBalance} />
+      <ExchangePageHeader currentPointBalance={pointBalance} userName={userName} />
 
       <div className="container mx-auto px-6">
         <div className="mt-6">

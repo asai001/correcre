@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 
 import { ExchangeDetail } from "@employee/features/exchange";
 import {
@@ -73,6 +74,7 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
     <ExchangeDetail
       item={item}
       initialPointBalance={currentUser.currentPointBalance ?? 0}
+      userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
       initialIsFavorite={isFavorite}
       relatedItems={relatedItems}
       relatedFavoriteKeys={Array.from(favoriteKeySet)}
