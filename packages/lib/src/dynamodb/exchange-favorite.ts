@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DeleteCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
 import type {
   ExchangeFavoriteItem,
@@ -107,6 +107,53 @@ export async function putFavorite(
     }
     throw err;
   }
+}
+
+export async function deleteFavoritesByMerchandise(
+  config: ExchangeFavoriteTableConfig,
+  merchantId: string,
+  merchandiseId: string,
+): Promise<{ deletedCount: number }> {
+  const client = getDynamoDocumentClient(config.region);
+  const favoriteSk = buildExchangeFavoriteSk(merchantId, merchandiseId);
+  const matches: Array<{ pk: string; sk: string }> = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new ScanCommand({
+        TableName: config.tableName,
+        FilterExpression: "sk = :sk AND recordType = :recordType",
+        ExpressionAttributeValues: {
+          ":sk": favoriteSk,
+          ":recordType": "FAVORITE",
+        },
+        ProjectionExpression: "pk, sk",
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      for (const item of Items as Array<{ pk: string; sk: string }>) {
+        matches.push({ pk: item.pk, sk: item.sk });
+      }
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  await Promise.all(
+    matches.map((key) =>
+      client.send(
+        new DeleteCommand({
+          TableName: config.tableName,
+          Key: key,
+        }),
+      ),
+    ),
+  );
+
+  return { deletedCount: matches.length };
 }
 
 export async function deleteFavorite(

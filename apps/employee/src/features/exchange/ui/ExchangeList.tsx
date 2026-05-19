@@ -32,6 +32,7 @@ import ExchangePageHeader from "./ExchangePageHeader";
 type Props = {
   items: PublicMerchandiseSummary[];
   currentPointBalance: number;
+  userName: string;
   initialFavorites: FavoriteSummary[];
   initialSavedFilters: SavedFilter[];
 };
@@ -585,7 +586,7 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
   }
 }
 
-export default function ExchangeList({ items, currentPointBalance, initialFavorites, initialSavedFilters }: Props) {
+export default function ExchangeList({ items, currentPointBalance, userName, initialFavorites, initialSavedFilters }: Props) {
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortKey>("popular");
@@ -696,7 +697,7 @@ export default function ExchangeList({ items, currentPointBalance, initialFavori
 
   return (
     <div className="-mt-px pb-12">
-      <ExchangePageHeader currentPointBalance={currentPointBalance} />
+      <ExchangePageHeader currentPointBalance={currentPointBalance} userName={userName} />
 
       <div className="container mx-auto space-y-6 px-6 pt-8">
         {pickupItems.length > 0 ? (

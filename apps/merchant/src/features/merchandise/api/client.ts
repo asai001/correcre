@@ -54,6 +54,17 @@ export async function updateMerchandise(
   return (await res.json()) as MerchandiseSummary;
 }
 
+export async function deleteMerchandise(merchandiseId: string): Promise<void> {
+  const res = await fetch(`/api/merchandise/${encodeURIComponent(merchandiseId)}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "商品の削除に失敗しました。"));
+  }
+}
+
 export async function updateMerchandiseStatus(
   merchandiseId: string,
   input: UpdateMerchandiseStatusRequest,

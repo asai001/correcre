@@ -14,7 +14,7 @@ export interface VercelOidcAccessProps {
   stage: InfraStage;
   dynamoTables: ApplicationDynamoTables;
   s3Buckets: ApplicationS3Buckets;
-  cognitoUserPoolArn: string;
+  cognitoUserPoolArns: readonly string[];
 }
 
 export interface VercelOidcAccess {
@@ -122,7 +122,7 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
         "cognito-idp:AdminUpdateUserAttributes",
         "cognito-idp:AdminResetUserPassword",
       ],
-      resources: [props.cognitoUserPoolArn],
+      resources: [...props.cognitoUserPoolArns],
     }),
   );
 

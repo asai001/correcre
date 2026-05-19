@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 
 import {
+  deleteMerchandiseForMerchant,
   getMerchandiseForMerchant,
+  MerchandiseHasActiveExchangesError,
   updateMerchandiseForMerchant,
 } from "@merchant/features/merchandise/api/server";
 import type { UpdateMerchandiseRequest } from "@merchant/features/merchandise/model/types";
@@ -47,6 +49,39 @@ export async function GET(_req: Request, context: RouteContext) {
     if (isAwsCredentialError(err)) {
       return NextResponse.json({ error: FAILED_MESSAGE }, { status: 500 });
     }
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(_req: Request, context: RouteContext) {
+  const { user, error } = await authorize();
+  if (error) return error;
+
+  const { merchandiseId } = await context.params;
+
+  try {
+    await deleteMerchandiseForMerchant(user!.merchantId, merchandiseId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/merchandise/[merchandiseId] error", err);
+
+    if (err instanceof MerchandiseHasActiveExchangesError) {
+      return NextResponse.json(
+        {
+          error: `進行中の交換が ${err.activeCount} 件あるため削除できません。対応を完了してから再度お試しください。`,
+        },
+        { status: 409 },
+      );
+    }
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: FAILED_MESSAGE }, { status: 500 });
+    }
+
+    if (err instanceof Error && err.message === "Merchandise not found") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }

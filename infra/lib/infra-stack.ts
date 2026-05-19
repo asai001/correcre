@@ -33,6 +33,7 @@ export class InfraStack extends cdk.Stack {
       account: props.env?.account,
       region: props.env?.region,
     });
+    const { internal: internalCognito, merchant: merchantCognito } = sharedCognito;
     const dynamoTables = createApplicationDynamoTables(this, {
       stage: props.stage,
     });
@@ -47,7 +48,7 @@ export class InfraStack extends cdk.Stack {
       stage: props.stage,
       dynamoTables,
       s3Buckets,
-      cognitoUserPoolArn: sharedCognito.userPool.userPoolArn,
+      cognitoUserPoolArns: [internalCognito.userPool.userPoolArn, merchantCognito.userPool.userPoolArn],
     });
 
     new cdk.CfnOutput(this, "EnvironmentName", {
@@ -105,19 +106,19 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "CognitoUserPoolId", {
-      value: sharedCognito.userPool.userPoolId,
+      value: internalCognito.userPool.userPoolId,
     });
 
     new cdk.CfnOutput(this, "CognitoIssuer", {
-      value: sharedCognito.issuer,
+      value: internalCognito.issuer,
     });
 
     new cdk.CfnOutput(this, "CognitoHostedUiBaseUrl", {
-      value: sharedCognito.userPoolDomain.baseUrl(),
+      value: internalCognito.userPoolDomain.baseUrl(),
     });
 
     new cdk.CfnOutput(this, "CognitoDomainPrefix", {
-      value: sharedCognito.domainPrefix,
+      value: internalCognito.domainPrefix,
     });
 
     new cdk.CfnOutput(this, "AdminCognitoRegion", {
@@ -125,23 +126,23 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "AdminCognitoUserPoolId", {
-      value: sharedCognito.userPool.userPoolId,
+      value: internalCognito.userPool.userPoolId,
     });
 
     new cdk.CfnOutput(this, "AdminCognitoUserPoolClientId", {
-      value: sharedCognito.adminUserPoolClient.userPoolClientId,
+      value: internalCognito.adminUserPoolClient.userPoolClientId,
     });
 
     new cdk.CfnOutput(this, "AdminCognitoIssuer", {
-      value: sharedCognito.issuer,
+      value: internalCognito.issuer,
     });
 
     new cdk.CfnOutput(this, "AdminCognitoHostedUiBaseUrl", {
-      value: sharedCognito.userPoolDomain.baseUrl(),
+      value: internalCognito.userPoolDomain.baseUrl(),
     });
 
     new cdk.CfnOutput(this, "AdminCognitoDomainPrefix", {
-      value: sharedCognito.domainPrefix,
+      value: internalCognito.domainPrefix,
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoRegion", {
@@ -149,23 +150,23 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoUserPoolId", {
-      value: sharedCognito.userPool.userPoolId,
+      value: internalCognito.userPool.userPoolId,
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoUserPoolClientId", {
-      value: sharedCognito.employeeUserPoolClient.userPoolClientId,
+      value: internalCognito.employeeUserPoolClient.userPoolClientId,
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoIssuer", {
-      value: sharedCognito.issuer,
+      value: internalCognito.issuer,
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoHostedUiBaseUrl", {
-      value: sharedCognito.userPoolDomain.baseUrl(),
+      value: internalCognito.userPoolDomain.baseUrl(),
     });
 
     new cdk.CfnOutput(this, "EmployeeCognitoDomainPrefix", {
-      value: sharedCognito.domainPrefix,
+      value: internalCognito.domainPrefix,
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoRegion", {
@@ -173,23 +174,23 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoUserPoolId", {
-      value: sharedCognito.userPool.userPoolId,
+      value: internalCognito.userPool.userPoolId,
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoUserPoolClientId", {
-      value: sharedCognito.operatorUserPoolClient.userPoolClientId,
+      value: internalCognito.operatorUserPoolClient.userPoolClientId,
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoIssuer", {
-      value: sharedCognito.issuer,
+      value: internalCognito.issuer,
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoHostedUiBaseUrl", {
-      value: sharedCognito.userPoolDomain.baseUrl(),
+      value: internalCognito.userPoolDomain.baseUrl(),
     });
 
     new cdk.CfnOutput(this, "OperatorCognitoDomainPrefix", {
-      value: sharedCognito.domainPrefix,
+      value: internalCognito.domainPrefix,
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoRegion", {
@@ -197,23 +198,23 @@ export class InfraStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoUserPoolId", {
-      value: sharedCognito.userPool.userPoolId,
+      value: merchantCognito.userPool.userPoolId,
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoUserPoolClientId", {
-      value: sharedCognito.merchantUserPoolClient.userPoolClientId,
+      value: merchantCognito.merchantUserPoolClient.userPoolClientId,
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoIssuer", {
-      value: sharedCognito.issuer,
+      value: merchantCognito.issuer,
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoHostedUiBaseUrl", {
-      value: sharedCognito.userPoolDomain.baseUrl(),
+      value: merchantCognito.userPoolDomain.baseUrl(),
     });
 
     new cdk.CfnOutput(this, "MerchantCognitoDomainPrefix", {
-      value: sharedCognito.domainPrefix,
+      value: merchantCognito.domainPrefix,
     });
 
     new cdk.CfnOutput(this, "CompanyTableName", {

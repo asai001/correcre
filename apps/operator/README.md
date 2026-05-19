@@ -8,6 +8,10 @@
 OPERATOR_COGNITO_REGION=ap-northeast-1
 OPERATOR_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 OPERATOR_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+# 提携企業ユーザーは別 User Pool に作成するため、運用者画面は
+# その User Pool を AdminCreateUser などで操作する必要がある
+MERCHANT_COGNITO_REGION=ap-northeast-1
+MERCHANT_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 AWS_REGION=ap-northeast-1
 AWS_PROFILE=CorreCre-Dev-Account
 # Vercel Preview / Production では AWS_PROFILE の代わりに AWS_ROLE_ARN を使う

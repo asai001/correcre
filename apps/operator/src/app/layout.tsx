@@ -23,6 +23,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "コレクレ 運用者",
   description: "運用者向けユーザー登録・管理アプリ",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

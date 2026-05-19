@@ -41,7 +41,7 @@ import type {
   OperatorAuditLogTarget,
 } from "@correcre/types";
 
-import { getOperatorCognitoConfig } from "@operator/lib/auth/config";
+import { getMerchantUserPoolAdminConfig } from "@operator/lib/auth/config";
 import type {
   CreateMerchantInput,
   CreateMerchantUserInput,
@@ -64,15 +64,15 @@ type RuntimeConfig = {
 };
 
 function getRuntimeConfig(): RuntimeConfig {
-  const cognitoConfig = getOperatorCognitoConfig();
+  const merchantPoolConfig = getMerchantUserPoolAdminConfig();
 
   return {
     region: readRequiredServerEnv("AWS_REGION"),
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchantUserTableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
     operatorAuditLogTableName: readRequiredServerEnv("DDB_OPERATOR_AUDIT_LOG_TABLE_NAME"),
-    cognitoRegion: cognitoConfig.region,
-    cognitoUserPoolId: cognitoConfig.userPoolId,
+    cognitoRegion: merchantPoolConfig.region,
+    cognitoUserPoolId: merchantPoolConfig.userPoolId,
   };
 }
 

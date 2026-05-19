@@ -2,10 +2,13 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
+import { deleteFavoritesByMerchandise } from "@correcre/lib/dynamodb/exchange-favorite";
+import { listExchangeHistoryByMerchantAndStatus } from "@correcre/lib/dynamodb/exchange-history";
 import {
   buildMerchandiseByStatusGsiPk,
   buildMerchandiseByStatusGsiSk,
   buildMerchandiseSk,
+  deleteMerchandise,
   getMerchandise,
   listMerchandiseByMerchant,
   putMerchandise,
@@ -18,6 +21,7 @@ import {
   buildMerchandiseFinalImageKey,
   createMerchandiseImageUploadUrl,
   createMerchandiseImageViewUrl,
+  deleteMerchandiseImage,
   getExtensionFromKey,
   isMerchandiseAllowedImageContentType,
   isMerchandiseDraftImageKey,
@@ -48,7 +52,16 @@ type RuntimeConfig = {
   merchandiseTableName: string;
   merchantTableName: string;
   merchandiseImageBucketName: string;
+  exchangeHistoryTableName: string;
+  exchangeFavoriteTableName: string;
 };
+
+export class MerchandiseHasActiveExchangesError extends Error {
+  constructor(public readonly activeCount: number) {
+    super("Merchandise has active exchanges");
+    this.name = "MerchandiseHasActiveExchangesError";
+  }
+}
 
 const ALLOWED_DELIVERY_METHODS: readonly MerchandiseDeliveryMethod[] = [
   "来店",
@@ -72,6 +85,8 @@ function getRuntimeConfig(): RuntimeConfig {
     merchandiseTableName: readRequiredServerEnv("DDB_MERCHANDISE_TABLE_NAME"),
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
+    exchangeHistoryTableName: readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME"),
+    exchangeFavoriteTableName: readRequiredServerEnv("DDB_EXCHANGE_FAVORITE_TABLE_NAME"),
   };
 }
 
@@ -451,6 +466,77 @@ export async function setMerchandiseStatusForMerchant(
   }
 
   return buildMerchandiseSummary(config, refreshed);
+}
+
+const ACTIVE_EXCHANGE_STATUSES = ["REQUESTED", "PREPARING", "IN_PROGRESS"] as const;
+
+export async function deleteMerchandiseForMerchant(
+  merchantId: string,
+  merchandiseId: string,
+): Promise<void> {
+  const config = getRuntimeConfig();
+  const existing = await getMerchandise(
+    {
+      region: config.region,
+      tableName: config.merchandiseTableName,
+    },
+    merchantId,
+    merchandiseId,
+  );
+
+  if (!existing) {
+    throw new Error("Merchandise not found");
+  }
+
+  const exchangeHistoryConfig = {
+    region: config.region,
+    tableName: config.exchangeHistoryTableName,
+  };
+
+  const activeExchangeLists = await Promise.all(
+    ACTIVE_EXCHANGE_STATUSES.map((status) =>
+      listExchangeHistoryByMerchantAndStatus(exchangeHistoryConfig, merchantId, status),
+    ),
+  );
+
+  const activeCount = activeExchangeLists
+    .flat()
+    .filter((exchange) => exchange.merchandiseId === merchandiseId).length;
+
+  if (activeCount > 0) {
+    throw new MerchandiseHasActiveExchangesError(activeCount);
+  }
+
+  await deleteFavoritesByMerchandise(
+    {
+      region: config.region,
+      tableName: config.exchangeFavoriteTableName,
+    },
+    merchantId,
+    merchandiseId,
+  );
+
+  await deleteMerchandise(
+    {
+      region: config.region,
+      tableName: config.merchandiseTableName,
+    },
+    merchantId,
+    merchandiseId,
+  );
+
+  const imageBucketConfig = {
+    region: config.region,
+    bucketName: config.merchandiseImageBucketName,
+  };
+
+  if (existing.cardImage) {
+    await deleteMerchandiseImage(imageBucketConfig, existing.cardImage.s3Key);
+  }
+
+  if (existing.detailImage) {
+    await deleteMerchandiseImage(imageBucketConfig, existing.detailImage.s3Key);
+  }
 }
 
 export async function createMerchandiseUploadUrl(

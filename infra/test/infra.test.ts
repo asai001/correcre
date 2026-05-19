@@ -31,10 +31,14 @@ function getSingleTableResource(template: Template, tableName: string): Record<s
   return matchedResources[0] as Record<string, unknown>;
 }
 
-function getCustomMessageLambdaCode(template: Template) {
+const INTERNAL_CUSTOM_MESSAGE_DESCRIPTION = "Customize Cognito forgot-password and admin-create-user emails.";
+const MERCHANT_CUSTOM_MESSAGE_DESCRIPTION =
+  "Customize Cognito forgot-password and admin-create-user emails (merchant pool).";
+
+function getCustomMessageLambdaCode(template: Template, description: string) {
   const resources = template.findResources("AWS::Lambda::Function", {
     Properties: {
-      Description: "Customize Cognito forgot-password and admin-create-user emails.",
+      Description: description,
       Handler: "index.handler",
     },
   });
@@ -51,7 +55,15 @@ function expectCustomMessageEmailCustomization(template: Template, fromEmail: st
   template.hasResourceProperties(
     "AWS::Lambda::Function",
     Match.objectLike({
-      Description: "Customize Cognito forgot-password and admin-create-user emails.",
+      Description: INTERNAL_CUSTOM_MESSAGE_DESCRIPTION,
+      Handler: "index.handler",
+    }),
+  );
+
+  template.hasResourceProperties(
+    "AWS::Lambda::Function",
+    Match.objectLike({
+      Description: MERCHANT_CUSTOM_MESSAGE_DESCRIPTION,
       Handler: "index.handler",
     }),
   );
@@ -270,32 +282,59 @@ describe("InfraStack", () => {
 
   test("embeds development admin-create-user routing in the custom message lambda", () => {
     const template = Template.fromStack(createStack("dev"));
-    const code = getCustomMessageLambdaCode(template);
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
 
-    expect(code).toContain("CustomMessage_AdminCreateUser");
-    expect(code).toContain("http://localhost:3000/login");
+    expect(internalCode).toContain("CustomMessage_AdminCreateUser");
+    expect(internalCode).toContain("http://localhost:3000/login");
+    expect(merchantCode).toContain("CustomMessage_AdminCreateUser");
+    expect(merchantCode).toContain("http://localhost:3003/login");
   });
 
   test("embeds staging admin-create-user routing in the custom message lambda", () => {
     const template = Template.fromStack(createStack("stg"));
-    const code = getCustomMessageLambdaCode(template);
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
 
-    expect(code).toContain("https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
-    expect(code).toContain("https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(internalCode).toContain("https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(internalCode).toContain("https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(merchantCode).toContain("https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
   });
 
   test("embeds production admin-create-user routing in the custom message lambda", () => {
     const template = Template.fromStack(createStack("prod"));
-    const code = getCustomMessageLambdaCode(template);
+    const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
+    const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
 
-    expect(code).toContain("https://correcre-admin.example.com/login");
-    expect(code).toContain("https://correcre-employee.example.com/login");
+    expect(internalCode).toContain("https://correcre-admin.example.com/login");
+    expect(internalCode).toContain("https://correcre-employee.example.com/login");
+    expect(merchantCode).toContain("https://correcre-merchant.example.com/login");
   });
 
-  test("creates distinct app clients for admin, employee, and operator on the shared user pool", () => {
+  test("separates the merchant user pool from the internal admin/employee/operator pool", () => {
     const template = Template.fromStack(createStack("dev"));
 
-    template.resourceCountIs("AWS::Cognito::UserPoolClient", 3);
+    template.resourceCountIs("AWS::Cognito::UserPool", 2);
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        UserPoolName: "correcre-users-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPool",
+      Match.objectLike({
+        UserPoolName: "correcre-merchant-users-dev",
+      }),
+    );
+  });
+
+  test("creates one app client per app across the two pools", () => {
+    const template = Template.fromStack(createStack("dev"));
+
+    template.resourceCountIs("AWS::Cognito::UserPoolClient", 4);
 
     template.hasResourceProperties(
       "AWS::Cognito::UserPoolClient",
@@ -315,6 +354,13 @@ describe("InfraStack", () => {
       "AWS::Cognito::UserPoolClient",
       Match.objectLike({
         ClientName: "correcre-operator-web-dev",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::Cognito::UserPoolClient",
+      Match.objectLike({
+        ClientName: "correcre-merchant-web-dev",
       }),
     );
   });
@@ -340,6 +386,7 @@ describe("InfraStack", () => {
                     "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:preview",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:preview",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:preview",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-merchant:environment:preview",
                   ],
                 },
               },
@@ -406,6 +453,7 @@ describe("InfraStack", () => {
                     "owner:asai001s-projects-3e71fbe6:project:correcre-admin:environment:development",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-employee:environment:development",
                     "owner:asai001s-projects-3e71fbe6:project:correcre-operator:environment:development",
+                    "owner:asai001s-projects-3e71fbe6:project:correcre-merchant:environment:development",
                   ],
                 },
               },

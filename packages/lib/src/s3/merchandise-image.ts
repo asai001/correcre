@@ -124,6 +124,23 @@ export async function createMerchandiseImageUploadUrl(
   };
 }
 
+export async function deleteMerchandiseImage(
+  config: MerchandiseImageS3Config,
+  s3Key: string,
+): Promise<void> {
+  const client = getS3Client(config.region);
+  try {
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: config.bucketName,
+        Key: s3Key,
+      }),
+    );
+  } catch (error) {
+    console.warn("failed to delete merchandise image", { s3Key, error });
+  }
+}
+
 export async function createMerchandiseImageViewUrl(
   config: MerchandiseImageS3Config,
   s3Key: string,

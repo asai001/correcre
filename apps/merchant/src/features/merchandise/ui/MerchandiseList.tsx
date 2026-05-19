@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Alert, Button } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCirclePlus, faPenToSquare } from "@fortawesome/free-solid-svg-icons";
+import { faCirclePlus, faPenToSquare, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
 import type { MerchandiseSummary } from "../model/types";
-import { updateMerchandiseStatus } from "../api/client";
+import { deleteMerchandise, updateMerchandiseStatus } from "../api/client";
 
 type Props = {
   initialItems: MerchandiseSummary[];
@@ -57,6 +57,29 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
     });
   };
 
+  const handleDelete = (item: MerchandiseSummary) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`「${item.merchandiseName}」を削除します。よろしいですか？\nこの操作は取り消せません。`)
+    ) {
+      return;
+    }
+
+    setError(null);
+    setPendingId(item.merchandiseId);
+
+    startTransition(async () => {
+      try {
+        await deleteMerchandise(item.merchandiseId);
+        setItems((current) => current.filter((entry) => entry.merchandiseId !== item.merchandiseId));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "商品の削除に失敗しました。");
+      } finally {
+        setPendingId(null);
+      }
+    });
+  };
+
   return (
     <div className="space-y-6 pb-10">
       <AdminPageHeader
@@ -86,7 +109,7 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
           まだ商品・サービスは登録されていません。「新規登録」から作成してください。
         </div>
       ) : (
-        <ul className="grid gap-4 md:grid-cols-2">
+        <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <li
               key={item.merchandiseId}
@@ -119,7 +142,7 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
                   <div className="text-xs text-slate-500">{item.heading}</div>
                   <div className="mt-1 line-clamp-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
                 </div>
-                <div className="flex items-center justify-between gap-3 pt-2">
+                <div className="flex items-center justify-end gap-4 pt-2">
                   <Link
                     href={`/merchandise/${encodeURIComponent(item.merchandiseId)}`}
                     className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900"
@@ -127,6 +150,15 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
                     <FontAwesomeIcon icon={faPenToSquare} />
                     編集
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item)}
+                    disabled={pendingId === item.merchandiseId}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-rose-600 transition hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                    削除
+                  </button>
                   <Button
                     size="small"
                     variant={item.status === "PUBLISHED" ? "outlined" : "contained"}

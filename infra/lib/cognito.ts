@@ -13,15 +13,27 @@ export type SharedCognitoProps = {
   region?: string;
 };
 
-export type SharedCognitoResources = {
+export type InternalCognitoResources = {
   userPool: cognito.UserPool;
   userPoolDomain: cognito.UserPoolDomain;
   adminUserPoolClient: cognito.UserPoolClient;
   employeeUserPoolClient: cognito.UserPoolClient;
   operatorUserPoolClient: cognito.UserPoolClient;
+  issuer: string;
+  domainPrefix: string;
+};
+
+export type MerchantCognitoResources = {
+  userPool: cognito.UserPool;
+  userPoolDomain: cognito.UserPoolDomain;
   merchantUserPoolClient: cognito.UserPoolClient;
   issuer: string;
   domainPrefix: string;
+};
+
+export type SharedCognitoResources = {
+  internal: InternalCognitoResources;
+  merchant: MerchantCognitoResources;
 };
 
 type CustomEmailSenderConfig = {
@@ -31,6 +43,8 @@ type CustomEmailSenderConfig = {
 };
 
 type LoginAppName = "admin" | "employee" | "merchant";
+
+type CognitoPoolKind = "internal" | "merchant";
 
 const DEFAULT_CUSTOM_EMAIL_SENDER_CONFIG: CustomEmailSenderConfig = {
   fromEmail: "correcre-info@efficient-technology.com",
@@ -86,16 +100,21 @@ const LOGIN_URLS = {
   },
 } satisfies Record<InfraStage, Record<LoginAppName, string>>;
 
-function buildCognitoDomainPrefix(props: SharedCognitoProps): string {
+function buildCognitoDomainPrefix(props: SharedCognitoProps, kind: CognitoPoolKind): string {
   if (!props.account || !props.region) {
     throw new Error("Cognito requires account and region for multi-environment deployment.");
   }
 
-  return ["correcre", "auth", props.stage, props.account, props.region].join("-").toLowerCase();
+  const parts =
+    kind === "merchant"
+      ? ["correcre", "auth", "merchant", props.stage, props.account, props.region]
+      : ["correcre", "auth", props.stage, props.account, props.region];
+
+  return parts.join("-").toLowerCase();
 }
 
-function buildUserPoolName(stage: InfraStage): string {
-  return `correcre-users-${stage}`;
+function buildUserPoolName(stage: InfraStage, kind: CognitoPoolKind): string {
+  return kind === "merchant" ? `correcre-merchant-users-${stage}` : `correcre-users-${stage}`;
 }
 
 function buildUserPoolClientName(appType: CognitoAppType, stage: InfraStage): string {
@@ -119,13 +138,26 @@ function getCustomEmailSenderConfig(stage: InfraStage): CustomEmailSenderConfig 
   return stage === "prod" ? PROD_CUSTOM_EMAIL_SENDER_CONFIG : DEFAULT_CUSTOM_EMAIL_SENDER_CONFIG;
 }
 
-function createPasswordResetCustomMessageTrigger(scope: Construct, stage: InfraStage) {
-  return new lambda.Function(scope, "PasswordResetCustomMessageTrigger", {
+function buildCustomMessageLambdaId(kind: CognitoPoolKind): string {
+  return kind === "merchant"
+    ? "MerchantPasswordResetCustomMessageTrigger"
+    : "PasswordResetCustomMessageTrigger";
+}
+
+function createCustomMessageTrigger(scope: Construct, stage: InfraStage, kind: CognitoPoolKind) {
+  const fixedAppName: LoginAppName | null = kind === "merchant" ? "merchant" : null;
+  const description =
+    kind === "merchant"
+      ? "Customize Cognito forgot-password and admin-create-user emails (merchant pool)."
+      : "Customize Cognito forgot-password and admin-create-user emails.";
+
+  return new lambda.Function(scope, buildCustomMessageLambdaId(kind), {
     runtime: lambda.Runtime.NODEJS_20_X,
     handler: "index.handler",
-    description: "Customize Cognito forgot-password and admin-create-user emails.",
+    description,
     code: lambda.Code.fromInline(`
 const loginUrls = ${JSON.stringify(LOGIN_URLS[stage])};
+const fixedAppName = ${JSON.stringify(fixedAppName)};
 
 exports.handler = async (event) => {
   if (
@@ -180,13 +212,21 @@ exports.handler = async (event) => {
       .map((role) => role.trim().toUpperCase())
       .filter(Boolean);
   };
-  const rawRoles = event.request?.clientMetadata?.roles ?? "";
-  const roles = parseRoles(rawRoles);
-  const appName = roles.includes("MERCHANT")
-    ? "merchant"
-    : roles.includes("EMPLOYEE")
-      ? "employee"
-      : "admin";
+  const resolveAppName = () => {
+    if (fixedAppName) {
+      return fixedAppName;
+    }
+
+    const rawRoles = event.request?.clientMetadata?.roles ?? "";
+    const roles = parseRoles(rawRoles);
+
+    if (roles.includes("EMPLOYEE")) {
+      return "employee";
+    }
+
+    return "admin";
+  };
+  const appName = resolveAppName();
   const loginUrl = loginUrls[appName] ?? loginUrls.admin;
 
   if (event.triggerSource === "CustomMessage_AdminCreateUser") {
@@ -225,12 +265,19 @@ exports.handler = async (event) => {
   });
 }
 
-function createSharedUserPool(scope: Construct, props: SharedCognitoProps) {
-  const passwordResetCustomMessageTrigger = createPasswordResetCustomMessageTrigger(scope, props.stage);
+type CreateUserPoolOptions = {
+  scope: Construct;
+  props: SharedCognitoProps;
+  kind: CognitoPoolKind;
+  constructId: string;
+};
+
+function createUserPool({ scope, props, kind, constructId }: CreateUserPoolOptions) {
+  const passwordResetCustomMessageTrigger = createCustomMessageTrigger(scope, props.stage, kind);
   const passwordResetSenderConfig = getCustomEmailSenderConfig(props.stage);
 
-  return new cognito.UserPool(scope, "SharedUserPool", {
-    userPoolName: buildUserPoolName(props.stage),
+  return new cognito.UserPool(scope, constructId, {
+    userPoolName: buildUserPoolName(props.stage, kind),
     selfSignUpEnabled: false,
     mfa: cognito.Mfa.OFF,
     signInAliases: {
@@ -294,9 +341,14 @@ function addUserPoolClient(userPool: cognito.UserPool, stage: InfraStage, appTyp
   });
 }
 
-export function createSharedCognito(scope: Construct, props: SharedCognitoProps): SharedCognitoResources {
-  const userPool = createSharedUserPool(scope, props);
-  const domainPrefix = buildCognitoDomainPrefix(props);
+function createInternalCognito(scope: Construct, props: SharedCognitoProps): InternalCognitoResources {
+  const userPool = createUserPool({
+    scope,
+    props,
+    kind: "internal",
+    constructId: "SharedUserPool",
+  });
+  const domainPrefix = buildCognitoDomainPrefix(props, "internal");
   const userPoolDomain = userPool.addDomain("SharedUserPoolDomain", {
     cognitoDomain: {
       domainPrefix,
@@ -310,8 +362,38 @@ export function createSharedCognito(scope: Construct, props: SharedCognitoProps)
     adminUserPoolClient: addUserPoolClient(userPool, props.stage, "admin"),
     employeeUserPoolClient: addUserPoolClient(userPool, props.stage, "employee"),
     operatorUserPoolClient: addUserPoolClient(userPool, props.stage, "operator"),
+    issuer: `https://cognito-idp.${cdk.Stack.of(scope).region}.amazonaws.com/${userPool.userPoolId}`,
+    domainPrefix,
+  };
+}
+
+function createMerchantCognito(scope: Construct, props: SharedCognitoProps): MerchantCognitoResources {
+  const userPool = createUserPool({
+    scope,
+    props,
+    kind: "merchant",
+    constructId: "MerchantUserPool",
+  });
+  const domainPrefix = buildCognitoDomainPrefix(props, "merchant");
+  const userPoolDomain = userPool.addDomain("MerchantUserPoolDomain", {
+    cognitoDomain: {
+      domainPrefix,
+    },
+    managedLoginVersion: cognito.ManagedLoginVersion.NEWER_MANAGED_LOGIN,
+  });
+
+  return {
+    userPool,
+    userPoolDomain,
     merchantUserPoolClient: addUserPoolClient(userPool, props.stage, "merchant"),
     issuer: `https://cognito-idp.${cdk.Stack.of(scope).region}.amazonaws.com/${userPool.userPoolId}`,
     domainPrefix,
+  };
+}
+
+export function createSharedCognito(scope: Construct, props: SharedCognitoProps): SharedCognitoResources {
+  return {
+    internal: createInternalCognito(scope, props),
+    merchant: createMerchantCognito(scope, props),
   };
 }

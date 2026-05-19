@@ -120,44 +120,46 @@ export default function RegistrationForm() {
             <TextField label="会社名" required fullWidth value={form.name} onChange={handleChange("name")} />
             <TextField label="会社名（カナ）" fullWidth value={form.kanaName} onChange={handleChange("kanaName")} />
           </div>
-          <TextField
-            label="会社所在地"
-            required
-            fullWidth
-            value={form.companyLocation}
-            onChange={handleChange("companyLocation")}
-          />
-          <TextField
-            select
-            label="店舗住所"
-            required
-            fullWidth
-            value={form.storeAddressMode}
-            onChange={handleChange("storeAddressMode")}
-          >
-            {storeAddressModeOptions.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          {form.storeAddressMode === "other" ? (
+          <div className="flex flex-col gap-6">
             <TextField
-              label="店舗住所（その他）"
+              label="会社所在地"
               required
               fullWidth
-              value={form.storeAddressOther}
-              onChange={handleChange("storeAddressOther")}
+              value={form.companyLocation}
+              onChange={handleChange("companyLocation")}
             />
-          ) : null}
-          <TextField
-            label="お客様お問い合わせ先"
-            required
-            fullWidth
-            value={form.customerInquiryContact}
-            onChange={handleChange("customerInquiryContact")}
-            helperText="電話番号、メールアドレス、URL など"
-          />
+            <TextField
+              select
+              label="店舗住所"
+              required
+              fullWidth
+              value={form.storeAddressMode}
+              onChange={handleChange("storeAddressMode")}
+            >
+              {storeAddressModeOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            {form.storeAddressMode === "other" ? (
+              <TextField
+                label="店舗住所（その他）"
+                required
+                fullWidth
+                value={form.storeAddressOther}
+                onChange={handleChange("storeAddressOther")}
+              />
+            ) : null}
+            <TextField
+              label="お客様お問い合わせ先"
+              required
+              fullWidth
+              value={form.customerInquiryContact}
+              onChange={handleChange("customerInquiryContact")}
+              helperText="電話番号、メールアドレス、URL など"
+            />
+          </div>
         </section>
 
         <section className="space-y-4">
@@ -190,38 +192,42 @@ export default function RegistrationForm() {
               onChange={handleChange("contactPersonFirstNameKana")}
             />
           </div>
-          <TextField
-            label="担当者電話番号"
-            required
-            fullWidth
-            value={form.contactPersonPhone}
-            onChange={handleChange("contactPersonPhone")}
-          />
-          <TextField
-            label="担当者メールアドレス"
-            type="email"
-            required
-            fullWidth
-            value={form.contactEmail}
-            onChange={handleChange("contactEmail")}
-            helperText="このメールアドレスがログインIDになります"
-          />
+          <div className="flex flex-col gap-6">
+            <TextField
+              label="担当者電話番号"
+              required
+              fullWidth
+              value={form.contactPersonPhone}
+              onChange={handleChange("contactPersonPhone")}
+            />
+            <TextField
+              label="担当者メールアドレス"
+              type="email"
+              required
+              fullWidth
+              value={form.contactEmail}
+              onChange={handleChange("contactEmail")}
+              helperText="このメールアドレスがログインIDになります"
+            />
+          </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-slate-900">支払い情報（任意）</h2>
-          <TextField
-            label="振込口座"
-            fullWidth
-            value={form.bankTransferAccount}
-            onChange={handleChange("bankTransferAccount")}
-          />
-          <TextField
-            label="支払サイクル"
-            fullWidth
-            value={form.paymentCycle}
-            onChange={handleChange("paymentCycle")}
-          />
+          <div className="flex flex-col gap-6">
+            <TextField
+              label="振込口座"
+              fullWidth
+              value={form.bankTransferAccount}
+              onChange={handleChange("bankTransferAccount")}
+            />
+            <TextField
+              label="支払サイクル"
+              fullWidth
+              value={form.paymentCycle}
+              onChange={handleChange("paymentCycle")}
+            />
+          </div>
         </section>
 
         <div className="flex flex-col gap-3 pt-4">

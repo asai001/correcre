@@ -2,7 +2,11 @@
 
 提携企業向けアプリです。コレクレに掲載する商品・サービスの登録、編集、交換管理を行います。
 
+提携企業ユーザーは admin/employee/operator とは別の Cognito User Pool（merchant pool）で管理しています。これは「提携企業 ↔ 利用企業」を同一メールアドレスで両立できるようにするためです。
+
 ## Environment Variables
+
+`MERCHANT_COGNITO_*` は merchant 専用 User Pool の ID・Client ID を指定してください（admin/employee/operator が使う内部用プールとは別です）。
 
 ```bash
 MERCHANT_COGNITO_REGION=ap-northeast-1

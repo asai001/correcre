@@ -35,10 +35,10 @@ export default async function ForgotPasswordPage({ searchParams }: ForgotPasswor
       </div>
       <Image
         className="absolute bottom-5 right-7.5 h-auto w-16 lg:bottom-15 lg:right-20 lg:w-[110px]"
-        src="/correcre-icon.svg"
+        src="/favicon.png"
         alt=""
         width={110}
-        height={66}
+        height={110}
       />
     </div>
   );

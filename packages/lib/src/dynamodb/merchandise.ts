@@ -1,6 +1,6 @@
 import "server-only";
 
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import type { Merchandise, MerchandiseStatus } from "@correcre/types";
 
@@ -111,6 +111,23 @@ export async function putMerchandise(config: MerchandiseTableConfig, item: Merch
     new PutCommand({
       TableName: config.tableName,
       Item: item,
+    }),
+  );
+}
+
+export async function deleteMerchandise(
+  config: MerchandiseTableConfig,
+  merchantId: string,
+  merchandiseId: string,
+): Promise<void> {
+  const client = getDynamoDocumentClient(config.region);
+  await client.send(
+    new DeleteCommand({
+      TableName: config.tableName,
+      Key: {
+        merchantId,
+        sk: buildMerchandiseSk(merchandiseId),
+      },
     }),
   );
 }
