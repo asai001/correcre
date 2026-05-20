@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   title: "コレクレ - 理念を行動に、行動をポイントに",
   description: "コレクレ - 理念を行動に、行動をポイントに",
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
   },
 };
 

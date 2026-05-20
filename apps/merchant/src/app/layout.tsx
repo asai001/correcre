@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   title: "コレクレ 提携企業",
   description: "提携企業向け 商品・サービス登録および交換管理アプリ",
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
   },
 };
 
