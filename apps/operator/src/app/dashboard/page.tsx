@@ -11,9 +11,9 @@ import {
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchantKpiCards, getOperatorDashboardData } from "@operator/features/dashboard";
-import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
-import { requireOperatorSession } from "@operator/lib/auth/operator";
+import { requireCurrentOperatorUser } from "@operator/lib/auth/operator";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,7 @@ const dashboardCards = [
   {
     href: "/company-registration",
     title: "企業登録",
-    description: "新しい企業を追加し、自動採番された companyId で運用対象を増やします。",
+    description: "新しい企業を追加して運用対象を増やします。",
     icon: faBuilding,
     accentClassName: "from-cyan-500 to-sky-600",
   },
@@ -60,8 +60,8 @@ const dashboardCards = [
 ] as const;
 
 export default async function DashboardPage() {
-  const session = await requireOperatorSession();
-  const [companies, merchantDashboard] = await Promise.all([
+  const [currentUser, companies, merchantDashboard] = await Promise.all([
+    requireCurrentOperatorUser(),
     listOperatorCompaniesFromDynamo(),
     getOperatorDashboardData(),
   ]);
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
     <div className="space-y-6 pb-5">
       <AdminPageHeader
         title="運用者ダッシュボード"
-        adminName={getOperatorDisplayName(session)}
+        adminName={joinNameParts(currentUser.lastName, currentUser.firstName)}
         subtitle="登録企業と運用タスクの入口をここに集約しています。"
       />
 
@@ -84,7 +84,7 @@ export default async function DashboardPage() {
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">管理ユーザー数</div>
           <div className="mt-4 text-4xl font-bold text-slate-900">{formatNumber(totalUsers)}</div>
-          <div className="mt-2 text-sm text-slate-500">現在 mock 上で管理対象になっている全従業員数です。</div>
+          <div className="mt-2 text-sm text-slate-500">全企業の従業員数の合計です。</div>
         </div>
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">最新更新企業</div>
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
             {companies[0]?.companyName ?? "未登録"}
           </div>
           <div className="mt-2 text-sm text-slate-500">
-            {companies[0]?.companyId ? `companyId: ${companies[0].companyId}` : "まだ企業が登録されていません。"}
+            {companies[0]?.companyId ? `企業 ID: ${companies[0].companyId}` : "まだ企業が登録されていません。"}
           </div>
         </div>
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">

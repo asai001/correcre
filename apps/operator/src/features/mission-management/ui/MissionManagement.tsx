@@ -71,7 +71,7 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
         title="ミッション管理"
         adminName={operatorName}
         backHref="/dashboard"
-        subtitle="企業のミッション項目（5 件固定）の編集と履歴管理を行います。"
+        subtitle="企業のミッション項目の編集と履歴管理を行います。"
       />
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
@@ -105,7 +105,7 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
 
       {selectedCompanyId ? (
         <Alert severity="info">
-          各企業のミッションは企業登録時には作成されません。5 つのスロットをこの画面から順に手動設定してください。
+          ミッション項目は企業登録時には作成されません。最大 5 つの項目をこの画面で順に設定してください。
         </Alert>
       ) : (
         <Alert severity="info">登録済み企業がありません。先に企業登録を行ってください。</Alert>

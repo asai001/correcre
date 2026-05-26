@@ -1,7 +1,7 @@
 import UserRegistrationManagement from "@operator/features/user-registration";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
-import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
-import { requireOperatorSession } from "@operator/lib/auth/operator";
+import { joinNameParts } from "@correcre/lib/user-profile";
+import { requireCurrentOperatorUser } from "@operator/lib/auth/operator";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +16,8 @@ function pickFirstQueryValue(value: string | string[] | undefined) {
 }
 
 export default async function UserRegistrationPage({ searchParams }: UserRegistrationPageProps) {
-  const [session, companies, params] = await Promise.all([
-    requireOperatorSession(),
+  const [currentUser, companies, params] = await Promise.all([
+    requireCurrentOperatorUser(),
     listOperatorCompaniesFromDynamo(),
     searchParams,
   ]);
@@ -30,7 +30,7 @@ export default async function UserRegistrationPage({ searchParams }: UserRegistr
     <UserRegistrationManagement
       companyId={selectedCompanyId}
       companyOptions={companies}
-      operatorName={getOperatorDisplayName(session)}
+      operatorName={joinNameParts(currentUser.lastName, currentUser.firstName)}
     />
   );
 }

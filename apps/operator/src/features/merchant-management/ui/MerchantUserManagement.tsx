@@ -191,7 +191,7 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
           <h2 className="text-xl font-bold text-slate-900">ユーザーを招待</h2>
         </div>
         <p className="mt-2 text-sm text-slate-500">
-          招待されたユーザーには Cognito から仮パスワード付きのメールが届きます。初回ログインで新しいパスワードを設定してもらいます。
+          招待されたユーザーには仮パスワード付きのメールが届きます。初回ログインで新しいパスワードを設定してもらいます。
         </p>
 
         {error ? (

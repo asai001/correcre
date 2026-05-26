@@ -15,6 +15,7 @@ export default function ExchangePageHeader({ currentPointBalance, userName }: Pr
   return (
     <EmployeePageHeader
       title="商品・サービス交換"
+      showPointExchangeLink
       right={
         <>
           <p className="text-sm font-semibold text-slate-200 sm:text-base">

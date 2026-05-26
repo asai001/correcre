@@ -1,17 +1,21 @@
 "use client";
 
-import { startTransition, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
-import { Alert } from "@mui/material";
-import { faArrowLeft, faCircleInfo, faShoppingCart } from "@fortawesome/free-solid-svg-icons";
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { faArrowLeft, faCircleInfo, faPenToSquare, faShoppingCart, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
+import { splitPostalCode } from "@correcre/lib/user-profile";
 import { MerchandiseCard, type PublicMerchandiseDetail, type PublicMerchandiseSummary } from "@correcre/merchandise-public";
 
 import { FavoriteButton } from "@employee/features/exchange-favorite";
+import { updateOwnProfile } from "@employee/features/profile-edit/api/client";
+import { ProfileEditDialog } from "@employee/features/profile-edit";
+import type { EditableEmployeeAddress, EditableEmployeeProfile, UpdateOwnProfileInput } from "@employee/features/profile-edit";
 
 import { requestExchange } from "../api/client";
 import ExchangePageHeader from "./ExchangePageHeader";
@@ -20,10 +24,25 @@ type Props = {
   item: PublicMerchandiseDetail;
   initialPointBalance: number;
   userName: string;
+  initialProfile: EditableEmployeeProfile;
   initialIsFavorite: boolean;
   relatedItems: PublicMerchandiseSummary[];
   relatedFavoriteKeys: string[];
 };
+
+function hasDeliveryAddress(address?: EditableEmployeeAddress) {
+  if (!address) return false;
+  return Boolean(address.postalCode?.trim() || address.prefecture?.trim() || address.city?.trim() || address.building?.trim());
+}
+
+function formatPostalCode(postalCode?: string) {
+  if (!postalCode) return "";
+  const { postalCodeFirstHalf, postalCodeSecondHalf } = splitPostalCode(postalCode);
+  if (postalCodeFirstHalf && postalCodeSecondHalf) {
+    return `〒${postalCodeFirstHalf}-${postalCodeSecondHalf}`;
+  }
+  return postalCode;
+}
 
 function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
@@ -47,17 +66,22 @@ function DetailRow({ label, children }: Readonly<{ label: string; children: Reac
   );
 }
 
-export default function ExchangeDetail({ item, initialPointBalance, userName, initialIsFavorite, relatedItems, relatedFavoriteKeys }: Props) {
+export default function ExchangeDetail({ item, initialPointBalance, userName, initialProfile, initialIsFavorite, relatedItems, relatedFavoriteKeys }: Props) {
   const router = useRouter();
-  const [pointBalance, setPointBalance] = useState(initialPointBalance);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [profile, setProfile] = useState<EditableEmployeeProfile>(initialProfile);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(() => new Set(relatedFavoriteKeys));
 
-  const insufficient = pointBalance < item.requiredPoint;
-  const buttonDisabled = submitting || submitted || insufficient;
+  const insufficient = initialPointBalance < item.requiredPoint;
+  const buttonDisabled = submitting || insufficient;
+  const balanceAfter = initialPointBalance - item.requiredPoint;
+  const addressPresent = hasDeliveryAddress(profile.address);
+  const confirmSubmitDisabled = submitting || !addressPresent;
 
   const merchandiseName = item.merchandiseName || item.heading || "商品・サービス";
   const merchantName = item.merchantName || "提供会社";
@@ -65,26 +89,56 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
   const areaLabel = item.serviceArea.trim() || "未設定";
   const deliveryLabel = item.deliveryMethods.length > 0 ? item.deliveryMethods.join("、") : "未設定";
 
-  const handleRequest = async () => {
+  const handleOpenConfirm = () => {
     setError(null);
-    setSuccess(null);
+    setConfirmOpen(true);
+  };
+
+  const handleCloseConfirm = () => {
+    if (submitting) return;
+    setConfirmOpen(false);
+  };
+
+  const handleConfirm = async () => {
+    setError(null);
     setSubmitting(true);
 
     try {
-      const result = await requestExchange({
+      await requestExchange({
         merchantId: item.merchantId,
         merchandiseId: item.merchandiseId,
       });
-      setPointBalance(result.currentPointBalance);
-      setSuccess(`交換を申請しました。${formatPoint(result.usedPoint)}を保留中です。提携企業の対応をお待ちください。`);
-      setSubmitted(true);
-      startTransition(() => {
-        router.refresh();
-      });
+      router.push("/exchange?notice=exchange-requested" as Route);
     } catch (err) {
       setError(err instanceof Error ? err.message : "交換申請に失敗しました");
-    } finally {
       setSubmitting(false);
+      setConfirmOpen(false);
+    }
+  };
+
+  const handleOpenProfileDialog = () => {
+    setProfileError(null);
+    setProfileDialogOpen(true);
+  };
+
+  const handleCloseProfileDialog = () => {
+    if (profileSubmitting) return;
+    setProfileDialogOpen(false);
+    setProfileError(null);
+  };
+
+  const handleUpdateProfile = async (input: UpdateOwnProfileInput) => {
+    setProfileSubmitting(true);
+    setProfileError(null);
+
+    try {
+      const updated = await updateOwnProfile(input);
+      setProfile(updated);
+      setProfileDialogOpen(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "登録情報の更新に失敗しました");
+    } finally {
+      setProfileSubmitting(false);
     }
   };
 
@@ -100,7 +154,7 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
 
   return (
     <div className="-mt-px pb-12">
-      <ExchangePageHeader currentPointBalance={pointBalance} userName={userName} />
+      <ExchangePageHeader currentPointBalance={initialPointBalance} userName={userName} />
 
       <div className="container mx-auto px-6">
         <div className="mt-6">
@@ -167,11 +221,11 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handleRequest}
+                  onClick={handleOpenConfirm}
                   disabled={buttonDisabled}
                   className="flex-1 rounded-lg bg-slate-900 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {submitted ? "申請済み" : submitting ? "申請中…" : "ポイントで交換する"}
+                  {submitting ? "申請中…" : "ポイントで交換する"}
                 </button>
                 <FavoriteButton
                   merchantId={item.merchantId}
@@ -183,12 +237,11 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
 
               {insufficient ? (
                 <div className="text-sm font-semibold text-red-600">
-                  ポイント残高が不足しています（不足 {formatPoint(item.requiredPoint - pointBalance)}）。
+                  ポイント残高が不足しています（不足 {formatPoint(item.requiredPoint - initialPointBalance)}）。
                 </div>
               ) : null}
 
               {error ? <Alert severity="error">{error}</Alert> : null}
-              {success ? <Alert severity="success">{success}</Alert> : null}
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -215,6 +268,96 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
             </div>
           </div>
         </section>
+
+        <Dialog
+          open={confirmOpen}
+          onClose={handleCloseConfirm}
+          maxWidth="sm"
+          fullWidth
+          slotProps={{ paper: { sx: { borderRadius: "16px" } } }}
+        >
+          <DialogTitle sx={{ fontWeight: "bold" }}>交換申請の確認</DialogTitle>
+          <DialogContent dividers>
+            <p className="text-sm text-slate-600">以下の内容で交換を申請します。よろしいですか？</p>
+            <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-500">商品・サービス</span>
+                <span className="text-right font-semibold text-slate-900">{merchandiseName}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-500">必要ポイント</span>
+                <span className="font-semibold text-amber-600">{formatPoint(item.requiredPoint)}</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 border-t border-slate-200 pt-3">
+                <span className="text-slate-500">申請後の残高</span>
+                <span className="font-semibold text-slate-900">{formatPoint(balanceAfter)}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 px-4 py-4 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <span className="font-semibold text-slate-700">お届け先</span>
+                <button
+                  type="button"
+                  onClick={handleOpenProfileDialog}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  <FontAwesomeIcon icon={faPenToSquare} className="text-[11px]" />
+                  {addressPresent ? "編集" : "登録"}
+                </button>
+              </div>
+
+              {addressPresent ? (
+                <div className="mt-3 space-y-1 text-slate-900">
+                  {profile.address?.postalCode ? (
+                    <div className="text-xs text-slate-500">{formatPostalCode(profile.address.postalCode)}</div>
+                  ) : null}
+                  <div>
+                    {profile.address?.prefecture ?? ""}
+                    {profile.address?.city ?? ""}
+                  </div>
+                  {profile.address?.building ? <div>{profile.address.building}</div> : null}
+                </div>
+              ) : (
+                <div className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
+                  <span>お届け先が未登録です。「登録」ボタンから入力してから申請してください。</span>
+                </div>
+              )}
+            </div>
+
+            {error ? (
+              <div className="mt-3">
+                <Alert severity="error">{error}</Alert>
+              </div>
+            ) : null}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={handleCloseConfirm} disabled={submitting} color="inherit">
+              キャンセル
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={confirmSubmitDisabled}
+              variant="contained"
+              sx={{
+                backgroundColor: "#0f172a",
+                "&:hover": { backgroundColor: "#1e293b" },
+              }}
+            >
+              {submitting ? "申請中…" : "申請する"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <ProfileEditDialog
+          open={profileDialogOpen}
+          profile={profile}
+          submitting={profileSubmitting}
+          error={profileError}
+          onClose={handleCloseProfileDialog}
+          onSubmit={handleUpdateProfile}
+        />
 
         {relatedItems.length > 0 ? (
           <section className="mt-25">

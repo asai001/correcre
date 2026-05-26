@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Alert, Snackbar } from "@mui/material";
 import {
   faChevronDown,
   faChevronLeft,
@@ -587,6 +589,8 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
 }
 
 export default function ExchangeList({ items, currentPointBalance, userName, initialFavorites, initialSavedFilters }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortKey>("popular");
@@ -597,7 +601,19 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(initialSavedFilters);
   const [savingFilter, setSavingFilter] = useState(false);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const listSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("notice") !== "exchange-requested") return;
+
+    setToastMessage("交換を申請しました。");
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("notice");
+    const nextSearch = params.toString();
+    router.replace((nextSearch ? `/exchange?${nextSearch}` : "/exchange") as Route);
+  }, [searchParams, router]);
 
   const handleShowFeatured = () => {
     setSort("popular");
@@ -769,6 +785,32 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
 
         <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
       </div>
+
+      <Snackbar
+        open={toastMessage !== null}
+        autoHideDuration={4000}
+        onClose={() => setToastMessage(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ top: { xs: 24, sm: 32 } }}
+      >
+        <Alert
+          severity="success"
+          variant="filled"
+          onClose={() => setToastMessage(null)}
+          sx={{
+            minWidth: { xs: 280, sm: 420 },
+            px: 3,
+            py: 1.75,
+            fontSize: "1rem",
+            fontWeight: 600,
+            borderRadius: "12px",
+            boxShadow: "0 12px 32px -12px rgba(15,23,42,0.35)",
+            "& .MuiAlert-icon": { fontSize: "1.5rem" },
+          }}
+        >
+          {toastMessage}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }

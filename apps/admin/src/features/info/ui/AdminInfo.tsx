@@ -294,7 +294,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
       <AdminPageHeader
         title="各種情報画面"
         adminName={initialData.account.name}
-        subtitle="理念体系、会社情報、登録情報、部署、ミッション定義をまとめて確認します。"
+        subtitle="理念体系、会社情報、登録情報、部署、ミッション項目をまとめて確認します。"
       />
 
       {notice ? <Alert severity="success">{notice}</Alert> : null}
@@ -337,7 +337,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
         <TabsContent value="philosophy">
           <InfoCard
             title="理念体系の編集"
-            description="運用者画面と同じ理念体系コンポーネントを再利用しています。ミッション、ビジョン、バリュー、クレドなどを柔軟に管理できます。"
+            description="ミッション、ビジョン、バリュー、クレドなどを柔軟に管理できます。"
           >
             <CompanyPhilosophyFields
               items={companyForm.philosophyItems}
@@ -490,7 +490,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
         <TabsContent value="departments">
           <InfoCard
             title="部署一覧"
-            description="部署マスタを一覧で確認できます。各行を開くと、その部署に所属する従業員一覧も確認できます。"
+            description="登録されている部署を一覧で確認できます。各行を開くと、その部署に所属する従業員も確認できます。"
           >
             <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
               <TextField
@@ -602,7 +602,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
         <TabsContent value="missions">
           <InfoCard
             title="ミッション項目一覧"
-            description="現在有効なミッション定義を一覧表示します。将来の編集機能追加に備え、ここを管理画面の確認起点として残しています。"
+            description="現在有効なミッション項目を一覧で確認できます。"
           >
             {/* TODO: ミッション編集 API が整い次第、この画面に編集導線を追加する */}
             {initialData.missions.length ? (

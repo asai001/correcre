@@ -75,6 +75,15 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
       item={item}
       initialPointBalance={currentUser.currentPointBalance ?? 0}
       userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
+      initialProfile={{
+        lastName: currentUser.lastName,
+        firstName: currentUser.firstName,
+        lastNameKana: currentUser.lastNameKana ?? "",
+        firstNameKana: currentUser.firstNameKana ?? "",
+        email: currentUser.email,
+        phoneNumber: currentUser.phoneNumber,
+        address: currentUser.address,
+      }}
       initialIsFavorite={isFavorite}
       relatedItems={relatedItems}
       relatedFavoriteKeys={Array.from(favoriteKeySet)}

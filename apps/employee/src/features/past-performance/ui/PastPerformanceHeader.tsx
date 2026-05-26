@@ -4,13 +4,15 @@ import EmployeePageHeader from "@employee/components/EmployeePageHeader";
 
 type PastPerformanceHeaderProps = {
   employeeName: string;
+  showPointExchangeLink: boolean;
   departmentName?: string;
 };
 
-export default function PastPerformanceHeader({ employeeName, departmentName }: PastPerformanceHeaderProps) {
+export default function PastPerformanceHeader({ employeeName, showPointExchangeLink, departmentName }: PastPerformanceHeaderProps) {
   return (
     <EmployeePageHeader
       title="過去の実績"
+      showPointExchangeLink={showPointExchangeLink}
       right={
         <>
           <p className="text-sm font-semibold text-slate-200 sm:text-base">

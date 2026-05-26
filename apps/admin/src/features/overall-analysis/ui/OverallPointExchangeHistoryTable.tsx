@@ -90,20 +90,22 @@ export default function OverallPointExchangeHistoryTable({
   const heading = (
     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center">
-        <FontAwesomeIcon icon={faTable} className="mr-3 text-xl text-blue-600 lg:text-2xl" />
+        <FontAwesomeIcon icon={faTable} className="mr-3 text-xl text-blue-500 lg:text-2xl" />
         <div className="text-lg font-bold lg:text-2xl">{"ポイント交換履歴"}</div>
       </div>
       <Button
-        variant="contained"
+        variant="outlined"
         startIcon={<FontAwesomeIcon icon={faDownload} />}
         disabled={items.length === 0}
         onClick={() => downloadCsv(`overall-point-exchange-history-${startDate}_${endDate}.csv`, exportRows)}
         sx={{
           alignSelf: { xs: "stretch", sm: "center" },
           borderRadius: "14px",
-          backgroundColor: "#475569",
           px: 2.5,
           py: 1.25,
+          color: "#475569",
+          borderColor: "#CBD5E1",
+          "&:hover": { borderColor: "#475569", backgroundColor: "#F8FAFC" },
         }}
       >
         {"データエクスポート"}

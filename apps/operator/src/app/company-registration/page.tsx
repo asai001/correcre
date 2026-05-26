@@ -1,13 +1,20 @@
 import CompanyRegistration from "@operator/features/company-registration";
 import { listOperatorCompaniesFromDynamo } from "@correcre/lib/company-management-server";
-import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
-import { requireOperatorSession } from "@operator/lib/auth/operator";
+import { joinNameParts } from "@correcre/lib/user-profile";
+import { requireCurrentOperatorUser } from "@operator/lib/auth/operator";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompanyRegistrationPage() {
-  const session = await requireOperatorSession();
-  const companies = await listOperatorCompaniesFromDynamo();
+  const [currentUser, companies] = await Promise.all([
+    requireCurrentOperatorUser(),
+    listOperatorCompaniesFromDynamo(),
+  ]);
 
-  return <CompanyRegistration initialCompanies={companies} operatorName={getOperatorDisplayName(session)} />;
+  return (
+    <CompanyRegistration
+      initialCompanies={companies}
+      operatorName={joinNameParts(currentUser.lastName, currentUser.firstName)}
+    />
+  );
 }

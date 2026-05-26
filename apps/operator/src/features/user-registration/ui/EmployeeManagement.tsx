@@ -150,7 +150,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "部署",
       "権限",
       "状態",
-      "Cognito連携",
+      "認証連携",
       "メールアドレス",
       "電話番号",
       "郵便番号",
@@ -243,7 +243,7 @@ function getEmployeeColumns(
           </div>
           {row.authLinkStatus === "UNLINKED" ? (
             <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-              要対応: Cognito 連携が失われています。User.cognitoSub を確認してください。
+              要対応: 認証連携が失われています。
             </div>
           ) : null}
         </div>
@@ -409,7 +409,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name} を登録しました。Cognito から招待メールを送信しています。`);
+      setNotice(`${createdEmployee.name} を登録しました。招待メールを送信しています。`);
       reload();
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ユーザーの登録に失敗しました");
@@ -595,7 +595,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             </div>
             <h2 className="mt-5 text-2xl font-bold text-slate-900">登録済みの会社がありません</h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-              先に会社を登録してください。companyId は自動採番されます。
+              先に会社を登録してください。
             </p>
             <Link
               href="/company-registration"
@@ -771,14 +771,9 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
 
         {unlinkedEmployeeCount > 0 ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
-            Cognito 未連携のユーザーが {unlinkedEmployeeCount} 人います。User.cognitoSub が欠落している重い異常状態です。対象ユーザーは正常にログインできないため、至急確認してください。
+            認証連携が失われているユーザーが {unlinkedEmployeeCount} 人います。対象ユーザーは正常にログインできないため、至急ご確認ください。
           </div>
         ) : null}
-
-        <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
-          User / Company / Department テーブルを使って管理しています。氏名は姓・名とフリガナ、連絡先は電話番号と住所まで保持します。
-          ポイント調整は User.currentPointBalance と Company.companyPointBalance を同時に更新します。
-        </div>
 
         {notice ? (
           <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">
@@ -803,13 +798,13 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         <StatCard
           label="ユーザーポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="有効ユーザーの currentPointBalance 合計"
+          description="ユーザーが保有しているポイントの合計"
           accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
         />
         <StatCard
           label="会社ポイント残高"
           value={`${formatNumber(summary.companyPointBalance)}${pointUnitLabel}`}
-          description="Company.companyPointBalance"
+          description="会社が保有しているポイント残高"
           accentClassName="bg-gradient-to-r from-violet-500 to-fuchsia-400"
         />
       </section>

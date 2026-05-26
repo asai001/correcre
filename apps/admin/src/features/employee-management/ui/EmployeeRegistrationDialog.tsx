@@ -192,7 +192,7 @@ export default function EmployeeRegistrationDialog({
         <Stack spacing={2.5}>
           {error && <Alert severity="error">{error}</Alert>}
           <Alert severity="info">
-            ユーザー登録後も Cognito 連携は未完了です。本人の初回ログイン時に認証情報が紐づきます。
+            ユーザー登録後、本人が初回ログインを行うと認証連携が完了します。
           </Alert>
 
           <div className="grid gap-4 md:grid-cols-4">

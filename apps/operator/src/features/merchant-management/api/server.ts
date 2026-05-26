@@ -59,18 +59,25 @@ type RuntimeConfig = {
   merchantTableName: string;
   merchantUserTableName: string;
   operatorAuditLogTableName: string;
+};
+
+type MerchantCognitoConfig = {
   cognitoRegion: string;
   cognitoUserPoolId: string;
 };
 
 function getRuntimeConfig(): RuntimeConfig {
-  const merchantPoolConfig = getMerchantUserPoolAdminConfig();
-
   return {
     region: readRequiredServerEnv("AWS_REGION"),
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchantUserTableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
     operatorAuditLogTableName: readRequiredServerEnv("DDB_OPERATOR_AUDIT_LOG_TABLE_NAME"),
+  };
+}
+
+function getMerchantCognitoConfig(): MerchantCognitoConfig {
+  const merchantPoolConfig = getMerchantUserPoolAdminConfig();
+  return {
     cognitoRegion: merchantPoolConfig.region,
     cognitoUserPoolId: merchantPoolConfig.userPoolId,
   };
@@ -373,6 +380,7 @@ export async function createMerchantUserForOperator(
   input: CreateMerchantUserInput,
 ): Promise<MerchantUserSummary> {
   const config = getRuntimeConfig();
+  const cognitoConfig = getMerchantCognitoConfig();
   const lastName = input.lastName.trim();
   const firstName = input.firstName.trim();
   const email = input.email.trim().toLowerCase();
@@ -428,8 +436,8 @@ export async function createMerchantUserForOperator(
   try {
     createdCognitoUser = await createCognitoUser(
       {
-        region: config.cognitoRegion,
-        userPoolId: config.cognitoUserPoolId,
+        region: cognitoConfig.cognitoRegion,
+        userPoolId: cognitoConfig.cognitoUserPoolId,
       },
       {
         email,
@@ -474,8 +482,8 @@ export async function createMerchantUserForOperator(
       try {
         await deleteCognitoUser(
           {
-            region: config.cognitoRegion,
-            userPoolId: config.cognitoUserPoolId,
+            region: cognitoConfig.cognitoRegion,
+            userPoolId: cognitoConfig.cognitoUserPoolId,
           },
           createdCognitoUser.username,
         );
@@ -502,6 +510,7 @@ export async function resetMerchantUserEmailForOperator(
   operator: DBUserItem,
 ): Promise<MerchantUserSummary> {
   const config = getRuntimeConfig();
+  const cognitoConfig = getMerchantCognitoConfig();
   const newEmail = input.newEmail.trim().toLowerCase();
 
   if (!newEmail) {
@@ -586,8 +595,8 @@ export async function resetMerchantUserEmailForOperator(
   try {
     await updateCognitoUserEmail(
       {
-        region: config.cognitoRegion,
-        userPoolId: config.cognitoUserPoolId,
+        region: cognitoConfig.cognitoRegion,
+        userPoolId: cognitoConfig.cognitoUserPoolId,
       },
       {
         username: user.cognitoSub ?? user.email,
@@ -650,6 +659,7 @@ export async function resetMerchantUserPasswordForOperator(
   operator: DBUserItem,
 ): Promise<MerchantUserSummary> {
   const config = getRuntimeConfig();
+  const cognitoConfig = getMerchantCognitoConfig();
 
   const merchant = await getMerchantById(
     {
@@ -688,8 +698,8 @@ export async function resetMerchantUserPasswordForOperator(
   try {
     await resetCognitoUserPassword(
       {
-        region: config.cognitoRegion,
-        userPoolId: config.cognitoUserPoolId,
+        region: cognitoConfig.cognitoRegion,
+        userPoolId: cognitoConfig.cognitoUserPoolId,
       },
       { username: user.cognitoSub ?? user.email },
     );
@@ -762,6 +772,7 @@ export async function approveMerchantApplicationForOperator(
   operator: DBUserItem,
 ): Promise<MerchantSummary> {
   const config = getRuntimeConfig();
+  const cognitoConfig = getMerchantCognitoConfig();
 
   const merchant = await getMerchantById(
     {
@@ -807,8 +818,8 @@ export async function approveMerchantApplicationForOperator(
   try {
     createdCognitoUser = await createCognitoUser(
       {
-        region: config.cognitoRegion,
-        userPoolId: config.cognitoUserPoolId,
+        region: cognitoConfig.cognitoRegion,
+        userPoolId: cognitoConfig.cognitoUserPoolId,
       },
       {
         email: pendingUser.email,
@@ -871,8 +882,8 @@ export async function approveMerchantApplicationForOperator(
     try {
       await deleteCognitoUser(
         {
-          region: config.cognitoRegion,
-          userPoolId: config.cognitoUserPoolId,
+          region: cognitoConfig.cognitoRegion,
+          userPoolId: cognitoConfig.cognitoUserPoolId,
         },
         createdCognitoUser.username,
       );
