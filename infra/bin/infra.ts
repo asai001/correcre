@@ -29,10 +29,13 @@ const environments: EnvironmentConfig[] = [
     stage: "stg",
     account: "622550700840",
     region: "ap-northeast-1",
-    adminUrl: "https://stg.correcre-admin.vercel.app/",
-    employeeUrl: "https://stg.correcre-employee.vercel.app/",
-    operatorUrl: "https://stg.correcre-operator.vercel.app/",
-    merchantUrl: "https://stg.correcre-merchant.vercel.app/",
+    // 実際にデプロイされている Vercel の git-stage URL を指定する。
+    // ここが実 URL と一致していないと S3 バケットの CORS 許可オリジンが合わず、
+    // presigned URL への直 PUT がプリフライトで弾かれて画像アップロードに失敗する。
+    adminUrl: "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
+    employeeUrl: "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
+    operatorUrl: "https://correcre-operator-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
+    merchantUrl: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
     sourceContext: "stage",
   },
   {

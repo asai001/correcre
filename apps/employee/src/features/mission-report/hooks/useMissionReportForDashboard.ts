@@ -113,6 +113,8 @@ export function useMissionReportForDashboard(
         comment: "",
       },
     ]);
+
+    window.dispatchEvent(new Event("employee-dashboard-summary:refresh"));
   };
 
   return {

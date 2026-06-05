@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Alert, Button, TextField } from "@mui/material";
+import { Alert, Button, TextField, Tooltip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faPaperPlane, faUsers } from "@fortawesome/free-solid-svg-icons";
 
@@ -256,14 +256,21 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
                       >
                         メアドリセット
                       </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => handleOpenPasswordDialog(user)}
-                        sx={{ borderRadius: "999px", textTransform: "none" }}
-                      >
-                        パスワードリセット
-                      </Button>
+                      {/* パスワードリセットは意図的に無効化している。
+                          disabled なボタンは hover を拾わないため span でラップして Tooltip を出す。 */}
+                      <Tooltip title="意図的に機能を殺しています">
+                        <span>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            disabled
+                            onClick={() => handleOpenPasswordDialog(user)}
+                            sx={{ borderRadius: "999px", textTransform: "none" }}
+                          >
+                            パスワードリセット
+                          </Button>
+                        </span>
+                      </Tooltip>
                     </>
                   ) : null}
                 </div>

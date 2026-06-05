@@ -4,6 +4,7 @@ import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { InsufficientPointBalanceError } from "@correcre/lib/dynamodb/exchange-history";
 
 import {
+  IncompleteExchangeProfileError,
   MerchandiseUnavailableError,
   requestExchangeForEmployee,
 } from "@employee/features/exchange/api/server";
@@ -56,6 +57,13 @@ export async function POST(req: Request, { params }: RouteParams) {
     if (err instanceof MerchandiseUnavailableError) {
       return NextResponse.json(
         { error: "merchandise_unavailable", message: err.message },
+        { status: 400 },
+      );
+    }
+
+    if (err instanceof IncompleteExchangeProfileError) {
+      return NextResponse.json(
+        { error: "incomplete_exchange_profile", message: err.message },
         { status: 400 },
       );
     }

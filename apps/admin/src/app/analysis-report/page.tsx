@@ -43,6 +43,10 @@ export default async function AnalysisReportPage() {
       departmentId: department.departmentId,
       name: department.name,
     }));
+  const departmentIds = new Set(departments.map((department) => department.departmentId));
+  const hasUnassignedUsers = users.some(
+    (user) => user.status !== "DELETED" && (!user.departmentId || !departmentIds.has(user.departmentId)),
+  );
 
   return (
     <div className="space-y-1 pb-5">
@@ -51,7 +55,13 @@ export default async function AnalysisReportPage() {
         tabs={[
           {
             label: "全体分析",
-            content: <OverallAnalysis companyId={currentAdminUser.companyId} departments={departmentOptions} />,
+            content: (
+              <OverallAnalysis
+                companyId={currentAdminUser.companyId}
+                departments={departmentOptions}
+                hasUnassignedUsers={hasUnassignedUsers}
+              />
+            ),
           },
           {
             label: "個人分析",

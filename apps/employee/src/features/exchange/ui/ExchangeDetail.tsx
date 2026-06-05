@@ -9,13 +9,13 @@ import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle } from
 import { faArrowLeft, faCircleInfo, faPenToSquare, faShoppingCart, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
-import { splitPostalCode } from "@correcre/lib/user-profile";
+import { hasCompleteExchangeRequestProfile, splitPostalCode } from "@correcre/lib/user-profile";
 import { MerchandiseCard, type PublicMerchandiseDetail, type PublicMerchandiseSummary } from "@correcre/merchandise-public";
 
 import { FavoriteButton } from "@employee/features/exchange-favorite";
 import { updateOwnProfile } from "@employee/features/profile-edit/api/client";
 import { ProfileEditDialog } from "@employee/features/profile-edit";
-import type { EditableEmployeeAddress, EditableEmployeeProfile, UpdateOwnProfileInput } from "@employee/features/profile-edit";
+import type { EditableEmployeeProfile, UpdateOwnProfileInput } from "@employee/features/profile-edit";
 
 import { requestExchange } from "../api/client";
 import ExchangePageHeader from "./ExchangePageHeader";
@@ -29,11 +29,6 @@ type Props = {
   relatedItems: PublicMerchandiseSummary[];
   relatedFavoriteKeys: string[];
 };
-
-function hasDeliveryAddress(address?: EditableEmployeeAddress) {
-  if (!address) return false;
-  return Boolean(address.postalCode?.trim() || address.prefecture?.trim() || address.city?.trim() || address.building?.trim());
-}
 
 function formatPostalCode(postalCode?: string) {
   if (!postalCode) return "";
@@ -80,14 +75,24 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
   const insufficient = initialPointBalance < item.requiredPoint;
   const buttonDisabled = submitting || insufficient;
   const balanceAfter = initialPointBalance - item.requiredPoint;
-  const addressPresent = hasDeliveryAddress(profile.address);
-  const confirmSubmitDisabled = submitting || !addressPresent;
+  const profileReadyForExchange = hasCompleteExchangeRequestProfile({
+    phoneNumber: profile.phoneNumber,
+    address: profile.address,
+  });
+  const hasAnyProfileInput = Boolean(
+    profile.phoneNumber?.trim()
+      || profile.address?.postalCode?.trim()
+      || profile.address?.prefecture?.trim()
+      || profile.address?.city?.trim()
+      || profile.address?.building?.trim(),
+  );
+  const confirmSubmitDisabled = submitting || !profileReadyForExchange;
 
   const merchandiseName = item.merchandiseName || item.heading || "商品・サービス";
   const merchantName = item.merchantName || "提供会社";
   const genreLabel = item.genre === "その他" ? item.genreOther?.trim() || "その他" : item.genre;
   const areaLabel = item.serviceArea.trim() || "未設定";
-  const deliveryLabel = item.deliveryMethods.length > 0 ? item.deliveryMethods.join("、") : "未設定";
+  const deliveryLabel = item.deliveryMethods.length > 0 ? item.deliveryMethods.join(" / ") : "未設定";
 
   const handleOpenConfirm = () => {
     setError(null);
@@ -110,7 +115,7 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
       });
       router.push("/exchange?notice=exchange-requested" as Route);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "交換申請に失敗しました");
+      setError(err instanceof Error ? err.message : "申請処理に失敗しました");
       setSubmitting(false);
       setConfirmOpen(false);
     }
@@ -296,18 +301,18 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
 
             <div className="mt-4 rounded-lg border border-slate-200 px-4 py-4 text-sm">
               <div className="flex items-start justify-between gap-3">
-                <span className="font-semibold text-slate-700">お届け先</span>
+                <span className="font-semibold text-slate-700">お届け先・連絡先</span>
                 <button
                   type="button"
                   onClick={handleOpenProfileDialog}
                   className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <FontAwesomeIcon icon={faPenToSquare} className="text-[11px]" />
-                  {addressPresent ? "編集" : "登録"}
+                  {hasAnyProfileInput ? "編集" : "登録"}
                 </button>
               </div>
 
-              {addressPresent ? (
+              {profileReadyForExchange ? (
                 <div className="mt-3 space-y-1 text-slate-900">
                   {profile.address?.postalCode ? (
                     <div className="text-xs text-slate-500">{formatPostalCode(profile.address.postalCode)}</div>
@@ -317,11 +322,12 @@ export default function ExchangeDetail({ item, initialPointBalance, userName, in
                     {profile.address?.city ?? ""}
                   </div>
                   {profile.address?.building ? <div>{profile.address.building}</div> : null}
+                  {profile.phoneNumber ? <div>{profile.phoneNumber}</div> : null}
                 </div>
               ) : (
                 <div className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
                   <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
-                  <span>お届け先が未登録です。「登録」ボタンから入力してから申請してください。</span>
+                  <span>郵便番号・都道府県・市区町村/丁目/番地・電話番号を登録してから申請してください。</span>
                 </div>
               )}
             </div>

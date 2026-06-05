@@ -39,7 +39,6 @@ export default async function ExchangePage() {
       currentPointBalance={currentUser.currentPointBalance ?? 0}
       userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
       initialFavorites={favoritesResult.favorites}
-      initialSavedFilters={favoritesResult.savedFilters}
     />
   );
 }

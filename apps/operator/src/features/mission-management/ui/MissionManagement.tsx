@@ -137,6 +137,9 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
           open
           companyId={selectedCompanyId}
           mission={editingMission}
+          otherMissionsTotalPoints={missions
+            .filter((m) => m.slotIndex !== editingMission.slotIndex && m.configured && m.enabled)
+            .reduce((sum, m) => sum + m.monthlyCount * m.score, 0)}
           onClose={() => setEditingMission(null)}
           onUpdated={handleMissionUpdated}
         />

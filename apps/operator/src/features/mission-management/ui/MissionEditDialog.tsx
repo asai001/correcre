@@ -15,6 +15,7 @@ import {
 
 import type { MissionField } from "@correcre/types";
 import { updateMission } from "../api/client";
+import { MISSION_TOTAL_POINTS_CAP } from "../model/types";
 import type { OperatorMissionSummary, UpdateMissionInput } from "../model/types";
 import { validateMissionInput } from "../model/validation";
 import FieldBuilder from "./FieldBuilder";
@@ -23,6 +24,8 @@ type MissionEditDialogProps = {
   open: boolean;
   companyId: string;
   mission: OperatorMissionSummary;
+  // 編集中のスロットを除いた、有効なミッションの「月間実施回数 × スコア」の合計。
+  otherMissionsTotalPoints: number;
   onClose: () => void;
   onUpdated: (mission: OperatorMissionSummary) => void;
 };
@@ -60,6 +63,7 @@ export default function MissionEditDialog({
   open,
   companyId,
   mission,
+  otherMissionsTotalPoints,
   onClose,
   onUpdated,
 }: MissionEditDialogProps) {
@@ -86,10 +90,22 @@ export default function MissionEditDialog({
   });
 
   const handleSave = () => {
-    const validationError = validateMissionInput(buildInput());
+    const nextInput = buildInput();
+    const validationError = validateMissionInput(nextInput);
 
     if (validationError) {
       setError(validationError);
+      return;
+    }
+
+    // 有効な全ミッションの「月間実施回数 × スコア」の合計が上限を超えないかをチェックする。
+    const editedMissionPoints = nextInput.enabled ? nextInput.monthlyCount * nextInput.score : 0;
+    const projectedTotalPoints = otherMissionsTotalPoints + editedMissionPoints;
+
+    if (projectedTotalPoints > MISSION_TOTAL_POINTS_CAP) {
+      setError(
+        `全ミッションの「月間実施回数 × スコア」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
+      );
       return;
     }
 

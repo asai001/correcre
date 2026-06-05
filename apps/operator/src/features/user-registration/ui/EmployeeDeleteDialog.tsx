@@ -47,6 +47,9 @@ export default function EmployeeDeleteDialog({
     await onSubmit(employee.userId);
   };
 
+  // すでに論理削除済みのユーザーは、この操作で DB・Cognito から物理削除される。
+  const isPhysicalDeletion = employee?.status === "DELETED";
+
   return (
     <Dialog
       open={open}
@@ -61,16 +64,20 @@ export default function EmployeeDeleteDialog({
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <div className="text-2xl font-bold text-slate-900">DELETE ステータスへ変更</div>
+        <div className="text-2xl font-bold text-slate-900">
+          {isPhysicalDeletion ? "ユーザーを完全に削除" : "DELETE ステータスへ変更"}
+        </div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          誤操作防止のため、対象のユーザーIDを入力した場合のみ DELETE ステータスへの変更を実行できます。
+          誤操作防止のため、対象のユーザーIDを入力した場合のみ実行できます。
         </Typography>
       </DialogTitle>
 
       <DialogContent sx={{ pt: "8px !important" }}>
         <div className="space-y-4">
-          <Alert severity="warning">
-            この操作を行うと対象ユーザーは DELETE 扱いになります。退職者など運用上残したいが利用停止したいユーザーにのみ使用してください。対象は「{employee?.name ?? "-"}」です。
+          <Alert severity={isPhysicalDeletion ? "error" : "warning"}>
+            {isPhysicalDeletion
+              ? `DB と Cognito からユーザーを完全に削除します。この操作は取り消せません。対象は「${employee?.name ?? "-"}」です。`
+              : `この操作を行うと対象ユーザーは DELETE 扱いになります。退職者など運用上残したいが利用停止したいユーザーにのみ使用してください。対象は「${employee?.name ?? "-"}」です。`}
           </Alert>
 
           {error && <Alert severity="error">{error}</Alert>}
@@ -88,7 +95,9 @@ export default function EmployeeDeleteDialog({
             fullWidth
             helperText={
               isUserIdMatched
-                ? "ユーザーIDが一致しました。DELETE ステータスへの変更を実行できます。"
+                ? isPhysicalDeletion
+                  ? "ユーザーIDが一致しました。完全削除を実行できます。"
+                  : "ユーザーIDが一致しました。DELETE ステータスへの変更を実行できます。"
                 : "上に表示されているユーザーIDを正確に入力してください。"
             }
           />
@@ -112,7 +121,13 @@ export default function EmployeeDeleteDialog({
             },
           }}
         >
-          {submitting ? "変更中..." : "DELETE に変更"}
+          {submitting
+            ? isPhysicalDeletion
+              ? "削除中..."
+              : "変更中..."
+            : isPhysicalDeletion
+              ? "完全に削除"
+              : "DELETE に変更"}
         </Button>
       </DialogActions>
     </Dialog>

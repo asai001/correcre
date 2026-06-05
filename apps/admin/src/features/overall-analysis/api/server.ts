@@ -1,4 +1,5 @@
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listExchangeHistoryByCompany } from "@correcre/lib/dynamodb/exchange-history";
 import { listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompanyAndStatus } from "@correcre/lib/dynamodb/mission-report";
@@ -16,6 +17,7 @@ import type {
   OverallAnalysisTrendItem,
   OverallExchangeHistoryItem,
 } from "../model/types";
+import { UNASSIGNED_DEPARTMENT_FILTER } from "../model/constants";
 
 type DateRange = {
   startDate: string;
@@ -161,7 +163,12 @@ function buildEmptySummary(): OverallAnalysisSummary {
   };
 }
 
-export const UNASSIGNED_DEPARTMENT_FILTER = "__UNASSIGNED__";
+function isUserWithoutAssignedDepartment(
+  user: { departmentId?: string },
+  departmentIds: ReadonlySet<string>,
+) {
+  return !user.departmentId || !departmentIds.has(user.departmentId);
+}
 
 export async function getOverallAnalysisSummaryFromDynamo(
   companyId: string,
@@ -170,7 +177,7 @@ export async function getOverallAnalysisSummaryFromDynamo(
   departmentId?: string,
 ): Promise<OverallAnalysisSummary> {
   const region = readRequiredServerEnv("AWS_REGION");
-  const [company, users, monthlyStatsAll, missions, missionReportsAll, exchangeHistoryAll] = await Promise.all([
+  const [company, users, departments, monthlyStatsAll, missions, missionReportsAll, exchangeHistoryAll] = await Promise.all([
     getCompanyById(
       {
         region,
@@ -182,6 +189,13 @@ export async function getOverallAnalysisSummaryFromDynamo(
       {
         region,
         tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+      },
+      companyId,
+    ),
+    listDepartmentsByCompany(
+      {
+        region,
+        tableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
       },
       companyId,
     ),
@@ -216,10 +230,13 @@ export async function getOverallAnalysisSummaryFromDynamo(
     ),
   ]);
 
+  const departmentIds = new Set(departments.map((item) => item.departmentId));
   const allCurrentUsers = users.filter((item) => item.status !== "DELETED");
   const currentUsers = departmentId
     ? allCurrentUsers.filter((item) =>
-        departmentId === UNASSIGNED_DEPARTMENT_FILTER ? !item.departmentId : item.departmentId === departmentId,
+        departmentId === UNASSIGNED_DEPARTMENT_FILTER
+          ? isUserWithoutAssignedDepartment(item, departmentIds)
+          : item.departmentId === departmentId,
       )
     : allCurrentUsers;
   const targetUserIds = new Set(currentUsers.map((item) => item.userId));

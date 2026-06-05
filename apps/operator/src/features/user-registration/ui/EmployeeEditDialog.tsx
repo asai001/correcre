@@ -67,7 +67,7 @@ const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
   { value: "OPERATOR", label: "運用者" },
 ];
 
-const managedStatusOptions: Array<{ value: Exclude<EmployeeManagementStatus, "INVITED">; label: string }> = [
+const managedStatusOptions: Array<{ value: Exclude<EmployeeManagementStatus, "INVITED" | "DELETED">; label: string }> = [
   { value: "ACTIVE", label: "有効" },
   { value: "INACTIVE", label: "休止中" },
 ];
@@ -76,6 +76,7 @@ const statusLabelMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "招待中",
   ACTIVE: "有効",
   INACTIVE: "休止中",
+  DELETED: "論理削除",
 };
 
 function getStatusSeverity(status: EmployeeManagementStatus): "info" | "success" | "warning" {

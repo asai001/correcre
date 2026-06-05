@@ -42,7 +42,7 @@ type CustomEmailSenderConfig = {
   sesVerifiedDomain: string;
 };
 
-type LoginAppName = "admin" | "employee" | "merchant";
+type LoginAppName = "admin" | "employee" | "operator" | "merchant";
 
 type CognitoPoolKind = "internal" | "merchant";
 
@@ -86,16 +86,19 @@ const LOGIN_URLS = {
   dev: {
     admin: "http://localhost:3000/login",
     employee: "http://localhost:3000/login",
+    operator: "http://localhost:3002/login",
     merchant: "http://localhost:3003/login",
   },
   stg: {
     admin: "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
     employee: "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
+    operator: "https://correcre-operator-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
     merchant: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
   },
   prod: {
     admin: "https://correcre-admin.example.com/login",
     employee: "https://correcre-employee.example.com/login",
+    operator: "https://correcre-operator.example.com/login",
     merchant: "https://correcre-merchant.example.com/login",
   },
 } satisfies Record<InfraStage, Record<LoginAppName, string>>;
@@ -220,8 +223,14 @@ exports.handler = async (event) => {
     const rawRoles = event.request?.clientMetadata?.roles ?? "";
     const roles = parseRoles(rawRoles);
 
+    // EMPLOYEE を併せ持つ場合は従業員アプリの URL でよい。
     if (roles.includes("EMPLOYEE")) {
       return "employee";
+    }
+
+    // 運用者専用ユーザー（EMPLOYEE を持たない OPERATOR）には運用者アプリの URL を案内する。
+    if (roles.includes("OPERATOR")) {
+      return "operator";
     }
 
     return "admin";
@@ -247,9 +256,14 @@ exports.handler = async (event) => {
     return event;
   }
 
+  const recoveryEmail = event.request?.userAttributes?.email ?? "";
+  const resetUrl =
+    \`\${loginUrl}/forgot-password\` +
+    (recoveryEmail ? \`?email=\${encodeURIComponent(recoveryEmail)}&sent=1\` : "?sent=1");
   const emailHtmlParts = [
     ...${JSON.stringify(PASSWORD_RESET_EMAIL_HTML_PREFIX)},
     \`<p style="margin: 24px 0; font-size: 16px; font-weight: 700;">確認コード：\${escapeHtml(codeParameter)}</p>\`,
+    \`<p style="margin: 24px 0 0;">下記のリンクからパスワード再設定画面を開き、上記の確認コードと新しいパスワードを入力してください。<br /><a href="\${escapeHtml(resetUrl)}">\${escapeHtml(resetUrl)}</a></p>\`,
     ...${JSON.stringify(PASSWORD_RESET_EMAIL_HTML_SUFFIX)},
   ];
 

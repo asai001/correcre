@@ -8,6 +8,7 @@ import {
   listExchangeHistoryByMerchantAndStatus,
   transitionExchangeStatus,
 } from "@correcre/lib/dynamodb/exchange-history";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -30,6 +31,7 @@ type RuntimeConfig = {
   merchandiseTableName: string;
   merchandiseImageBucketName: string;
   userTableName: string;
+  companyTableName: string;
 };
 
 function getRuntimeConfig(): RuntimeConfig {
@@ -39,7 +41,24 @@ function getRuntimeConfig(): RuntimeConfig {
     merchandiseTableName: readRequiredServerEnv("DDB_MERCHANDISE_TABLE_NAME"),
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
   };
+}
+
+async function resolveCompanyName(config: RuntimeConfig, companyId: string): Promise<string | undefined> {
+  const company = await getCompanyById(
+    {
+      region: config.region,
+      tableName: config.companyTableName,
+    },
+    companyId,
+  );
+
+  if (!company) {
+    return undefined;
+  }
+
+  return company.shortName || company.name;
 }
 
 function normalizeStatus(value?: ExchangeHistoryStatus): ExchangeHistoryStatus {
@@ -168,10 +187,12 @@ async function buildExchangeDetail(
   }
 
   const status = normalizeStatus(item.status);
+  const companyName = await resolveCompanyName(config, item.companyId);
 
   return {
     ...toSummary(item, userName),
     merchantId: item.merchantId ?? "",
+    companyName,
     merchandiseImageViewUrl,
     history: item.history ?? [],
     allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),

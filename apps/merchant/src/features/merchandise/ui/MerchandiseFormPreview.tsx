@@ -1,9 +1,13 @@
 "use client";
 
 import { Box, Paper, Typography } from "@mui/material";
+import { faHeart } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+import { MerchandiseCard, type PublicMerchandiseSummary } from "@correcre/merchandise-public";
+import type { MerchandiseDeliveryMethod, MerchandiseGenre } from "@correcre/types";
 
 type Props = {
-  heading: string;
   merchandiseName: string;
   serviceDescription: string;
   priceYen: number;
@@ -31,19 +35,34 @@ function PreviewRow({ label, children }: Readonly<{ label: string; children: Rea
 }
 
 export default function MerchandiseFormPreview(props: Props) {
-  const headingPreview = props.heading || "見出し";
   const merchandiseName = props.merchandiseName || "商品・サービス名";
   const providerName = props.merchantCompanyName || "御社名";
-  const previewTitle = `${headingPreview} | ${providerName}`;
+  const previewTitle = `${merchandiseName} | ${providerName}`;
   const requiredPointLabel =
     Number.isFinite(props.requiredPoint) && props.requiredPoint > 0
       ? `${new Intl.NumberFormat("ja-JP", { maximumFractionDigits: 2 }).format(props.requiredPoint)}pt`
       : "未設定";
   const areaSummary = props.serviceArea.trim() || "未設定";
-  const deliveryMethodSummary = props.deliveryMethods.length > 0 ? props.deliveryMethods.join("、") : "未設定";
   const descriptionPreview =
     props.serviceDescription.trim() || "商品の特徴や利用シーンが伝わる説明文を入力してください。";
   const genreLabel = props.genre === "その他" ? props.genreOther.trim() || "その他" : props.genre;
+
+  // 一覧カードプレビューは従業員アプリの交換ページと同じ MerchandiseCard で描画し、見え方を忠実に再現する。
+  const previewCardItem: PublicMerchandiseSummary = {
+    merchandiseId: "preview",
+    merchantId: "preview",
+    merchantName: providerName,
+    heading: merchandiseName,
+    merchandiseName,
+    serviceDescription: props.serviceDescription,
+    priceYen: props.priceYen,
+    requiredPoint: props.requiredPoint,
+    deliveryMethods: props.deliveryMethods as MerchandiseDeliveryMethod[],
+    serviceArea: props.serviceArea,
+    genre: props.genre as MerchandiseGenre,
+    genreOther: props.genreOther || undefined,
+    cardImageViewUrl: props.cardImagePreviewUrl,
+  };
 
   return (
     <div className="xl:sticky xl:top-6 xl:self-start">
@@ -56,50 +75,19 @@ export default function MerchandiseFormPreview(props: Props) {
             商品交換ページでの見え方です。
           </Typography>
 
-          <div className="mt-4 p-0">
-            {props.cardImagePreviewUrl ? (
-              <Box
-                component="img"
-                src={props.cardImagePreviewUrl}
-                alt={previewTitle}
-                className="aspect-[16/10] h-full w-full border border-slate-300 object-cover shadow-[0_2px_10px_rgba(15,23,42,0.14)]"
-              />
-            ) : (
-              <div className="flex aspect-[16/10] items-center justify-center border border-slate-300 bg-[linear-gradient(135deg,#e0f0f5_0%,#f8fafc_100%)] px-6 text-center text-sm text-slate-500 shadow-[0_2px_10px_rgba(15,23,42,0.14)]">
-                商品画像プレビュー
-              </div>
-            )}
-
-            <div className="px-0 pb-1 pt-6">
-              <Typography variant="h6" className="text-[1.4rem] font-bold leading-[1.45] text-slate-900">
-                {previewTitle}
-              </Typography>
-
-              <div className="mt-5 overflow-hidden border border-[#75afe1] bg-white">
-                <div className="grid grid-cols-[136px_minmax(0,1fr)] border-b border-[#75afe1]">
-                  <div className="bg-[#86bcea] px-4 py-3 text-sm font-semibold text-slate-900">必要ポイント数</div>
-                  <div className="flex items-center justify-center px-4 py-3 text-sm text-slate-700">
-                    {requiredPointLabel}
-                  </div>
-                </div>
-                <div className="grid grid-cols-[136px_minmax(0,1fr)] border-b border-[#75afe1]">
-                  <div className="bg-[#86bcea] px-4 py-3 text-sm font-semibold text-slate-900">対応エリア</div>
-                  <div className="flex items-center justify-center px-4 py-3 text-center text-sm text-slate-700">
-                    {areaSummary}
-                  </div>
-                </div>
-                <div className="grid grid-cols-[136px_minmax(0,1fr)] border-b border-[#75afe1]">
-                  <div className="bg-[#86bcea] px-4 py-3 text-sm font-semibold text-slate-900">提供方法</div>
-                  <div className="flex items-center justify-center px-4 py-3 text-sm text-slate-700">
-                    {deliveryMethodSummary}
-                  </div>
-                </div>
-                <div className="grid grid-cols-[136px_minmax(0,1fr)]">
-                  <div className="bg-[#86bcea] px-4 py-3 text-sm font-semibold text-slate-900">ジャンル</div>
-                  <div className="flex items-center justify-center px-4 py-3 text-sm text-slate-700">{genreLabel}</div>
-                </div>
-              </div>
-            </div>
+          <div className="group mt-4 block h-full">
+            <MerchandiseCard
+              item={previewCardItem}
+              favoriteSlot={
+                // 従業員アプリのカードと見た目を揃えるための、操作不可のお気に入りハートのモック。
+                <span
+                  aria-hidden
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-300 shadow-sm"
+                >
+                  <FontAwesomeIcon icon={faHeart} />
+                </span>
+              }
+            />
           </div>
         </Paper>
 
@@ -161,11 +149,6 @@ export default function MerchandiseFormPreview(props: Props) {
               <ul className="list-disc pl-5">
                 <li>{genreLabel}</li>
               </ul>
-            </PreviewRow>
-            <PreviewRow label="価格（参考）">
-              {Number.isFinite(props.priceYen) && props.priceYen > 0
-                ? `${new Intl.NumberFormat("ja-JP").format(props.priceYen)}円`
-                : "未設定"}
             </PreviewRow>
             {props.contentVolume ? <PreviewRow label="内容量">{props.contentVolume}</PreviewRow> : null}
             {props.expiration ? <PreviewRow label="賞味期限">{props.expiration}</PreviewRow> : null}

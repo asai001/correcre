@@ -25,6 +25,10 @@ export function buildUserMonthlyStatsByCompanyGsiPk(companyId: string) {
   return `COMPANY#${companyId}` as const;
 }
 
+export function buildUserMonthlyStatsByCompanyGsiSk(yearMonth: string, userId: string) {
+  return `YM#${yearMonth}#USER#${userId}` as const;
+}
+
 export async function getUserMonthlyStatsByCompanyUserAndYearMonth(
   config: UserMonthlyStatsTableConfig,
   companyId: string,

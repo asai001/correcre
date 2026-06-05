@@ -139,8 +139,7 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
                   <span className="text-sm font-semibold text-slate-700">{formatPoint(item.requiredPoint)}</span>
                 </div>
                 <div>
-                  <div className="text-xs text-slate-500">{item.heading}</div>
-                  <div className="mt-1 line-clamp-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
+                  <div className="line-clamp-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
                 </div>
                 <div className="flex items-center justify-end gap-4 pt-2">
                   <Link

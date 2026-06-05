@@ -3,7 +3,14 @@
 import { useState, useTransition } from "react";
 import { Alert, Button, TextField } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck, faClock, faPaperPlane, faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCheck,
+  faChevronRight,
+  faClock,
+  faPaperPlane,
+  faRotateLeft,
+  faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { getExchangeStatusBadge, getExchangeStatusLabel } from "@correcre/merchandise-public";
@@ -35,6 +42,98 @@ const TRANSITION_BUTTONS: Record<
   REQUESTED: undefined,
   CANCELLED: undefined,
 };
+
+type TransitionButtonConfig = NonNullable<(typeof TRANSITION_BUTTONS)[ExchangeHistoryStatus]>;
+
+// 遷移ボタンは遷移先ステータスを基準に決まるが、一部は遷移元によって意味が変わる。
+// 「対応中 → 準備中」は前のステップへ差し戻す操作なので、専用のラベル・アイコンに切り替える。
+function resolveTransitionButton(
+  fromStatus: ExchangeHistoryStatus,
+  nextStatus: ExchangeHistoryStatus,
+): TransitionButtonConfig | undefined {
+  if (fromStatus === "IN_PROGRESS" && nextStatus === "PREPARING") {
+    return {
+      label: "準備中に戻す",
+      icon: faRotateLeft,
+      color: "warning",
+      confirm: "対応中から準備中へ差し戻します。よろしいですか？",
+    };
+  }
+
+  return TRANSITION_BUTTONS[nextStatus];
+}
+
+// 交換フローの基本ステップ（申請中 → 準備中 → 対応中 → 完了）。
+const MAIN_FLOW_STATUSES: ExchangeHistoryStatus[] = ["REQUESTED", "PREPARING", "IN_PROGRESS", "COMPLETED"];
+
+function isCanceledStatus(status: ExchangeHistoryStatus): boolean {
+  return status === "REJECTED" || status === "CANCELED" || status === "CANCELLED";
+}
+
+type ExchangeHistoryEvent = OperatorExchangeDetail["history"][number];
+
+// 状態遷移ログの上部に表示するパンくず。どんな状態があり、今どこにいるのかを示す。
+function StatusBreadcrumb({
+  status,
+  history,
+}: {
+  status: ExchangeHistoryStatus;
+  history: ExchangeHistoryEvent[];
+}) {
+  const reachedStatuses = new Set<ExchangeHistoryStatus>(history.map((event) => event.status));
+  reachedStatuses.add(status);
+  const canceled = isCanceledStatus(status);
+  const currentIndex = MAIN_FLOW_STATUSES.indexOf(status);
+
+  const chipClassName = (state: "done" | "current" | "upcoming") => {
+    if (state === "current") {
+      // 現在のステータス：薄緑背景・緑ボーダー・緑文字
+      return "border border-emerald-500 bg-emerald-50 font-bold text-emerald-700";
+    }
+    if (state === "done") {
+      // 経過したステータス：背景なし・黒文字
+      return "font-semibold text-slate-900";
+    }
+    // これから迎えるステータス：薄いグレー背景・グレー文字
+    return "bg-slate-100 text-slate-400";
+  };
+
+  return (
+    <ol className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-2">
+      {MAIN_FLOW_STATUSES.map((flowStatus, index) => {
+        const badge = getExchangeStatusBadge(flowStatus);
+        const state: "done" | "current" | "upcoming" = canceled
+          ? reachedStatuses.has(flowStatus)
+            ? "done"
+            : "upcoming"
+          : flowStatus === status
+            ? "current"
+            : index < currentIndex
+              ? "done"
+              : "upcoming";
+
+        return (
+          <li key={flowStatus} className="flex items-center gap-1.5">
+            <span className={`rounded-full px-3 py-1 text-xs ${chipClassName(state)}`}>
+              {badge.label}
+            </span>
+            {index < MAIN_FLOW_STATUSES.length - 1 ? (
+              <FontAwesomeIcon icon={faChevronRight} className="text-[10px] text-slate-300" />
+            ) : null}
+          </li>
+        );
+      })}
+      {canceled ? (
+        <li className="flex items-center gap-1.5">
+          <FontAwesomeIcon icon={faChevronRight} className="text-[10px] text-slate-300" />
+          <span className={`rounded-full px-3 py-1 text-xs ${chipClassName("current")}`}>
+            {getExchangeStatusBadge(status).label}
+          </span>
+        </li>
+      ) : null}
+    </ol>
+  );
+}
 
 function formatDateTime(value?: string) {
   if (!value) return "-";
@@ -71,7 +170,7 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
   const badge = getExchangeStatusBadge(detail.status);
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
-    const button = TRANSITION_BUTTONS[nextStatus];
+    const button = resolveTransitionButton(detail.status, nextStatus);
     if (button?.confirm && typeof window !== "undefined" && !window.confirm(button.confirm)) {
       return;
     }
@@ -197,7 +296,7 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
 
           <div className="mt-5 flex flex-wrap gap-3">
             {detail.allowedNextStatuses.map((nextStatus) => {
-              const button = TRANSITION_BUTTONS[nextStatus];
+              const button = resolveTransitionButton(detail.status, nextStatus);
               if (!button) return null;
               return (
                 <Button
@@ -223,6 +322,7 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <h2 className="text-lg font-bold text-slate-900">状態遷移ログ</h2>
+        <StatusBreadcrumb status={detail.status} history={detail.history} />
         {detail.history.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">履歴がまだありません。</p>
         ) : (
@@ -235,9 +335,8 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
                   className="flex flex-col gap-2 rounded-2xl border border-slate-200 p-4 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${eventBadge.className}`}>
-                      {eventBadge.label}
-                    </span>
+                    {/* ログ行のステータスラベルは色付けせず、背景色なし・黒文字で統一する。 */}
+                    <span className="text-xs font-semibold text-slate-900">{eventBadge.label}</span>
                     <span className="ml-3 text-sm text-slate-700">
                       {ACTOR_LABEL[event.actorType] ?? event.actorType}
                       {event.actorId ? ` (${event.actorId})` : ""}

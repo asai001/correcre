@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
@@ -455,11 +455,14 @@ export async function getEmployeeManagementSummaryFromDynamo(
     ),
   ]);
 
-  const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const employees = currentUsers
+  const nonDeletedUsers = users.filter((user) => user.status !== "DELETED");
+  // 一覧には論理削除（DELETED）済みのユーザーも表示する。末尾にまとめる。
+  const employees = users
     .map((user) => toEmployee(user))
-    .filter((employee): employee is EmployeeManagementEmployee => employee !== null);
-  const activeEmployees = employees.filter((employee) => employee.status === "ACTIVE");
+    .filter((employee): employee is EmployeeManagementEmployee => employee !== null)
+    .sort((left, right) => (left.status === "DELETED" ? 1 : 0) - (right.status === "DELETED" ? 1 : 0));
+  const nonDeletedEmployees = employees.filter((employee) => employee.status !== "DELETED");
+  const activeEmployees = nonDeletedEmployees.filter((employee) => employee.status === "ACTIVE");
   const totalEmployeePoints = activeEmployees.reduce((sum, employee) => sum + employee.pointBalance, 0);
   const totalCompletionRate = activeEmployees.reduce((sum, employee) => sum + employee.completionRate, 0);
   const departmentOptions: EmployeeDepartmentOption[] = departments
@@ -467,15 +470,15 @@ export async function getEmployeeManagementSummaryFromDynamo(
     .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name, "ja"))
     .map((department) => ({
       name: department.name,
-      employeeCount: currentUsers.filter((user) => user.departmentId === department.departmentId).length,
+      employeeCount: nonDeletedUsers.filter((user) => user.departmentId === department.departmentId).length,
     }));
 
   return {
     companyId,
     companyName: company.shortName || company.name,
-    adminName: getAdminName(currentUsers, adminUserId),
+    adminName: getAdminName(nonDeletedUsers, adminUserId),
     updatedAt: company.updatedAt,
-    employeeCount: employees.length,
+    employeeCount: nonDeletedEmployees.length,
     departmentCount: departmentOptions.length,
     totalEmployeePoints,
     companyPointBalance: company.companyPointBalance,
@@ -783,13 +786,56 @@ export async function deleteEmployeeInDynamo(companyId: string, input: DeleteEmp
     input.userId.trim(),
   );
 
-  if (!targetUser || targetUser.status === "DELETED") {
+  if (!targetUser) {
     throw new Error("Employee not found");
+  }
+
+  // 運用者アカウントを削除すると、その運用者自身のセッションが解決できなくなり
+  // （getOperatorUserForSession が null を返し）画面全体が 403 で操作不能になる。
+  // この画面は企業の従業員管理用なので、運用者アカウントの削除は許可しない。
+  if (normalizeRoles(targetUser.roles).includes("OPERATOR")) {
+    throw new Error("運用者権限を持つユーザーはこの画面から削除できません");
   }
 
   const now = new Date().toISOString();
   const client = getDynamoDocumentClient(config.region);
 
+  // すでに論理削除（DELETED）済みのユーザーは、2 度目の削除で物理削除する。
+  // DynamoDB のレコードと Cognito のユーザーの両方を完全に削除する。
+  if (targetUser.status === "DELETED") {
+    const cognitoUsername = targetUser.cognitoSub?.trim() || targetUser.email?.trim();
+
+    if (cognitoUsername) {
+      try {
+        await deleteCognitoUser(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          cognitoUsername,
+        );
+      } catch (error) {
+        // すでに Cognito 側に存在しない場合は無視して DB の削除を続行する。
+        if (!(error instanceof Error) || error.name !== "UserNotFoundException") {
+          throw error;
+        }
+      }
+    }
+
+    await client.send(
+      new DeleteCommand({
+        TableName: config.userTableName,
+        Key: {
+          companyId,
+          sk: buildUserSk(targetUser.userId),
+        },
+      }),
+    );
+    await syncCompanyUserCounts(config, companyId, now);
+    return;
+  }
+
+  // 未削除（INVITED / ACTIVE / INACTIVE）のユーザーは論理削除（DELETED へ）する。
   await client.send(
     new UpdateCommand({
       TableName: config.userTableName,

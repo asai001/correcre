@@ -74,12 +74,14 @@ const statusLabelMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "招待中",
   ACTIVE: "有効",
   INACTIVE: "休止中",
+  DELETED: "論理削除",
 };
 
 const statusBadgeClassMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "bg-amber-50 text-amber-700 border-amber-200",
   ACTIVE: "bg-emerald-50 text-emerald-700 border-emerald-200",
   INACTIVE: "bg-rose-50 text-rose-700 border-rose-200",
+  DELETED: "bg-slate-200 text-slate-600 border-slate-300",
 };
 
 const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
@@ -269,24 +271,30 @@ function getEmployeeColumns(
       label: "削除",
       align: "center",
       width: "6%",
-      render: (row) => (
-        <div className="flex items-center justify-center gap-1">
-          <IconButton
-            size="small"
-            aria-label={`${row.name}を削除`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDeleteEmployee(row);
-            }}
-            onKeyDown={(event) => {
-              event.stopPropagation();
-            }}
-            sx={{ color: "#EF4444" }}
-          >
-            <FontAwesomeIcon icon={faTrashCan} />
-          </IconButton>
-        </div>
-      ),
+      render: (row) =>
+        row.roles.includes("OPERATOR") ? (
+          // 運用者アカウントを削除すると運用者自身のセッションが壊れ操作不能になるため、削除不可。
+          <div className="flex items-center justify-center text-xs text-slate-300" title="運用者アカウントは削除できません">
+            —
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-1">
+            <IconButton
+              size="small"
+              aria-label={`${row.name}を削除`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDeleteEmployee(row);
+              }}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+              }}
+              sx={{ color: "#EF4444" }}
+            >
+              <FontAwesomeIcon icon={faTrashCan} />
+            </IconButton>
+          </div>
+        ),
     },
   ];
 }
@@ -323,7 +331,8 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     [employees],
   );
   const unlinkedEmployeeCount = useMemo(
-    () => employees.filter((employee) => employee.authLinkStatus === "UNLINKED").length,
+    () =>
+      employees.filter((employee) => employee.status !== "DELETED" && employee.authLinkStatus === "UNLINKED").length,
     [employees],
   );
 
@@ -446,6 +455,13 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     setDeletingEmployee(true);
     setDeleteError(null);
 
+    const targetEmployee =
+      employeePendingDeletion?.userId === userId
+        ? employeePendingDeletion
+        : employees.find((employee) => employee.userId === userId) ?? null;
+    // すでに論理削除済みのユーザーへの削除は物理削除になる。
+    const isPhysicalDeletion = targetEmployee?.status === "DELETED";
+
     try {
       const result = await deleteEmployee(selectedCompanyId, { userId });
       if (!result.ok) {
@@ -453,13 +469,14 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         return result;
       }
 
-      const deletedEmployeeName =
-        employeePendingDeletion?.userId === userId
-          ? employeePendingDeletion.name
-          : employees.find((employee) => employee.userId === userId)?.name ?? userId;
+      const deletedEmployeeName = targetEmployee?.name ?? userId;
 
       setEmployeePendingDeletion(null);
-      setNotice(`${deletedEmployeeName} をDELETEに変更しました`);
+      setNotice(
+        isPhysicalDeletion
+          ? `${deletedEmployeeName} を完全に削除しました（DB・Cognito から削除）`
+          : `${deletedEmployeeName} を論理削除しました`,
+      );
       reload();
       return result;
     } finally {
@@ -822,7 +839,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           </div>
 
           <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-            {filteredEmployees.length} / {summary.employeeCount} 件を表示中
+            {filteredEmployees.length} / {employees.length} 件を表示中
           </div>
         </div>
 
@@ -832,8 +849,13 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             rows={pagedEmployees}
             footer={footer}
             getRowKey={(row) => row.userId}
-            onRowClick={setEditingEmployee}
-            getRowAriaLabel={(row) => `${row.name}を編集`}
+            onRowClick={(row) => {
+              // 論理削除済みユーザーは編集不可（物理削除のみ可能）。
+              if (row.status !== "DELETED") {
+                setEditingEmployee(row);
+              }
+            }}
+            getRowAriaLabel={(row) => (row.status === "DELETED" ? row.name : `${row.name}を編集`)}
           />
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">

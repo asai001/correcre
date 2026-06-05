@@ -21,6 +21,7 @@ import {
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
+import { hasCompleteExchangeRequestProfile } from "@correcre/lib/user-profile";
 import {
   toPublicMerchandiseSummary,
   type PublicMerchandiseDetail,
@@ -212,6 +213,11 @@ export async function requestExchangeForEmployee(params: {
   }
 
   const currentBalance = user.currentPointBalance ?? 0;
+  if (!hasCompleteExchangeRequestProfile({ phoneNumber: user.phoneNumber, address: user.address })) {
+    throw new IncompleteExchangeProfileError(
+      "郵便番号・都道府県・市区町村/丁目/番地・電話番号を登録してから申請してください",
+    );
+  }
 
   if (currentBalance < merchandise.requiredPoint) {
     throw new InsufficientPointBalanceError("ポイント残高が不足しています");
@@ -300,5 +306,12 @@ export class MerchandiseUnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "MerchandiseUnavailableError";
+  }
+}
+
+export class IncompleteExchangeProfileError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "IncompleteExchangeProfileError";
   }
 }

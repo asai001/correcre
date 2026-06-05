@@ -23,6 +23,7 @@ export type ExchangeSummary = {
 
 export type ExchangeDetail = ExchangeSummary & {
   merchantId: string;
+  companyName?: string;
   merchandiseImageViewUrl?: string;
   history: ExchangeHistoryStatusEvent[];
   allowedNextStatuses: ExchangeHistoryStatus[];

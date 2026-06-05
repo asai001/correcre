@@ -8,6 +8,7 @@ import {
   faArrowUpRightFromSquare,
   faCirclePlus,
   faClipboardCheck,
+  faPenToSquare,
   faStore,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -16,13 +17,16 @@ import {
   approveMerchantApplication,
   createMerchant,
   rejectMerchantApplication,
+  updateMerchant,
 } from "../api/client";
 import type {
   CreateMerchantInput,
   MerchantApplicationDetail,
   MerchantSummary,
+  UpdateMerchantInput,
 } from "../model/types";
 import ApplicationDecisionDialog from "./ApplicationDecisionDialog";
+import MerchantEditDialog from "./MerchantEditDialog";
 
 const storeAddressModeOptions = [
   { value: "same_company", label: "会社と同じ" },
@@ -92,6 +96,10 @@ export default function MerchantManagement({
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
 
+  const [editingMerchant, setEditingMerchant] = useState<MerchantSummary | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const handleChange =
     (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const value = event.target.value;
@@ -128,6 +136,34 @@ export default function MerchantManagement({
       setError(err instanceof Error ? err.message : "提携企業の登録に失敗しました。");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenEdit = (merchant: MerchantSummary) => {
+    setEditingMerchant(merchant);
+    setEditError(null);
+  };
+
+  const handleCloseEdit = () => {
+    if (editSubmitting) return;
+    setEditingMerchant(null);
+    setEditError(null);
+  };
+
+  const handleSubmitEdit = async (input: UpdateMerchantInput) => {
+    setEditSubmitting(true);
+    setEditError(null);
+
+    try {
+      const updated = await updateMerchant(input);
+
+      setMerchants((current) => [updated, ...current.filter((merchant) => merchant.merchantId !== updated.merchantId)]);
+      setEditingMerchant(null);
+      setNotice(`提携企業「${updated.name}」の情報を更新しました。`);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "提携企業情報の更新に失敗しました。");
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -180,7 +216,12 @@ export default function MerchantManagement({
 
   return (
     <div className="space-y-6 pb-10">
-      <AdminPageHeader title="提携企業管理" adminName={operatorName} subtitle="商品・サービスを提供する提携企業の登録と管理" />
+      <AdminPageHeader
+        title="提携企業管理"
+        adminName={operatorName}
+        backHref="/dashboard"
+        subtitle="商品・サービスを提供する提携企業の登録と管理"
+      />
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <div className="flex items-center gap-3">
@@ -371,13 +412,24 @@ export default function MerchantManagement({
                       merchantId: {merchant.merchantId} ／ 状態: {STATUS_LABELS[merchant.status]}
                     </div>
                   </div>
-                  <Link
-                    href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-                  >
-                    ユーザー招待
-                    <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleOpenEdit(merchant)}
+                      startIcon={<FontAwesomeIcon icon={faPenToSquare} />}
+                      sx={{ borderRadius: "999px", textTransform: "none" }}
+                    >
+                      編集
+                    </Button>
+                    <Link
+                      href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    >
+                      ユーザー招待
+                      <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                    </Link>
+                  </div>
                 </li>
               ))}
           </ul>
@@ -392,6 +444,15 @@ export default function MerchantManagement({
         error={decisionError}
         onClose={handleCloseDecision}
         onSubmit={handleSubmitDecision}
+      />
+
+      <MerchantEditDialog
+        open={editingMerchant !== null}
+        merchant={editingMerchant}
+        submitting={editSubmitting}
+        error={editError}
+        onClose={handleCloseEdit}
+        onSubmit={handleSubmitEdit}
       />
     </div>
   );

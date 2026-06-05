@@ -1,6 +1,6 @@
 export type EmployeeManagementRole = "EMPLOYEE" | "MANAGER" | "ADMIN" | "OPERATOR";
 export type EmployeeAssignableRole = "EMPLOYEE" | "ADMIN" | "OPERATOR";
-export type EmployeeManagementStatus = "INVITED" | "ACTIVE" | "INACTIVE";
+export type EmployeeManagementStatus = "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
 export type EmployeeAuthLinkStatus = "UNLINKED" | "LINKED";
 
 export type MutationResult =

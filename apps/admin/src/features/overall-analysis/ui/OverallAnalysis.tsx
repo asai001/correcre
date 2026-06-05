@@ -17,6 +17,7 @@ import OverallScoreTrendChart from "./OverallScoreTrendChart";
 type OverallAnalysisProps = {
   companyId: string;
   departments: OverallAnalysisDepartmentOption[];
+  hasUnassignedUsers: boolean;
 };
 
 const emptySummary: OverallAnalysisSummary = {
@@ -30,7 +31,7 @@ const emptySummary: OverallAnalysisSummary = {
   exchangeHistory: [],
 };
 
-export default function OverallAnalysis({ companyId, departments }: OverallAnalysisProps) {
+export default function OverallAnalysis({ companyId, departments, hasUnassignedUsers }: OverallAnalysisProps) {
   const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const exchangeHistoryPagination = useMemo(
     () => ({
@@ -75,6 +76,7 @@ export default function OverallAnalysis({ companyId, departments }: OverallAnaly
         onStartDateChange={handleStartDateChange}
         onEndDateChange={handleEndDateChange}
         departments={departments}
+        hasUnassignedUsers={hasUnassignedUsers}
         selectedDepartmentId={selectedDepartmentId}
         onDepartmentChange={setSelectedDepartmentId}
       />

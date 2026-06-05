@@ -36,6 +36,18 @@ function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
 }
 
+function getStatusBadgeClassName(status: OperatorCompanySummary["status"]): string {
+  if (status === "ACTIVE") {
+    return "bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "INACTIVE") {
+    return "bg-rose-50 text-rose-700";
+  }
+
+  return "bg-white text-slate-700";
+}
+
 function upsertCompany(
   companies: OperatorCompanySummary[],
   nextCompany: OperatorCompanySummary,
@@ -354,7 +366,9 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
 
                   <div className="pointer-events-none relative z-10 mt-4 flex flex-wrap gap-2 text-sm">
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.plan}</span>
-                    <span className="rounded-full bg-white px-3 py-1 text-slate-700">{company.status}</span>
+                    <span className={`rounded-full px-3 py-1 ${getStatusBadgeClassName(company.status)}`}>
+                      {company.status}
+                    </span>
                     <span className="rounded-full bg-white px-3 py-1 text-slate-700">
                       登録ユーザー {company.employeeCount} 人
                     </span>

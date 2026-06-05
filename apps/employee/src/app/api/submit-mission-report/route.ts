@@ -1,8 +1,27 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { getMissionBySlot } from "@correcre/lib/dynamodb/mission";
-import { putMissionReport } from "@correcre/lib/dynamodb/mission-report";
+import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { nowYYYYMM } from "@correcre/lib";
+import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
+import { getMissionBySlot, listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
+import {
+  buildMissionReportByCompanyGsiPk,
+  buildMissionReportByCompanyStatusGsiPk,
+  buildMissionReportGsi1Sk,
+  buildMissionReportGsi2Sk,
+  buildMissionReportPk,
+  buildMissionReportSk,
+  listMissionReportsByCompanyAndUser,
+} from "@correcre/lib/dynamodb/mission-report";
+import {
+  buildUserMonthlyStatsByCompanyGsiPk,
+  buildUserMonthlyStatsByCompanyGsiSk,
+  buildUserMonthlyStatsPk,
+  buildUserMonthlyStatsSk,
+  getUserMonthlyStatsByCompanyUserAndYearMonth,
+} from "@correcre/lib/dynamodb/user-monthly-stats";
+import { buildUserSk } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
   buildFinalImageKey,
@@ -42,6 +61,18 @@ async function findMissionForCompany(companyId: string, missionId: string): Prom
   }
 
   return null;
+}
+
+function toYearMonth(dateTime: string) {
+  return dateTime.slice(0, 7);
+}
+
+function toCompletionRate(actualCount: number, totalCount: number) {
+  if (totalCount <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.round((actualCount / totalCount) * 100));
 }
 
 export async function POST(req: Request) {
@@ -98,6 +129,35 @@ export async function POST(req: Request) {
     const region = readRequiredServerEnv("AWS_REGION");
     const bucketName = readRequiredServerEnv("S3_MISSION_REPORT_IMAGE_BUCKET_NAME");
     const missionReportTableName = readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME");
+    const userTableName = readRequiredServerEnv("DDB_USER_TABLE_NAME");
+    const userMonthlyStatsTableName = readRequiredServerEnv("DDB_USER_MONTHLY_STATS_TABLE_NAME");
+    const currentYearMonth = nowYYYYMM();
+    const [enabledMissions, existingReports, currentMonthStats] = await Promise.all([
+      listEnabledLatestMissionsByCompany(
+        {
+          region,
+          tableName: readRequiredServerEnv("DDB_MISSION_TABLE_NAME"),
+        },
+        companyId,
+      ),
+      listMissionReportsByCompanyAndUser(
+        {
+          region,
+          tableName: missionReportTableName,
+        },
+        companyId,
+        user.userId,
+      ),
+      getUserMonthlyStatsByCompanyUserAndYearMonth(
+        {
+          region,
+          tableName: userMonthlyStatsTableName,
+        },
+        companyId,
+        user.userId,
+        currentYearMonth,
+      ),
+    ]);
 
     const finalizedFieldValues: Record<string, MissionReportFieldValue> = {};
 
@@ -174,8 +234,77 @@ export async function POST(req: Request) {
       createdAt: reportedAt,
       updatedAt: reportedAt,
     };
+    const approvedReportsThisMonth = existingReports.filter(
+      (item) => item.status === "APPROVED" && toYearMonth(item.reportedAt) === currentYearMonth,
+    );
+    const nextMissionCompletedCount = approvedReportsThisMonth.length + 1;
+    const nextEarnedScore =
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.scoreGranted ?? 0), 0) + mission.score;
+    const nextEarnedPoints =
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.pointGranted ?? 0), 0) + mission.score;
+    const totalMonthlyMissionCount = enabledMissions.reduce((sum, item) => sum + item.monthlyCount, 0);
+    const nextCompletionRate = toCompletionRate(nextMissionCompletedCount, totalMonthlyMissionCount);
+    const earnedPointDelta = nextEarnedPoints - (currentMonthStats?.earnedPoints ?? 0);
+    const nextCurrentPointBalance = (user.currentPointBalance ?? 0) + earnedPointDelta;
+    const statsUpdatedAt = reportedAt;
+    const client = getDynamoDocumentClient(region);
 
-    await putMissionReport({ region, tableName: missionReportTableName }, report);
+    await client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: missionReportTableName,
+              Item: {
+                ...report,
+                pk: buildMissionReportPk(report.companyId, report.userId),
+                sk: buildMissionReportSk(report.reportedAt, report.reportId),
+                gsi1pk: buildMissionReportByCompanyGsiPk(report.companyId),
+                gsi1sk: buildMissionReportGsi1Sk(report.reportedAt, report.userId, report.reportId),
+                gsi2pk: buildMissionReportByCompanyStatusGsiPk(report.companyId, report.status),
+                gsi2sk: buildMissionReportGsi2Sk(report.reportedAt, report.userId, report.reportId),
+              },
+            },
+          },
+          {
+            Update: {
+              TableName: userTableName,
+              Key: {
+                companyId,
+                sk: buildUserSk(user.userId),
+              },
+              UpdateExpression:
+                "SET currentPointBalance = :currentPointBalance, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
+              ExpressionAttributeValues: {
+                ":currentPointBalance": nextCurrentPointBalance,
+                ":currentMonthCompletionRate": nextCompletionRate,
+                ":updatedAt": statsUpdatedAt,
+              },
+            },
+          },
+          {
+            Put: {
+              TableName: userMonthlyStatsTableName,
+              Item: {
+                pk: buildUserMonthlyStatsPk(companyId, user.userId),
+                sk: buildUserMonthlyStatsSk(currentYearMonth),
+                companyId,
+                userId: user.userId,
+                yearMonth: currentYearMonth,
+                earnedPoints: nextEarnedPoints,
+                usedPoints: currentMonthStats?.usedPoints ?? 0,
+                earnedScore: nextEarnedScore,
+                completionRate: nextCompletionRate,
+                missionCompletedCount: nextMissionCompletedCount,
+                updatedAt: statsUpdatedAt,
+                gsi1pk: buildUserMonthlyStatsByCompanyGsiPk(companyId),
+                gsi1sk: buildUserMonthlyStatsByCompanyGsiSk(currentYearMonth, user.userId),
+              },
+            },
+          },
+        ],
+      }),
+    );
 
     return NextResponse.json({
       reportId,
