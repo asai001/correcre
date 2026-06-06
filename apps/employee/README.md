@@ -22,11 +22,21 @@ DDB_MISSION_TABLE_NAME=correcre-mission-dev
 DDB_MISSION_REPORT_TABLE_NAME=correcre-mission-report-dev
 DDB_USER_MONTHLY_STATS_TABLE_NAME=correcre-user-monthly-stats-dev
 DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
+DDB_POINT_TRANSACTION_TABLE_NAME=correcre-point-transaction-dev
+DDB_MERCHANDISE_TABLE_NAME=correcre-merchandise-dev
+DDB_MERCHANT_TABLE_NAME=correcre-merchant-dev
+DDB_MERCHANT_USER_TABLE_NAME=correcre-merchant-user-dev
+DDB_EXCHANGE_FAVORITE_TABLE_NAME=correcre-exchange-favorite-dev
+DDB_SESSION_TABLE_NAME=correcre-session-dev
+S3_MISSION_REPORT_IMAGE_BUCKET_NAME=correcre-mission-report-image-dev-<account-id>
+S3_MERCHANDISE_IMAGE_BUCKET_NAME=correcre-merchandise-image-dev-<account-id>
+MERCHANT_APP_URL=http://localhost:3003
+SES_FROM_EMAIL=correcre-info@efficient-technology.com
 ```
 
 `EMPLOYEE_COGNITO_REGION`、`EMPLOYEE_COGNITO_USER_POOL_ID`、`EMPLOYEE_COGNITO_APP_CLIENT_ID` の値は、CDK スタックの `EmployeeCognitoRegion`、`EmployeeCognitoUserPoolId`、`EmployeeCognitoUserPoolClientId` として出力されます。
 
-DynamoDB のテーブル名は、CDK スタックから `UserTableName`、`CompanyTableName`、`MissionTableName`、`MissionReportTableName`、`UserMonthlyStatsTableName`、`ExchangeHistoryTableName` として出力されます。
+DynamoDB / S3 のリソース名は、CDK スタックの各 `*TableName` / `*BucketName` 出力を設定してください。
 
 dev AWS アカウントに対してローカル開発を行う場合は `AWS_PROFILE=CorreCre-Dev-Account` を使用し、事前に `aws sso login --profile CorreCre-Dev-Account` を実行してください。
 

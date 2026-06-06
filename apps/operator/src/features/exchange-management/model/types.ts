@@ -1,4 +1,5 @@
 import type {
+  DBUserAddress,
   ExchangeHistoryActorType,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
@@ -24,6 +25,9 @@ export type OperatorExchangeSummary = {
 };
 
 export type OperatorExchangeDetail = OperatorExchangeSummary & {
+  applicantEmail?: string;
+  applicantPhoneNumber?: string;
+  applicantAddress?: DBUserAddress;
   merchandiseImageViewUrl?: string;
   history: ExchangeHistoryStatusEvent[];
   allowedNextStatuses: ExchangeHistoryStatus[];

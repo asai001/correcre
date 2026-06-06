@@ -103,9 +103,12 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const unauthorized = await authorizeOperator();
-  if (unauthorized) {
-    return unauthorized;
+  const access = await getOperatorAccessStatus();
+  if (!access.allowed) {
+    const status = access.reason === "unauthenticated" ? 401 : 403;
+    const error = access.reason === "unauthenticated" ? "unauthorized" : "operator_only";
+
+    return NextResponse.json({ error }, { status });
   }
 
   let body: UpdateEmployeeRequest | null = null;
@@ -122,7 +125,7 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const employee = await updateEmployeeInDynamo(body.companyId, body);
+    const employee = await updateEmployeeInDynamo(body.companyId, body, access.user.userId);
     return NextResponse.json(employee);
   } catch (err) {
     console.error("PATCH /api/employee-management error", err);

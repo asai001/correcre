@@ -14,6 +14,7 @@ import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import type {
+  DBUserAddress,
   ExchangeHistoryActorType,
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
@@ -32,6 +33,14 @@ type RuntimeConfig = {
   merchandiseImageBucketName: string;
   userTableName: string;
   companyTableName: string;
+  pointTransactionTableName: string;
+};
+
+type ApplicantProfile = {
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: DBUserAddress;
 };
 
 function getRuntimeConfig(): RuntimeConfig {
@@ -42,6 +51,7 @@ function getRuntimeConfig(): RuntimeConfig {
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
   };
 }
 
@@ -90,6 +100,28 @@ function toSummary(item: ExchangeHistoryItem, userName?: string): ExchangeSummar
   };
 }
 
+async function resolveApplicantProfile(
+  config: RuntimeConfig,
+  companyId: string,
+  userId: string,
+): Promise<ApplicantProfile> {
+  const user = await getUserByCompanyAndUserId(
+    {
+      region: config.region,
+      tableName: config.userTableName,
+    },
+    companyId,
+    userId,
+  );
+
+  return {
+    name: user ? `${user.lastName ?? ""} ${user.firstName ?? ""}`.trim() || undefined : undefined,
+    email: user?.email,
+    phoneNumber: user?.phoneNumber,
+    address: user?.address,
+  };
+}
+
 async function resolveUserName(
   config: RuntimeConfig,
   companyId: string,
@@ -101,20 +133,11 @@ async function resolveUserName(
     return cache.get(cacheKey);
   }
 
-  const user = await getUserByCompanyAndUserId(
-    {
-      region: config.region,
-      tableName: config.userTableName,
-    },
-    companyId,
-    userId,
-  );
-
-  const name = user ? `${user.lastName ?? ""} ${user.firstName ?? ""}`.trim() : undefined;
-  if (name) {
-    cache.set(cacheKey, name);
+  const profile = await resolveApplicantProfile(config, companyId, userId);
+  if (profile.name) {
+    cache.set(cacheKey, profile.name);
   }
-  return name;
+  return profile.name;
 }
 
 export async function listExchangesForMerchant(
@@ -156,10 +179,7 @@ async function buildExchangeDetail(
   item: ExchangeHistoryItem,
   actorType: ExchangeHistoryActorType,
 ): Promise<ExchangeDetail> {
-  const userName = await (async () => {
-    const cache = new Map<string, string>();
-    return resolveUserName(config, item.companyId, item.userId, cache);
-  })();
+  const applicant = await resolveApplicantProfile(config, item.companyId, item.userId);
 
   let merchandiseImageViewUrl: string | undefined;
 
@@ -190,9 +210,12 @@ async function buildExchangeDetail(
   const companyName = await resolveCompanyName(config, item.companyId);
 
   return {
-    ...toSummary(item, userName),
+    ...toSummary(item, applicant.name),
     merchantId: item.merchantId ?? "",
     companyName,
+    applicantEmail: applicant.email,
+    applicantPhoneNumber: applicant.phoneNumber,
+    applicantAddress: applicant.address,
     merchandiseImageViewUrl,
     history: item.history ?? [],
     allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
@@ -254,6 +277,7 @@ export async function transitionExchangeForMerchant(params: {
       actorId: params.actorUserId,
       comment: params.comment,
       userTableName: config.userTableName,
+      pointTransactionTableName: config.pointTransactionTableName,
     },
   );
 

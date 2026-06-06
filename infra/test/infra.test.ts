@@ -432,6 +432,36 @@ describe("InfraStack", () => {
     expect(cognitoStatement).toBeDefined();
   });
 
+  test("grants the Vercel OIDC role SES email sending permissions", () => {
+    const template = Template.fromStack(createStack("stg"));
+    const inlinePolicies = template.findResources("AWS::IAM::Policy");
+
+    type PolicyResource = {
+      Properties: {
+        PolicyDocument: {
+          Statement: Array<{ Action?: unknown; Effect?: string; Resource?: unknown }>;
+        };
+      };
+    };
+
+    const allStatements = Object.values(inlinePolicies).flatMap(
+      (resource) => (resource as PolicyResource).Properties.PolicyDocument.Statement ?? [],
+    );
+
+    const sesStatement = allStatements.find((stmt) => {
+      const action = stmt.Action;
+      const resources = Array.isArray(stmt.Resource) ? stmt.Resource : [stmt.Resource];
+
+      return (
+        action === "ses:SendEmail" &&
+        stmt.Effect === "Allow" &&
+        resources.some((resource) => JSON.stringify(resource).includes("identity/efficient-technology.com"))
+      );
+    });
+
+    expect(sesStatement).toBeDefined();
+  });
+
   test("scopes the dev AWS account to development subjects only", () => {
     const template = Template.fromStack(createStack("dev"));
 

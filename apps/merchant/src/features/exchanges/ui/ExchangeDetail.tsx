@@ -150,6 +150,41 @@ function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
+type ApplicantAddress = NonNullable<ExchangeDetailType["applicantAddress"]>;
+
+function formatOptional(value?: string) {
+  return value?.trim() || "-";
+}
+
+function formatPostalCode(postalCode?: string) {
+  if (!postalCode) {
+    return undefined;
+  }
+
+  const digits = postalCode.replace(/\D/g, "");
+  if (digits.length !== 7) {
+    return postalCode;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+}
+
+function formatApplicantAddress(address?: ApplicantAddress) {
+  if (!address) {
+    return "-";
+  }
+
+  const postalCode = formatPostalCode(address.postalCode);
+  const parts = [
+    postalCode ? `〒${postalCode}` : undefined,
+    address.prefecture,
+    address.city,
+    address.building,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" ") : "-";
+}
+
 const ACTOR_LABEL: Record<string, string> = {
   EMPLOYEE: "従業員",
   MERCHANT: "提携企業",
@@ -240,6 +275,18 @@ export default function ExchangeDetail({ initial, merchantName }: Props) {
           <div>
             <dt className="text-xs font-semibold text-slate-500">申請者</dt>
             <dd className="mt-1 text-slate-900">{detail.userName ?? detail.userId}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">メールアドレス</dt>
+            <dd className="mt-1 break-all text-slate-900">{formatOptional(detail.applicantEmail)}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold text-slate-500">電話番号</dt>
+            <dd className="mt-1 text-slate-900">{formatOptional(detail.applicantPhoneNumber)}</dd>
+          </div>
+          <div className="md:col-span-2">
+            <dt className="text-xs font-semibold text-slate-500">住所</dt>
+            <dd className="mt-1 text-slate-900">{formatApplicantAddress(detail.applicantAddress)}</dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-slate-500">企業名</dt>

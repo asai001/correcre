@@ -6,8 +6,8 @@ import NewPasswordForm from "@operator/components/auth/NewPasswordForm";
 import { OPERATOR_DEFAULT_REDIRECT_PATH, OPERATOR_LOGIN_PATH } from "@operator/lib/auth/constants";
 import { getLoginErrorMessage } from "@operator/lib/auth/errors";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
-import { pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { clearOperatorSession, getPendingNewPasswordChallenge } from "@operator/lib/auth/session";
+import { buildClearOperatorSessionRedirect, pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
+import { getPendingNewPasswordChallenge } from "@operator/lib/auth/session";
 
 type NewPasswordPageProps = {
   searchParams: Promise<{
@@ -39,7 +39,7 @@ export default async function NewPasswordPage({ searchParams }: NewPasswordPageP
   }
 
   if (access.reason === "forbidden") {
-    await clearOperatorSession();
+    redirect(buildClearOperatorSessionRedirect(redirectTo) as Route);
   }
 
   if (!challenge) {

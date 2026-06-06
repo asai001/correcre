@@ -3,6 +3,7 @@ import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib
 import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import {
   buildDepartmentSk,
   deleteDepartment,
@@ -24,7 +25,7 @@ import {
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameKanaParts, joinNameParts } from "@correcre/lib/user-profile";
 
-import type { Company, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import type { DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
 import { getOperatorCognitoConfig } from "@operator/lib/auth/config";
 import type {
   CreateDepartmentInput,
@@ -45,6 +46,7 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   departmentTableName: string;
+  pointTransactionTableName: string;
   cognitoRegion: string;
   cognitoUserPoolId: string;
 };
@@ -70,6 +72,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     departmentTableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     cognitoRegion: cognitoConfig.region,
     cognitoUserPoolId: cognitoConfig.userPoolId,
   };
@@ -609,6 +612,7 @@ export async function createEmployeeInDynamo(
 export async function updateEmployeeInDynamo(
   companyId: string,
   input: UpdateEmployeeInput,
+  actorUserId?: string,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
   const [company, targetUser, departments] = await Promise.all([
@@ -656,6 +660,22 @@ export async function updateEmployeeInDynamo(
 
   const now = new Date().toISOString();
   const department = await resolveDepartment(config, companyId, normalizedInput.departmentName, departments);
+  const pointTransaction =
+    input.pointAdjustment === 0
+      ? null
+      : createPointTransaction({
+          companyId,
+          userId: targetUser.userId,
+          transactionId: randomUUID(),
+          occurredAt: now,
+          type: "OPERATOR_ADJUSTMENT",
+          deltaPoint: input.pointAdjustment,
+          balanceAfter: nextUserPointBalance,
+          sourceType: "OPERATOR_USER_REGISTRATION",
+          sourceId: targetUser.userId,
+          actorType: "OPERATOR",
+          actorUserId,
+        });
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
     "lastName = :lastName",
@@ -743,6 +763,9 @@ export async function updateEmployeeInDynamo(
             },
           },
         },
+        ...(pointTransaction
+          ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
+          : []),
       ],
     }),
   );

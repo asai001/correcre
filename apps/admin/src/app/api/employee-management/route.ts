@@ -115,7 +115,7 @@ export async function PATCH(req: Request) {
 
     body = (await req.json()) as UpdateEmployeeRequest;
     await ensureDepartmentExists(currentAdminUser.companyId, body.departmentName);
-    const employee = await updateEmployeeInDynamo(currentAdminUser.companyId, body);
+    const employee = await updateEmployeeInDynamo(currentAdminUser.companyId, body, currentAdminUser.userId);
     return NextResponse.json(employee);
   } catch (err) {
     if (err instanceof SyntaxError) {

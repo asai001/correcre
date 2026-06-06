@@ -7,8 +7,7 @@ import LoginForm from "@operator/components/auth/LoginForm";
 import { OPERATOR_LOGIN_NOTICE_COOKIE_NAME } from "@operator/lib/auth/constants";
 import { getLoginNoticeMessage } from "@operator/lib/auth/errors";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
-import { pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { clearOperatorSession } from "@operator/lib/auth/session";
+import { buildClearOperatorSessionRedirect, pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -28,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   if (access.reason === "forbidden") {
-    await clearOperatorSession();
+    redirect(buildClearOperatorSessionRedirect(redirectTo) as Route);
   }
 
   return (

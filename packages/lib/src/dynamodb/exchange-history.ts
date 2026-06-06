@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import {
   QueryCommand,
   TransactWriteCommand,
@@ -12,9 +14,11 @@ import type {
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  PointTransaction,
 } from "@correcre/types";
 
 import { buildUserSk } from "./user";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "./point-transaction";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -263,6 +267,10 @@ export type PutExchangeHistoryWithReservationInput = {
     nextCurrentPointBalance: number;
     updatedAt: string;
   };
+  pointTransaction?: {
+    tableName: string;
+    transaction: PointTransaction;
+  };
 };
 
 export class InsufficientPointBalanceError extends Error {
@@ -316,6 +324,9 @@ export async function putExchangeHistoryWithReservation(
               ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)",
             },
           },
+          ...(input.pointTransaction
+            ? [createPointTransactionPutTransactItem(input.pointTransaction.tableName, input.pointTransaction.transaction)]
+            : []),
         ],
       }),
     );
@@ -427,6 +438,7 @@ export type TransitionExchangeStatusInput = {
   comment?: string;
   occurredAt?: string;
   userTableName: string;
+  pointTransactionTableName?: string;
 };
 
 export async function transitionExchangeStatus(
@@ -524,6 +536,27 @@ export async function transitionExchangeStatus(
         },
       },
     });
+
+    if (input.pointTransactionTableName) {
+      transactItems.push(
+        createPointTransactionPutTransactItem(
+          input.pointTransactionTableName,
+          createPointTransaction({
+            companyId: input.item.companyId,
+            userId: input.item.userId,
+            transactionId: randomUUID(),
+            occurredAt,
+            type: "EXCHANGE_REFUND",
+            deltaPoint: refundAmount,
+            sourceType: "EXCHANGE_HISTORY",
+            sourceId: input.item.exchangeId,
+            actorType: input.actorType,
+            actorUserId: input.actorId,
+            description: input.item.merchandiseNameSnapshot,
+          }),
+        ),
+      );
+    }
   }
 
   await client.send(new TransactWriteCommand({ TransactItems: transactItems }));

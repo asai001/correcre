@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import {
   buildDepartmentSk,
   deleteDepartment,
@@ -44,6 +46,7 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   departmentTableName: string;
+  pointTransactionTableName: string;
   cognitoRegion: string;
   cognitoUserPoolId: string;
 };
@@ -69,6 +72,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     departmentTableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     cognitoRegion: cognitoConfig.region,
     cognitoUserPoolId: cognitoConfig.userPoolId,
   };
@@ -547,6 +551,7 @@ export async function createEmployeeInDynamo(
 export async function updateEmployeeInDynamo(
   companyId: string,
   input: UpdateEmployeeInput,
+  actorUserId?: string,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
   const [company, targetUser, departments] = await Promise.all([
@@ -592,6 +597,22 @@ export async function updateEmployeeInDynamo(
   }
 
   const now = new Date().toISOString();
+  const pointTransaction =
+    input.pointAdjustment === 0
+      ? null
+      : createPointTransaction({
+          companyId,
+          userId: targetUser.userId,
+          transactionId: randomUUID(),
+          occurredAt: now,
+          type: "ADMIN_ADJUSTMENT",
+          deltaPoint: input.pointAdjustment,
+          balanceAfter: nextUserPointBalance,
+          sourceType: "ADMIN_EMPLOYEE_MANAGEMENT",
+          sourceId: targetUser.userId,
+          actorType: "ADMIN",
+          actorUserId,
+        });
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
     "lastName = :lastName",
@@ -676,6 +697,9 @@ export async function updateEmployeeInDynamo(
             },
           },
         },
+        ...(pointTransaction
+          ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
+          : []),
       ],
     }),
   );

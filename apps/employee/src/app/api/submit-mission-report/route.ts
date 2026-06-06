@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { nowYYYYMM } from "@correcre/lib";
+import { calculateMissionRewardPoint, nowYYYYMM } from "@correcre/lib";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMissionBySlot, listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import {
   buildMissionReportByCompanyGsiPk,
@@ -21,6 +22,7 @@ import {
   buildUserMonthlyStatsSk,
   getUserMonthlyStatsByCompanyUserAndYearMonth,
 } from "@correcre/lib/dynamodb/user-monthly-stats";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import { buildUserSk } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
@@ -128,11 +130,20 @@ export async function POST(req: Request) {
 
     const region = readRequiredServerEnv("AWS_REGION");
     const bucketName = readRequiredServerEnv("S3_MISSION_REPORT_IMAGE_BUCKET_NAME");
+    const companyTableName = readRequiredServerEnv("DDB_COMPANY_TABLE_NAME");
     const missionReportTableName = readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME");
+    const pointTransactionTableName = readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME");
     const userTableName = readRequiredServerEnv("DDB_USER_TABLE_NAME");
     const userMonthlyStatsTableName = readRequiredServerEnv("DDB_USER_MONTHLY_STATS_TABLE_NAME");
     const currentYearMonth = nowYYYYMM();
-    const [enabledMissions, existingReports, currentMonthStats] = await Promise.all([
+    const [company, enabledMissions, existingReports, currentMonthStats] = await Promise.all([
+      getCompanyById(
+        {
+          region,
+          tableName: companyTableName,
+        },
+        companyId,
+      ),
       listEnabledLatestMissionsByCompany(
         {
           region,
@@ -158,6 +169,10 @@ export async function POST(req: Request) {
         currentYearMonth,
       ),
     ]);
+
+    if (!company) {
+      return NextResponse.json({ error: "company_not_found" }, { status: 404 });
+    }
 
     const finalizedFieldValues: Record<string, MissionReportFieldValue> = {};
 
@@ -217,6 +232,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_field_value", field: field.key }, { status: 400 });
     }
 
+    const scoreGranted = mission.score;
+    const pointGranted = calculateMissionRewardPoint({
+      score: scoreGranted,
+      perEmployeeMonthlyFee: company.perEmployeeMonthlyFee,
+    });
+
     // レビューフローは廃止。提出時点で即承認扱いとし、スコア/ポイントを確定させる。
     const report: MissionReport = {
       companyId,
@@ -229,8 +250,8 @@ export async function POST(req: Request) {
       reportedAt,
       status: "APPROVED",
       fieldValues: finalizedFieldValues,
-      scoreGranted: mission.score,
-      pointGranted: mission.score,
+      scoreGranted,
+      pointGranted,
       createdAt: reportedAt,
       updatedAt: reportedAt,
     };
@@ -239,14 +260,30 @@ export async function POST(req: Request) {
     );
     const nextMissionCompletedCount = approvedReportsThisMonth.length + 1;
     const nextEarnedScore =
-      approvedReportsThisMonth.reduce((sum, item) => sum + (item.scoreGranted ?? 0), 0) + mission.score;
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.scoreGranted ?? 0), 0) + scoreGranted;
     const nextEarnedPoints =
-      approvedReportsThisMonth.reduce((sum, item) => sum + (item.pointGranted ?? 0), 0) + mission.score;
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.pointGranted ?? 0), 0) + pointGranted;
     const totalMonthlyMissionCount = enabledMissions.reduce((sum, item) => sum + item.monthlyCount, 0);
     const nextCompletionRate = toCompletionRate(nextMissionCompletedCount, totalMonthlyMissionCount);
-    const earnedPointDelta = nextEarnedPoints - (currentMonthStats?.earnedPoints ?? 0);
-    const nextCurrentPointBalance = (user.currentPointBalance ?? 0) + earnedPointDelta;
+    const nextCurrentPointBalance = (user.currentPointBalance ?? 0) + pointGranted;
     const statsUpdatedAt = reportedAt;
+    const pointTransaction =
+      pointGranted === 0
+        ? null
+        : createPointTransaction({
+            companyId,
+            userId: user.userId,
+            transactionId: randomUUID(),
+            occurredAt: reportedAt,
+            type: "MISSION_REWARD",
+            deltaPoint: pointGranted,
+            balanceAfter: nextCurrentPointBalance,
+            sourceType: "MISSION_REPORT",
+            sourceId: reportId,
+            actorType: "EMPLOYEE",
+            actorUserId: user.userId,
+            description: mission.title,
+          });
     const client = getDynamoDocumentClient(region);
 
     await client.send(
@@ -266,6 +303,7 @@ export async function POST(req: Request) {
               },
             },
           },
+          ...(pointTransaction ? [createPointTransactionPutTransactItem(pointTransactionTableName, pointTransaction)] : []),
           {
             Update: {
               TableName: userTableName,
@@ -310,6 +348,7 @@ export async function POST(req: Request) {
       reportId,
       reportedAt,
       status: report.status,
+      pointGranted,
     });
   } catch (error) {
     console.error("POST /api/submit-mission-report error", error);

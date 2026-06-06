@@ -26,6 +26,7 @@ type TableNames = {
   missionReport: string;
   userMonthlyStats: string;
   exchangeHistory: string;
+  pointTransaction: string;
 };
 
 type Pattern = "poor" | "good";
@@ -101,9 +102,15 @@ const TABLES: TableNames = {
   missionReport: `correcre-mission-report-${STAGE}`,
   userMonthlyStats: `correcre-user-monthly-stats-${STAGE}`,
   exchangeHistory: `correcre-exchange-history-${STAGE}`,
+  pointTransaction: `correcre-point-transaction-${STAGE}`,
 };
 
 const MONTHS_INCLUDING_CURRENT = 13;
+const PER_EMPLOYEE_MONTHLY_FEE = 1000;
+
+function calculateMissionRewardPoint(score: number) {
+  return Math.round((score * PER_EMPLOYEE_MONTHLY_FEE) / 100 / 5);
+}
 
 // アカマツ商会の田中一郎 (u-001) は確認用に「過去1年分で75→35の右肩下がり」を描く。
 // シード対象 (MONTHS_INCLUDING_CURRENT ヶ月) 全体で線形に下降させ、月ごとに
@@ -356,7 +363,7 @@ function buildCompanyItem(spec: CompanySpec, now: string): DynamoItem {
     shortName: spec.shortName,
     status: "ACTIVE",
     plan: "STANDARD",
-    perEmployeeMonthlyFee: 1000,
+    perEmployeeMonthlyFee: PER_EMPLOYEE_MONTHLY_FEE,
     companyPointBalance,
     totalEmployees: USERS.length,
     activeEmployees: USERS.length,
@@ -485,7 +492,7 @@ function buildMissionReportItem(params: {
     missionTitleSnapshot: params.missionTitle,
     scoreSnapshot: params.score,
     scoreGranted: params.score,
-    pointGranted: params.score,
+    pointGranted: calculateMissionRewardPoint(params.score),
     status: "APPROVED",
     reportedAt: params.reportedAt,
     reviewedAt: params.reviewedAt,
@@ -515,7 +522,7 @@ function buildMonthlyStatsItem(params: {
     userId: params.userId,
     yearMonth: params.yearMonth,
     earnedScore: params.earnedScore,
-    earnedPoints: params.earnedScore,
+    earnedPoints: calculateMissionRewardPoint(params.earnedScore),
     usedPoints: 0,
     missionCompletedCount: params.missionCompletedCount,
     completionRate: params.completionRate,

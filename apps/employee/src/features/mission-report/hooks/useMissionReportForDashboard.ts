@@ -109,7 +109,7 @@ export function useMissionReportForDashboard(
         missionId: payload.missionId,
         reportedAt: result.reportedAt,
         status: result.status,
-        pointGranted: payload.score,
+        pointGranted: result.pointGranted,
         comment: "",
       },
     ]);
