@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
+import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
@@ -58,6 +58,11 @@ export async function GET() {
     return NextResponse.json(summary);
   } catch (err) {
     console.error("GET /api/employee-management error", err);
+
+    if (isAwsCredentialError(err)) {
+      return NextResponse.json({ error: buildAwsCredentialErrorMessage() }, { status: 500 });
+    }
+
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }
