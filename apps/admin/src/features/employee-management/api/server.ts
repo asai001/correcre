@@ -457,6 +457,11 @@ export async function createEmployeeInDynamo(
   ]);
 
   const normalizedInput = normalizeEmployeeInput(input, departments);
+
+  if (normalizedInput.roles.includes("OPERATOR")) {
+    throw new Error("運用者権限のユーザーは作成できません");
+  }
+
   await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();

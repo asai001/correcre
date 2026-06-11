@@ -289,6 +289,10 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
             </dd>
           </div>
           <div>
+            <dt className="text-xs font-semibold text-slate-500">所属企業</dt>
+            <dd className="mt-1 text-slate-900">{detail.companyName ?? detail.companyId}</dd>
+          </div>
+          <div>
             <dt className="text-xs font-semibold text-slate-500">メールアドレス</dt>
             <dd className="mt-1 break-all text-slate-900">{formatOptional(detail.applicantEmail)}</dd>
           </div>

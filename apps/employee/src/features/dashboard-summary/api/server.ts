@@ -1,4 +1,4 @@
-import { isValidYYYYMM, toYYYYMM } from "@correcre/lib";
+import { isValidYYYYMM, reflectPoints, toYYYYMM } from "@correcre/lib";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { getUserMonthlyStatsByCompanyUserAndYearMonth } from "@correcre/lib/dynamodb/user-monthly-stats";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -69,9 +69,12 @@ export async function getDashboardSummaryFromDynamo(
     return null;
   }
 
+  const reflected = reflectPoints(user);
+
   return {
     thisMonthCompletionRate: toEarnedScoreRate(currentMonthStats?.earnedScore),
-    currentPointBalance: user.currentPointBalance ?? 0,
+    currentPointBalance: reflected.spendablePoint,
+    pendingPointBalance: reflected.pendingPoint,
     lastMonthEarnedPoints: lastMonthStats?.earnedPoints ?? 0,
   };
 }

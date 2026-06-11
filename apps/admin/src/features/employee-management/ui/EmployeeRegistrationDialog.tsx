@@ -55,7 +55,6 @@ type ValidationState = {
 const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
   { value: "EMPLOYEE", label: "従業員" },
   { value: "ADMIN", label: "管理者" },
-  { value: "OPERATOR", label: "運用者" },
 ];
 
 function getToday() {

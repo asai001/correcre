@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { calculateMissionRewardPoint, nowYYYYMM } from "@correcre/lib";
+import { calculateMissionRewardPoint, nowYYYYMM, reflectPoints } from "@correcre/lib";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMissionBySlot, listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
@@ -265,7 +265,12 @@ export async function POST(req: Request) {
       approvedReportsThisMonth.reduce((sum, item) => sum + (item.pointGranted ?? 0), 0) + pointGranted;
     const totalMonthlyMissionCount = enabledMissions.reduce((sum, item) => sum + item.monthlyCount, 0);
     const nextCompletionRate = toCompletionRate(nextMissionCompletedCount, totalMonthlyMissionCount);
-    const nextCurrentPointBalance = (user.currentPointBalance ?? 0) + pointGranted;
+    // ポイントは即時反映せず「今月の未反映分(pending)」へ積む。
+    // まず前月以前の pending があれば利用可能残高へ繰り入れ(reflect)、その上で今月分を加算する。
+    const reflected = reflectPoints(user, currentYearMonth);
+    const nextSpendablePointBalance = reflected.spendablePoint; // 報酬では利用可能残高は増えない
+    const nextPendingPointBalance = reflected.pendingPoint + pointGranted;
+    const totalHoldingAfter = nextSpendablePointBalance + nextPendingPointBalance;
     const statsUpdatedAt = reportedAt;
     const pointTransaction =
       pointGranted === 0
@@ -277,7 +282,7 @@ export async function POST(req: Request) {
             occurredAt: reportedAt,
             type: "MISSION_REWARD",
             deltaPoint: pointGranted,
-            balanceAfter: nextCurrentPointBalance,
+            balanceAfter: totalHoldingAfter,
             sourceType: "MISSION_REPORT",
             sourceId: reportId,
             actorType: "EMPLOYEE",
@@ -312,9 +317,11 @@ export async function POST(req: Request) {
                 sk: buildUserSk(user.userId),
               },
               UpdateExpression:
-                "SET currentPointBalance = :currentPointBalance, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
+                "SET currentPointBalance = :currentPointBalance, pendingPointBalance = :pendingPointBalance, pendingPointYearMonth = :pendingPointYearMonth, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
               ExpressionAttributeValues: {
-                ":currentPointBalance": nextCurrentPointBalance,
+                ":currentPointBalance": nextSpendablePointBalance,
+                ":pendingPointBalance": nextPendingPointBalance,
+                ":pendingPointYearMonth": currentYearMonth,
                 ":currentMonthCompletionRate": nextCompletionRate,
                 ":updatedAt": statsUpdatedAt,
               },

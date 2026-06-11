@@ -10,6 +10,7 @@ export type OperatorExchangeSummary = {
   merchantId: string;
   merchantName?: string;
   companyId: string;
+  companyName?: string;
   userId: string;
   userName?: string;
   merchandiseId?: string;

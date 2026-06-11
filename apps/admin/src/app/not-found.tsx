@@ -1,7 +1,5 @@
 import Image from "next/image";
 
-import { logout } from "@admin/app/lib/actions/authenticate";
-
 export default function NotFound() {
   return (
     <main className="fixed inset-0 z-50 flex min-h-dvh flex-col items-center overflow-hidden bg-white px-6">
@@ -14,14 +12,12 @@ export default function NotFound() {
           ページが移動または削除された可能性があります。ログイン画面から再度アクセスしてください。
         </p>
 
-        <form action={logout} className="mt-8">
-          <button
-            type="submit"
-            className="w-full rounded bg-[#0EA5B7] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#0b8fa0]"
-          >
-            ログイン画面へ
-          </button>
-        </form>
+        <a
+          href="/api/auth/clear-session"
+          className="mt-8 block w-full rounded bg-[#0EA5B7] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#0b8fa0]"
+        >
+          ログイン画面へ
+        </a>
       </section>
 
       <Image

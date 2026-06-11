@@ -27,11 +27,11 @@ const ALLOWED_TRANSITIONS: Record<
   Partial<Record<ExchangeHistoryActorType, ExchangeHistoryStatus[]>>
 > = {
   REQUESTED: {
-    MERCHANT: ["PREPARING", "REJECTED"],
+    MERCHANT: ["PREPARING", "REJECTED", "CANCELED"],
     OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
   },
   PREPARING: {
-    MERCHANT: ["IN_PROGRESS"],
+    MERCHANT: ["IN_PROGRESS", "CANCELED"],
     OPERATOR: ["IN_PROGRESS", "CANCELED"],
   },
   IN_PROGRESS: {
@@ -266,6 +266,9 @@ export type PutExchangeHistoryWithReservationInput = {
     expectedCurrentPointBalance: number;
     nextCurrentPointBalance: number;
     updatedAt: string;
+    // 翌月反映(reflect)で pending を利用可能残高へ繰り入れた場合、その結果を同一トランザクションで永続化する。
+    nextPendingPointBalance?: number;
+    clearPendingPointYearMonth?: boolean;
   };
   pointTransaction?: {
     tableName: string;
@@ -297,6 +300,22 @@ export async function putExchangeHistoryWithReservation(
 ): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
 
+  const userSetExpressions = ["currentPointBalance = :nextPointBalance", "updatedAt = :updatedAt"];
+  const userExpressionValues: Record<string, unknown> = {
+    ":expectedPointBalance": input.user.expectedCurrentPointBalance,
+    ":nextPointBalance": input.user.nextCurrentPointBalance,
+    ":updatedAt": input.user.updatedAt,
+  };
+
+  if (input.user.nextPendingPointBalance !== undefined) {
+    userSetExpressions.push("pendingPointBalance = :nextPendingPointBalance");
+    userExpressionValues[":nextPendingPointBalance"] = input.user.nextPendingPointBalance;
+  }
+
+  const userUpdateExpression = input.user.clearPendingPointYearMonth
+    ? `SET ${userSetExpressions.join(", ")} REMOVE pendingPointYearMonth`
+    : `SET ${userSetExpressions.join(", ")}`;
+
   try {
     await client.send(
       new TransactWriteCommand({
@@ -309,12 +328,8 @@ export async function putExchangeHistoryWithReservation(
                 sk: buildUserSk(input.user.userId),
               },
               ConditionExpression: "currentPointBalance = :expectedPointBalance",
-              UpdateExpression: "SET currentPointBalance = :nextPointBalance, updatedAt = :updatedAt",
-              ExpressionAttributeValues: {
-                ":expectedPointBalance": input.user.expectedCurrentPointBalance,
-                ":nextPointBalance": input.user.nextCurrentPointBalance,
-                ":updatedAt": input.user.updatedAt,
-              },
+              UpdateExpression: userUpdateExpression,
+              ExpressionAttributeValues: userExpressionValues,
             },
           },
           {

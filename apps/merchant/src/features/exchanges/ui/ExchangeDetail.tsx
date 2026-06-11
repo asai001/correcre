@@ -38,7 +38,7 @@ const TRANSITION_BUTTONS: Record<
   IN_PROGRESS: { label: "対応を開始する", icon: faClock, color: "primary" },
   COMPLETED: { label: "完了にする", icon: faCheck, color: "success", confirm: "完了するとポイントが消費確定となります。よろしいですか？" },
   REJECTED: { label: "却下する", icon: faXmark, color: "error", confirm: "却下するとポイントが従業員に返却されます。よろしいですか？" },
-  CANCELED: { label: "キャンセルする", icon: faXmark, color: "warning", confirm: "キャンセルするとポイントが従業員に返却されます。よろしいですか？" },
+  CANCELED: { label: "強制キャンセルする", icon: faXmark, color: "warning", confirm: "強制キャンセルするとポイントが従業員に返却されます。よろしいですか？" },
   REQUESTED: undefined,
   CANCELLED: undefined,
 };

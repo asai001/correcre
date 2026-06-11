@@ -25,6 +25,7 @@ import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { hasCompleteExchangeRequestProfile } from "@correcre/lib/user-profile";
+import { reflectPoints } from "@correcre/lib/points-reflection";
 import {
   toPublicMerchandiseSummary,
   type PublicMerchandiseDetail,
@@ -375,7 +376,9 @@ export async function requestExchangeForEmployee(params: {
     throw new MerchandiseUnavailableError("商品の必要ポイントが正しく設定されていません");
   }
 
-  const currentBalance = user.currentPointBalance ?? 0;
+  // 翌月反映を読み取り時に適用し、利用可能（反映済み）残高で判定・消費する。今月の未反映分は使えない。
+  const reflected = reflectPoints(user);
+  const currentBalance = reflected.spendablePoint;
   if (!hasCompleteExchangeRequestProfile({ phoneNumber: user.phoneNumber, address: user.address })) {
     throw new IncompleteExchangeProfileError(
       "郵便番号・都道府県・市区町村/丁目/番地・電話番号を登録してから申請してください",
@@ -446,9 +449,13 @@ export async function requestExchangeForEmployee(params: {
         tableName: config.userTableName,
         companyId: params.companyId,
         userId: params.userId,
-        expectedCurrentPointBalance: currentBalance,
+        // 条件式は DB の現在値（反映前の保存値）と照合する。
+        expectedCurrentPointBalance: user.currentPointBalance ?? 0,
+        // nextBalance は「反映後の利用可能残高 − 必要ポイント」。反映分もこの1更新でまとめて確定する。
         nextCurrentPointBalance: nextBalance,
         updatedAt: now,
+        // 反映が発生した場合は pending を 0 にし、年月マーカーを削除する。
+        ...(reflected.changed ? { nextPendingPointBalance: 0, clearPendingPointYearMonth: true } : {}),
       },
       pointTransaction: {
         tableName: config.pointTransactionTableName,

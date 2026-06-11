@@ -3,8 +3,6 @@
 import { useEffect } from "react";
 import Image from "next/image";
 
-import { logout } from "@operator/app/lib/actions/authenticate";
-
 export default function Error({
   error,
   reset,
@@ -35,14 +33,12 @@ export default function Error({
           再試行する
         </button>
 
-        <form action={logout} className="mt-3">
-          <button
-            type="submit"
-            className="w-full rounded border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-          >
-            ログイン画面へ
-          </button>
-        </form>
+        <a
+          href="/api/auth/clear-session"
+          className="mt-3 block w-full rounded border border-slate-300 px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+        >
+          ログイン画面へ
+        </a>
 
         {error.digest ? <p className="mt-6 text-xs text-slate-400">エラーID: {error.digest}</p> : null}
       </section>

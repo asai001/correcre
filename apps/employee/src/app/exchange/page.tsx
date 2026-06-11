@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { reflectPoints } from "@correcre/lib/points-reflection";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
 import { ExchangeList } from "@employee/features/exchange";
@@ -33,10 +34,13 @@ export default async function ExchangePage() {
     }),
   ]);
 
+  const reflected = reflectPoints(currentUser);
+
   return (
     <ExchangeList
       items={items}
-      currentPointBalance={currentUser.currentPointBalance ?? 0}
+      currentPointBalance={reflected.spendablePoint}
+      pendingPointBalance={reflected.pendingPoint}
       userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
       initialFavorites={favoritesResult.favorites}
     />

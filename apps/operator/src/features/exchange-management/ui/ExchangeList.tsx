@@ -206,7 +206,7 @@ export default function ExchangeList({
                       </div>
                       <div className="mt-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        提携企業: {item.merchantName ?? item.merchantId} ／ 申請者: {item.userName ?? item.userId} ／ ポイント: {formatPoint(item.usedPoint)}
+                        提携企業: {item.merchantName ?? item.merchantId} ／ 申請者: {item.userName ?? item.userId} ／ 所属企業: {item.companyName ?? item.companyId} ／ ポイント: {formatPoint(item.usedPoint)}
                       </div>
                     </div>
                   </div>

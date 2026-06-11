@@ -27,6 +27,7 @@ import ExchangePageHeader from "./ExchangePageHeader";
 type Props = {
   items: PublicMerchandiseSummary[];
   currentPointBalance: number;
+  pendingPointBalance?: number;
   userName: string;
   initialFavorites: FavoriteSummary[];
 };
@@ -508,13 +509,14 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
   }
 }
 
-export default function ExchangeList({ items, currentPointBalance, userName, initialFavorites }: Props) {
+export default function ExchangeList({ items, currentPointBalance, pendingPointBalance, userName, initialFavorites }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortKey>("popular");
   const [page, setPage] = useState(1);
+  const [itemList, setItemList] = useState(items);
   const [favorites, setFavorites] = useState<Set<string>>(
     () => new Set(initialFavorites.map((f) => favoriteKey(f.merchantId, f.merchandiseId))),
   );
@@ -545,23 +547,23 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
     listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const genres = useMemo(() => uniqueValues(items.map((item) => getGenreLabel(item))), [items]);
-  const deliveries = useMemo(() => uniqueValues(items.flatMap((item) => item.deliveryMethods)), [items]);
-  const areas = useMemo(() => uniqueValues(items.map((item) => item.serviceArea?.trim())), [items]);
+  const genres = useMemo(() => uniqueValues(itemList.map((item) => getGenreLabel(item))), [itemList]);
+  const deliveries = useMemo(() => uniqueValues(itemList.flatMap((item) => item.deliveryMethods)), [itemList]);
+  const areas = useMemo(() => uniqueValues(itemList.map((item) => item.serviceArea?.trim())), [itemList]);
 
   const pickupItems = useMemo(() => {
-    const tagged = items.filter((item) => item.tags && item.tags.length > 0);
-    const picks = tagged.length > 0 ? tagged : items;
+    const tagged = itemList.filter((item) => item.tags && item.tags.length > 0);
+    const picks = tagged.length > 0 ? tagged : itemList;
     return picks.slice(0, 5);
-  }, [items]);
+  }, [itemList]);
 
   const filtered = useMemo(() => {
-    let next = applyFilters(items, filter);
+    let next = applyFilters(itemList, filter);
     if (onlyFavorites) {
       next = next.filter((item) => favorites.has(favoriteKey(item.merchantId, item.merchandiseId)));
     }
     return next;
-  }, [items, filter, onlyFavorites, favorites]);
+  }, [itemList, filter, onlyFavorites, favorites]);
 
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort]);
 
@@ -588,11 +590,23 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
       else updated.delete(key);
       return updated;
     });
+    // お気に入り数を即時に反映し、人気順ソートに反映されるようにする。
+    setItemList((prev) =>
+      prev.map((item) =>
+        item.merchantId === merchantId && item.merchandiseId === merchandiseId
+          ? { ...item, favoriteCount: Math.max(0, (item.favoriteCount ?? 0) + (next ? 1 : -1)) }
+          : item,
+      ),
+    );
   };
 
   return (
     <div className="-mt-px pb-12">
-      <ExchangePageHeader currentPointBalance={currentPointBalance} userName={userName} />
+      <ExchangePageHeader
+        currentPointBalance={currentPointBalance}
+        pendingPointBalance={pendingPointBalance}
+        userName={userName}
+      />
 
       <div className="container mx-auto space-y-6 px-6 pt-8">
         {pickupItems.length > 0 ? (

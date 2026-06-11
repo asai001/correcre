@@ -8,6 +8,7 @@ import {
   listExchangeHistoryByMerchantAndStatus,
   transitionExchangeStatus,
 } from "@correcre/lib/dynamodb/exchange-history";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
@@ -33,6 +34,7 @@ type RuntimeConfig = {
   merchantTableName: string;
   merchandiseImageBucketName: string;
   userTableName: string;
+  companyTableName: string;
   pointTransactionTableName: string;
 };
 
@@ -51,8 +53,33 @@ function getRuntimeConfig(): RuntimeConfig {
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
   };
+}
+
+async function resolveCompanyName(
+  config: RuntimeConfig,
+  companyId: string,
+  cache: Map<string, string>,
+): Promise<string | undefined> {
+  if (cache.has(companyId)) {
+    return cache.get(companyId);
+  }
+
+  const company = await getCompanyById(
+    {
+      region: config.region,
+      tableName: config.companyTableName,
+    },
+    companyId,
+  );
+
+  const name = company ? company.shortName || company.name : undefined;
+  if (name) {
+    cache.set(companyId, name);
+  }
+  return name;
 }
 
 function normalizeStatus(value?: ExchangeHistoryStatus): ExchangeHistoryStatus {
@@ -109,12 +136,14 @@ function toSummary(
   item: ExchangeHistoryItem,
   merchantName: string | undefined,
   userName: string | undefined,
+  companyName: string | undefined,
 ): OperatorExchangeSummary {
   return {
     exchangeId: item.exchangeId,
     merchantId: item.merchantId ?? "",
     merchantName,
     companyId: item.companyId,
+    companyName,
     userId: item.userId,
     userName,
     merchandiseId: item.merchandiseId,
@@ -181,12 +210,14 @@ export async function listExchangesForOperator(
   }
 
   const userNameCache = new Map<string, string>();
+  const companyNameCache = new Map<string, string>();
   const summaries: OperatorExchangeSummary[] = [];
 
   for (const item of allItems) {
     const merchantName = item.merchantId ? merchantNameCache.get(item.merchantId) : undefined;
     const userName = await resolveUserName(config, item.companyId, item.userId, userNameCache);
-    summaries.push(toSummary(item, merchantName, userName));
+    const companyName = await resolveCompanyName(config, item.companyId, companyNameCache);
+    summaries.push(toSummary(item, merchantName, userName, companyName));
   }
 
   return summaries.sort(compareExchangedAtDesc);
@@ -198,6 +229,7 @@ async function buildExchangeDetail(
   actorType: ExchangeHistoryActorType,
 ): Promise<OperatorExchangeDetail> {
   const applicant = await resolveApplicantProfile(config, item.companyId, item.userId);
+  const companyName = await resolveCompanyName(config, item.companyId, new Map());
 
   let merchantName: string | undefined;
   if (item.merchantId) {
@@ -230,7 +262,7 @@ async function buildExchangeDetail(
   const status = normalizeStatus(item.status);
 
   return {
-    ...toSummary(item, merchantName, applicant.name),
+    ...toSummary(item, merchantName, applicant.name, companyName),
     applicantEmail: applicant.email,
     applicantPhoneNumber: applicant.phoneNumber,
     applicantAddress: applicant.address,

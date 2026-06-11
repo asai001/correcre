@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listUsersByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { DBUserItem } from "@correcre/types";
@@ -36,7 +37,26 @@ export async function getEmployeeUserForSession(session: EmployeeSession): Promi
     throw error;
   }
 
-  return users.find((user) => user.status !== "DELETED" && user.roles.includes("EMPLOYEE")) ?? null;
+  const user = users.find((user) => user.status !== "DELETED" && user.roles.includes("EMPLOYEE")) ?? null;
+
+  if (!user) {
+    return null;
+  }
+
+  // 所属企業が無効化（INACTIVE）されている場合はログイン・アクセスを許可しない。
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    user.companyId,
+  );
+
+  if (company?.status === "INACTIVE") {
+    return null;
+  }
+
+  return user;
 }
 
 export async function requireCurrentEmployeeUser() {

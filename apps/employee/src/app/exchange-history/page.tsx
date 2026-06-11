@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { reflectPoints } from "@correcre/lib/points-reflection";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
 import { ExchangeHistoryPage } from "@employee/features/exchange-history";
@@ -29,7 +30,7 @@ export default async function ExchangeHistoryRoute() {
       companyId={currentUser.companyId}
       userId={currentUser.userId}
       userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
-      currentPointBalance={currentUser.currentPointBalance ?? 0}
+      currentPointBalance={reflectPoints(currentUser).spendablePoint}
     />
   );
 }

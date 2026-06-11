@@ -4,6 +4,7 @@ import {
   faArrowRight,
   faBuilding,
   faBullseye,
+  faChartLine,
   faRightLeft,
   faStore,
   faUsers,
@@ -56,6 +57,13 @@ const dashboardCards = [
     description: "全提携企業の交換申請を俯瞰し、状態確認と必要に応じた代理操作・強制キャンセルを行います。",
     icon: faRightLeft,
     accentClassName: "from-rose-500 to-pink-600",
+  },
+  {
+    href: "/finance",
+    title: "収支ダッシュボード",
+    description: "導入企業からの収入と商品交換による支出を、提携企業ごと・月ごとに集計して確認します。",
+    icon: faChartLine,
+    accentClassName: "from-slate-600 to-slate-800",
   },
 ] as const;
 
