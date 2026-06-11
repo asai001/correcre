@@ -11,7 +11,7 @@ import {
   ADMIN_LOGIN_PATH,
   ADMIN_NEW_PASSWORD_PATH,
 } from "@admin/lib/auth/constants";
-import { getAdminUserForSession } from "@admin/lib/auth/current-user";
+import { getAdminUserForSession, resolveAdminUserForSession } from "@admin/lib/auth/current-user";
 import {
   mapAuthenticationErrorToCode,
   mapForgotPasswordConfirmErrorToCode,
@@ -150,11 +150,13 @@ export async function authenticate(
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
-  if (!(await getAdminUserForSession(result.session))) {
+  const lookup = await resolveAdminUserForSession(result.session);
+
+  if (!lookup.allowed) {
     await clearAdminSession();
 
     return {
-      errorCode: "admin_role_not_allowed",
+      errorCode: lookup.reason === "company_inactive" ? "company_inactive" : "admin_role_not_allowed",
     };
   }
 

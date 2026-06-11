@@ -12,11 +12,15 @@ import { ADMIN_LOGIN_PATH } from "./constants";
 import { getAdminSession } from "./session";
 import type { AdminSession } from "./verify-token";
 
-export async function getAdminUserForSession(session: AdminSession): Promise<DBUserItem | null> {
+export type AdminSessionUserLookup =
+  | { allowed: true; user: DBUserItem }
+  | { allowed: false; reason: "user_not_found" | "company_inactive" };
+
+export async function resolveAdminUserForSession(session: AdminSession): Promise<AdminSessionUserLookup> {
   const cognitoSub = session.payload.sub?.trim();
 
   if (!cognitoSub) {
-    return null;
+    return { allowed: false, reason: "user_not_found" };
   }
 
   let users: DBUserItem[];
@@ -40,7 +44,7 @@ export async function getAdminUserForSession(session: AdminSession): Promise<DBU
   const user = users.find((user) => user.status !== "DELETED" && user.roles.includes("ADMIN")) ?? null;
 
   if (!user) {
-    return null;
+    return { allowed: false, reason: "user_not_found" };
   }
 
   // 所属企業が無効化（INACTIVE）されている場合はログイン・アクセスを許可しない。
@@ -53,10 +57,15 @@ export async function getAdminUserForSession(session: AdminSession): Promise<DBU
   );
 
   if (company?.status === "INACTIVE") {
-    return null;
+    return { allowed: false, reason: "company_inactive" };
   }
 
-  return user;
+  return { allowed: true, user };
+}
+
+export async function getAdminUserForSession(session: AdminSession): Promise<DBUserItem | null> {
+  const lookup = await resolveAdminUserForSession(session);
+  return lookup.allowed ? lookup.user : null;
 }
 
 export async function requireCurrentAdminUser() {
