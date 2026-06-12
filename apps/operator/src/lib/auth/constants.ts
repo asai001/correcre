@@ -14,4 +14,5 @@ export const OPERATOR_PROTECTED_PATH_PREFIXES = [
   "/missions",
   "/exchanges",
   "/merchants",
+  "/settings",
 ] as const;

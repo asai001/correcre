@@ -192,6 +192,18 @@ function normalizeMerchantInput(input: CreateMerchantInput) {
     throw new Error("メールアドレスの形式が正しくありません");
   }
 
+  const exchangeFeePercent = input.exchangeFeePercent;
+  if (exchangeFeePercent !== undefined) {
+    if (
+      typeof exchangeFeePercent !== "number" ||
+      !Number.isFinite(exchangeFeePercent) ||
+      exchangeFeePercent < 0 ||
+      exchangeFeePercent > 100
+    ) {
+      throw new Error("交換手数料は 0〜100 の数値（%）で入力してください");
+    }
+  }
+
   return {
     name,
     kanaName: normalizeOptionalText(input.kanaName),
@@ -204,6 +216,7 @@ function normalizeMerchantInput(input: CreateMerchantInput) {
     contactEmail,
     bankTransferAccount: normalizeOptionalText(input.bankTransferAccount),
     paymentCycle: normalizeOptionalText(input.paymentCycle),
+    exchangeFeePercent,
   };
 }
 
@@ -301,6 +314,7 @@ export async function createMerchantForOperator(input: CreateMerchantInput): Pro
     contactEmail: normalized.contactEmail,
     bankTransferAccount: normalized.bankTransferAccount,
     paymentCycle: normalized.paymentCycle,
+    exchangeFeePercent: normalized.exchangeFeePercent,
     createdAt: now,
     updatedAt: now,
   };
@@ -347,6 +361,7 @@ export async function updateMerchantForOperator(input: UpdateMerchantInput): Pro
     contactEmail: normalized.contactEmail,
     bankTransferAccount: normalized.bankTransferAccount,
     paymentCycle: normalized.paymentCycle,
+    exchangeFeePercent: normalized.exchangeFeePercent,
     updatedAt: now,
   };
 

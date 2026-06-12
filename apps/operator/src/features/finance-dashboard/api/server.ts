@@ -1,5 +1,6 @@
 import "server-only";
 
+import { resolveExchangeFeePercent } from "@correcre/lib/billing";
 import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
@@ -109,6 +110,7 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
       return {
         merchantId: merchant.merchantId,
         merchantName: merchant.name,
+        exchangeFeePercent: resolveExchangeFeePercent(merchant.exchangeFeePercent),
         byMonth,
         totalExpenseYen,
       };

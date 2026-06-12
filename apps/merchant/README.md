@@ -19,7 +19,13 @@ AWS_PROFILE=CorreCre-Dev-Account
 DDB_MERCHANT_TABLE_NAME=correcre-merchant-dev
 DDB_MERCHANT_USER_TABLE_NAME=correcre-merchant-user-dev
 DDB_MERCHANDISE_TABLE_NAME=correcre-merchandise-dev
+DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
+DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
+# 収支・精算画面の請求メール送信（SES）
+SES_FROM_EMAIL=correcre-info@efficient-technology.com
 ```
+
+請求メールの宛先は運用者アプリの「設定」画面（system-setting テーブル）で管理します。未設定の場合は correcre-info@efficient-technology.com 宛に送信されます。
 
 ## Merchant User Provisioning
 

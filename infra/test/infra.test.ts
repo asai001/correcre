@@ -87,7 +87,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 15);
+    template.resourceCountIs("AWS::DynamoDB::Table", 16);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",

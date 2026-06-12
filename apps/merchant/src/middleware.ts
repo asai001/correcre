@@ -100,5 +100,6 @@ export const config = {
     "/dashboard/:path*",
     "/merchandise/:path*",
     "/exchanges/:path*",
+    "/settlement/:path*",
   ],
 };

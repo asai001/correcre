@@ -7,6 +7,7 @@ import type { Route } from "next";
 import {
   faArrowLeft,
   faBoxesStacked,
+  faFileInvoice,
   faGauge,
   faRightLeft,
   faUserShield,
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "ダッシュボード", href: "/dashboard" as Route, icon: faGauge },
   { label: "商品・サービス管理", href: "/merchandise" as Route, icon: faBoxesStacked },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
+  { label: "収支・精算", href: "/settlement" as Route, icon: faFileInvoice },
 ];
 
 function isActiveNav(pathname: string | null, href: string): boolean {

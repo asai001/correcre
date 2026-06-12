@@ -6,6 +6,7 @@ import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowUpRightFromSquare,
+  faChartColumn,
   faCirclePlus,
   faClipboardCheck,
   faPenToSquare,
@@ -22,7 +23,6 @@ import {
 import type {
   CreateMerchantInput,
   MerchantApplicationDetail,
-  MerchantStats,
   MerchantSummary,
   UpdateMerchantInput,
 } from "../model/types";
@@ -68,24 +68,7 @@ function createInitialFormState(): FormState {
 type MerchantManagementProps = {
   initialMerchants: MerchantSummary[];
   initialPendingApplications: MerchantApplicationDetail[];
-  merchantStats: MerchantStats[];
   operatorName: string;
-};
-
-function formatYen(value: number) {
-  return `¥${value.toLocaleString("ja-JP")}`;
-}
-
-function formatCount(value: number) {
-  return value.toLocaleString("ja-JP");
-}
-
-const EMPTY_MERCHANT_STATS: Omit<MerchantStats, "merchantId"> = {
-  publishedCount: 0,
-  unpublishedCount: 0,
-  inProgressCount: 0,
-  totalExchangeCount: 0,
-  totalAmountYen: 0,
 };
 
 const STATUS_LABELS: Record<MerchantSummary["status"], string> = {
@@ -98,10 +81,8 @@ const STATUS_LABELS: Record<MerchantSummary["status"], string> = {
 export default function MerchantManagement({
   initialMerchants,
   initialPendingApplications,
-  merchantStats,
   operatorName,
 }: MerchantManagementProps) {
-  const statsByMerchantId = new Map(merchantStats.map((stats) => [stats.merchantId, stats]));
   const [merchants, setMerchants] = useState(initialMerchants);
   const [pendingApplications, setPendingApplications] = useState(initialPendingApplications);
   const [form, setForm] = useState<FormState>(() => createInitialFormState());
@@ -413,10 +394,22 @@ export default function MerchantManagement({
       </section>
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
-        <div className="flex items-center gap-3">
-          <FontAwesomeIcon icon={faStore} className="text-emerald-600" />
-          <h2 className="text-xl font-bold text-slate-900">登録済みの提携企業</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <FontAwesomeIcon icon={faStore} className="text-emerald-600" />
+            <h2 className="text-xl font-bold text-slate-900">登録済みの提携企業</h2>
+          </div>
+          <Link
+            href="/merchants/summary"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+          >
+            <FontAwesomeIcon icon={faChartColumn} />
+            全体サマリーを見る
+          </Link>
         </div>
+        <p className="mt-2 text-sm text-slate-500">
+          企業ごとの商品・交換実績や月ごとの収支は、各行の「サマリー」から確認できます。
+        </p>
 
         {merchants.length === 0 ? (
           <p className="mt-6 text-sm text-slate-500">まだ提携企業は登録されていません。</p>
@@ -424,83 +417,51 @@ export default function MerchantManagement({
           <ul className="mt-5 divide-y divide-slate-200">
             {merchants
               .filter((merchant) => merchant.status !== "PENDING")
-              .map((merchant) => {
-                const stats = statsByMerchantId.get(merchant.merchantId) ?? {
-                  merchantId: merchant.merchantId,
-                  ...EMPTY_MERCHANT_STATS,
-                };
-                return (
-                  <li
-                    key={merchant.merchantId}
-                    className="flex flex-col gap-4 py-5 lg:flex-row lg:items-start lg:justify-between"
-                  >
-                    <div className="flex-1">
-                      <div className="text-base font-semibold text-slate-900">{merchant.name}</div>
-                      <div className="text-xs text-slate-500">
-                        merchantId: {merchant.merchantId} ／ 状態: {STATUS_LABELS[merchant.status]}
-                      </div>
-
-                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 xl:grid-cols-5">
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          <dt className="text-[11px] font-semibold text-slate-500">公開済み商品</dt>
-                          <dd className="mt-0.5 text-lg font-bold text-emerald-600">
-                            {formatCount(stats.publishedCount)}
-                          </dd>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          <dt className="text-[11px] font-semibold text-slate-500">非公開商品</dt>
-                          <dd className="mt-0.5 text-lg font-bold text-amber-600">
-                            {formatCount(stats.unpublishedCount)}
-                          </dd>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          <dt className="text-[11px] font-semibold text-slate-500">対応中の商品</dt>
-                          <dd className="mt-0.5 text-lg font-bold text-indigo-600">
-                            {formatCount(stats.inProgressCount)}
-                          </dd>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          <dt className="text-[11px] font-semibold text-slate-500">累計交換数</dt>
-                          <dd className="mt-0.5 text-lg font-bold text-slate-900">
-                            {formatCount(stats.totalExchangeCount)}
-                          </dd>
-                        </div>
-                        <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                          <dt className="text-[11px] font-semibold text-slate-500">発生金額</dt>
-                          <dd className="mt-0.5 text-lg font-bold text-slate-900">
-                            {formatYen(stats.totalAmountYen)}
-                          </dd>
-                        </div>
-                      </dl>
+              .map((merchant) => (
+                <li
+                  key={merchant.merchantId}
+                  className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div className="flex-1">
+                    <div className="text-base font-semibold text-slate-900">{merchant.name}</div>
+                    <div className="text-xs text-slate-500">
+                      merchantId: {merchant.merchantId} ／ 状態: {STATUS_LABELS[merchant.status]}
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => handleOpenEdit(merchant)}
-                        startIcon={<FontAwesomeIcon icon={faPenToSquare} />}
-                        sx={{ borderRadius: "999px", textTransform: "none" }}
-                      >
-                        編集
-                      </Button>
-                      <Link
-                        href={`/merchants/${encodeURIComponent(merchant.merchantId)}/merchandise`}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-                      >
-                        登録商品
-                        <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                      </Link>
-                      <Link
-                        href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
-                      >
-                        ユーザー招待
-                        <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                      </Link>
-                    </div>
-                  </li>
-                );
-              })}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => handleOpenEdit(merchant)}
+                      startIcon={<FontAwesomeIcon icon={faPenToSquare} />}
+                      sx={{ borderRadius: "999px", textTransform: "none" }}
+                    >
+                      編集
+                    </Button>
+                    <Link
+                      href={`/merchants/${encodeURIComponent(merchant.merchantId)}/summary`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    >
+                      サマリー
+                      <FontAwesomeIcon icon={faChartColumn} />
+                    </Link>
+                    <Link
+                      href={`/merchants/${encodeURIComponent(merchant.merchantId)}/merchandise`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    >
+                      登録商品
+                      <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                    </Link>
+                    <Link
+                      href={`/merchants/${encodeURIComponent(merchant.merchantId)}/users`}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
+                    >
+                      ユーザー招待
+                      <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                    </Link>
+                  </div>
+                </li>
+              ))}
           </ul>
         )}
       </section>

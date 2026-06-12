@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faArrowRight, faBoxesStacked, faRightLeft } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faBoxesStacked, faFileInvoice, faRightLeft } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
 import { joinNameParts } from "@correcre/lib/user-profile";
@@ -23,6 +23,13 @@ const dashboardCards = [
     description: "従業員から申請された商品・サービスの交換を確認し、状態を更新します。",
     icon: faRightLeft,
     accentClassName: "from-emerald-500 to-teal-600",
+  },
+  {
+    href: "/settlement" as const,
+    title: "収支・精算",
+    description: "月ごとの売上と運用者へのご請求額を確認し、請求メールを送信します。",
+    icon: faFileInvoice,
+    accentClassName: "from-amber-500 to-orange-600",
   },
 ];
 

@@ -86,7 +86,7 @@ export async function POST(req: Request) {
 
     body = (await req.json()) as CreateEmployeeRequest;
     await ensureDepartmentExists(currentAdminUser.companyId, body.departmentName);
-    const employee = await createEmployeeInDynamo(currentAdminUser.companyId, body);
+    const employee = await createEmployeeInDynamo(currentAdminUser.companyId, body, currentAdminUser);
     return NextResponse.json(employee, { status: 201 });
   } catch (err) {
     if (err instanceof SyntaxError) {

@@ -20,6 +20,8 @@ export type CompanyIncomeRow = {
 export type MerchantExpenseRow = {
   merchantId: string;
   merchantName: string;
+  // 適用される交換手数料率（%、既定値解決済み）。
+  exchangeFeePercent: number;
   byMonth: Record<string, number>;
   totalExpenseYen: number;
 };

@@ -24,6 +24,7 @@ export interface ApplicationDynamoTables {
   exchangeFavoriteTable: dynamodb.Table;
   operatorAuditLogTable: dynamodb.Table;
   sessionTable: dynamodb.Table;
+  systemSettingTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -365,6 +366,18 @@ function createSessionTable(scope: Construct, stage: InfraStage): dynamodb.Table
   return table;
 }
 
+// SystemSetting
+// - settingKey = <settingKey>（例: NOTIFICATION）
+// - sort key なし（1 設定 = 1 アイテム）
+// - GSI なし（settingKey の Get のみ）
+function createSystemSettingTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "SystemSettingTable",
+    buildTableProps(stage, buildTableName("system-setting", stage), "settingKey"),
+  );
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -385,5 +398,6 @@ export function createApplicationDynamoTables(
     exchangeFavoriteTable: createExchangeFavoriteTable(scope, props.stage),
     operatorAuditLogTable: createOperatorAuditLogTable(scope, props.stage),
     sessionTable: createSessionTable(scope, props.stage),
+    systemSettingTable: createSystemSettingTable(scope, props.stage),
   };
 }

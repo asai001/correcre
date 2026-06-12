@@ -103,5 +103,6 @@ export const config = {
     "/missions/:path*",
     "/exchanges/:path*",
     "/merchants/:path*",
+    "/settings/:path*",
   ],
 };

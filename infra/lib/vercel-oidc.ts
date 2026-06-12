@@ -79,6 +79,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.exchangeFavoriteTable,
     dynamoTables.operatorAuditLogTable,
     dynamoTables.sessionTable,
+    dynamoTables.systemSettingTable,
   ];
 }
 

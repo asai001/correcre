@@ -12,6 +12,7 @@ import {
   TextField,
 } from "@mui/material";
 
+import { DEFAULT_EXCHANGE_FEE_PERCENT } from "@correcre/lib/billing";
 import type { MerchantStatus } from "@correcre/types";
 import type { CreateMerchantInput, MerchantSummary, UpdateMerchantInput } from "../model/types";
 
@@ -39,6 +40,7 @@ type FormState = {
   contactEmail: string;
   bankTransferAccount: string;
   paymentCycle: string;
+  exchangeFeePercent: string;
 };
 
 function toFormState(merchant: MerchantSummary): FormState {
@@ -55,6 +57,7 @@ function toFormState(merchant: MerchantSummary): FormState {
     contactEmail: merchant.contactEmail ?? "",
     bankTransferAccount: merchant.bankTransferAccount ?? "",
     paymentCycle: merchant.paymentCycle ?? "",
+    exchangeFeePercent: merchant.exchangeFeePercent !== undefined ? String(merchant.exchangeFeePercent) : "",
   };
 }
 
@@ -90,6 +93,8 @@ export default function MerchantEditDialog({
   const handleSubmit = () => {
     if (!merchant || !form || submitting) return;
 
+    const exchangeFeePercentText = form.exchangeFeePercent.trim();
+
     onSubmit({
       merchantId: merchant.merchantId,
       name: form.name,
@@ -104,6 +109,7 @@ export default function MerchantEditDialog({
       contactEmail: form.contactEmail || undefined,
       bankTransferAccount: form.bankTransferAccount || undefined,
       paymentCycle: form.paymentCycle || undefined,
+      exchangeFeePercent: exchangeFeePercentText === "" ? undefined : Number(exchangeFeePercentText),
     });
   };
 
@@ -133,7 +139,15 @@ export default function MerchantEditDialog({
                 </MenuItem>
               ))}
             </TextField>
-            <div />
+            <TextField
+              label="交換手数料（%）"
+              type="number"
+              fullWidth
+              value={form.exchangeFeePercent}
+              onChange={handleChange("exchangeFeePercent")}
+              inputProps={{ min: 0, max: 100, step: 0.1 }}
+              helperText={`請求時に売上から差し引く手数料率。未入力の場合は既定値（${DEFAULT_EXCHANGE_FEE_PERCENT}%）を適用します。`}
+            />
             <TextField
               className="md:col-span-2"
               label="会社所在地"

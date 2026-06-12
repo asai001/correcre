@@ -19,7 +19,11 @@ AWS_PROFILE=CorreCre-Dev-Account
 DDB_USER_TABLE_NAME=correcre-user-dev
 DDB_COMPANY_TABLE_NAME=correcre-company-dev
 DDB_DEPARTMENT_TABLE_NAME=correcre-department-dev
+# 「設定」画面（通知先メールアドレス）の保存先
+DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
 ```
+
+「設定」画面で保存した通知先メールアドレス（複数登録可）は、提携企業からの請求メールと、管理者画面でのユーザー追加通知メールの宛先として使用されます。
 
 ## First Operator User
 
