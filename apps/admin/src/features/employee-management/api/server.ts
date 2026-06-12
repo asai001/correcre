@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
+import { createCognitoUser, deleteCognitoUser, updateCognitoUserEmail } from "@correcre/lib/cognito/user";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
@@ -590,6 +590,10 @@ export async function updateEmployeeInDynamo(
 
   await assertUniqueEmail(config, normalizedInput.email, targetUser.userId);
 
+  const previousEmail = targetUser.email;
+  const emailChanged = previousEmail.trim().toLowerCase() !== normalizedInput.email;
+  const cognitoUsername = targetUser.cognitoSub?.trim();
+
   const nextUserPointBalance = (targetUser.currentPointBalance ?? 0) + input.pointAdjustment;
   const nextCompanyPointBalance = company.companyPointBalance - input.pointAdjustment;
 
@@ -671,43 +675,82 @@ export async function updateEmployeeInDynamo(
     userRemoveExpressions.push("address");
   }
 
-  await client.send(
-    new TransactWriteCommand({
-      TransactItems: [
+  if (emailChanged && cognitoUsername) {
+    try {
+      await updateCognitoUserEmail(
         {
-          Update: {
-            TableName: config.userTableName,
-            Key: {
-              companyId,
-              sk: buildUserSk(targetUser.userId),
-            },
-            ConditionExpression: "currentPointBalance = :currentPointBalance",
-            UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
-            ExpressionAttributeNames: userExpressionAttributeNames,
-            ExpressionAttributeValues: userExpressionAttributeValues,
-          },
+          region: config.cognitoRegion,
+          userPoolId: config.cognitoUserPoolId,
         },
         {
-          Update: {
-            TableName: config.companyTableName,
-            Key: {
-              companyId,
-            },
-            ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
-            UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
-            ExpressionAttributeValues: {
-              ":currentCompanyPointBalance": company.companyPointBalance,
-              ":nextCompanyPointBalance": nextCompanyPointBalance,
-              ":updatedAt": now,
+          username: cognitoUsername,
+          newEmail: normalizedInput.email,
+        },
+      );
+    } catch (error) {
+      throw toEmployeeProvisionError(error);
+    }
+  }
+
+  try {
+    await client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: config.userTableName,
+              Key: {
+                companyId,
+                sk: buildUserSk(targetUser.userId),
+              },
+              ConditionExpression: "currentPointBalance = :currentPointBalance",
+              UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
+              ExpressionAttributeNames: userExpressionAttributeNames,
+              ExpressionAttributeValues: userExpressionAttributeValues,
             },
           },
-        },
-        ...(pointTransaction
-          ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
-          : []),
-      ],
-    }),
-  );
+          {
+            Update: {
+              TableName: config.companyTableName,
+              Key: {
+                companyId,
+              },
+              ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
+              UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
+              ExpressionAttributeValues: {
+                ":currentCompanyPointBalance": company.companyPointBalance,
+                ":nextCompanyPointBalance": nextCompanyPointBalance,
+                ":updatedAt": now,
+              },
+            },
+          },
+          ...(pointTransaction
+            ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
+            : []),
+        ],
+      }),
+    );
+  } catch (error) {
+    if (emailChanged && cognitoUsername) {
+      try {
+        await updateCognitoUserEmail(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          {
+            username: cognitoUsername,
+            newEmail: previousEmail,
+          },
+        );
+      } catch (rollbackError) {
+        console.error("Failed to roll back Cognito email after DynamoDB update failure", rollbackError);
+        throw new Error("DB 更新失敗後の Cognito メールアドレスのロールバックに失敗しました。手動確認が必要です。");
+      }
+    }
+
+    throw error;
+  }
 
   const updatedEmployee = toEmployee({
     ...targetUser,

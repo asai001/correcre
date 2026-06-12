@@ -1,10 +1,12 @@
 import "server-only";
 
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { updateCognitoUserEmail } from "@correcre/lib/cognito/user";
 import { buildUserByEmailGsiPk, buildUserSk, listUsersByEmail } from "@correcre/lib/dynamodb/user";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
+import { getEmployeeCognitoConfig } from "@employee/lib/auth/config";
 import type { DBUserAddress, DBUserItem } from "@correcre/types";
 import type { EditableEmployeeProfile, UpdateOwnProfileInput } from "../model/types";
 
@@ -142,6 +144,10 @@ export async function updateOwnProfileInDynamo(currentUser: DBUserItem, input: U
 
   await assertUniqueEmail(config, normalizedInput.email, currentUser.userId);
 
+  const previousEmail = currentUser.email;
+  const emailChanged = previousEmail.trim().toLowerCase() !== normalizedInput.email;
+  const cognitoUsername = currentUser.cognitoSub?.trim();
+
   const now = new Date().toISOString();
   const client = getDynamoDocumentClient(config.region);
   const setExpressions = [
@@ -178,17 +184,64 @@ export async function updateOwnProfileInDynamo(currentUser: DBUserItem, input: U
     removeExpressions.push("address");
   }
 
-  await client.send(
-    new UpdateCommand({
-      TableName: config.userTableName,
-      Key: {
-        companyId: currentUser.companyId,
-        sk: buildUserSk(currentUser.userId),
-      },
-      UpdateExpression: `${setExpressions.length ? `SET ${setExpressions.join(", ")}` : ""}${removeExpressions.length ? ` REMOVE ${removeExpressions.join(", ")}` : ""}`,
-      ExpressionAttributeValues: expressionAttributeValues,
-    }),
-  );
+  if (emailChanged && cognitoUsername) {
+    const cognitoConfig = getEmployeeCognitoConfig();
+
+    try {
+      await updateCognitoUserEmail(
+        {
+          region: cognitoConfig.region,
+          userPoolId: cognitoConfig.userPoolId,
+        },
+        {
+          username: cognitoUsername,
+          newEmail: normalizedInput.email,
+        },
+      );
+    } catch (error) {
+      if (error instanceof Error && (error.name === "UsernameExistsException" || error.name === "AliasExistsException")) {
+        throw new Error("同じメールアドレスのユーザーがすでに登録されています");
+      }
+
+      throw error;
+    }
+  }
+
+  try {
+    await client.send(
+      new UpdateCommand({
+        TableName: config.userTableName,
+        Key: {
+          companyId: currentUser.companyId,
+          sk: buildUserSk(currentUser.userId),
+        },
+        UpdateExpression: `${setExpressions.length ? `SET ${setExpressions.join(", ")}` : ""}${removeExpressions.length ? ` REMOVE ${removeExpressions.join(", ")}` : ""}`,
+        ExpressionAttributeValues: expressionAttributeValues,
+      }),
+    );
+  } catch (error) {
+    if (emailChanged && cognitoUsername) {
+      const cognitoConfig = getEmployeeCognitoConfig();
+
+      try {
+        await updateCognitoUserEmail(
+          {
+            region: cognitoConfig.region,
+            userPoolId: cognitoConfig.userPoolId,
+          },
+          {
+            username: cognitoUsername,
+            newEmail: previousEmail,
+          },
+        );
+      } catch (rollbackError) {
+        console.error("Failed to roll back Cognito email after DynamoDB update failure", rollbackError);
+        throw new Error("DB 更新失敗後の Cognito メールアドレスのロールバックに失敗しました。手動確認が必要です。");
+      }
+    }
+
+    throw error;
+  }
 
   return toEditableEmployeeProfile({
     ...currentUser,
