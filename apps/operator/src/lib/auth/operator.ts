@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
@@ -7,8 +8,8 @@ import { listUsersByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { DBUserItem } from "@correcre/types";
 
-import { OPERATOR_LOGIN_PATH } from "./constants";
-import { clearOperatorSession, getOperatorSession } from "./session";
+import { buildClearOperatorSessionRedirect } from "./redirect";
+import { getOperatorSession } from "./session";
 import type { OperatorSession } from "./verify-token";
 
 type OperatorAccessStatus =
@@ -74,8 +75,7 @@ export async function requireOperatorSession() {
   const access = await getOperatorAccessStatus();
 
   if (!access.allowed) {
-    await clearOperatorSession();
-    redirect(OPERATOR_LOGIN_PATH);
+    redirect(buildClearOperatorSessionRedirect() as Route);
   }
 
   return access.session;
@@ -85,8 +85,7 @@ export async function requireCurrentOperatorUser() {
   const access = await getOperatorAccessStatus();
 
   if (!access.allowed) {
-    await clearOperatorSession();
-    redirect(OPERATOR_LOGIN_PATH);
+    redirect(buildClearOperatorSessionRedirect() as Route);
   }
 
   return access.user;

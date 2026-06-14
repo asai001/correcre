@@ -23,6 +23,7 @@ import PastPerformanceStatsCards from "./PastPerformanceStatsCards";
 type PastPerformanceProps = {
   companyId: string;
   userId: string;
+  showPointExchangeLink: boolean;
 };
 
 const emptySummary: IndividualAnalysisSummary = {
@@ -36,7 +37,7 @@ const emptySummary: IndividualAnalysisSummary = {
   improvementMissions: [],
 };
 
-export default function PastPerformance({ companyId, userId }: PastPerformanceProps) {
+export default function PastPerformance({ companyId, userId, showPointExchangeLink }: PastPerformanceProps) {
   const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
   const reportTablePagination = useMemo(
     () => ({
@@ -79,7 +80,11 @@ export default function PastPerformance({ companyId, userId }: PastPerformancePr
 
   return (
     <div className="space-y-1 pb-5">
-      <PastPerformanceHeader employeeName={loginInfo?.displayName ?? "社員"} departmentName={loginInfo?.departmentName} />
+      <PastPerformanceHeader
+        employeeName={loginInfo?.displayName ?? "社員"}
+        departmentName={loginInfo?.departmentName}
+        showPointExchangeLink={showPointExchangeLink}
+      />
 
       <div className="container mx-auto px-6">
         <div className="mt-5">

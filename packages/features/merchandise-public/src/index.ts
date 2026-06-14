@@ -11,3 +11,4 @@ export {
 } from "./types";
 export { default as MerchandiseCard } from "./ui/MerchandiseCard";
 export { default as MerchandiseDetail } from "./ui/MerchandiseDetail";
+export { default as MerchandiseDetailView } from "./ui/MerchandiseDetailView";

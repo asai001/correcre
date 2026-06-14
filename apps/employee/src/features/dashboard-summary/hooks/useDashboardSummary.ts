@@ -33,6 +33,16 @@ export function useDashboardSummary(
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => setRefreshKey((current) => current + 1);
+
+    window.addEventListener("employee-dashboard-summary:refresh", handleRefresh);
+    return () => {
+      window.removeEventListener("employee-dashboard-summary:refresh", handleRefresh);
+    };
+  }, []);
 
   useEffect(() => {
     // companyId / userId がまだ分からないとき or 明示的に無効化されているとき
@@ -73,7 +83,7 @@ export function useDashboardSummary(
     return () => {
       ac.abort();
     };
-  }, [companyId, userId, targetYearMonth, enabled]);
+  }, [companyId, userId, targetYearMonth, enabled, refreshKey]);
 
   return { summary, loading, error };
 }

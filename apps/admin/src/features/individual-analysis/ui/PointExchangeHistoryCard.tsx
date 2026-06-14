@@ -173,16 +173,18 @@ export default function PointExchangeHistoryCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-2xl font-bold text-slate-900">{"ポイント交換履歴"}</h3>
         <Button
-          variant="contained"
+          variant="outlined"
           startIcon={<FontAwesomeIcon icon={faDownload} />}
           disabled={loading || items.length === 0}
           onClick={() => downloadCsv(exportFilename, exportRows)}
           sx={{
             alignSelf: { xs: "stretch", sm: "center" },
             borderRadius: "14px",
-            backgroundColor: "#475569",
             px: 2.5,
             py: 1.25,
+            color: "#475569",
+            borderColor: "#CBD5E1",
+            "&:hover": { borderColor: "#475569", backgroundColor: "#F8FAFC" },
           }}
         >
           {"データエクスポート"}

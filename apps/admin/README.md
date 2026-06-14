@@ -23,6 +23,13 @@ DDB_MISSION_TABLE_NAME=correcre-mission-dev
 DDB_MISSION_REPORT_TABLE_NAME=correcre-mission-report-dev
 DDB_USER_MONTHLY_STATS_TABLE_NAME=correcre-user-monthly-stats-dev
 DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
+# ユーザー追加時に運用者へ通知メールを送るための設定
+# OPERATOR_APP_URL は通知メール内の運用者画面リンクに使用します（development では未設定時 http://localhost:3002）
+OPERATOR_APP_URL=http://localhost:3002
+# SES_FROM_EMAIL は省略時 correcre-info@efficient-technology.com
+# SES_FROM_EMAIL=correcre-info@efficient-technology.com
+# 通知メールの宛先設定（運用者画面の「設定」で管理）。未設定時は OPERATOR ロールのユーザー全員に送信
+DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
 ```
 
 `ADMIN_COGNITO_REGION`、`ADMIN_COGNITO_USER_POOL_ID`、`ADMIN_COGNITO_APP_CLIENT_ID` の値は、CDK スタックの `AdminCognitoRegion`、`AdminCognitoUserPoolId`、`AdminCognitoUserPoolClientId` として出力されます。

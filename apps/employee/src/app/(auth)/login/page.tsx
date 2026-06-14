@@ -34,7 +34,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </div>
       <Image
         className="absolute bottom-5 right-7.5 h-auto w-16 lg:bottom-15 lg:right-20 lg:w-[110px]"
-        src="/favicon.png"
+        src="/favicon.svg"
         alt=""
         width={110}
         height={110}

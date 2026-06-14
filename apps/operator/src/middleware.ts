@@ -101,6 +101,8 @@ export const config = {
     "/company-registration/:path*",
     "/user-registration/:path*",
     "/missions/:path*",
+    "/exchanges/:path*",
     "/merchants/:path*",
+    "/settings/:path*",
   ],
 };

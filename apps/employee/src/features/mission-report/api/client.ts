@@ -81,6 +81,7 @@ export type SubmitMissionReportResult = {
   reportId: string;
   reportedAt: string;
   status: "PENDING" | "APPROVED";
+  pointGranted: number;
 };
 
 export async function submitMissionReport(payload: SubmitPayload): Promise<SubmitMissionReportResult> {

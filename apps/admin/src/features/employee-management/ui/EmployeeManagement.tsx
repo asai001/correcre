@@ -58,9 +58,9 @@ const roleLabelMap: Record<EmployeeManagementRole, string> = {
 
 const roleBadgeClassMap: Record<EmployeeManagementRole, string> = {
   EMPLOYEE: "bg-slate-100 text-slate-700 border-slate-200",
-  MANAGER: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  ADMIN: "bg-violet-50 text-violet-700 border-violet-200",
-  OPERATOR: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  MANAGER: "bg-blue-50 text-blue-600 border-blue-200",
+  ADMIN: "bg-blue-500 text-white border-blue-500",
+  OPERATOR: "bg-blue-100 text-blue-700 border-blue-200",
 };
 
 const statusLabelMap: Record<EmployeeManagementStatus, string> = {
@@ -81,8 +81,8 @@ const authLinkLabelMap: Record<EmployeeAuthLinkStatus, string> = {
 };
 
 const authLinkBadgeClassMap: Record<EmployeeAuthLinkStatus, string> = {
-  UNLINKED: "bg-orange-50 text-orange-700 border-orange-200",
-  LINKED: "bg-cyan-50 text-cyan-700 border-cyan-200",
+  UNLINKED: "bg-red-50 text-red-700 border-red-200",
+  LINKED: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 function formatDateTime(value?: string) {
@@ -143,7 +143,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "部署",
       "権限",
       "状態",
-      "Cognito連携",
+      "認証連携",
       "メールアドレス",
       "電話番号",
       "郵便番号",
@@ -201,7 +201,7 @@ function getEmployeeColumns(
       render: (row) => (
         <div className="flex min-w-[220px] flex-wrap gap-2">
           {row.departmentName ? (
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600">
               {row.departmentName}
             </span>
           ) : null}
@@ -236,7 +236,7 @@ function getEmployeeColumns(
           </div>
           {row.authLinkStatus === "UNLINKED" ? (
             <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
-              要対応: Cognito 連携が失われています。User.cognitoSub を確認してください。
+              要対応: 認証連携が失われています。
             </div>
           ) : null}
         </div>
@@ -264,7 +264,7 @@ function getEmployeeColumns(
       width: "8%",
       render: (row) => (
         <div className="flex items-center justify-center">
-          <IconButton size="small" aria-label={`${row.name}を編集`} onClick={() => onEditEmployee(row)} sx={{ color: "#2563EB" }}>
+          <IconButton size="small" aria-label={`${row.name}を編集`} onClick={() => onEditEmployee(row)} sx={{ color: "#3B82F6" }}>
             <FontAwesomeIcon icon={faPenToSquare} />
           </IconButton>
         </div>
@@ -371,7 +371,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
       setSearchQuery("");
       setSelectedDepartment("all");
       setPage(0);
-      setNotice(`${createdEmployee.name} を登録しました。Cognito から招待メールを送信しています。`);
+      setNotice(`${createdEmployee.name} を登録しました。招待メールを送信しています。`);
       reload();
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ユーザーの登録に失敗しました");
@@ -502,20 +502,27 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                 setRegistrationError(null);
                 setRegistrationDialogOpen(true);
               }}
-              sx={{ borderRadius: "14px", backgroundColor: "#2563EB", px: 2.5, py: 1.25 }}
+              sx={{ borderRadius: "14px", backgroundColor: "#3B82F6", px: 2.5, py: 1.25, "&:hover": { backgroundColor: "#2563EB" } }}
             >
               ユーザー登録
             </Button>
             <Button
-              variant="contained"
+              variant="outlined"
               startIcon={<FontAwesomeIcon icon={faBuilding} />}
               onClick={() => setDepartmentDialogOpen(true)}
-              sx={{ borderRadius: "14px", backgroundColor: "#10B981", px: 2.5, py: 1.25 }}
+              sx={{
+                borderRadius: "14px",
+                px: 2.5,
+                py: 1.25,
+                color: "#3B82F6",
+                borderColor: "#BFDBFE",
+                "&:hover": { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" },
+              }}
             >
               部署管理
             </Button>
             <Button
-              variant="contained"
+              variant="outlined"
               startIcon={<FontAwesomeIcon icon={faDownload} />}
               onClick={() =>
                 downloadCsv(
@@ -523,7 +530,14 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
                   buildExportRows(filteredEmployees),
                 )
               }
-              sx={{ borderRadius: "14px", backgroundColor: "#475569", px: 2.5, py: 1.25 }}
+              sx={{
+                borderRadius: "14px",
+                px: 2.5,
+                py: 1.25,
+                color: "#475569",
+                borderColor: "#CBD5E1",
+                "&:hover": { borderColor: "#475569", backgroundColor: "#F8FAFC" },
+              }}
             >
               CSV 出力
             </Button>
@@ -571,14 +585,9 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
 
         {unlinkedEmployeeCount > 0 ? (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-800">
-            Cognito 未連携のユーザーが {unlinkedEmployeeCount} 人います。User.cognitoSub が欠落している重い異常状態です。対象ユーザーは正常にログインできないため、至急確認してください。
+            認証連携が失われているユーザーが {unlinkedEmployeeCount} 人います。対象ユーザーは正常にログインできないため、至急ご確認ください。
           </div>
         ) : null}
-
-        <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-4 text-sm text-indigo-900">
-          User / Company / Department テーブルを使って管理しています。氏名は姓・名とフリガナ、連絡先は電話番号と住所まで保持します。
-          ポイント調整は User.currentPointBalance と Company.companyPointBalance を同時に更新します。
-        </div>
 
         {notice && (
           <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">{notice}</div>
@@ -590,37 +599,37 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
           label="ユーザー数"
           value={`${summary.employeeCount}`}
           description="現在管理中のユーザー数"
-          accentClassName="bg-gradient-to-r from-blue-500 to-cyan-400"
+          accentClassName="bg-blue-500"
         />
         <StatCard
           label="部署数"
           value={`${summary.departmentCount}`}
           description="有効な部署数"
-          accentClassName="bg-gradient-to-r from-emerald-500 to-teal-400"
+          accentClassName="bg-blue-500"
         />
         <StatCard
           label="ユーザーポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="有効ユーザーの currentPointBalance 合計"
-          accentClassName="bg-gradient-to-r from-amber-500 to-orange-400"
+          description="ユーザーが保有しているポイントの合計"
+          accentClassName="bg-blue-500"
         />
         <StatCard
           label="会社ポイント残高"
           value={`${formatNumber(summary.companyPointBalance)}${pointUnitLabel}`}
-          description="Company.companyPointBalance"
-          accentClassName="bg-gradient-to-r from-violet-500 to-fuchsia-400"
+          description="会社が保有しているポイント残高"
+          accentClassName="bg-blue-500"
         />
       </section>
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <div className="mb-5 flex flex-col gap-4 border-b border-slate-100 pb-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-500">
               <FontAwesomeIcon icon={faUsers} className="text-lg" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">ユーザー一覧</h2>
-              <p className="text-sm text-slate-500">User テーブルに登録されているユーザー情報を表示しています。</p>
+              <p className="text-sm text-slate-500">登録されているユーザーの一覧です。</p>
             </div>
           </div>
 

@@ -7,8 +7,7 @@ import LoginForm from "@operator/components/auth/LoginForm";
 import { OPERATOR_LOGIN_NOTICE_COOKIE_NAME } from "@operator/lib/auth/constants";
 import { getLoginNoticeMessage } from "@operator/lib/auth/errors";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
-import { pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
-import { clearOperatorSession } from "@operator/lib/auth/session";
+import { buildClearOperatorSessionRedirect, pickFirstQueryValue, sanitizeRedirectTo } from "@operator/lib/auth/redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -28,7 +27,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   }
 
   if (access.reason === "forbidden") {
-    await clearOperatorSession();
+    redirect(buildClearOperatorSessionRedirect(redirectTo) as Route);
   }
 
   return (
@@ -39,7 +38,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       </div>
       <Image
         className="absolute bottom-5 right-7.5 h-auto w-16 lg:bottom-15 lg:right-20 lg:w-[110px]"
-        src="/favicon.png"
+        src="/favicon.svg"
         alt=""
         width={110}
         height={110}

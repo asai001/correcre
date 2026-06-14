@@ -1,8 +1,29 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
-import { getMissionBySlot } from "@correcre/lib/dynamodb/mission";
-import { putMissionReport } from "@correcre/lib/dynamodb/mission-report";
+import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { calculateMissionRewardPoint, nowYYYYMM, reflectPoints } from "@correcre/lib";
+import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { getMissionBySlot, listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
+import {
+  buildMissionReportByCompanyGsiPk,
+  buildMissionReportByCompanyStatusGsiPk,
+  buildMissionReportGsi1Sk,
+  buildMissionReportGsi2Sk,
+  buildMissionReportPk,
+  buildMissionReportSk,
+  listMissionReportsByCompanyAndUser,
+} from "@correcre/lib/dynamodb/mission-report";
+import {
+  buildUserMonthlyStatsByCompanyGsiPk,
+  buildUserMonthlyStatsByCompanyGsiSk,
+  buildUserMonthlyStatsPk,
+  buildUserMonthlyStatsSk,
+  getUserMonthlyStatsByCompanyUserAndYearMonth,
+} from "@correcre/lib/dynamodb/user-monthly-stats";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
+import { buildUserSk } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
   buildFinalImageKey,
@@ -42,6 +63,18 @@ async function findMissionForCompany(companyId: string, missionId: string): Prom
   }
 
   return null;
+}
+
+function toYearMonth(dateTime: string) {
+  return dateTime.slice(0, 7);
+}
+
+function toCompletionRate(actualCount: number, totalCount: number) {
+  if (totalCount <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.round((actualCount / totalCount) * 100));
 }
 
 export async function POST(req: Request) {
@@ -97,7 +130,49 @@ export async function POST(req: Request) {
 
     const region = readRequiredServerEnv("AWS_REGION");
     const bucketName = readRequiredServerEnv("S3_MISSION_REPORT_IMAGE_BUCKET_NAME");
+    const companyTableName = readRequiredServerEnv("DDB_COMPANY_TABLE_NAME");
     const missionReportTableName = readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME");
+    const pointTransactionTableName = readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME");
+    const userTableName = readRequiredServerEnv("DDB_USER_TABLE_NAME");
+    const userMonthlyStatsTableName = readRequiredServerEnv("DDB_USER_MONTHLY_STATS_TABLE_NAME");
+    const currentYearMonth = nowYYYYMM();
+    const [company, enabledMissions, existingReports, currentMonthStats] = await Promise.all([
+      getCompanyById(
+        {
+          region,
+          tableName: companyTableName,
+        },
+        companyId,
+      ),
+      listEnabledLatestMissionsByCompany(
+        {
+          region,
+          tableName: readRequiredServerEnv("DDB_MISSION_TABLE_NAME"),
+        },
+        companyId,
+      ),
+      listMissionReportsByCompanyAndUser(
+        {
+          region,
+          tableName: missionReportTableName,
+        },
+        companyId,
+        user.userId,
+      ),
+      getUserMonthlyStatsByCompanyUserAndYearMonth(
+        {
+          region,
+          tableName: userMonthlyStatsTableName,
+        },
+        companyId,
+        user.userId,
+        currentYearMonth,
+      ),
+    ]);
+
+    if (!company) {
+      return NextResponse.json({ error: "company_not_found" }, { status: 404 });
+    }
 
     const finalizedFieldValues: Record<string, MissionReportFieldValue> = {};
 
@@ -157,6 +232,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_field_value", field: field.key }, { status: 400 });
     }
 
+    const scoreGranted = mission.score;
+    const pointGranted = calculateMissionRewardPoint({
+      score: scoreGranted,
+      perEmployeeMonthlyFee: company.perEmployeeMonthlyFee,
+    });
+
     // レビューフローは廃止。提出時点で即承認扱いとし、スコア/ポイントを確定させる。
     const report: MissionReport = {
       companyId,
@@ -169,18 +250,112 @@ export async function POST(req: Request) {
       reportedAt,
       status: "APPROVED",
       fieldValues: finalizedFieldValues,
-      scoreGranted: mission.score,
-      pointGranted: mission.score,
+      scoreGranted,
+      pointGranted,
       createdAt: reportedAt,
       updatedAt: reportedAt,
     };
+    const approvedReportsThisMonth = existingReports.filter(
+      (item) => item.status === "APPROVED" && toYearMonth(item.reportedAt) === currentYearMonth,
+    );
+    const nextMissionCompletedCount = approvedReportsThisMonth.length + 1;
+    const nextEarnedScore =
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.scoreGranted ?? 0), 0) + scoreGranted;
+    const nextEarnedPoints =
+      approvedReportsThisMonth.reduce((sum, item) => sum + (item.pointGranted ?? 0), 0) + pointGranted;
+    const totalMonthlyMissionCount = enabledMissions.reduce((sum, item) => sum + item.monthlyCount, 0);
+    const nextCompletionRate = toCompletionRate(nextMissionCompletedCount, totalMonthlyMissionCount);
+    // ポイントは即時反映せず「今月の未反映分(pending)」へ積む。
+    // まず前月以前の pending があれば利用可能残高へ繰り入れ(reflect)、その上で今月分を加算する。
+    const reflected = reflectPoints(user, currentYearMonth);
+    const nextSpendablePointBalance = reflected.spendablePoint; // 報酬では利用可能残高は増えない
+    const nextPendingPointBalance = reflected.pendingPoint + pointGranted;
+    const totalHoldingAfter = nextSpendablePointBalance + nextPendingPointBalance;
+    const statsUpdatedAt = reportedAt;
+    const pointTransaction =
+      pointGranted === 0
+        ? null
+        : createPointTransaction({
+            companyId,
+            userId: user.userId,
+            transactionId: randomUUID(),
+            occurredAt: reportedAt,
+            type: "MISSION_REWARD",
+            deltaPoint: pointGranted,
+            balanceAfter: totalHoldingAfter,
+            sourceType: "MISSION_REPORT",
+            sourceId: reportId,
+            actorType: "EMPLOYEE",
+            actorUserId: user.userId,
+            description: mission.title,
+          });
+    const client = getDynamoDocumentClient(region);
 
-    await putMissionReport({ region, tableName: missionReportTableName }, report);
+    await client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: missionReportTableName,
+              Item: {
+                ...report,
+                pk: buildMissionReportPk(report.companyId, report.userId),
+                sk: buildMissionReportSk(report.reportedAt, report.reportId),
+                gsi1pk: buildMissionReportByCompanyGsiPk(report.companyId),
+                gsi1sk: buildMissionReportGsi1Sk(report.reportedAt, report.userId, report.reportId),
+                gsi2pk: buildMissionReportByCompanyStatusGsiPk(report.companyId, report.status),
+                gsi2sk: buildMissionReportGsi2Sk(report.reportedAt, report.userId, report.reportId),
+              },
+            },
+          },
+          ...(pointTransaction ? [createPointTransactionPutTransactItem(pointTransactionTableName, pointTransaction)] : []),
+          {
+            Update: {
+              TableName: userTableName,
+              Key: {
+                companyId,
+                sk: buildUserSk(user.userId),
+              },
+              UpdateExpression:
+                "SET currentPointBalance = :currentPointBalance, pendingPointBalance = :pendingPointBalance, pendingPointYearMonth = :pendingPointYearMonth, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
+              ExpressionAttributeValues: {
+                ":currentPointBalance": nextSpendablePointBalance,
+                ":pendingPointBalance": nextPendingPointBalance,
+                ":pendingPointYearMonth": currentYearMonth,
+                ":currentMonthCompletionRate": nextCompletionRate,
+                ":updatedAt": statsUpdatedAt,
+              },
+            },
+          },
+          {
+            Put: {
+              TableName: userMonthlyStatsTableName,
+              Item: {
+                pk: buildUserMonthlyStatsPk(companyId, user.userId),
+                sk: buildUserMonthlyStatsSk(currentYearMonth),
+                companyId,
+                userId: user.userId,
+                yearMonth: currentYearMonth,
+                earnedPoints: nextEarnedPoints,
+                usedPoints: currentMonthStats?.usedPoints ?? 0,
+                earnedScore: nextEarnedScore,
+                completionRate: nextCompletionRate,
+                missionCompletedCount: nextMissionCompletedCount,
+                updatedAt: statsUpdatedAt,
+                gsi1pk: buildUserMonthlyStatsByCompanyGsiPk(companyId),
+                gsi1sk: buildUserMonthlyStatsByCompanyGsiSk(currentYearMonth, user.userId),
+              },
+            },
+          },
+        ],
+      }),
+    );
 
     return NextResponse.json({
       reportId,
       reportedAt,
       status: report.status,
+      pointGranted,
     });
   } catch (error) {
     console.error("POST /api/submit-mission-report error", error);

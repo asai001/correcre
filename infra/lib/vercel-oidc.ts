@@ -1,3 +1,4 @@
+import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
@@ -7,6 +8,7 @@ import type { InfraStage } from "./infra-stack";
 
 const VERCEL_TEAM_SLUG = "asai001s-projects-3e71fbe6";
 const VERCEL_PROJECT_NAMES = ["correcre-admin", "correcre-employee", "correcre-operator", "correcre-merchant"] as const;
+const APPLICATION_SES_IDENTITY_DOMAIN = "efficient-technology.com";
 
 type VercelEnvironment = "development" | "preview" | "production";
 
@@ -77,6 +79,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.exchangeFavoriteTable,
     dynamoTables.operatorAuditLogTable,
     dynamoTables.sessionTable,
+    dynamoTables.systemSettingTable,
   ];
 }
 
@@ -123,6 +126,19 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
         "cognito-idp:AdminResetUserPassword",
       ],
       resources: [...props.cognitoUserPoolArns],
+    }),
+  );
+
+  role.addToPolicy(
+    new iam.PolicyStatement({
+      actions: ["ses:SendEmail"],
+      resources: [
+        cdk.Stack.of(scope).formatArn({
+          service: "ses",
+          resource: "identity",
+          resourceName: APPLICATION_SES_IDENTITY_DOMAIN,
+        }),
+      ],
     }),
   );
 

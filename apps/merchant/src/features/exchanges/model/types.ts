@@ -1,4 +1,5 @@
 import type {
+  DBUserAddress,
   ExchangeHistoryActorType,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
@@ -23,6 +24,10 @@ export type ExchangeSummary = {
 
 export type ExchangeDetail = ExchangeSummary & {
   merchantId: string;
+  companyName?: string;
+  applicantEmail?: string;
+  applicantPhoneNumber?: string;
+  applicantAddress?: DBUserAddress;
   merchandiseImageViewUrl?: string;
   history: ExchangeHistoryStatusEvent[];
   allowedNextStatuses: ExchangeHistoryStatus[];

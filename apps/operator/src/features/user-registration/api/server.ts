@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
+import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { createCognitoUser, deleteCognitoUser, updateCognitoUserEmail } from "@correcre/lib/cognito/user";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import {
   buildDepartmentSk,
   deleteDepartment,
@@ -24,7 +25,7 @@ import {
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameKanaParts, joinNameParts } from "@correcre/lib/user-profile";
 
-import type { Company, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import type { DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
 import { getOperatorCognitoConfig } from "@operator/lib/auth/config";
 import type {
   CreateDepartmentInput,
@@ -45,6 +46,7 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   departmentTableName: string;
+  pointTransactionTableName: string;
   cognitoRegion: string;
   cognitoUserPoolId: string;
 };
@@ -70,6 +72,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     departmentTableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     cognitoRegion: cognitoConfig.region,
     cognitoUserPoolId: cognitoConfig.userPoolId,
   };
@@ -455,11 +458,14 @@ export async function getEmployeeManagementSummaryFromDynamo(
     ),
   ]);
 
-  const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const employees = currentUsers
+  const nonDeletedUsers = users.filter((user) => user.status !== "DELETED");
+  // 一覧には論理削除（DELETED）済みのユーザーも表示する。末尾にまとめる。
+  const employees = users
     .map((user) => toEmployee(user))
-    .filter((employee): employee is EmployeeManagementEmployee => employee !== null);
-  const activeEmployees = employees.filter((employee) => employee.status === "ACTIVE");
+    .filter((employee): employee is EmployeeManagementEmployee => employee !== null)
+    .sort((left, right) => (left.status === "DELETED" ? 1 : 0) - (right.status === "DELETED" ? 1 : 0));
+  const nonDeletedEmployees = employees.filter((employee) => employee.status !== "DELETED");
+  const activeEmployees = nonDeletedEmployees.filter((employee) => employee.status === "ACTIVE");
   const totalEmployeePoints = activeEmployees.reduce((sum, employee) => sum + employee.pointBalance, 0);
   const totalCompletionRate = activeEmployees.reduce((sum, employee) => sum + employee.completionRate, 0);
   const departmentOptions: EmployeeDepartmentOption[] = departments
@@ -467,15 +473,15 @@ export async function getEmployeeManagementSummaryFromDynamo(
     .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name, "ja"))
     .map((department) => ({
       name: department.name,
-      employeeCount: currentUsers.filter((user) => user.departmentId === department.departmentId).length,
+      employeeCount: nonDeletedUsers.filter((user) => user.departmentId === department.departmentId).length,
     }));
 
   return {
     companyId,
     companyName: company.shortName || company.name,
-    adminName: getAdminName(currentUsers, adminUserId),
+    adminName: getAdminName(nonDeletedUsers, adminUserId),
     updatedAt: company.updatedAt,
-    employeeCount: employees.length,
+    employeeCount: nonDeletedEmployees.length,
     departmentCount: departmentOptions.length,
     totalEmployeePoints,
     companyPointBalance: company.companyPointBalance,
@@ -606,6 +612,7 @@ export async function createEmployeeInDynamo(
 export async function updateEmployeeInDynamo(
   companyId: string,
   input: UpdateEmployeeInput,
+  actorUserId?: string,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
   const [company, targetUser, departments] = await Promise.all([
@@ -640,6 +647,10 @@ export async function updateEmployeeInDynamo(
 
   await assertUniqueEmail(config, normalizedInput.email, targetUser.userId);
 
+  const previousEmail = targetUser.email;
+  const emailChanged = previousEmail.trim().toLowerCase() !== normalizedInput.email;
+  const cognitoUsername = targetUser.cognitoSub?.trim();
+
   const nextUserPointBalance = (targetUser.currentPointBalance ?? 0) + input.pointAdjustment;
   const nextCompanyPointBalance = company.companyPointBalance - input.pointAdjustment;
 
@@ -653,6 +664,22 @@ export async function updateEmployeeInDynamo(
 
   const now = new Date().toISOString();
   const department = await resolveDepartment(config, companyId, normalizedInput.departmentName, departments);
+  const pointTransaction =
+    input.pointAdjustment === 0
+      ? null
+      : createPointTransaction({
+          companyId,
+          userId: targetUser.userId,
+          transactionId: randomUUID(),
+          occurredAt: now,
+          type: "OPERATOR_ADJUSTMENT",
+          deltaPoint: input.pointAdjustment,
+          balanceAfter: nextUserPointBalance,
+          sourceType: "OPERATOR_USER_REGISTRATION",
+          sourceId: targetUser.userId,
+          actorType: "OPERATOR",
+          actorUserId,
+        });
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
     "lastName = :lastName",
@@ -709,40 +736,82 @@ export async function updateEmployeeInDynamo(
     userRemoveExpressions.push("address");
   }
 
-  await client.send(
-    new TransactWriteCommand({
-      TransactItems: [
+  if (emailChanged && cognitoUsername) {
+    try {
+      await updateCognitoUserEmail(
         {
-          Update: {
-            TableName: config.userTableName,
-            Key: {
-              companyId,
-              sk: buildUserSk(targetUser.userId),
-            },
-            ConditionExpression: "currentPointBalance = :currentPointBalance",
-            UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
-            ExpressionAttributeNames: userExpressionAttributeNames,
-            ExpressionAttributeValues: userExpressionAttributeValues,
-          },
+          region: config.cognitoRegion,
+          userPoolId: config.cognitoUserPoolId,
         },
         {
-          Update: {
-            TableName: config.companyTableName,
-            Key: {
-              companyId,
-            },
-            ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
-            UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
-            ExpressionAttributeValues: {
-              ":currentCompanyPointBalance": company.companyPointBalance,
-              ":nextCompanyPointBalance": nextCompanyPointBalance,
-              ":updatedAt": now,
+          username: cognitoUsername,
+          newEmail: normalizedInput.email,
+        },
+      );
+    } catch (error) {
+      throw toEmployeeProvisionError(error);
+    }
+  }
+
+  try {
+    await client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: config.userTableName,
+              Key: {
+                companyId,
+                sk: buildUserSk(targetUser.userId),
+              },
+              ConditionExpression: "currentPointBalance = :currentPointBalance",
+              UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
+              ExpressionAttributeNames: userExpressionAttributeNames,
+              ExpressionAttributeValues: userExpressionAttributeValues,
             },
           },
-        },
-      ],
-    }),
-  );
+          {
+            Update: {
+              TableName: config.companyTableName,
+              Key: {
+                companyId,
+              },
+              ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
+              UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
+              ExpressionAttributeValues: {
+                ":currentCompanyPointBalance": company.companyPointBalance,
+                ":nextCompanyPointBalance": nextCompanyPointBalance,
+                ":updatedAt": now,
+              },
+            },
+          },
+          ...(pointTransaction
+            ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
+            : []),
+        ],
+      }),
+    );
+  } catch (error) {
+    if (emailChanged && cognitoUsername) {
+      try {
+        await updateCognitoUserEmail(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          {
+            username: cognitoUsername,
+            newEmail: previousEmail,
+          },
+        );
+      } catch (rollbackError) {
+        console.error("Failed to roll back Cognito email after DynamoDB update failure", rollbackError);
+        throw new Error("DB 更新失敗後の Cognito メールアドレスのロールバックに失敗しました。手動確認が必要です。");
+      }
+    }
+
+    throw error;
+  }
 
   const updatedEmployee = toEmployee({
     ...targetUser,
@@ -783,13 +852,56 @@ export async function deleteEmployeeInDynamo(companyId: string, input: DeleteEmp
     input.userId.trim(),
   );
 
-  if (!targetUser || targetUser.status === "DELETED") {
+  if (!targetUser) {
     throw new Error("Employee not found");
+  }
+
+  // 運用者アカウントを削除すると、その運用者自身のセッションが解決できなくなり
+  // （getOperatorUserForSession が null を返し）画面全体が 403 で操作不能になる。
+  // この画面は企業の従業員管理用なので、運用者アカウントの削除は許可しない。
+  if (normalizeRoles(targetUser.roles).includes("OPERATOR")) {
+    throw new Error("運用者権限を持つユーザーはこの画面から削除できません");
   }
 
   const now = new Date().toISOString();
   const client = getDynamoDocumentClient(config.region);
 
+  // すでに論理削除（DELETED）済みのユーザーは、2 度目の削除で物理削除する。
+  // DynamoDB のレコードと Cognito のユーザーの両方を完全に削除する。
+  if (targetUser.status === "DELETED") {
+    const cognitoUsername = targetUser.cognitoSub?.trim() || targetUser.email?.trim();
+
+    if (cognitoUsername) {
+      try {
+        await deleteCognitoUser(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          cognitoUsername,
+        );
+      } catch (error) {
+        // すでに Cognito 側に存在しない場合は無視して DB の削除を続行する。
+        if (!(error instanceof Error) || error.name !== "UserNotFoundException") {
+          throw error;
+        }
+      }
+    }
+
+    await client.send(
+      new DeleteCommand({
+        TableName: config.userTableName,
+        Key: {
+          companyId,
+          sk: buildUserSk(targetUser.userId),
+        },
+      }),
+    );
+    await syncCompanyUserCounts(config, companyId, now);
+    return;
+  }
+
+  // 未削除（INVITED / ACTIVE / INACTIVE）のユーザーは論理削除（DELETED へ）する。
   await client.send(
     new UpdateCommand({
       TableName: config.userTableName,

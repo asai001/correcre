@@ -46,7 +46,6 @@ type ImageState = {
 };
 
 type FormState = {
-  heading: string;
   merchandiseName: string;
   serviceDescription: string;
   priceYen: string;
@@ -78,7 +77,6 @@ function calculateRequiredPoint(priceYen: number) {
 function getInitialFormState(initial: MerchandiseSummary | undefined): FormState {
   if (!initial) {
     return {
-      heading: "",
       merchandiseName: "",
       serviceDescription: "",
       priceYen: "",
@@ -94,7 +92,6 @@ function getInitialFormState(initial: MerchandiseSummary | undefined): FormState
   }
 
   return {
-    heading: initial.heading,
     merchandiseName: initial.merchandiseName,
     serviceDescription: initial.serviceDescription,
     priceYen: formatNumberInput(initial.priceYen),
@@ -200,7 +197,8 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
 
     try {
       const payload: CreateMerchandiseRequest = {
-        heading: form.heading,
+        // 「見出し」項目は廃止したため、商品・サービス名を見出しとして保存する。
+        heading: form.merchandiseName,
         merchandiseName: form.merchandiseName,
         serviceDescription: form.serviceDescription,
         priceYen: Number(form.priceYen),
@@ -238,10 +236,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
     }
   };
 
-  const previewTitle = useMemo(
-    () => `${form.heading || "見出し"} | ${form.merchandiseName || "商品名"}`,
-    [form.heading, form.merchandiseName],
-  );
+  const previewTitle = useMemo(() => form.merchandiseName || "商品名", [form.merchandiseName]);
 
   return (
     <div className="space-y-6 pb-10">
@@ -263,7 +258,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
         </Typography>
 
         <Stack spacing={2.5} className="!mt-4">
-          <TextField label="見出し" required fullWidth value={form.heading} onChange={handleField("heading")} />
           <TextField
             label="商品・サービス名"
             required
@@ -483,7 +477,6 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
         </div>
 
         <MerchandiseFormPreview
-          heading={form.heading}
           merchandiseName={form.merchandiseName}
           serviceDescription={form.serviceDescription}
           priceYen={Number(form.priceYen)}

@@ -126,7 +126,7 @@ export default function CompanyEditDialog({
       <DialogTitle sx={{ pb: 1 }}>
         <div className="text-2xl font-bold text-slate-900">企業情報を編集</div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          契約条件、企業ポイント残高、理念体系を更新します。companyId は変更できません。
+          契約条件、企業ポイント残高、理念体系を更新します。企業 ID は変更できません。
         </Typography>
       </DialogTitle>
 
@@ -138,7 +138,7 @@ export default function CompanyEditDialog({
             <Alert severity="info" sx={{ "& .MuiAlert-message": { width: "100%" } }}>
               <div className="flex flex-col gap-1">
                 <div className="font-semibold text-slate-900">{company.companyName}</div>
-                <div className="text-sm text-slate-600">companyId: {company.companyId}</div>
+                <div className="text-sm text-slate-600">企業 ID: {company.companyId}</div>
               </div>
             </Alert>
           ) : null}

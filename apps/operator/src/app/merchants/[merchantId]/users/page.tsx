@@ -5,8 +5,8 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import { MerchantUserManagement } from "@operator/features/merchant-management";
 import { listMerchantUsersForOperator } from "@operator/features/merchant-management/api/server";
-import { getOperatorDisplayName } from "@operator/lib/auth/display-name";
-import { requireOperatorSession } from "@operator/lib/auth/operator";
+import { joinNameParts } from "@correcre/lib/user-profile";
+import { requireCurrentOperatorUser } from "@operator/lib/auth/operator";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ type PageProps = {
 };
 
 export default async function MerchantUsersPage({ params }: PageProps) {
-  const [session, { merchantId }] = await Promise.all([requireOperatorSession(), params]);
+  const [currentUser, { merchantId }] = await Promise.all([requireCurrentOperatorUser(), params]);
 
   const merchant = await getMerchantById(
     {
@@ -35,7 +35,7 @@ export default async function MerchantUsersPage({ params }: PageProps) {
     <MerchantUserManagement
       merchant={merchant}
       initialUsers={users}
-      operatorName={getOperatorDisplayName(session)}
+      operatorName={joinNameParts(currentUser.lastName, currentUser.firstName)}
     />
   );
 }

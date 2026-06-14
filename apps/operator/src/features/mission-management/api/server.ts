@@ -12,6 +12,7 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { Mission, MissionField, MissionHistory } from "@correcre/types";
 import {
   MISSION_SLOT_COUNT,
+  MISSION_TOTAL_POINTS_CAP,
   createEmptyMissionSummary,
   toMissionSummary,
   toHistoryItem,
@@ -118,6 +119,25 @@ export async function updateMissionInDynamo(
   validateUpdateInput(input);
 
   const config = getRuntimeConfig();
+
+  // 有効な全ミッションの「月間実施回数 × スコア」の合計が 100 点を超えないようにする。
+  // （無効なミッションは従業員が獲得できないため合計に含めない）
+  const allMissions = await listMissionsByCompany(
+    { region: config.region, tableName: config.missionTableName },
+    companyId,
+  );
+  const otherMissionsPoints = allMissions
+    .filter((mission) => mission.slotIndex !== slotIndex && mission.enabled)
+    .reduce((sum, mission) => sum + mission.monthlyCount * mission.score, 0);
+  const editedMissionPoints = input.enabled ? input.monthlyCount * input.score : 0;
+  const projectedTotalPoints = otherMissionsPoints + editedMissionPoints;
+
+  if (projectedTotalPoints > MISSION_TOTAL_POINTS_CAP) {
+    throw new Error(
+      `全ミッションの「月間実施回数 × スコア」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
+    );
+  }
+
   const currentMission = await getMissionBySlot(
     { region: config.region, tableName: config.missionTableName },
     companyId,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 import type { DBUserItem, DBUserStatus } from "@correcre/types";
 
@@ -134,6 +134,37 @@ export async function listUsersByEmail(config: UserTableConfig, email: string): 
   );
 
   return (Items as DBUserItem[] | undefined) ?? [];
+}
+
+// 運用者はロールで引ける GSI が無く任意の companyId で登録されるため、Scan で全件から抽出する（少数の想定）。
+export async function listOperatorUsers(config: UserTableConfig): Promise<DBUserItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const users: DBUserItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new ScanCommand({
+        TableName: config.tableName,
+        FilterExpression: "contains(#roles, :operatorRole)",
+        ExpressionAttributeNames: {
+          "#roles": "roles",
+        },
+        ExpressionAttributeValues: {
+          ":operatorRole": "OPERATOR",
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      users.push(...(Items as DBUserItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return users;
 }
 
 export async function putUser(config: UserTableConfig, user: DBUserItem): Promise<void> {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import { SessionExpiryGuard } from "@correcre/ui";
 import "./globals.css";
 import Providers from "./providers";
 import LayoutShell from "./layout-shell";
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
   title: "コレクレ 提携企業",
   description: "提携企業向け 商品・サービス登録および交換管理アプリ",
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
   },
 };
 
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh !bg-gray-50`}>
         <AppRouterCacheProvider options={{ enableCssLayer: true }}>
           <Providers>
+            <SessionExpiryGuard />
             <LayoutShell>{children}</LayoutShell>
           </Providers>
         </AppRouterCacheProvider>

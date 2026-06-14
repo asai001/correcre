@@ -44,6 +44,11 @@ export default function ExchangeHistory({
         width: "15%",
       },
       {
+        id: "merchantName",
+        label: "提携企業",
+        render: (row) => row.merchantName ?? "-",
+      },
+      {
         id: "merchandiseName",
         label: "景品・サービス",
       },

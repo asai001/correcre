@@ -12,6 +12,7 @@ export const LOGIN_ERROR_MESSAGES = {
   rate_limited: "試行回数が多すぎます。しばらく待ってから再度お試しください。",
   user_not_confirmed: "ユーザー確認が完了していません。管理状態を確認してください。",
   admin_role_not_allowed: "管理者権限がないため、ログインできません。",
+  company_inactive: "所属企業が無効化されているため、ログインできません。",
   system_error: "ログイン処理に失敗しました。設定内容とアカウント状態を確認してください。",
 } as const;
 

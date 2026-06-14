@@ -68,3 +68,24 @@ export function splitPostalCode(postalCode?: string) {
     postalCodeSecondHalf: digits.slice(3, 7),
   };
 }
+
+type AddressLike = {
+  postalCode?: string | null;
+  prefecture?: string | null;
+  city?: string | null;
+};
+
+export function hasCompleteDeliveryAddress(address?: AddressLike | null) {
+  if (!address) {
+    return false;
+  }
+
+  return Boolean(address.postalCode?.trim() && address.prefecture?.trim() && address.city?.trim());
+}
+
+export function hasCompleteExchangeRequestProfile(params: {
+  phoneNumber?: string | null;
+  address?: AddressLike | null;
+}) {
+  return Boolean(params.phoneNumber?.trim()) && hasCompleteDeliveryAddress(params.address);
+}

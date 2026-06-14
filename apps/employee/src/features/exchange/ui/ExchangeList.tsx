@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import type { Route } from "next";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { Alert, Snackbar } from "@mui/material";
 import {
   faChevronDown,
   faChevronLeft,
@@ -12,44 +14,37 @@ import {
   faSearch,
   faSliders,
   faTag,
-  faTrashCan,
   faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { MerchandiseCard, type PublicMerchandiseSummary } from "@correcre/merchandise-public";
 
-import {
-  createSavedFilter as createSavedFilterApi,
-  deleteSavedFilter as deleteSavedFilterApi,
-  FavoriteButton,
-  type FavoriteSummary,
-  type SavedFilter,
-} from "@employee/features/exchange-favorite";
+import { FavoriteButton, type FavoriteSummary } from "@employee/features/exchange-favorite";
 
 import ExchangePageHeader from "./ExchangePageHeader";
 
 type Props = {
   items: PublicMerchandiseSummary[];
   currentPointBalance: number;
+  pendingPointBalance?: number;
   userName: string;
   initialFavorites: FavoriteSummary[];
-  initialSavedFilters: SavedFilter[];
 };
 
 type SortKey = "popular" | "newest" | "lowestPoint";
 
-type PointRange = { min: number; max?: number };
+type PointRange = { min?: number; max?: number };
 
 const PAGE_SIZE = 13;
 
 const POINT_RANGES: { value: string; label: string; range: PointRange }[] = [
-  { value: "any", label: "指定なし", range: { min: 0 } },
-  { value: "lt500", label: "〜500pt", range: { min: 0, max: 500 } },
+  { value: "any", label: "指定なし", range: {} },
+  { value: "lt500", label: "500pt未満", range: { max: 499 } },
   { value: "500to1000", label: "500〜1,000pt", range: { min: 500, max: 1000 } },
-  { value: "1000to2000", label: "1,000〜2,000pt", range: { min: 1000, max: 2000 } },
-  { value: "2000to5000", label: "2,000〜5,000pt", range: { min: 2000, max: 5000 } },
-  { value: "gt5000", label: "5,000pt〜", range: { min: 5000 } },
+  { value: "1000to2000", label: "1,001〜2,000pt", range: { min: 1001, max: 2000 } },
+  { value: "2000to5000", label: "2,001〜5,000pt", range: { min: 2001, max: 5000 } },
+  { value: "gt5000", label: "5,001pt〜", range: { min: 5001 } },
 ];
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
@@ -232,11 +227,6 @@ function FilterBox({
   onChange,
   onApply,
   onReset,
-  onSave,
-  onLoadSaved,
-  onDeleteSaved,
-  savedFilters,
-  saving,
   genres,
   deliveries,
   areas,
@@ -245,28 +235,14 @@ function FilterBox({
   onChange: (next: FilterState) => void;
   onApply: () => void;
   onReset: () => void;
-  onSave: (name: string) => Promise<void>;
-  onLoadSaved: (filter: SavedFilter) => void;
-  onDeleteSaved: (filterId: string) => Promise<void>;
-  savedFilters: SavedFilter[];
-  saving: boolean;
   genres: string[];
   deliveries: string[];
   areas: string[];
 }) {
   const [open, setOpen] = useState(true);
-  const [savedOpen, setSavedOpen] = useState(false);
-  const [draftName, setDraftName] = useState("");
 
   const update = <K extends keyof FilterState>(key: K, next: FilterState[K]) => {
     onChange({ ...value, [key]: next });
-  };
-
-  const handleSave = async () => {
-    const name = draftName.trim();
-    if (!name) return;
-    await onSave(name);
-    setDraftName("");
   };
 
   return (
@@ -284,44 +260,7 @@ function FilterBox({
             className={`text-xs text-slate-500 transition-transform ${open ? "rotate-180" : "rotate-0"}`}
           />
         </button>
-        <button
-          type="button"
-          onClick={() => setSavedOpen((prev) => !prev)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-        >
-          保存条件 {savedFilters.length}件
-          <FontAwesomeIcon icon={faChevronDown} className={`text-[10px] transition-transform ${savedOpen ? "rotate-180" : "rotate-0"}`} />
-        </button>
       </div>
-
-      {savedOpen ? (
-        <div className="border-t border-slate-200 px-5 py-4">
-          {savedFilters.length === 0 ? (
-            <p className="text-xs text-slate-500">保存された条件はまだありません。</p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {savedFilters.map((filter) => (
-                <li
-                  key={filter.filterId}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 pl-3 pr-1 py-1 text-xs font-semibold text-slate-700"
-                >
-                  <button type="button" onClick={() => onLoadSaved(filter)} className="hover:text-slate-900">
-                    {filter.name}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteSaved(filter.filterId)}
-                    className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                    aria-label="保存条件を削除"
-                  >
-                    <FontAwesomeIcon icon={faTrashCan} className="text-[10px]" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
 
       {open ? (
         <div className="space-y-3 border-t border-slate-200 px-5 py-4">
@@ -397,23 +336,6 @@ function FilterBox({
             >
               条件をリセット
             </button>
-            <div className="ml-auto flex items-center gap-2">
-              <input
-                type="text"
-                value={draftName}
-                onChange={(event) => setDraftName(event.target.value)}
-                placeholder="保存名（例: 食品・全国）"
-                className="h-9 rounded-[2px] border border-slate-200 bg-white px-3 text-xs text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-              />
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || !draftName.trim()}
-                className="inline-flex items-center rounded-[2px] border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {saving ? "保存中…" : "条件を保存"}
-              </button>
-            </div>
           </div>
         </div>
       ) : null}
@@ -546,8 +468,8 @@ function applyFilters(items: PublicMerchandiseSummary[], filter: FilterState): P
       return false;
     }
     if (range) {
-      if (item.requiredPoint < range.min) return false;
-      if (range.max !== undefined && item.requiredPoint >= range.max) return false;
+      if (range.min !== undefined && item.requiredPoint < range.min) return false;
+      if (range.max !== undefined && item.requiredPoint > range.max) return false;
     }
     if (keyword) {
       const haystack = `${item.merchandiseName} ${item.heading} ${item.merchantName} ${item.serviceDescription}`.toLowerCase();
@@ -561,9 +483,10 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
   const sorted = [...items];
   switch (sort) {
     case "newest":
+      // 登録日時（createdAt）の新しい順。createdAt が無い場合は公開日→IDで補完する。
       sorted.sort((a, b) => {
-        const ad = a.publishDate ?? "";
-        const bd = b.publishDate ?? "";
+        const ad = a.createdAt ?? a.publishDate ?? "";
+        const bd = b.createdAt ?? b.publishDate ?? "";
         if (ad !== bd) return ad < bd ? 1 : -1;
         return a.merchandiseId < b.merchandiseId ? 1 : -1;
       });
@@ -586,18 +509,31 @@ function applySort(items: PublicMerchandiseSummary[], sort: SortKey): PublicMerc
   }
 }
 
-export default function ExchangeList({ items, currentPointBalance, userName, initialFavorites, initialSavedFilters }: Props) {
+export default function ExchangeList({ items, currentPointBalance, pendingPointBalance, userName, initialFavorites }: Props) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [filterDraft, setFilterDraft] = useState<FilterState>(INITIAL_FILTER);
   const [filter, setFilter] = useState<FilterState>(INITIAL_FILTER);
   const [sort, setSort] = useState<SortKey>("popular");
   const [page, setPage] = useState(1);
+  const [itemList, setItemList] = useState(items);
   const [favorites, setFavorites] = useState<Set<string>>(
     () => new Set(initialFavorites.map((f) => favoriteKey(f.merchantId, f.merchandiseId))),
   );
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(initialSavedFilters);
-  const [savingFilter, setSavingFilter] = useState(false);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const listSectionRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("notice") !== "exchange-requested") return;
+
+    setToastMessage("交換を申請しました。");
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("notice");
+    const nextSearch = params.toString();
+    router.replace((nextSearch ? `/exchange?${nextSearch}` : "/exchange") as Route);
+  }, [searchParams, router]);
 
   const handleShowFeatured = () => {
     setSort("popular");
@@ -611,26 +547,23 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
     listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const genres = useMemo(
-    () => uniqueValues(items.map((item) => (item.genre === "その他" ? item.genreOther || "その他" : item.genre))),
-    [items],
-  );
-  const deliveries = useMemo(() => uniqueValues(items.flatMap((item) => item.deliveryMethods)), [items]);
-  const areas = useMemo(() => uniqueValues(items.map((item) => item.serviceArea?.trim())), [items]);
+  const genres = useMemo(() => uniqueValues(itemList.map((item) => getGenreLabel(item))), [itemList]);
+  const deliveries = useMemo(() => uniqueValues(itemList.flatMap((item) => item.deliveryMethods)), [itemList]);
+  const areas = useMemo(() => uniqueValues(itemList.map((item) => item.serviceArea?.trim())), [itemList]);
 
   const pickupItems = useMemo(() => {
-    const tagged = items.filter((item) => item.tags && item.tags.length > 0);
-    const picks = tagged.length > 0 ? tagged : items;
+    const tagged = itemList.filter((item) => item.tags && item.tags.length > 0);
+    const picks = tagged.length > 0 ? tagged : itemList;
     return picks.slice(0, 5);
-  }, [items]);
+  }, [itemList]);
 
   const filtered = useMemo(() => {
-    let next = applyFilters(items, filter);
+    let next = applyFilters(itemList, filter);
     if (onlyFavorites) {
       next = next.filter((item) => favorites.has(favoriteKey(item.merchantId, item.merchandiseId)));
     }
     return next;
-  }, [items, filter, onlyFavorites, favorites]);
+  }, [itemList, filter, onlyFavorites, favorites]);
 
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort]);
 
@@ -649,42 +582,6 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
     setPage(1);
   };
 
-  const handleSaveFilter = async (name: string) => {
-    setSavingFilter(true);
-    try {
-      const created = await createSavedFilterApi({ name, criteria: filterDraft });
-      setSavedFilters((prev) => [created, ...prev]);
-    } catch (err) {
-      console.error("createSavedFilter failed", err);
-    } finally {
-      setSavingFilter(false);
-    }
-  };
-
-  const handleLoadSavedFilter = (saved: SavedFilter) => {
-    const next: FilterState = {
-      keyword: saved.criteria.keyword ?? "",
-      genre: saved.criteria.genre ?? "",
-      delivery: saved.criteria.delivery ?? "",
-      area: saved.criteria.area ?? "",
-      pointRange: saved.criteria.pointRange ?? "any",
-    };
-    setFilterDraft(next);
-    setFilter(next);
-    setPage(1);
-  };
-
-  const handleDeleteSavedFilter = async (filterId: string) => {
-    const previous = savedFilters;
-    setSavedFilters((prev) => prev.filter((f) => f.filterId !== filterId));
-    try {
-      await deleteSavedFilterApi(filterId);
-    } catch (err) {
-      console.error("deleteSavedFilter failed", err);
-      setSavedFilters(previous);
-    }
-  };
-
   const handleFavoriteToggle = (merchantId: string, merchandiseId: string) => (next: boolean) => {
     setFavorites((prev) => {
       const updated = new Set(prev);
@@ -693,11 +590,23 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
       else updated.delete(key);
       return updated;
     });
+    // お気に入り数を即時に反映し、人気順ソートに反映されるようにする。
+    setItemList((prev) =>
+      prev.map((item) =>
+        item.merchantId === merchantId && item.merchandiseId === merchandiseId
+          ? { ...item, favoriteCount: Math.max(0, (item.favoriteCount ?? 0) + (next ? 1 : -1)) }
+          : item,
+      ),
+    );
   };
 
   return (
     <div className="-mt-px pb-12">
-      <ExchangePageHeader currentPointBalance={currentPointBalance} userName={userName} />
+      <ExchangePageHeader
+        currentPointBalance={currentPointBalance}
+        pendingPointBalance={pendingPointBalance}
+        userName={userName}
+      />
 
       <div className="container mx-auto space-y-6 px-6 pt-8">
         {pickupItems.length > 0 ? (
@@ -709,11 +618,6 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
           onChange={setFilterDraft}
           onApply={handleApply}
           onReset={handleReset}
-          onSave={handleSaveFilter}
-          onLoadSaved={handleLoadSavedFilter}
-          onDeleteSaved={handleDeleteSavedFilter}
-          savedFilters={savedFilters}
-          saving={savingFilter}
           genres={genres}
           deliveries={deliveries}
           areas={areas}
@@ -769,6 +673,32 @@ export default function ExchangeList({ items, currentPointBalance, userName, ini
 
         <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
       </div>
+
+      <Snackbar
+        open={toastMessage !== null}
+        autoHideDuration={4000}
+        onClose={() => setToastMessage(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ top: { xs: 24, sm: 32 } }}
+      >
+        <Alert
+          severity="success"
+          variant="filled"
+          onClose={() => setToastMessage(null)}
+          sx={{
+            minWidth: { xs: 280, sm: 420 },
+            px: 3,
+            py: 1.75,
+            fontSize: "1rem",
+            fontWeight: 600,
+            borderRadius: "12px",
+            boxShadow: "0 12px 32px -12px rgba(15,23,42,0.35)",
+            "& .MuiAlert-icon": { fontSize: "1.5rem" },
+          }}
+        >
+          {toastMessage}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }

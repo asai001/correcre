@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { reflectPoints } from "@correcre/lib/points-reflection";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
 import { ExchangeDetail } from "@employee/features/exchange";
@@ -70,11 +71,23 @@ export default async function ExchangeDetailPage({ params, searchParams }: PageP
   }
   const relatedItems = relatedCandidates.slice(0, 8);
 
+  const reflected = reflectPoints(currentUser);
+
   return (
     <ExchangeDetail
       item={item}
-      initialPointBalance={currentUser.currentPointBalance ?? 0}
+      initialPointBalance={reflected.spendablePoint}
+      pendingPointBalance={reflected.pendingPoint}
       userName={joinNameParts(currentUser.lastName, currentUser.firstName)}
+      initialProfile={{
+        lastName: currentUser.lastName,
+        firstName: currentUser.firstName,
+        lastNameKana: currentUser.lastNameKana ?? "",
+        firstNameKana: currentUser.firstNameKana ?? "",
+        email: currentUser.email,
+        phoneNumber: currentUser.phoneNumber,
+        address: currentUser.address,
+      }}
       initialIsFavorite={isFavorite}
       relatedItems={relatedItems}
       relatedFavoriteKeys={Array.from(favoriteKeySet)}

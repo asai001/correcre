@@ -11,3 +11,5 @@ export * from "./db/merchandise";
 export * from "./db/exchangeFavorite";
 export * from "./db/operatorAuditLog";
 export * from "./db/session";
+export * from "./db/pointTransaction";
+export * from "./db/systemSetting";

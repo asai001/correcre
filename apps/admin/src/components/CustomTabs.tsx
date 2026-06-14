@@ -49,7 +49,7 @@ export default function CustomTabs({ tabs, defaultIndex = 0 }: CustomTabsProps) 
                 className={[
                   "rounded-md px-6 py-3 text-[0.95rem] font-bold transition-all duration-200 ease-in-out",
                   selected
-                    ? "bg-[linear-gradient(135deg,#667eea_0%,#764ba2_100%)] text-white"
+                    ? "bg-blue-500 text-white"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200",
                 ].join(" ")}
               >

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import {
   QueryCommand,
   TransactWriteCommand,
@@ -12,9 +14,11 @@ import type {
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  PointTransaction,
 } from "@correcre/types";
 
 import { buildUserSk } from "./user";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "./point-transaction";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -23,16 +27,16 @@ const ALLOWED_TRANSITIONS: Record<
   Partial<Record<ExchangeHistoryActorType, ExchangeHistoryStatus[]>>
 > = {
   REQUESTED: {
-    MERCHANT: ["PREPARING", "REJECTED"],
+    MERCHANT: ["PREPARING", "REJECTED", "CANCELED"],
     OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
   },
   PREPARING: {
-    MERCHANT: ["IN_PROGRESS"],
+    MERCHANT: ["IN_PROGRESS", "CANCELED"],
     OPERATOR: ["IN_PROGRESS", "CANCELED"],
   },
   IN_PROGRESS: {
-    MERCHANT: ["COMPLETED"],
-    OPERATOR: ["COMPLETED"],
+    MERCHANT: ["COMPLETED", "PREPARING"],
+    OPERATOR: ["COMPLETED", "PREPARING"],
   },
   COMPLETED: {},
   REJECTED: {},
@@ -262,6 +266,13 @@ export type PutExchangeHistoryWithReservationInput = {
     expectedCurrentPointBalance: number;
     nextCurrentPointBalance: number;
     updatedAt: string;
+    // 翌月反映(reflect)で pending を利用可能残高へ繰り入れた場合、その結果を同一トランザクションで永続化する。
+    nextPendingPointBalance?: number;
+    clearPendingPointYearMonth?: boolean;
+  };
+  pointTransaction?: {
+    tableName: string;
+    transaction: PointTransaction;
   };
 };
 
@@ -289,6 +300,22 @@ export async function putExchangeHistoryWithReservation(
 ): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
 
+  const userSetExpressions = ["currentPointBalance = :nextPointBalance", "updatedAt = :updatedAt"];
+  const userExpressionValues: Record<string, unknown> = {
+    ":expectedPointBalance": input.user.expectedCurrentPointBalance,
+    ":nextPointBalance": input.user.nextCurrentPointBalance,
+    ":updatedAt": input.user.updatedAt,
+  };
+
+  if (input.user.nextPendingPointBalance !== undefined) {
+    userSetExpressions.push("pendingPointBalance = :nextPendingPointBalance");
+    userExpressionValues[":nextPendingPointBalance"] = input.user.nextPendingPointBalance;
+  }
+
+  const userUpdateExpression = input.user.clearPendingPointYearMonth
+    ? `SET ${userSetExpressions.join(", ")} REMOVE pendingPointYearMonth`
+    : `SET ${userSetExpressions.join(", ")}`;
+
   try {
     await client.send(
       new TransactWriteCommand({
@@ -301,12 +328,8 @@ export async function putExchangeHistoryWithReservation(
                 sk: buildUserSk(input.user.userId),
               },
               ConditionExpression: "currentPointBalance = :expectedPointBalance",
-              UpdateExpression: "SET currentPointBalance = :nextPointBalance, updatedAt = :updatedAt",
-              ExpressionAttributeValues: {
-                ":expectedPointBalance": input.user.expectedCurrentPointBalance,
-                ":nextPointBalance": input.user.nextCurrentPointBalance,
-                ":updatedAt": input.user.updatedAt,
-              },
+              UpdateExpression: userUpdateExpression,
+              ExpressionAttributeValues: userExpressionValues,
             },
           },
           {
@@ -316,6 +339,9 @@ export async function putExchangeHistoryWithReservation(
               ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)",
             },
           },
+          ...(input.pointTransaction
+            ? [createPointTransactionPutTransactItem(input.pointTransaction.tableName, input.pointTransaction.transaction)]
+            : []),
         ],
       }),
     );
@@ -427,6 +453,7 @@ export type TransitionExchangeStatusInput = {
   comment?: string;
   occurredAt?: string;
   userTableName: string;
+  pointTransactionTableName?: string;
 };
 
 export async function transitionExchangeStatus(
@@ -524,6 +551,27 @@ export async function transitionExchangeStatus(
         },
       },
     });
+
+    if (input.pointTransactionTableName) {
+      transactItems.push(
+        createPointTransactionPutTransactItem(
+          input.pointTransactionTableName,
+          createPointTransaction({
+            companyId: input.item.companyId,
+            userId: input.item.userId,
+            transactionId: randomUUID(),
+            occurredAt,
+            type: "EXCHANGE_REFUND",
+            deltaPoint: refundAmount,
+            sourceType: "EXCHANGE_HISTORY",
+            sourceId: input.item.exchangeId,
+            actorType: input.actorType,
+            actorUserId: input.actorId,
+            description: input.item.merchandiseNameSnapshot,
+          }),
+        ),
+      );
+    }
   }
 
   await client.send(new TransactWriteCommand({ TransactItems: transactItems }));

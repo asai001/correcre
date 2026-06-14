@@ -11,7 +11,7 @@ import {
   EMPLOYEE_LOGIN_PATH,
   EMPLOYEE_NEW_PASSWORD_PATH,
 } from "@employee/lib/auth/constants";
-import { getEmployeeUserForSession } from "@employee/lib/auth/current-user";
+import { getEmployeeUserForSession, resolveEmployeeUserForSession } from "@employee/lib/auth/current-user";
 import {
   mapAuthenticationErrorToCode,
   mapForgotPasswordConfirmErrorToCode,
@@ -150,11 +150,13 @@ export async function authenticate(
     redirect(buildNewPasswordRedirect(undefined, redirectTo) as Route);
   }
 
-  if (!(await getEmployeeUserForSession(result.session))) {
+  const lookup = await resolveEmployeeUserForSession(result.session);
+
+  if (!lookup.allowed) {
     await clearEmployeeSession();
 
     return {
-      errorCode: "employee_role_not_allowed",
+      errorCode: lookup.reason === "company_inactive" ? "company_inactive" : "employee_role_not_allowed",
     };
   }
 

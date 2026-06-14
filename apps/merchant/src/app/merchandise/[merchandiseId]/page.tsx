@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 
+import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchandiseForm } from "@merchant/features/merchandise";
 import { getMerchandiseForMerchant, getMerchantCompanyName } from "@merchant/features/merchandise/api/server";
-import { getMerchantDisplayName } from "@merchant/lib/auth/display-name";
-import { requireCurrentMerchantUser, requireMerchantSession } from "@merchant/lib/auth/merchant";
+import { requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +12,7 @@ type PageProps = {
 };
 
 export default async function MerchandiseEditPage({ params }: PageProps) {
-  const [session, user, { merchandiseId }] = await Promise.all([
-    requireMerchantSession(),
-    requireCurrentMerchantUser(),
-    params,
-  ]);
+  const [user, { merchandiseId }] = await Promise.all([requireCurrentMerchantUser(), params]);
 
   const [item, merchantCompanyName] = await Promise.all([
     getMerchandiseForMerchant(user.merchantId, merchandiseId),
@@ -30,7 +26,7 @@ export default async function MerchandiseEditPage({ params }: PageProps) {
   return (
     <MerchandiseForm
       mode="edit"
-      merchantName={getMerchantDisplayName(session)}
+      merchantName={joinNameParts(user.lastName, user.firstName)}
       merchantCompanyName={merchantCompanyName ?? ""}
       initial={item}
     />

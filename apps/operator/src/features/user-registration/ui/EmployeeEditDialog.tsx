@@ -67,7 +67,7 @@ const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
   { value: "OPERATOR", label: "運用者" },
 ];
 
-const managedStatusOptions: Array<{ value: Exclude<EmployeeManagementStatus, "INVITED">; label: string }> = [
+const managedStatusOptions: Array<{ value: Exclude<EmployeeManagementStatus, "INVITED" | "DELETED">; label: string }> = [
   { value: "ACTIVE", label: "有効" },
   { value: "INACTIVE", label: "休止中" },
 ];
@@ -76,6 +76,7 @@ const statusLabelMap: Record<EmployeeManagementStatus, string> = {
   INVITED: "招待中",
   ACTIVE: "有効",
   INACTIVE: "休止中",
+  DELETED: "論理削除",
 };
 
 function getStatusSeverity(status: EmployeeManagementStatus): "info" | "success" | "warning" {
@@ -289,10 +290,10 @@ export default function EmployeeEditDialog({
           {error && <Alert severity="error">{error}</Alert>}
           {employee && (
             employee.authLinkStatus === "LINKED" ? (
-              <Alert severity="success">Cognito 連携状況: 連携済み</Alert>
+              <Alert severity="success">認証連携: 連携済み</Alert>
             ) : (
               <Alert severity="error">
-                Cognito 連携状況: 未連携です。User.cognitoSub が欠落している異常状態のため、このユーザーは正常にログインできません。早急に確認してください。
+                認証連携: 未連携のため、このユーザーは正常にログインできません。早急にご確認ください。
               </Alert>
             )
           )}

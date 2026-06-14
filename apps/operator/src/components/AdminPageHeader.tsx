@@ -1,11 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { Route } from "next";
-import { faArrowLeft, faUserShield } from "@fortawesome/free-solid-svg-icons";
+
+import {
+  faArrowLeft,
+  faBuilding,
+  faBullseye,
+  faGauge,
+  faGear,
+  faRightLeft,
+  faStore,
+  faUsers,
+  faUserShield,
+} from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { logout } from "@operator/app/lib/actions/authenticate";
+
+type NavItem = {
+  label: string;
+  href: Route;
+  icon: IconDefinition;
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "ダッシュボード", href: "/dashboard" as Route, icon: faGauge },
+  { label: "企業登録", href: "/company-registration" as Route, icon: faBuilding },
+  { label: "ユーザー管理", href: "/user-registration" as Route, icon: faUsers },
+  { label: "ミッション管理", href: "/missions" as Route, icon: faBullseye },
+  { label: "提携企業管理", href: "/merchants" as Route, icon: faStore },
+  { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
+  { label: "設定", href: "/settings" as Route, icon: faGear },
+];
+
+function isActiveNav(pathname: string | null, href: string): boolean {
+  if (!pathname) return false;
+  if (pathname === href) return true;
+  return pathname.startsWith(`${href}/`);
+}
 
 type AdminPageHeaderProps = {
   title: string;
@@ -20,44 +55,68 @@ export default function AdminPageHeader({
   backHref,
   subtitle = "運用者向けユーザー登録・管理",
 }: AdminPageHeaderProps) {
+  const pathname = usePathname();
+
   return (
     <section className="relative left-1/2 -mx-[50vw] w-screen bg-[linear-gradient(90deg,#0f766e_0%,#0f4c81_100%)] text-white">
-      <div className="container mx-auto flex flex-col gap-5 px-6 py-7 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
+      <div className="container mx-auto flex flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 items-center gap-3">
           {backHref ? (
             <Link
               href={backHref}
               aria-label="前の画面へ戻る"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-lg text-white/90 transition hover:bg-white/10 hover:text-white"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 hover:text-white"
             >
               <FontAwesomeIcon icon={faArrowLeft} />
             </Link>
           ) : null}
-
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight sm:text-[2.2rem]">{title}</h1>
-            <p className="mt-1 text-sm font-semibold text-white/85 sm:text-[1.05rem]">{subtitle}</p>
+          <div className="min-w-0">
+            <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+            <p className="mt-1 text-sm font-semibold text-white/85">{subtitle}</p>
           </div>
         </div>
-
-        <div className="flex items-center gap-4 self-end sm:self-auto">
-          <form action={logout}>
-            <button
-              type="submit"
-              className="rounded-full border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              ログアウト
-            </button>
-          </form>
+        <div className="flex shrink-0 items-center gap-4 self-end sm:self-auto">
           <div className="text-right">
-            <div className="text-xs font-semibold tracking-[0.2em] text-white/70">OPERATOR</div>
-            <div className="mt-1 text-lg font-bold sm:text-[1.7rem]">{adminName}</div>
+            <div className="text-lg font-bold sm:text-xl">{adminName}</div>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/18 text-lg shadow-lg shadow-violet-900/15">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg">
             <FontAwesomeIcon icon={faUserShield} style={{ color: "#fff", width: "1.5rem", height: "1.5rem" }} />
           </div>
         </div>
       </div>
+      <nav aria-label="グローバルメニュー" className="border-t border-white/15 bg-black/20">
+        <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-6">
+          <ul className="flex flex-wrap items-center gap-1">
+            {NAV_ITEMS.map((item) => {
+              const active = isActiveNav(pathname, item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                      active
+                        ? "border-white text-white"
+                        : "border-transparent text-white/75 hover:border-white/40 hover:text-white"
+                    }`}
+                  >
+                    <FontAwesomeIcon icon={item.icon} className="text-xs" />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <form action={logout} className="py-2">
+            <button
+              type="submit"
+              className="rounded-full border border-white/30 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              ログアウト
+            </button>
+          </form>
+        </div>
+      </nav>
     </section>
   );
 }

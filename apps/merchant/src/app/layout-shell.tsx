@@ -9,7 +9,7 @@ type LayoutShellProps = Readonly<{
 export default function LayoutShell({ children }: LayoutShellProps) {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/login")) {
+  if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
     return children;
   }
 

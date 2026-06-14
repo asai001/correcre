@@ -1,7 +1,9 @@
-import { createCognitoUser, deleteCognitoUser } from "@correcre/lib/cognito/user";
+import { randomUUID } from "node:crypto";
+import { createCognitoUser, deleteCognitoUser, updateCognitoUserEmail } from "@correcre/lib/cognito/user";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import {
   buildDepartmentSk,
   deleteDepartment,
@@ -16,14 +18,17 @@ import {
   buildUserByEmailGsiPk,
   buildUserSk,
   getUserByCompanyAndUserId,
+  listOperatorUsers,
   listUsersByCompany,
   listUsersByEmail,
   putUser,
 } from "@correcre/lib/dynamodb/user";
+import { getOperatorNotificationEmails } from "@correcre/lib/dynamodb/system-setting";
+import { sendSesEmail } from "@correcre/lib/email/ses";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameKanaParts, joinNameParts } from "@correcre/lib/user-profile";
 
-import type { DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
+import type { Company, DBUserAddress, DBUserItem, DBUserRole, Department } from "@correcre/types";
 import { getAdminCognitoConfig } from "@admin/lib/auth/config";
 import type {
   CreateDepartmentInput,
@@ -44,8 +49,19 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   departmentTableName: string;
+  pointTransactionTableName: string;
   cognitoRegion: string;
   cognitoUserPoolId: string;
+};
+
+const DEFAULT_SES_FROM_EMAIL = "correcre-info@efficient-technology.com";
+const OPERATOR_USER_CREATED_SUBJECT = "【コレクレ】ユーザー追加のお知らせ";
+const NOTIFIABLE_OPERATOR_STATUSES = new Set<DBUserItem["status"]>(["INVITED", "ACTIVE"]);
+const ROLE_LABEL_MAP: Record<DBUserRole, string> = {
+  EMPLOYEE: "従業員",
+  MANAGER: "マネージャー",
+  ADMIN: "管理者",
+  OPERATOR: "運用者",
 };
 
 type NormalizedEmployeeInput = {
@@ -69,6 +85,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     departmentTableName: readRequiredServerEnv("DDB_DEPARTMENT_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     cognitoRegion: cognitoConfig.region,
     cognitoUserPoolId: cognitoConfig.userPoolId,
   };
@@ -308,6 +325,144 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
   };
 }
 
+function readOptionalServerEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function resolveOperatorAppUrl() {
+  const configuredUrl = readOptionalServerEnv("OPERATOR_APP_URL");
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  return process.env.NODE_ENV === "development" ? "http://localhost:3002" : undefined;
+}
+
+function formatNotificationDateTime(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function buildOperatorUserCreatedEmailBody(params: {
+  companyName: string;
+  employeeName: string;
+  employeeNameKana: string;
+  email: string;
+  departmentName: string;
+  roles: DBUserRole[];
+  joinedAt: string;
+  actorName: string;
+  createdAt: string;
+  dashboardUrl: string;
+}) {
+  const roleLabels = params.roles.map((role) => ROLE_LABEL_MAP[role]).join("、");
+
+  return `コレクレ運用ご担当者様
+
+企業の管理者によって新しいユーザーが追加されましたので、お知らせいたします。
+
+■ 追加されたユーザー
+企業名：${params.companyName}
+氏名：${params.employeeName}（${params.employeeNameKana}）
+メールアドレス：${params.email}
+所属部署：${params.departmentName}
+権限：${roleLabels}
+入社日：${params.joinedAt.replace(/-/g, "/")}
+
+■ 登録操作
+操作者：${params.actorName}
+登録日時：${formatNotificationDateTime(params.createdAt)}
+
+運用者画面はこちら：
+${params.dashboardUrl}
+
+本メールはシステムより自動送信されています。`;
+}
+
+// 運用者画面で設定された通知先メールアドレス（複数可）を優先し、
+// 未設定の場合は OPERATOR ロールのユーザー全員にフォールバックする。
+async function resolveOperatorNotificationRecipients(config: RuntimeConfig): Promise<string[]> {
+  const systemSettingTableName = readOptionalServerEnv("DDB_SYSTEM_SETTING_TABLE_NAME");
+
+  if (systemSettingTableName) {
+    const configuredEmails = await getOperatorNotificationEmails({
+      region: config.region,
+      tableName: systemSettingTableName,
+    });
+    if (configuredEmails.length) {
+      return configuredEmails;
+    }
+  }
+
+  const operators = await listOperatorUsers({
+    region: config.region,
+    tableName: config.userTableName,
+  });
+  return [
+    ...new Set(
+      operators
+        .filter((user) => NOTIFIABLE_OPERATOR_STATUSES.has(user.status))
+        .map((user) => user.email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+async function notifyOperatorsUserCreated(params: {
+  config: RuntimeConfig;
+  company: Company;
+  input: NormalizedEmployeeInput;
+  actorName: string;
+  createdAt: string;
+}) {
+  const recipients = await resolveOperatorNotificationRecipients(params.config);
+
+  if (!recipients.length) {
+    console.warn("Skipped operator user-created notification because no operator recipient was found.", {
+      companyId: params.company.companyId,
+    });
+    return;
+  }
+
+  const operatorAppUrl = resolveOperatorAppUrl();
+  if (!operatorAppUrl) {
+    throw new Error("OPERATOR_APP_URL is not set.");
+  }
+
+  const text = buildOperatorUserCreatedEmailBody({
+    companyName: params.company.name,
+    employeeName: joinNameParts(params.input.lastName, params.input.firstName),
+    employeeNameKana: joinNameKanaParts(params.input.lastNameKana, params.input.firstNameKana),
+    email: params.input.email,
+    departmentName: params.input.department.name,
+    roles: params.input.roles,
+    joinedAt: params.input.joinedAt,
+    actorName: params.actorName,
+    createdAt: params.createdAt,
+    dashboardUrl: `${operatorAppUrl}/dashboard`,
+  });
+
+  await sendSesEmail(
+    {
+      region: params.config.region,
+      fromEmail: readOptionalServerEnv("SES_FROM_EMAIL") ?? DEFAULT_SES_FROM_EMAIL,
+    },
+    {
+      to: recipients,
+      subject: OPERATOR_USER_CREATED_SUBJECT,
+      text,
+    },
+  );
+}
+
 async function getCompanyOrThrow(config: RuntimeConfig, companyId: string) {
   const company = await getCompanyById(
     {
@@ -432,9 +587,10 @@ export async function getEmployeeManagementSummaryFromDynamo(
 export async function createEmployeeInDynamo(
   companyId: string,
   input: CreateEmployeeInput,
+  actor?: Pick<DBUserItem, "lastName" | "firstName">,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
-  const [, companyUsers, departments] = await Promise.all([
+  const [company, companyUsers, departments] = await Promise.all([
     getCompanyOrThrow(config, companyId),
     listUsersByCompany(
       {
@@ -453,6 +609,11 @@ export async function createEmployeeInDynamo(
   ]);
 
   const normalizedInput = normalizeEmployeeInput(input, departments);
+
+  if (normalizedInput.roles.includes("OPERATOR")) {
+    throw new Error("運用者権限のユーザーは作成できません");
+  }
+
   await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();
@@ -521,6 +682,23 @@ export async function createEmployeeInDynamo(
       throw new Error("Created user does not have an employee-management role.");
     }
 
+    // 通知の失敗でユーザー登録（および外側 catch の Cognito ロールバック）に影響させない。
+    try {
+      await notifyOperatorsUserCreated({
+        config,
+        company,
+        input: normalizedInput,
+        actorName: actor ? joinNameParts(actor.lastName, actor.firstName) || "管理者" : "管理者",
+        createdAt: now,
+      });
+    } catch (notifyError) {
+      console.error("Failed to send operator user-created notification.", {
+        error: notifyError,
+        companyId,
+        userId,
+      });
+    }
+
     return createdEmployee;
   } catch (error) {
     if (createdCognitoUser) {
@@ -547,6 +725,7 @@ export async function createEmployeeInDynamo(
 export async function updateEmployeeInDynamo(
   companyId: string,
   input: UpdateEmployeeInput,
+  actorUserId?: string,
 ): Promise<EmployeeManagementEmployee> {
   const config = getRuntimeConfig();
   const [company, targetUser, departments] = await Promise.all([
@@ -580,6 +759,10 @@ export async function updateEmployeeInDynamo(
 
   await assertUniqueEmail(config, normalizedInput.email, targetUser.userId);
 
+  const previousEmail = targetUser.email;
+  const emailChanged = previousEmail.trim().toLowerCase() !== normalizedInput.email;
+  const cognitoUsername = targetUser.cognitoSub?.trim();
+
   const nextUserPointBalance = (targetUser.currentPointBalance ?? 0) + input.pointAdjustment;
   const nextCompanyPointBalance = company.companyPointBalance - input.pointAdjustment;
 
@@ -592,6 +775,22 @@ export async function updateEmployeeInDynamo(
   }
 
   const now = new Date().toISOString();
+  const pointTransaction =
+    input.pointAdjustment === 0
+      ? null
+      : createPointTransaction({
+          companyId,
+          userId: targetUser.userId,
+          transactionId: randomUUID(),
+          occurredAt: now,
+          type: "ADMIN_ADJUSTMENT",
+          deltaPoint: input.pointAdjustment,
+          balanceAfter: nextUserPointBalance,
+          sourceType: "ADMIN_EMPLOYEE_MANAGEMENT",
+          sourceId: targetUser.userId,
+          actorType: "ADMIN",
+          actorUserId,
+        });
   const client = getDynamoDocumentClient(config.region);
   const userSetExpressions = [
     "lastName = :lastName",
@@ -645,40 +844,82 @@ export async function updateEmployeeInDynamo(
     userRemoveExpressions.push("address");
   }
 
-  await client.send(
-    new TransactWriteCommand({
-      TransactItems: [
+  if (emailChanged && cognitoUsername) {
+    try {
+      await updateCognitoUserEmail(
         {
-          Update: {
-            TableName: config.userTableName,
-            Key: {
-              companyId,
-              sk: buildUserSk(targetUser.userId),
-            },
-            ConditionExpression: "currentPointBalance = :currentPointBalance",
-            UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
-            ExpressionAttributeNames: userExpressionAttributeNames,
-            ExpressionAttributeValues: userExpressionAttributeValues,
-          },
+          region: config.cognitoRegion,
+          userPoolId: config.cognitoUserPoolId,
         },
         {
-          Update: {
-            TableName: config.companyTableName,
-            Key: {
-              companyId,
-            },
-            ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
-            UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
-            ExpressionAttributeValues: {
-              ":currentCompanyPointBalance": company.companyPointBalance,
-              ":nextCompanyPointBalance": nextCompanyPointBalance,
-              ":updatedAt": now,
+          username: cognitoUsername,
+          newEmail: normalizedInput.email,
+        },
+      );
+    } catch (error) {
+      throw toEmployeeProvisionError(error);
+    }
+  }
+
+  try {
+    await client.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: config.userTableName,
+              Key: {
+                companyId,
+                sk: buildUserSk(targetUser.userId),
+              },
+              ConditionExpression: "currentPointBalance = :currentPointBalance",
+              UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
+              ExpressionAttributeNames: userExpressionAttributeNames,
+              ExpressionAttributeValues: userExpressionAttributeValues,
             },
           },
-        },
-      ],
-    }),
-  );
+          {
+            Update: {
+              TableName: config.companyTableName,
+              Key: {
+                companyId,
+              },
+              ConditionExpression: "companyPointBalance = :currentCompanyPointBalance",
+              UpdateExpression: "SET companyPointBalance = :nextCompanyPointBalance, updatedAt = :updatedAt",
+              ExpressionAttributeValues: {
+                ":currentCompanyPointBalance": company.companyPointBalance,
+                ":nextCompanyPointBalance": nextCompanyPointBalance,
+                ":updatedAt": now,
+              },
+            },
+          },
+          ...(pointTransaction
+            ? [createPointTransactionPutTransactItem(config.pointTransactionTableName, pointTransaction)]
+            : []),
+        ],
+      }),
+    );
+  } catch (error) {
+    if (emailChanged && cognitoUsername) {
+      try {
+        await updateCognitoUserEmail(
+          {
+            region: config.cognitoRegion,
+            userPoolId: config.cognitoUserPoolId,
+          },
+          {
+            username: cognitoUsername,
+            newEmail: previousEmail,
+          },
+        );
+      } catch (rollbackError) {
+        console.error("Failed to roll back Cognito email after DynamoDB update failure", rollbackError);
+        throw new Error("DB 更新失敗後の Cognito メールアドレスのロールバックに失敗しました。手動確認が必要です。");
+      }
+    }
+
+    throw error;
+  }
 
   const updatedEmployee = toEmployee({
     ...targetUser,

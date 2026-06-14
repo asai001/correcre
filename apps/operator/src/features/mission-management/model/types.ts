@@ -2,6 +2,9 @@ import type { Mission, MissionField, MissionHistory } from "@correcre/types";
 
 export const MISSION_SLOT_COUNT = 5;
 
+// 有効な全ミッションの「月間実施回数 × スコア」の合計の上限（点）。
+export const MISSION_TOTAL_POINTS_CAP = 100;
+
 // API レスポンス用のミッションサマリー
 export type OperatorMissionSummary = {
   missionId: string | null;

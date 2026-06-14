@@ -109,10 +109,12 @@ export function useMissionReportForDashboard(
         missionId: payload.missionId,
         reportedAt: result.reportedAt,
         status: result.status,
-        pointGranted: payload.score,
+        pointGranted: result.pointGranted,
         comment: "",
       },
     ]);
+
+    window.dispatchEvent(new Event("employee-dashboard-summary:refresh"));
   };
 
   return {

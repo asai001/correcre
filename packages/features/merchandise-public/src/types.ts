@@ -29,6 +29,7 @@ export type PublicMerchandiseSummary = {
   deliverySchedule?: string;
   notes?: string;
   favoriteCount?: number;
+  createdAt?: string;
 };
 
 export type PublicMerchandiseDetail = PublicMerchandiseSummary;
@@ -61,6 +62,7 @@ export function toPublicMerchandiseSummary(
     deliverySchedule: merchandise.deliverySchedule,
     notes: merchandise.notes,
     favoriteCount: merchandise.favoriteCount,
+    createdAt: merchandise.createdAt,
   };
 }
 

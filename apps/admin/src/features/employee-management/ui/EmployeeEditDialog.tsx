@@ -89,10 +89,7 @@ function normalizeOptionalText(value?: string) {
 }
 
 function getInitialRoles(roles: EmployeeManagementRole[]): EmployeeAssignableRole[] {
-  const filtered = roles.filter(
-    (role): role is EmployeeAssignableRole =>
-      role === "EMPLOYEE" || role === "ADMIN" || role === "OPERATOR",
-  );
+  const filtered = roles.filter((role): role is EmployeeAssignableRole => role === "EMPLOYEE" || role === "ADMIN" || role === "OPERATOR");
 
   return filtered.length ? filtered : ["EMPLOYEE"];
 }
@@ -132,6 +129,7 @@ export default function EmployeeEditDialog({
 }: EmployeeEditDialogProps) {
   const [form, setForm] = useState<FormState>(() => createInitialFormState(employee));
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [addressAutoFilling, setAddressAutoFilling] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -143,11 +141,9 @@ export default function EmployeeEditDialog({
   }, [employee, open]);
 
   const pointAdjustmentValue = form.pointAdjustment.trim();
-  const parsedPointAdjustment =
-    /^-?\d+$/.test(pointAdjustmentValue) ? Number.parseInt(pointAdjustmentValue, 10) : null;
+  const parsedPointAdjustment = /^-?\d+$/.test(pointAdjustmentValue) ? Number.parseInt(pointAdjustmentValue, 10) : null;
   const currentPointBalance = employee?.pointBalance ?? 0;
-  const nextPointBalance =
-    parsedPointAdjustment === null ? currentPointBalance : currentPointBalance + parsedPointAdjustment;
+  const nextPointBalance = parsedPointAdjustment === null ? currentPointBalance : currentPointBalance + parsedPointAdjustment;
 
   const validation = useMemo<ValidationState>(() => {
     const email = form.email.trim();
@@ -168,12 +164,37 @@ export default function EmployeeEditDialog({
       joinedAt: !form.joinedAt.trim(),
       pointAdjustment: parsedPointAdjustment === null,
       pointBalance: parsedPointAdjustment !== null && nextPointBalance < 0,
-      postalCode:
-        hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
+      postalCode: hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
     };
   }, [form, nextPointBalance, parsedPointAdjustment]);
 
   const hasError = Object.values(validation).some(Boolean);
+
+  const handleAutoFillAddress = async () => {
+    const firstHalf = form.postalCodeFirstHalf?.trim() ?? "";
+    const secondHalf = form.postalCodeSecondHalf?.trim() ?? "";
+
+    if (!/^\d{3}$/.test(firstHalf) || !/^\d{4}$/.test(secondHalf)) {
+      return;
+    }
+
+    setAddressAutoFilling(true);
+    try {
+      const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${firstHalf}${secondHalf}`);
+      const data = await response.json();
+      const result = data.results?.[0];
+
+      if (result) {
+        setForm((current) => ({
+          ...current,
+          prefecture: result.address1 ?? "",
+          city: `${result.address2 ?? ""}${result.address3 ?? ""}`,
+        }));
+      }
+    } finally {
+      setAddressAutoFilling(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setHasSubmitted(true);
@@ -225,15 +246,12 @@ export default function EmployeeEditDialog({
       <DialogContent sx={{ pt: "8px !important" }}>
         <Stack spacing={2.5}>
           {error && <Alert severity="error">{error}</Alert>}
-          {employee && (
-            employee.authLinkStatus === "LINKED" ? (
-              <Alert severity="success">Cognito 連携状況: 連携済み</Alert>
+          {employee &&
+            (employee.authLinkStatus === "LINKED" ? (
+              <Alert severity="success">認証連携: 連携済み</Alert>
             ) : (
-              <Alert severity="error">
-                Cognito 連携状況: 未連携です。User.cognitoSub が欠落している異常状態のため、このユーザーは正常にログインできません。早急に確認してください。
-              </Alert>
-            )
-          )}
+              <Alert severity="error">認証連携: 未連携のため、このユーザーは正常にログインできません。早急にご確認ください。</Alert>
+            ))}
 
           <div className="grid gap-4 md:grid-cols-4">
             <TextField
@@ -261,9 +279,7 @@ export default function EmployeeEditDialog({
               fullWidth
               required
               error={hasSubmitted && validation.lastNameKana}
-              helperText={
-                hasSubmitted && validation.lastNameKana ? "姓フリガナは全角カタカナで入力してください" : " "
-              }
+              helperText={hasSubmitted && validation.lastNameKana ? "姓フリガナは全角カタカナで入力してください" : " "}
             />
             <TextField
               label="名フリガナ"
@@ -272,9 +288,7 @@ export default function EmployeeEditDialog({
               fullWidth
               required
               error={hasSubmitted && validation.firstNameKana}
-              helperText={
-                hasSubmitted && validation.firstNameKana ? "名フリガナは全角カタカナで入力してください" : " "
-              }
+              helperText={hasSubmitted && validation.firstNameKana ? "名フリガナは全角カタカナで入力してください" : " "}
             />
           </div>
 
@@ -318,16 +332,16 @@ export default function EmployeeEditDialog({
                   }))
                 }
               >
-                {roleOptions.map((roleOption) => (
-                  <MenuItem key={roleOption.value} value={roleOption.value}>
-                    <Checkbox checked={form.roles.includes(roleOption.value)} />
-                    <ListItemText primary={roleOption.label} />
-                  </MenuItem>
-                ))}
+                {roleOptions
+                  .filter((roleOption) => roleOption.value !== "OPERATOR")
+                  .map((roleOption) => (
+                    <MenuItem key={roleOption.value} value={roleOption.value}>
+                      <Checkbox checked={form.roles.includes(roleOption.value)} />
+                      <ListItemText primary={roleOption.label} />
+                    </MenuItem>
+                  ))}
               </Select>
-              <FormHelperText>
-                {hasSubmitted && validation.roles ? "権限を 1 つ以上選択してください" : " "}
-              </FormHelperText>
+              <FormHelperText>{hasSubmitted && validation.roles ? "権限を 1 つ以上選択してください" : " "}</FormHelperText>
             </FormControl>
 
             <TextField
@@ -343,7 +357,7 @@ export default function EmployeeEditDialog({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px]">
+          <div className="grid gap-4 md:grid-cols-2">
             <TextField
               label="メールアドレス"
               type="email"
@@ -360,30 +374,11 @@ export default function EmployeeEditDialog({
               onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
               fullWidth
               error={hasSubmitted && validation.phoneNumber}
-              helperText={
-                hasSubmitted && validation.phoneNumber
-                  ? "電話番号は 10 桁または 11 桁の数字で入力してください"
-                  : " "
-              }
+              helperText={hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : " "}
             />
-            <TextField
-              select
-              label="都道府県"
-              value={form.prefecture}
-              onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
-              fullWidth
-              helperText=" "
-            >
-              <MenuItem value="">未選択</MenuItem>
-              {JAPAN_PREFECTURES.map((prefecture) => (
-                <MenuItem key={prefecture} value={prefecture}>
-                  {prefecture}
-                </MenuItem>
-              ))}
-            </TextField>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_minmax(0,1.4fr)_minmax(0,1fr)] md:items-start">
+          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_120px] md:items-start">
             <TextField
               label="郵便番号(前半)"
               value={form.postalCodeFirstHalf}
@@ -413,6 +408,33 @@ export default function EmployeeEditDialog({
               error={hasSubmitted && validation.postalCode}
               helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
             />
+            <Button
+              type="button"
+              variant="outlined"
+              onClick={handleAutoFillAddress}
+              disabled={addressAutoFilling}
+              sx={{ minHeight: "56px", whiteSpace: "nowrap" }}
+            >
+              自動入力
+            </Button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1.7fr)_minmax(0,1fr)] md:items-start">
+            <TextField
+              select
+              label="都道府県"
+              value={form.prefecture}
+              onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
+              fullWidth
+              helperText=" "
+            >
+              <MenuItem value="">未選択</MenuItem>
+              {JAPAN_PREFECTURES.map((prefecture) => (
+                <MenuItem key={prefecture} value={prefecture}>
+                  {prefecture}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               label="市区町村・丁目・番地"
               value={form.city}

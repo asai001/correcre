@@ -8,12 +8,14 @@ import {
   listExchangeHistoryByMerchantAndStatus,
   transitionExchangeStatus,
 } from "@correcre/lib/dynamodb/exchange-history";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import type {
+  DBUserAddress,
   ExchangeHistoryActorType,
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
@@ -32,6 +34,15 @@ type RuntimeConfig = {
   merchantTableName: string;
   merchandiseImageBucketName: string;
   userTableName: string;
+  companyTableName: string;
+  pointTransactionTableName: string;
+};
+
+type ApplicantProfile = {
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: DBUserAddress;
 };
 
 function getRuntimeConfig(): RuntimeConfig {
@@ -42,7 +53,33 @@ function getRuntimeConfig(): RuntimeConfig {
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
   };
+}
+
+async function resolveCompanyName(
+  config: RuntimeConfig,
+  companyId: string,
+  cache: Map<string, string>,
+): Promise<string | undefined> {
+  if (cache.has(companyId)) {
+    return cache.get(companyId);
+  }
+
+  const company = await getCompanyById(
+    {
+      region: config.region,
+      tableName: config.companyTableName,
+    },
+    companyId,
+  );
+
+  const name = company ? company.shortName || company.name : undefined;
+  if (name) {
+    cache.set(companyId, name);
+  }
+  return name;
 }
 
 function normalizeStatus(value?: ExchangeHistoryStatus): ExchangeHistoryStatus {
@@ -53,6 +90,28 @@ function normalizeStatus(value?: ExchangeHistoryStatus): ExchangeHistoryStatus {
 
 function compareExchangedAtDesc(left: OperatorExchangeSummary, right: OperatorExchangeSummary) {
   return right.exchangedAt.localeCompare(left.exchangedAt);
+}
+
+async function resolveApplicantProfile(
+  config: RuntimeConfig,
+  companyId: string,
+  userId: string,
+): Promise<ApplicantProfile> {
+  const user = await getUserByCompanyAndUserId(
+    {
+      region: config.region,
+      tableName: config.userTableName,
+    },
+    companyId,
+    userId,
+  );
+
+  return {
+    name: user ? `${user.lastName ?? ""} ${user.firstName ?? ""}`.trim() || undefined : undefined,
+    email: user?.email,
+    phoneNumber: user?.phoneNumber,
+    address: user?.address,
+  };
 }
 
 async function resolveUserName(
@@ -66,32 +125,25 @@ async function resolveUserName(
     return cache.get(cacheKey);
   }
 
-  const user = await getUserByCompanyAndUserId(
-    {
-      region: config.region,
-      tableName: config.userTableName,
-    },
-    companyId,
-    userId,
-  );
-
-  const name = user ? `${user.lastName ?? ""} ${user.firstName ?? ""}`.trim() : undefined;
-  if (name) {
-    cache.set(cacheKey, name);
+  const profile = await resolveApplicantProfile(config, companyId, userId);
+  if (profile.name) {
+    cache.set(cacheKey, profile.name);
   }
-  return name;
+  return profile.name;
 }
 
 function toSummary(
   item: ExchangeHistoryItem,
   merchantName: string | undefined,
   userName: string | undefined,
+  companyName: string | undefined,
 ): OperatorExchangeSummary {
   return {
     exchangeId: item.exchangeId,
     merchantId: item.merchantId ?? "",
     merchantName,
     companyId: item.companyId,
+    companyName,
     userId: item.userId,
     userName,
     merchandiseId: item.merchandiseId,
@@ -158,12 +210,14 @@ export async function listExchangesForOperator(
   }
 
   const userNameCache = new Map<string, string>();
+  const companyNameCache = new Map<string, string>();
   const summaries: OperatorExchangeSummary[] = [];
 
   for (const item of allItems) {
     const merchantName = item.merchantId ? merchantNameCache.get(item.merchantId) : undefined;
     const userName = await resolveUserName(config, item.companyId, item.userId, userNameCache);
-    summaries.push(toSummary(item, merchantName, userName));
+    const companyName = await resolveCompanyName(config, item.companyId, companyNameCache);
+    summaries.push(toSummary(item, merchantName, userName, companyName));
   }
 
   return summaries.sort(compareExchangedAtDesc);
@@ -174,8 +228,8 @@ async function buildExchangeDetail(
   item: ExchangeHistoryItem,
   actorType: ExchangeHistoryActorType,
 ): Promise<OperatorExchangeDetail> {
-  const userNameCache = new Map<string, string>();
-  const userName = await resolveUserName(config, item.companyId, item.userId, userNameCache);
+  const applicant = await resolveApplicantProfile(config, item.companyId, item.userId);
+  const companyName = await resolveCompanyName(config, item.companyId, new Map());
 
   let merchantName: string | undefined;
   if (item.merchantId) {
@@ -208,7 +262,10 @@ async function buildExchangeDetail(
   const status = normalizeStatus(item.status);
 
   return {
-    ...toSummary(item, merchantName, userName),
+    ...toSummary(item, merchantName, applicant.name, companyName),
+    applicantEmail: applicant.email,
+    applicantPhoneNumber: applicant.phoneNumber,
+    applicantAddress: applicant.address,
     merchandiseImageViewUrl,
     history: item.history ?? [],
     allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
@@ -261,6 +318,7 @@ export async function transitionExchangeForOperator(params: {
       actorId: params.actorUserId,
       comment: params.comment,
       userTableName: config.userTableName,
+      pointTransactionTableName: config.pointTransactionTableName,
     },
   );
 

@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listUsersByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { DBUserItem } from "@correcre/types";
@@ -11,11 +12,15 @@ import { ADMIN_LOGIN_PATH } from "./constants";
 import { getAdminSession } from "./session";
 import type { AdminSession } from "./verify-token";
 
-export async function getAdminUserForSession(session: AdminSession): Promise<DBUserItem | null> {
+export type AdminSessionUserLookup =
+  | { allowed: true; user: DBUserItem }
+  | { allowed: false; reason: "user_not_found" | "company_inactive" };
+
+export async function resolveAdminUserForSession(session: AdminSession): Promise<AdminSessionUserLookup> {
   const cognitoSub = session.payload.sub?.trim();
 
   if (!cognitoSub) {
-    return null;
+    return { allowed: false, reason: "user_not_found" };
   }
 
   let users: DBUserItem[];
@@ -36,7 +41,31 @@ export async function getAdminUserForSession(session: AdminSession): Promise<DBU
     throw error;
   }
 
-  return users.find((user) => user.status !== "DELETED" && user.roles.includes("ADMIN")) ?? null;
+  const user = users.find((user) => user.status !== "DELETED" && user.roles.includes("ADMIN")) ?? null;
+
+  if (!user) {
+    return { allowed: false, reason: "user_not_found" };
+  }
+
+  // 所属企業が無効化（INACTIVE）されている場合はログイン・アクセスを許可しない。
+  const company = await getCompanyById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    },
+    user.companyId,
+  );
+
+  if (company?.status === "INACTIVE") {
+    return { allowed: false, reason: "company_inactive" };
+  }
+
+  return { allowed: true, user };
+}
+
+export async function getAdminUserForSession(session: AdminSession): Promise<DBUserItem | null> {
+  const lookup = await resolveAdminUserForSession(session);
+  return lookup.allowed ? lookup.user : null;
 }
 
 export async function requireCurrentAdminUser() {
