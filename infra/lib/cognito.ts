@@ -96,10 +96,10 @@ const LOGIN_URLS = {
     merchant: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
   },
   prod: {
-    admin: "https://correcre-admin.example.com/login",
-    employee: "https://correcre-employee.example.com/login",
-    operator: "https://correcre-operator.example.com/login",
-    merchant: "https://correcre-merchant.example.com/login",
+    admin: "https://admin.correcre.jp/login",
+    employee: "https://app.correcre.jp/login",
+    operator: "https://operator.correcre.jp/login",
+    merchant: "https://merchant.correcre.jp/login",
   },
 } satisfies Record<InfraStage, Record<LoginAppName, string>>;
 
