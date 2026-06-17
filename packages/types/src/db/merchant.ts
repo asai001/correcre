@@ -5,6 +5,8 @@ export type StoreAddressMode = "same_company" | "no_store" | "other";
 export type Merchant = {
   merchantId: string;
   name: string;
+  // 一覧（従業員向け商品・サービスカタログなど）に表示する名称。未設定の場合は name を表示する。
+  displayName?: string;
   kanaName?: string;
 
   status: MerchantStatus;

@@ -267,7 +267,8 @@ async function resolveMerchantName(
     },
     merchantId,
   );
-  const name = merchant?.name ?? "";
+  // 表示名（任意）を優先し、未設定なら会社名にフォールバックする。
+  const name = merchant?.displayName?.trim() || merchant?.name || "";
   cache.set(merchantId, name);
   return name;
 }
