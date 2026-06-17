@@ -42,10 +42,13 @@ const environments: EnvironmentConfig[] = [
     stage: "prod",
     account: "923520716541",
     region: "ap-northeast-1",
-    adminUrl: "https://correcre-admin.vercel.app/",
-    employeeUrl: "https://correcre-employee.vercel.app/",
-    operatorUrl: "https://correcre-operator.vercel.app/",
-    merchantUrl: "https://correcre-merchant.vercel.app/",
+    // 本番はカスタムドメインで配信している（cognito.ts のログイン URL と一致させる）。
+    // ここが実アクセス元のオリジンと一致していないと S3 バケットの CORS 許可オリジンが合わず、
+    // presigned URL への直 PUT がプリフライトで弾かれて画像アップロードに失敗する。
+    adminUrl: "https://admin.correcre.jp/",
+    employeeUrl: "https://app.correcre.jp/",
+    operatorUrl: "https://operator.correcre.jp/",
+    merchantUrl: "https://merchant.correcre.jp/",
     sourceContext: "main",
   },
 ];
