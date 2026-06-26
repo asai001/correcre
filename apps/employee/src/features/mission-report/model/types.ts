@@ -1,4 +1,13 @@
-export type FieldType = "text" | "textarea" | "number" | "datetime-local" | "date" | "select" | "url" | "image";
+export type FieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "datetime-local"
+  | "date"
+  | "select"
+  | "multiSelect"
+  | "url"
+  | "image";
 
 export type ImageFieldValue = {
   s3Key: string;
@@ -30,8 +39,12 @@ export type FieldConfig = {
   helpText?: string;
   required?: boolean;
   rows?: number; // textarea
+  minLength?: number;
+  maxLength?: number;
   min?: number;
   max?: number;
+  minSelected?: number;
+  maxSelected?: number;
   step?: number; // number
   selectValueType?: "string" | "number" | "boolean"; // select の 要素の型（ひとつの select で共通）
   options?: { label: string; value: string }[]; // select
@@ -62,7 +75,7 @@ export type MissionProgress = {
 export type SubmitPayload = {
   companyId: string;
   missionId: string;
-  values: Record<string, string | ImageFieldValue>;
+  values: Record<string, string | string[] | ImageFieldValue>;
   score: number;
 };
 

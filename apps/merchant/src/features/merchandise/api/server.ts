@@ -100,7 +100,7 @@ export async function getMerchantCompanyName(merchantId: string): Promise<string
     merchantId,
   );
 
-  return merchant?.name ?? null;
+  return (merchant?.displayName?.trim() || merchant?.name) ?? null;
 }
 
 function getNextMerchandiseId(items: Merchandise[]) {

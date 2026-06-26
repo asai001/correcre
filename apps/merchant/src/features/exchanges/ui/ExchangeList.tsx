@@ -16,6 +16,7 @@ type Props = {
   initialItems: ExchangeSummary[];
   initialFilter: ExchangeListFilter;
   merchantName: string;
+  merchantDisplayName?: string;
 };
 
 const FILTER_OPTIONS: ReadonlyArray<{ value: ExchangeListFilter; label: string }> = [
@@ -45,7 +46,7 @@ function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
-export default function ExchangeList({ initialItems, initialFilter, merchantName }: Props) {
+export default function ExchangeList({ initialItems, initialFilter, merchantName, merchantDisplayName }: Props) {
   const [filter, setFilter] = useState<ExchangeListFilter>(initialFilter);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
       <AdminPageHeader
         title="交換管理"
         adminName={merchantName}
+        merchantDisplayName={merchantDisplayName}
         subtitle="従業員からの交換申請の確認と状態更新"
         backHref="/dashboard"
       />

@@ -10,6 +10,7 @@ import type { SettlementData } from "../model/types";
 type Props = {
   data: SettlementData;
   merchantUserName: string;
+  merchantDisplayName?: string;
 };
 
 type Feedback = {
@@ -26,7 +27,7 @@ function formatMonthLabel(month: string) {
   return `${year}年${Number(mon)}月`;
 }
 
-export default function SettlementView({ data, merchantUserName }: Props) {
+export default function SettlementView({ data, merchantUserName, merchantDisplayName }: Props) {
   const [sendingMonth, setSendingMonth] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export default function SettlementView({ data, merchantUserName }: Props) {
       <AdminPageHeader
         title="収支・精算"
         adminName={merchantUserName}
+        merchantDisplayName={merchantDisplayName}
         subtitle="交換実績にもとづく売上と、運用者への請求額を確認できます"
         backHref="/dashboard"
       />

@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Stack, Typography, Box, MenuItem, IconButton } from "@mui/material";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  ListItemText,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faImage, faXmark } from "@fortawesome/free-solid-svg-icons";
 
@@ -9,6 +23,9 @@ import SuccessDialog from "@employee/features/mission-report/ui/SuccessDialog";
 import { fetchMissionFormConfig, uploadMissionReportImage } from "../api/client";
 import type { Mission, SubmitPayload, FieldConfig, ImageFieldValue } from "../model/types";
 import { useMissionReportDialog } from "../hooks/useMissionReportDialog";
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_TOO_LARGE_MESSAGE = "10MB以上の画像はアップロードできません。";
 
 function isImageFieldValue(value: unknown): value is ImageFieldValue {
   return (
@@ -82,7 +99,7 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     };
   }, [open, companyId, missionId, missionConfig.missionId]);
 
-  const { values, submitting, error, successOpen, successMessage, setSuccessOpen, handleChange, setImageValue, handleSubmit } = useMissionReportDialog({
+  const { values, submitting, error, successOpen, successMessage, setSuccessOpen, handleChange, setFieldValue, setImageValue, handleSubmit } = useMissionReportDialog({
     companyId,
     missionId,
     missionConfig: resolvedMissionConfig,
@@ -114,6 +131,12 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
       return;
     }
 
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageErrorByField((prev) => ({ ...prev, [field.id]: IMAGE_TOO_LARGE_MESSAGE }));
+      e.target.value = "";
+      return;
+    }
+
     setImageUploadingByField((prev) => ({ ...prev, [field.id]: true }));
     setImageErrorByField((prev) => ({ ...prev, [field.id]: null }));
 
@@ -124,7 +147,9 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
       console.error("image upload failed", uploadError);
       setImageErrorByField((prev) => ({
         ...prev,
-        [field.id]: "画像のアップロードに失敗しました。時間をおいて再度お試しください。",
+        [field.id]: uploadError instanceof Error && uploadError.message === "file_too_large"
+          ? IMAGE_TOO_LARGE_MESSAGE
+          : "画像のアップロードに失敗しました。時間をおいて再度お試しください。",
       }));
     } finally {
       setImageUploadingByField((prev) => ({ ...prev, [field.id]: false }));
@@ -137,7 +162,7 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
 
   const renderField = (field: FieldConfig) => {
     const rawValue = values[field.id] ?? "";
-    const value: string = isImageFieldValue(rawValue) ? "" : rawValue;
+    const value = typeof rawValue === "string" ? rawValue : "";
 
     // 共通 props
     const commonProps = {
@@ -245,7 +270,53 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
           rows={field.rows ?? 4}
           value={value}
           onChange={handleChange(field)}
+          slotProps={{
+            htmlInput: {
+              minLength: field.minLength,
+              maxLength: field.maxLength,
+            },
+          }}
         />
+      );
+    }
+
+    if (field.type === "multiSelect") {
+      const selectedValues = Array.isArray(rawValue) ? rawValue : [];
+
+      return (
+        <Box key={field.id}>
+          <TextField
+            {...commonProps}
+            select
+            value={selectedValues}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setFieldValue(field.id, Array.isArray(nextValue) ? nextValue : nextValue.split(","));
+            }}
+            slotProps={{
+              select: {
+                multiple: true,
+                renderValue: (selected) => (selected as string[]).join("、"),
+              },
+            }}
+          >
+            {field.options?.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                <Checkbox checked={selectedValues.includes(option.value)} size="small" />
+                <ListItemText primary={option.label} />
+              </MenuItem>
+            ))}
+          </TextField>
+          {field.required ? (
+            <input
+              tabIndex={-1}
+              required
+              value={selectedValues.length ? "selected" : ""}
+              onChange={() => undefined}
+              style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
+            />
+          ) : null}
+        </Box>
       );
     }
 
@@ -279,12 +350,10 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
           value={value}
           onChange={handleChange(field)}
           slotProps={{
-            input: {
-              inputProps: {
-                min: field.min,
-                max: field.max,
-                step: field.step,
-              },
+            htmlInput: {
+              min: field.min,
+              max: field.max,
+              step: field.step,
             },
           }}
         />
@@ -307,7 +376,20 @@ export default function MissionReportDialog({ open, onClose, onSubmit, companyId
     }
 
     // 他のタイプ（text / url など）
-    return <TextField key={field.id} {...commonProps} value={value} onChange={handleChange(field)} />;
+    return (
+      <TextField
+        key={field.id}
+        {...commonProps}
+        value={value}
+        onChange={handleChange(field)}
+        slotProps={{
+          htmlInput: {
+            minLength: field.minLength,
+            maxLength: field.maxLength,
+          },
+        }}
+      />
+    );
   };
 
   return (

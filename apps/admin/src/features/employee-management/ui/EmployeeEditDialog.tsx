@@ -58,6 +58,9 @@ type ValidationState = {
   pointAdjustment: boolean;
   pointBalance: boolean;
   postalCode: boolean;
+  prefecture: boolean;
+  city: boolean;
+  street: boolean;
 };
 
 const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
@@ -110,6 +113,7 @@ function createInitialFormState(employee: EmployeeManagementEmployee | null): Fo
     postalCodeSecondHalf: postalCode.postalCodeSecondHalf,
     prefecture: employee?.address?.prefecture ?? "",
     city: employee?.address?.city ?? "",
+    street: employee?.address?.street ?? "",
     building: employee?.address?.building ?? "",
     roles: employee ? getInitialRoles(employee.roles) : ["EMPLOYEE"],
     joinedAt: employee?.joinedAt ?? "",
@@ -151,6 +155,9 @@ export default function EmployeeEditDialog({
     const postalCodeFirstHalf = form.postalCodeFirstHalf?.trim() ?? "";
     const postalCodeSecondHalf = form.postalCodeSecondHalf?.trim() ?? "";
     const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
+    const prefecture = form.prefecture?.trim() ?? "";
+    const city = form.city?.trim() ?? "";
+    const street = form.street?.trim() ?? "";
 
     return {
       lastName: !form.lastName.trim(),
@@ -165,6 +172,9 @@ export default function EmployeeEditDialog({
       pointAdjustment: parsedPointAdjustment === null,
       pointBalance: parsedPointAdjustment !== null && nextPointBalance < 0,
       postalCode: hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
+      prefecture: !prefecture,
+      city: !city,
+      street: !street,
     };
   }, [form, nextPointBalance, parsedPointAdjustment]);
 
@@ -188,7 +198,8 @@ export default function EmployeeEditDialog({
         setForm((current) => ({
           ...current,
           prefecture: result.address1 ?? "",
-          city: `${result.address2 ?? ""}${result.address3 ?? ""}`,
+          city: result.address2 ?? "",
+          street: result.address3 ?? "",
         }));
       }
     } finally {
@@ -216,6 +227,7 @@ export default function EmployeeEditDialog({
       postalCodeSecondHalf: normalizeOptionalText(form.postalCodeSecondHalf),
       prefecture: normalizeOptionalText(form.prefecture),
       city: normalizeOptionalText(form.city),
+      street: normalizeOptionalText(form.street),
       building: normalizeOptionalText(form.building),
       roles: form.roles,
       joinedAt: form.joinedAt.trim(),
@@ -419,14 +431,16 @@ export default function EmployeeEditDialog({
             </Button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1.7fr)_minmax(0,1fr)] md:items-start">
+          <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1fr)] md:items-start">
             <TextField
               select
               label="都道府県"
               value={form.prefecture}
               onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
               fullWidth
-              helperText=" "
+              required
+              error={hasSubmitted && validation.prefecture}
+              helperText={hasSubmitted && validation.prefecture ? "必須項目です" : " "}
             >
               <MenuItem value="">未選択</MenuItem>
               {JAPAN_PREFECTURES.map((prefecture) => (
@@ -436,11 +450,22 @@ export default function EmployeeEditDialog({
               ))}
             </TextField>
             <TextField
-              label="市区町村・丁目・番地"
+              label="市区町村"
               value={form.city}
               onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               fullWidth
-              helperText=" "
+              required
+              error={hasSubmitted && validation.city}
+              helperText={hasSubmitted && validation.city ? "必須項目です" : " "}
+            />
+            <TextField
+              label="丁目・番地"
+              value={form.street}
+              onChange={(event) => setForm((current) => ({ ...current, street: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.street}
+              helperText={hasSubmitted && validation.street ? "必須項目です" : " "}
             />
             <TextField
               label="建物名・部屋番号"

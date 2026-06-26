@@ -14,7 +14,7 @@ type Args = {
   onClose: () => void;
 };
 
-type FormValue = string | ImageFieldValue;
+type FormValue = string | string[] | ImageFieldValue;
 type FormValues = Record<string, FormValue>;
 
 const makeDraftKey = (companyId: string, missionId?: string) => (missionId ? `missionReport:${companyId}:${missionId}` : "");
@@ -93,6 +93,10 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
     });
   };
 
+  const setFieldValue = (fieldId: string, value: FormValue) => {
+    setValues((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
   useEffect(() => {
     if (!draftKey) {
       return;
@@ -164,6 +168,7 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
     successMessage,
     setSuccessOpen,
     handleChange,
+    setFieldValue,
     setImageValue,
     handleSubmit,
   };

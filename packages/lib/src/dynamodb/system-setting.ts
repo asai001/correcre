@@ -13,6 +13,8 @@ export type SystemSettingTableConfig = {
 
 export const NOTIFICATION_SETTING_KEY = "NOTIFICATION";
 
+const TABLE_NAME_STAGE_PATTERN = /^correcre-(user|company|merchant|exchange-history)-(.+)$/;
+
 export function isSystemSettingTableMissingError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -23,6 +25,31 @@ export function isSystemSettingTableMissingError(error: unknown): boolean {
 
 function normalizeEmails(emails: readonly string[]): string[] {
   return [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+}
+
+export function resolveSystemSettingTableName(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const configured = env.DDB_SYSTEM_SETTING_TABLE_NAME?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const sourceTableNames = [
+    env.DDB_USER_TABLE_NAME,
+    env.DDB_COMPANY_TABLE_NAME,
+    env.DDB_MERCHANT_TABLE_NAME,
+    env.DDB_EXCHANGE_HISTORY_TABLE_NAME,
+  ];
+
+  for (const tableName of sourceTableNames) {
+    const normalized = tableName?.trim();
+    const match = normalized ? TABLE_NAME_STAGE_PATTERN.exec(normalized) : null;
+
+    if (match) {
+      return `correcre-system-setting-${match[2]}`;
+    }
+  }
+
+  return undefined;
 }
 
 export async function getNotificationSetting(

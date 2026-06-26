@@ -41,6 +41,7 @@ function isActiveNav(pathname: string | null, href: string): boolean {
 type AdminPageHeaderProps = {
   title: string;
   adminName: string;
+  merchantDisplayName?: string;
   backHref?: Route;
   subtitle?: string;
 };
@@ -48,6 +49,7 @@ type AdminPageHeaderProps = {
 export default function AdminPageHeader({
   title,
   adminName,
+  merchantDisplayName,
   backHref,
   subtitle = "提携企業向け 商品・サービス管理",
 }: AdminPageHeaderProps) {
@@ -73,6 +75,11 @@ export default function AdminPageHeader({
         </div>
         <div className="flex shrink-0 items-center gap-4 self-end sm:self-auto">
           <div className="text-right">
+            {merchantDisplayName ? (
+              <div className="max-w-48 truncate text-xs font-semibold text-white/75 sm:max-w-64">
+                {merchantDisplayName}
+              </div>
+            ) : null}
             <div className="text-lg font-bold sm:text-xl">{adminName}</div>
           </div>
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 text-lg">

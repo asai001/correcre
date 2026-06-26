@@ -9,6 +9,7 @@ import {
   faBuilding,
   faDownload,
   faMagnifyingGlass,
+  faPaperPlane,
   faPlus,
   faTrashCan,
   faUsers,
@@ -26,6 +27,7 @@ import {
   deleteDepartment,
   deleteEmployee,
   renameDepartment,
+  resendEmployeeInvitation,
   updateEmployee,
 } from "../api/client";
 import { useEmployeeManagementSummary } from "../hooks/useEmployeeManagementSummary";
@@ -42,6 +44,7 @@ import DepartmentManagementDialog from "./DepartmentManagementDialog";
 import EmployeeDeleteDialog from "./EmployeeDeleteDialog";
 import EmployeeEditDialog from "./EmployeeEditDialog";
 import EmployeeRegistrationDialog from "./EmployeeRegistrationDialog";
+import EmployeeResendInvitationDialog from "./EmployeeResendInvitationDialog";
 
 type EmployeeManagementProps = {
   companyId?: string;
@@ -129,7 +132,7 @@ function formatAddress(employee: EmployeeManagementEmployee) {
     return "-";
   }
 
-  return [address.prefecture, address.city, address.building].filter(Boolean).join(" ");
+  return [address.prefecture, address.city, address.street, address.building].filter(Boolean).join(" ");
 }
 
 function StatCard({ label, value, description, accentClassName }: StatCardProps) {
@@ -157,6 +160,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "電話番号",
       "郵便番号",
       "住所",
+      "丁目・番地",
       "建物名・部屋番号",
       "ポイント",
       "達成率",
@@ -175,6 +179,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       employee.phoneNumber ?? "-",
       formatPostalCode(employee.address?.postalCode),
       [employee.address?.prefecture, employee.address?.city].filter(Boolean).join(" ") || "-",
+      employee.address?.street ?? "-",
       employee.address?.building ?? "-",
       employee.pointBalance,
       `${employee.completionRate}%`,
@@ -187,6 +192,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
 function getEmployeeColumns(
   pointUnitLabel: string,
   onDeleteEmployee: (employee: EmployeeManagementEmployee) => void,
+  onResendInvitation: (employee: EmployeeManagementEmployee) => void,
 ): ColumnDef<EmployeeManagementEmployee>[] {
   return [
     {
@@ -225,6 +231,11 @@ function getEmployeeColumns(
           <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClassMap[row.status]}`}>
             {statusLabelMap[row.status]}
           </span>
+          {row.status === "INVITED" && row.invitationExpired ? (
+            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+              仮パスワード期限切れ
+            </span>
+          ) : null}
           <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${authLinkBadgeClassMap[row.authLinkStatus]}`}>
             {authLinkLabelMap[row.authLinkStatus]}
           </span>
@@ -268,33 +279,61 @@ function getEmployeeColumns(
     },
     {
       id: "userId",
-      label: "削除",
+      label: "操作",
       align: "center",
-      width: "6%",
-      render: (row) =>
-        row.roles.includes("OPERATOR") ? (
-          // 運用者アカウントを削除すると運用者自身のセッションが壊れ操作不能になるため、削除不可。
-          <div className="flex items-center justify-center text-xs text-slate-300" title="運用者アカウントは削除できません">
-            —
-          </div>
-        ) : (
+      width: "8%",
+      render: (row) => {
+        const canResendInvitation = row.status === "INVITED" && row.invitationExpired;
+        // 運用者アカウントを削除すると運用者自身のセッションが壊れ操作不能になるため、削除不可。
+        const canDelete = !row.roles.includes("OPERATOR");
+
+        if (!canResendInvitation && !canDelete) {
+          return (
+            <div className="flex items-center justify-center text-xs text-slate-300" title="運用者アカウントは削除できません">
+              —
+            </div>
+          );
+        }
+
+        return (
           <div className="flex items-center justify-center gap-1">
-            <IconButton
-              size="small"
-              aria-label={`${row.name}を削除`}
-              onClick={(event) => {
-                event.stopPropagation();
-                onDeleteEmployee(row);
-              }}
-              onKeyDown={(event) => {
-                event.stopPropagation();
-              }}
-              sx={{ color: "#EF4444" }}
-            >
-              <FontAwesomeIcon icon={faTrashCan} />
-            </IconButton>
+            {canResendInvitation ? (
+              <IconButton
+                size="small"
+                aria-label={`${row.name}に招待メールを再送`}
+                title="招待メールを再送"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onResendInvitation(row);
+                }}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+                }}
+                sx={{ color: "#2563EB" }}
+              >
+                <FontAwesomeIcon icon={faPaperPlane} />
+              </IconButton>
+            ) : null}
+            {canDelete ? (
+              <IconButton
+                size="small"
+                aria-label={`${row.name}を削除`}
+                title="削除"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteEmployee(row);
+                }}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+                }}
+                sx={{ color: "#EF4444" }}
+              >
+                <FontAwesomeIcon icon={faTrashCan} />
+              </IconButton>
+            ) : null}
           </div>
-        ),
+        );
+      },
     },
   ];
 }
@@ -322,6 +361,9 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
   const [employeePendingDeletion, setEmployeePendingDeletion] = useState<EmployeeManagementEmployee | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingEmployee, setDeletingEmployee] = useState(false);
+  const [employeePendingResend, setEmployeePendingResend] = useState<EmployeeManagementEmployee | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendingInvitation, setResendingInvitation] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const employees = useMemo(() => summary?.employees ?? [], [summary]);
@@ -359,6 +401,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         employee.address?.postalCode ?? "",
         employee.address?.prefecture ?? "",
         employee.address?.city ?? "",
+        employee.address?.street ?? "",
         employee.address?.building ?? "",
         ...employee.roles.map((role) => roleLabelMap[role]),
         statusLabelMap[employee.status],
@@ -481,6 +524,28 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
       return result;
     } finally {
       setDeletingEmployee(false);
+    }
+  };
+
+  const handleResendInvitation = async (userId: string) => {
+    if (!selectedCompanyId) {
+      setResendError("会社が選択されていません");
+      return;
+    }
+
+    try {
+      setResendingInvitation(true);
+      setResendError(null);
+
+      const updatedEmployee = await resendEmployeeInvitation(selectedCompanyId, userId);
+
+      setEmployeePendingResend(null);
+      setNotice(`${updatedEmployee.name} に招待メールを再送しました。`);
+      reload();
+    } catch (err) {
+      setResendError(err instanceof Error ? err.message : "招待メールの再送に失敗しました");
+    } finally {
+      setResendingInvitation(false);
     }
   };
 
@@ -679,7 +744,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     );
   }
 
-  const columns = getEmployeeColumns(pointUnitLabel, setEmployeePendingDeletion);
+  const columns = getEmployeeColumns(pointUnitLabel, setEmployeePendingDeletion, setEmployeePendingResend);
   const footer = (
     <TablePagination
       component="div"
@@ -906,6 +971,20 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
           }
         }}
         onSubmit={handleDeleteEmployee}
+      />
+
+      <EmployeeResendInvitationDialog
+        open={Boolean(employeePendingResend)}
+        employee={employeePendingResend}
+        submitting={resendingInvitation}
+        error={resendError}
+        onClose={() => {
+          if (!resendingInvitation) {
+            setEmployeePendingResend(null);
+            setResendError(null);
+          }
+        }}
+        onSubmit={handleResendInvitation}
       />
 
       <DepartmentManagementDialog

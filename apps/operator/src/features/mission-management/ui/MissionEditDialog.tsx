@@ -59,6 +59,10 @@ const floatingLabelTextFieldSx = {
   },
 };
 
+function toIntegerFormValue(value: string) {
+  return /^\d*$/.test(value) ? value : null;
+}
+
 export default function MissionEditDialog({
   open,
   companyId,
@@ -83,8 +87,8 @@ export default function MissionEditDialog({
     title: form.title,
     description: form.description,
     category: form.category,
-    monthlyCount: parseInt(form.monthlyCount, 10),
-    score: parseInt(form.score, 10),
+    monthlyCount: Number(form.monthlyCount),
+    score: Number(form.score),
     enabled: form.enabled,
     fields: form.fields,
   });
@@ -187,9 +191,22 @@ export default function MissionEditDialog({
                     label="月間実施回数"
                     type="number"
                     value={form.monthlyCount}
-                    onChange={(e) => setForm((c) => ({ ...c, monthlyCount: e.target.value }))}
+                    onChange={(e) => {
+                      const nextValue = toIntegerFormValue(e.target.value);
+                      if (nextValue !== null) {
+                        setForm((c) => ({ ...c, monthlyCount: nextValue }));
+                      }
+                    }}
                     fullWidth
                     required
+                    slotProps={{
+                      htmlInput: {
+                        min: 1,
+                        step: 1,
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
+                      },
+                    }}
                     sx={floatingLabelTextFieldSx}
                   />
                 </div>
@@ -198,9 +215,22 @@ export default function MissionEditDialog({
                     label="スコア"
                     type="number"
                     value={form.score}
-                    onChange={(e) => setForm((c) => ({ ...c, score: e.target.value }))}
+                    onChange={(e) => {
+                      const nextValue = toIntegerFormValue(e.target.value);
+                      if (nextValue !== null) {
+                        setForm((c) => ({ ...c, score: nextValue }));
+                      }
+                    }}
                     fullWidth
                     required
+                    slotProps={{
+                      htmlInput: {
+                        min: 1,
+                        step: 1,
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
+                      },
+                    }}
                     sx={floatingLabelTextFieldSx}
                   />
                 </div>

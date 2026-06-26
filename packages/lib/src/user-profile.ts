@@ -73,6 +73,7 @@ type AddressLike = {
   postalCode?: string | null;
   prefecture?: string | null;
   city?: string | null;
+  street?: string | null;
 };
 
 export function hasCompleteDeliveryAddress(address?: AddressLike | null) {
@@ -80,7 +81,12 @@ export function hasCompleteDeliveryAddress(address?: AddressLike | null) {
     return false;
   }
 
-  return Boolean(address.postalCode?.trim() && address.prefecture?.trim() && address.city?.trim());
+  return Boolean(
+    address.postalCode?.trim() &&
+      address.prefecture?.trim() &&
+      address.city?.trim() &&
+      address.street?.trim(),
+  );
 }
 
 export function hasCompleteExchangeRequestProfile(params: {

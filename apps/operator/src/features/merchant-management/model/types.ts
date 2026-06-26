@@ -29,6 +29,13 @@ export type MerchantStats = {
 };
 
 // 提携企業ごとの月次収支（売上・交換手数料・支払額）。
+export type MerchantMonthlyFinanceItemRow = {
+  merchandiseId: string;
+  merchandiseName: string;
+  exchangeCount: number;
+  salesYen: number;
+};
+
 export type MerchantMonthlyFinanceRow = {
   month: string; // YYYY-MM
   exchangeCount: number;
@@ -37,6 +44,7 @@ export type MerchantMonthlyFinanceRow = {
   exchangeFeeYen: number;
   // 提携企業への支払額（売上 − 交換手数料）。
   payableYen: number;
+  items: MerchantMonthlyFinanceItemRow[];
 };
 
 // 提携企業サマリー画面用：商品・交換の集計値と月ごとの収支。

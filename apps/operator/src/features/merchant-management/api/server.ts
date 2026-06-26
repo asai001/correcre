@@ -607,6 +607,8 @@ export async function resetMerchantUserEmailForOperator(
     throw new Error("対象のユーザーが見つかりません");
   }
 
+  let cognitoEmailUpdated = false;
+
   try {
     await updateCognitoUserEmail(
       {
@@ -618,7 +620,34 @@ export async function resetMerchantUserEmailForOperator(
         newEmail,
       },
     );
+    cognitoEmailUpdated = true;
+    await resetCognitoUserPassword(
+      {
+        region: cognitoConfig.cognitoRegion,
+        userPoolId: cognitoConfig.cognitoUserPoolId,
+      },
+      {
+        username: user.cognitoSub ?? user.email,
+      },
+    );
   } catch (error) {
+    if (cognitoEmailUpdated) {
+      try {
+        await updateCognitoUserEmail(
+          {
+            region: cognitoConfig.cognitoRegion,
+            userPoolId: cognitoConfig.cognitoUserPoolId,
+          },
+          {
+            username: user.cognitoSub ?? user.email,
+            newEmail: beforeEmail,
+          },
+        );
+      } catch (rollbackCognitoError) {
+        console.error("Failed to roll back Cognito email after password reset notification failure", rollbackCognitoError);
+      }
+    }
+
     try {
       await updateMerchantUserEmail(
         {

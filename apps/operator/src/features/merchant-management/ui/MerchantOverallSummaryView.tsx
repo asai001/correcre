@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -61,9 +62,14 @@ function MetricCard({
 export default function MerchantOverallSummaryView({ summary, operatorName }: Props) {
   const { stats } = summary;
   const currentMonth = summary.monthly[0];
+  const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const merchantsByAmount = [...summary.merchants].sort(
     (left, right) => right.stats.totalAmountYen - left.stats.totalAmountYen,
   );
+
+  const toggleBreakdown = (month: string) => {
+    setExpandedMonth((prev) => (prev === month ? null : month));
+  };
 
   return (
     <div className="space-y-6 pb-10">
@@ -179,15 +185,62 @@ export default function MerchantOverallSummaryView({ summary, operatorName }: Pr
             </thead>
             <tbody>
               {summary.monthly.map((row) => (
-                <tr key={row.month} className="border-b border-slate-100 last:border-b-0">
-                  <td className="py-2 pr-4 font-semibold text-slate-700">{formatMonthLabel(row.month)}</td>
-                  <td className="py-2 pr-4 text-right text-slate-700">
-                    {formatCount(row.exchangeCount)}件
-                  </td>
-                  <td className="py-2 pr-4 text-right text-sky-700">{formatYen(row.salesYen)}</td>
-                  <td className="py-2 pr-4 text-right text-emerald-700">{formatYen(row.exchangeFeeYen)}</td>
-                  <td className="py-2 text-right font-bold text-rose-700">{formatYen(row.payableYen)}</td>
-                </tr>
+                <Fragment key={row.month}>
+                  <tr className="border-b border-slate-100 last:border-b-0">
+                    <td className="py-2 pr-4 font-semibold text-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => toggleBreakdown(row.month)}
+                        disabled={row.items.length === 0}
+                        aria-expanded={expandedMonth === row.month}
+                        className="inline-flex items-center gap-1.5 disabled:cursor-default"
+                      >
+                        <span
+                          aria-hidden
+                          className={`text-[10px] text-slate-400 ${row.items.length === 0 ? "invisible" : ""}`}
+                        >
+                          {expandedMonth === row.month ? "▼" : "▶"}
+                        </span>
+                        {formatMonthLabel(row.month)}
+                      </button>
+                    </td>
+                    <td className="py-2 pr-4 text-right text-slate-700">
+                      {formatCount(row.exchangeCount)}件
+                    </td>
+                    <td className="py-2 pr-4 text-right text-sky-700">{formatYen(row.salesYen)}</td>
+                    <td className="py-2 pr-4 text-right text-emerald-700">{formatYen(row.exchangeFeeYen)}</td>
+                    <td className="py-2 text-right font-bold text-rose-700">{formatYen(row.payableYen)}</td>
+                  </tr>
+                  {expandedMonth === row.month && row.items.length > 0 ? (
+                    <tr className="border-b border-slate-100 last:border-b-0">
+                      <td colSpan={5} className="bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-semibold text-slate-500">
+                          {formatMonthLabel(row.month)}の商品・サービス別内訳
+                        </div>
+                        <table className="mt-2 w-full border-collapse text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-left text-slate-500">
+                              <th className="py-1.5 pr-4 font-semibold">提携企業 / 商品・サービス</th>
+                              <th className="py-1.5 pr-4 text-right font-semibold">交換件数</th>
+                              <th className="py-1.5 text-right font-semibold">売上</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {row.items.map((item) => (
+                              <tr key={item.merchandiseId} className="border-b border-slate-200/60 last:border-b-0">
+                                <td className="py-1.5 pr-4 text-slate-700">{item.merchandiseName}</td>
+                                <td className="py-1.5 pr-4 text-right text-slate-700">
+                                  {formatCount(item.exchangeCount)}件
+                                </td>
+                                <td className="py-1.5 text-right font-semibold text-sky-700">{formatYen(item.salesYen)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

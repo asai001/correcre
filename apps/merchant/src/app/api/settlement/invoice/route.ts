@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
-import { getOperatorNotificationEmails } from "@correcre/lib/dynamodb/system-setting";
+import { getOperatorNotificationEmails, resolveSystemSettingTableName } from "@correcre/lib/dynamodb/system-setting";
 import { sendSesEmail } from "@correcre/lib/email/ses";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
@@ -118,10 +118,13 @@ export async function POST(req: Request) {
     const merchantName = merchant?.name ?? merchantId;
 
     // 宛先は運用者画面で設定された通知先メールアドレス（複数可）を使う。
-    const configuredEmails = await getOperatorNotificationEmails({
-      region,
-      tableName: readRequiredServerEnv("DDB_SYSTEM_SETTING_TABLE_NAME"),
-    });
+    const systemSettingTableName = resolveSystemSettingTableName();
+    const configuredEmails = systemSettingTableName
+      ? await getOperatorNotificationEmails({
+          region,
+          tableName: systemSettingTableName,
+        })
+      : [];
     const recipients = configuredEmails.length ? configuredEmails : [DEFAULT_OPERATOR_NOTIFICATION_EMAIL];
 
     await sendSesEmail(

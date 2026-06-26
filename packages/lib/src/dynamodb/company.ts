@@ -11,6 +11,42 @@ export type CompanyTableConfig = {
   tableName: string;
 };
 
+export function toBillingSnapshotMonth(value: string | Date = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function buildCompanyMonthlyBillingSnapshot(params: {
+  month: string;
+  status: Company["status"];
+  activeEmployees: number;
+  perEmployeeMonthlyFee: number;
+  capturedAt: string;
+}) {
+  const activeEmployees = Math.max(0, Math.trunc(params.activeEmployees));
+  const perEmployeeMonthlyFee = Math.max(0, Math.trunc(params.perEmployeeMonthlyFee));
+  const monthlyIncomeYen = params.status === "INACTIVE" ? 0 : activeEmployees * perEmployeeMonthlyFee;
+
+  return {
+    month: params.month,
+    status: params.status,
+    activeEmployees,
+    perEmployeeMonthlyFee,
+    monthlyIncomeYen,
+    capturedAt: params.capturedAt,
+  };
+}
+
+export function upsertCompanyMonthlyBillingSnapshot(
+  company: Company,
+  snapshot: ReturnType<typeof buildCompanyMonthlyBillingSnapshot>,
+) {
+  return {
+    ...(company.monthlyBillingSnapshots ?? {}),
+    [snapshot.month]: snapshot,
+  };
+}
+
 export async function getCompanyById(config: CompanyTableConfig, companyId: string): Promise<Company | null> {
   const client = getDynamoDocumentClient(config.region);
   const { Item } = await client.send(

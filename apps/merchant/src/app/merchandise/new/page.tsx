@@ -13,6 +13,7 @@ export default async function MerchandiseNewPage() {
     <MerchandiseForm
       mode="create"
       merchantName={joinNameParts(user.lastName, user.firstName)}
+      merchantDisplayName={merchantCompanyName}
       merchantCompanyName={merchantCompanyName}
     />
   );

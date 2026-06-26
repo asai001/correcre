@@ -64,16 +64,21 @@ async function assertUniqueEmail(config: RuntimeConfig, email: string, currentUs
   }
 }
 
-function buildAddress(input: Pick<UpdateOwnProfileInput, "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "building">) {
+function buildAddress(
+  input: Pick<
+    UpdateOwnProfileInput,
+    "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "street" | "building"
+  >,
+) {
   const postalCodeFirstHalf = input.postalCodeFirstHalf?.trim() ?? "";
   const postalCodeSecondHalf = input.postalCodeSecondHalf?.trim() ?? "";
   const prefecture = input.prefecture?.trim() ?? "";
   const city = input.city?.trim() ?? "";
+  const street = input.street?.trim() ?? "";
   const building = normalizeOptionalText(input.building);
-  const hasAnyAddressField = [postalCodeFirstHalf, postalCodeSecondHalf, prefecture, city, building].some(Boolean);
 
-  if (!hasAnyAddressField) {
-    return undefined;
+  if (!prefecture || !city || !street) {
+    throw new Error("都道府県・市区町村・丁目・番地を入力してください");
   }
 
   const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
@@ -83,8 +88,9 @@ function buildAddress(input: Pick<UpdateOwnProfileInput, "postalCodeFirstHalf" |
 
   return {
     postalCode: hasAnyPostalCodeField ? `${postalCodeFirstHalf}${postalCodeSecondHalf}` : undefined,
-    prefecture: prefecture || undefined,
-    city: city || undefined,
+    prefecture,
+    city,
+    street,
     building,
   } satisfies DBUserAddress;
 }

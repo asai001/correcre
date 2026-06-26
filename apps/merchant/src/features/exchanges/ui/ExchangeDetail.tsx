@@ -22,6 +22,7 @@ import type { ExchangeDetail as ExchangeDetailType } from "../model/types";
 type Props = {
   initial: ExchangeDetailType;
   merchantName: string;
+  merchantDisplayName?: string;
 };
 
 const TRANSITION_BUTTONS: Record<
@@ -179,6 +180,7 @@ function formatApplicantAddress(address?: ApplicantAddress) {
     postalCode ? `〒${postalCode}` : undefined,
     address.prefecture,
     address.city,
+    address.street,
     address.building,
   ].filter(Boolean);
 
@@ -192,7 +194,7 @@ const ACTOR_LABEL: Record<string, string> = {
   SYSTEM: "システム",
 };
 
-export default function ExchangeDetail({ initial, merchantName }: Props) {
+export default function ExchangeDetail({ initial, merchantName, merchantDisplayName }: Props) {
   const [detail, setDetail] = useState(initial);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -234,6 +236,7 @@ export default function ExchangeDetail({ initial, merchantName }: Props) {
       <AdminPageHeader
         title="交換詳細"
         adminName={merchantName}
+        merchantDisplayName={merchantDisplayName}
         subtitle="状態遷移とポイント精算"
         backHref="/exchanges"
       />
