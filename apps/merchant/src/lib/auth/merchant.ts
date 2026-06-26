@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
+import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { listMerchantUsersByCognitoSub } from "@correcre/lib/dynamodb/merchant-user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { MerchantUserItem } from "@correcre/types";
@@ -48,6 +49,18 @@ export async function getMerchantUserForSession(session: MerchantSession): Promi
   }
 
   return users.find((user) => user.status !== "DELETED" && user.roles.includes("MERCHANT")) ?? null;
+}
+
+export async function getMerchantDisplayName(merchantId: string): Promise<string> {
+  const merchant = await getMerchantById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
+    },
+    merchantId,
+  );
+
+  return merchant?.displayName?.trim() || merchant?.name?.trim() || "";
 }
 
 export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {

@@ -28,6 +28,16 @@ export async function uploadMissionReportImage(file: File): Promise<UploadMissio
 
   if (!issueRes.ok) {
     const errorBody = await issueRes.text();
+    try {
+      const parsed = JSON.parse(errorBody) as { error?: unknown };
+      if (parsed.error === "file_too_large") {
+        throw new Error("file_too_large");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "file_too_large") {
+        throw error;
+      }
+    }
     throw new Error(`failed to issue upload url: ${issueRes.status} ${errorBody}`);
   }
 

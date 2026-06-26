@@ -12,6 +12,7 @@ import type { MerchantCompanyInfo } from "../model/types";
 type Props = {
   initialData: MerchantCompanyInfo;
   merchantUserName: string;
+  merchantDisplayName?: string;
 };
 
 const storeAddressModeOptions = [
@@ -73,7 +74,7 @@ function formatDateTime(value?: string) {
   }).format(date);
 }
 
-export default function CompanyInfoForm({ initialData, merchantUserName }: Props) {
+export default function CompanyInfoForm({ initialData, merchantUserName, merchantDisplayName }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createFormState(initialData));
   const [updatedAt, setUpdatedAt] = useState(initialData.updatedAt);
@@ -128,6 +129,7 @@ export default function CompanyInfoForm({ initialData, merchantUserName }: Props
       <AdminPageHeader
         title="会社情報"
         adminName={merchantUserName}
+        merchantDisplayName={merchantDisplayName ?? initialData.displayName ?? initialData.name}
         subtitle="提携企業の会社情報を確認・編集します。"
         backHref="/dashboard"
       />

@@ -77,6 +77,14 @@ function toCompletionRate(actualCount: number, totalCount: number) {
   return Math.min(100, Math.round((actualCount / totalCount) * 100));
 }
 
+function isMissingFieldValue(value: unknown) {
+  return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
+}
+
+function isValidOptionValue(value: string, options?: string[]) {
+  return !options?.length || options.includes(value);
+}
+
 export async function POST(req: Request) {
   const session = await getEmployeeSession();
 
@@ -179,13 +187,80 @@ export async function POST(req: Request) {
     for (const field of mission.fields) {
       const incoming = rawValues[field.key];
 
-      if (incoming === undefined || incoming === null || incoming === "") {
+      if (isMissingFieldValue(incoming)) {
         if (field.required) {
           return NextResponse.json(
             { error: "required_field_missing", field: field.key },
             { status: 400 },
           );
         }
+        continue;
+      }
+
+      if (field.type === "text" || field.type === "textarea") {
+        if (typeof incoming !== "string") {
+          return NextResponse.json({ error: "invalid_text_value", field: field.key }, { status: 400 });
+        }
+
+        if (field.minLength !== undefined && incoming.length < field.minLength) {
+          return NextResponse.json({ error: "field_too_short", field: field.key }, { status: 400 });
+        }
+
+        if (field.maxLength !== undefined && incoming.length > field.maxLength) {
+          return NextResponse.json({ error: "field_too_long", field: field.key }, { status: 400 });
+        }
+
+        finalizedFieldValues[field.key] = incoming;
+        continue;
+      }
+
+      if (field.type === "select") {
+        if (typeof incoming !== "string" || !isValidOptionValue(incoming, field.options)) {
+          return NextResponse.json({ error: "invalid_select_value", field: field.key }, { status: 400 });
+        }
+
+        finalizedFieldValues[field.key] = incoming;
+        continue;
+      }
+
+      if (field.type === "multiSelect") {
+        if (
+          !Array.isArray(incoming) ||
+          incoming.some((value) => typeof value !== "string" || !isValidOptionValue(value, field.options))
+        ) {
+          return NextResponse.json({ error: "invalid_multi_select_value", field: field.key }, { status: 400 });
+        }
+
+        const selectedValues = incoming as string[];
+
+        if (field.minSelected !== undefined && selectedValues.length < field.minSelected) {
+          return NextResponse.json({ error: "too_few_selected", field: field.key }, { status: 400 });
+        }
+
+        if (field.maxSelected !== undefined && selectedValues.length > field.maxSelected) {
+          return NextResponse.json({ error: "too_many_selected", field: field.key }, { status: 400 });
+        }
+
+        finalizedFieldValues[field.key] = selectedValues;
+        continue;
+      }
+
+      if (field.type === "number") {
+        const numericValue = typeof incoming === "number" ? incoming : typeof incoming === "string" ? Number(incoming) : NaN;
+
+        if (!Number.isFinite(numericValue)) {
+          return NextResponse.json({ error: "invalid_number_value", field: field.key }, { status: 400 });
+        }
+
+        if (field.min !== undefined && numericValue < field.min) {
+          return NextResponse.json({ error: "number_too_small", field: field.key }, { status: 400 });
+        }
+
+        if (field.max !== undefined && numericValue > field.max) {
+          return NextResponse.json({ error: "number_too_large", field: field.key }, { status: 400 });
+        }
+
+        finalizedFieldValues[field.key] = numericValue;
         continue;
       }
 

@@ -27,6 +27,7 @@ export default async function MerchandiseEditPage({ params }: PageProps) {
     <MerchandiseForm
       mode="edit"
       merchantName={joinNameParts(user.lastName, user.firstName)}
+      merchantDisplayName={merchantCompanyName ?? ""}
       merchantCompanyName={merchantCompanyName ?? ""}
       initial={item}
     />

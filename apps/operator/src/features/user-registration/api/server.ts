@@ -1,8 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { createCognitoUser, deleteCognitoUser, updateCognitoUserEmail } from "@correcre/lib/cognito/user";
+import {
+  createCognitoUser,
+  deleteCognitoUser,
+  isInvitationExpired,
+  resendCognitoUserInvitation,
+  updateCognitoUserEmail,
+} from "@correcre/lib/cognito/user";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
-import { getCompanyById } from "@correcre/lib/dynamodb/company";
+import {
+  buildCompanyMonthlyBillingSnapshot,
+  getCompanyById,
+  toBillingSnapshotMonth,
+  upsertCompanyMonthlyBillingSnapshot,
+} from "@correcre/lib/dynamodb/company";
 import { createPointTransaction, createPointTransactionPutTransactItem } from "@correcre/lib/dynamodb/point-transaction";
 import {
   buildDepartmentSk,
@@ -165,6 +176,7 @@ function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
     departmentName: user.departmentName,
     roles,
     status: normalizeUserStatus(user.status) as EmployeeManagementStatus,
+    invitationExpired: user.status === "INVITED" && isInvitationExpired(user),
     authLinkStatus: getAuthLinkStatus(user.cognitoSub),
     email: user.email,
     phoneNumber: normalizeOptionalText(user.phoneNumber),
@@ -266,17 +278,20 @@ async function assertUniqueEmail(config: RuntimeConfig, email: string, currentUs
 }
 
 function buildAddress(
-  input: Pick<CreateEmployeeInput, "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "building">,
-): DBUserAddress | undefined {
+  input: Pick<
+    CreateEmployeeInput,
+    "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "street" | "building"
+  >,
+): DBUserAddress {
   const postalCodeFirstHalf = input.postalCodeFirstHalf?.trim() ?? "";
   const postalCodeSecondHalf = input.postalCodeSecondHalf?.trim() ?? "";
   const prefecture = input.prefecture?.trim() ?? "";
   const city = input.city?.trim() ?? "";
+  const street = input.street?.trim() ?? "";
   const building = normalizeOptionalText(input.building);
-  const hasAnyAddressField = [postalCodeFirstHalf, postalCodeSecondHalf, prefecture, city, building].some(Boolean);
 
-  if (!hasAnyAddressField) {
-    return undefined;
+  if (!prefecture || !city || !street) {
+    throw new Error("都道府県・市区町村・丁目・番地を入力してください");
   }
 
   const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
@@ -286,8 +301,9 @@ function buildAddress(
 
   return {
     postalCode: hasAnyPostalCodeField ? `${postalCodeFirstHalf}${postalCodeSecondHalf}` : undefined,
-    prefecture: prefecture || undefined,
-    city: city || undefined,
+    prefecture,
+    city,
+    street,
     building,
   };
 }
@@ -391,15 +407,33 @@ async function getCompanyOrThrow(config: RuntimeConfig, companyId: string) {
 }
 
 async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, updatedAt: string) {
-  const users = await listUsersByCompany(
-    {
-      region: config.region,
-      tableName: config.userTableName,
-    },
-    companyId,
-  );
+  const [company, users] = await Promise.all([
+    getCompanyById(
+      {
+        region: config.region,
+        tableName: config.companyTableName,
+      },
+      companyId,
+    ),
+    listUsersByCompany(
+      {
+        region: config.region,
+        tableName: config.userTableName,
+      },
+      companyId,
+    ),
+  ]);
   const currentUsers = users.filter((user) => user.status !== "DELETED");
   const activeUsers = currentUsers.filter((user) => user.status === "ACTIVE");
+  const billingSnapshot = company
+    ? buildCompanyMonthlyBillingSnapshot({
+        month: toBillingSnapshotMonth(updatedAt),
+        status: company.status,
+        activeEmployees: activeUsers.length,
+        perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
+        capturedAt: updatedAt,
+      })
+    : null;
   const client = getDynamoDocumentClient(config.region);
 
   await client.send(
@@ -408,10 +442,17 @@ async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, u
       Key: {
         companyId,
       },
-      UpdateExpression: "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, updatedAt = :updatedAt",
+      UpdateExpression: billingSnapshot
+        ? "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt"
+        : "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
         ":totalEmployees": currentUsers.length,
         ":activeEmployees": activeUsers.length,
+        ...(billingSnapshot && company
+          ? {
+              ":monthlyBillingSnapshots": upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
+            }
+          : {}),
         ":updatedAt": updatedAt,
       },
     }),
@@ -607,6 +648,85 @@ export async function createEmployeeInDynamo(
 
     throw toEmployeeProvisionError(error);
   }
+}
+
+export async function resendEmployeeInvitationInDynamo(
+  companyId: string,
+  input: { userId: string },
+): Promise<EmployeeManagementEmployee> {
+  const config = getRuntimeConfig();
+  const targetUser = await getUserByCompanyAndUserId(
+    {
+      region: config.region,
+      tableName: config.userTableName,
+    },
+    companyId,
+    input.userId.trim(),
+  );
+
+  if (!targetUser || targetUser.status === "DELETED") {
+    throw new Error("Employee not found");
+  }
+
+  // 招待中（初回パスワード未設定）のユーザーで、かつ仮パスワードが有効期限切れの場合のみ再送できる。
+  if (targetUser.status !== "INVITED") {
+    throw new Error("招待中のユーザーのみ招待メールを再送できます");
+  }
+
+  if (!isInvitationExpired(targetUser)) {
+    throw new Error("仮パスワードの有効期限が切れていないため招待メールを再送できません");
+  }
+
+  const cognitoUsername = targetUser.cognitoSub?.trim();
+
+  if (!cognitoUsername) {
+    throw new Error("Cognito ユーザーが見つからないため招待メールを再送できません");
+  }
+
+  try {
+    await resendCognitoUserInvitation(
+      {
+        region: config.cognitoRegion,
+        userPoolId: config.cognitoUserPoolId,
+      },
+      {
+        username: cognitoUsername,
+        roles: targetUser.roles,
+      },
+    );
+  } catch (error) {
+    throw toEmployeeProvisionError(error);
+  }
+
+  const now = new Date().toISOString();
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.userTableName,
+      Key: {
+        companyId,
+        sk: buildUserSk(targetUser.userId),
+      },
+      UpdateExpression: "SET invitationSentAt = :invitationSentAt, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":invitationSentAt": now,
+        ":updatedAt": now,
+      },
+    }),
+  );
+
+  const updatedEmployee = toEmployee({
+    ...targetUser,
+    invitationSentAt: now,
+    updatedAt: now,
+  });
+
+  if (!updatedEmployee) {
+    throw new Error("Updated user does not have an employee-management role.");
+  }
+
+  return updatedEmployee;
 }
 
 export async function updateEmployeeInDynamo(

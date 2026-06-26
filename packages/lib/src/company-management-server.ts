@@ -2,7 +2,14 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { getCompanyById, listCompanies, putCompany } from "./dynamodb/company";
+import {
+  buildCompanyMonthlyBillingSnapshot,
+  getCompanyById,
+  listCompanies,
+  putCompany,
+  toBillingSnapshotMonth,
+  upsertCompanyMonthlyBillingSnapshot,
+} from "./dynamodb/company";
 import { readRequiredServerEnv } from "./env/server";
 
 import type { Company, CompanyPhilosophy } from "@correcre/types";
@@ -256,6 +263,13 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
 
   const now = new Date().toISOString();
   const companyId = createCompanyId(companies);
+  const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
+    month: toBillingSnapshotMonth(now),
+    status: input.status,
+    activeEmployees: 0,
+    perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
+    capturedAt: now,
+  });
   const createdCompany: Company = {
     companyId,
     name: input.name.trim(),
@@ -265,6 +279,9 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     companyPointBalance: input.companyPointBalance,
     totalEmployees: 0,
     activeEmployees: 0,
+    monthlyBillingSnapshots: {
+      [billingSnapshot.month]: billingSnapshot,
+    },
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
     showPointExchangeLink: input.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, now),
@@ -301,6 +318,13 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
   }
 
   const updatedAt = new Date().toISOString();
+  const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
+    month: toBillingSnapshotMonth(updatedAt),
+    status: input.status,
+    activeEmployees: company.activeEmployees ?? 0,
+    perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
+    capturedAt: updatedAt,
+  });
   const updatedCompany: Company = {
     ...company,
     name: input.name.trim(),
@@ -308,6 +332,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     plan: input.plan,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
     companyPointBalance: nextCompanyPointBalance,
+    monthlyBillingSnapshots: upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
     showPointExchangeLink: input.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),

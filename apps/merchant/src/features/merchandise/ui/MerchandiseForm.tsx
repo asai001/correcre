@@ -35,6 +35,8 @@ import MerchandiseFormPreview from "./MerchandiseFormPreview";
 
 const deliveryMethodOptions = ["来店", "出張", "発送", "オンライン"] as const;
 const genreOptions = ["健康・美容", "日用品・生活雑貨", "服飾", "記念", "食品", "その他"] as const;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_TOO_LARGE_MESSAGE = "10MB以上の画像はアップロードできません。";
 
 type ImageTarget = "card" | "detail";
 
@@ -62,6 +64,7 @@ type FormState = {
 type Props = {
   mode: "create" | "edit";
   merchantName: string;
+  merchantDisplayName?: string;
   merchantCompanyName: string;
   initial?: MerchandiseSummary;
 };
@@ -122,13 +125,17 @@ function getInitialImageState(initial: MerchandiseSummary | undefined, target: I
   };
 }
 
-export default function MerchandiseForm({ mode, merchantName, merchantCompanyName, initial }: Props) {
+export default function MerchandiseForm({ mode, merchantName, merchantDisplayName, merchantCompanyName, initial }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => getInitialFormState(initial));
   const [cardImage, setCardImage] = useState<ImageState>(() => getInitialImageState(initial, "card"));
   const [detailImage, setDetailImage] = useState<ImageState>(() => getInitialImageState(initial, "detail"));
   const [submitting, setSubmitting] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState<ImageTarget | null>(null);
+  const [imageErrorByTarget, setImageErrorByTarget] = useState<Record<ImageTarget, string | null>>({
+    card: null,
+    detail: null,
+  });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -156,6 +163,13 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
     if (!file) return;
 
     setError(null);
+    setImageErrorByTarget((prev) => ({ ...prev, [target]: null }));
+
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageErrorByTarget((prev) => ({ ...prev, [target]: IMAGE_TOO_LARGE_MESSAGE }));
+      return;
+    }
+
     setUploadingTarget(target);
 
     try {
@@ -182,7 +196,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "画像のアップロードに失敗しました。");
+      setImageErrorByTarget((prev) => ({
+        ...prev,
+        [target]: err instanceof Error ? err.message : "画像のアップロードに失敗しました。",
+      }));
     } finally {
       setUploadingTarget(null);
     }
@@ -243,6 +260,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
       <AdminPageHeader
         title={mode === "create" ? "商品・サービス 新規登録" : "商品・サービス 編集"}
         adminName={merchantName}
+        merchantDisplayName={merchantDisplayName ?? merchantCompanyName}
         subtitle={mode === "create" ? "新しい商品・サービスを登録します" : `merchandiseId: ${initial?.merchandiseId ?? ""}`}
         backHref="/merchandise"
       />
@@ -417,6 +435,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
           {(["card", "detail"] as const).map((target) => {
             const image = target === "card" ? cardImage : detailImage;
             const labelTitle = target === "card" ? "一覧カード用画像" : "詳細ページ用画像";
+            const imageError = imageErrorByTarget[target];
 
             return (
               <div key={target} className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-4">
@@ -435,6 +454,11 @@ export default function MerchandiseForm({ mode, merchantName, merchantCompanyNam
                 <Typography variant="body2" className="!mt-3 text-slate-600">
                   {image.fileName ?? (image.s3Key ? "登録済みの画像" : "画像は未選択です。")}
                 </Typography>
+                {imageError ? (
+                  <Typography variant="body2" className="!mt-2 text-rose-600">
+                    {imageError}
+                  </Typography>
+                ) : null}
                 <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white">
                   {image.previewUrl ? (
                     <Box

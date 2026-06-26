@@ -8,7 +8,6 @@ import type { Mission as DBMission, MissionField } from "@correcre/types";
 import type { FieldConfig, Mission, MissionReport } from "../model/types";
 
 function mapMissionFieldType(type: MissionField["type"]): FieldConfig["type"] {
-  if (type === "multiSelect") return "select";
   if (type === "datetime") return "datetime-local";
   return type as FieldConfig["type"];
 }
@@ -22,8 +21,12 @@ function toFieldConfig(field: MissionField): FieldConfig {
     helpText: field.helpText,
     required: field.required,
     rows: field.type === "textarea" ? 4 : undefined,
-    min: field.min ?? field.minLength,
-    max: field.max ?? field.maxLength,
+    minLength: field.minLength,
+    maxLength: field.maxLength,
+    min: field.min,
+    max: field.max,
+    minSelected: field.minSelected,
+    maxSelected: field.maxSelected,
     options: field.options?.map((option) => ({
       label: option,
       value: option,

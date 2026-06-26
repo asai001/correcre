@@ -50,6 +50,9 @@ type ValidationState = {
   phoneNumber: boolean;
   joinedAt: boolean;
   postalCode: boolean;
+  prefecture: boolean;
+  city: boolean;
+  street: boolean;
 };
 
 const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
@@ -74,6 +77,7 @@ function createInitialFormState(): FormState {
     postalCodeSecondHalf: "",
     prefecture: "",
     city: "",
+    street: "",
     building: "",
     roles: ["EMPLOYEE"],
     joinedAt: getToday(),
@@ -124,6 +128,9 @@ export default function EmployeeRegistrationDialog({
     const postalCodeFirstHalf = form.postalCodeFirstHalf?.trim() ?? "";
     const postalCodeSecondHalf = form.postalCodeSecondHalf?.trim() ?? "";
     const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
+    const prefecture = form.prefecture?.trim() ?? "";
+    const city = form.city?.trim() ?? "";
+    const street = form.street?.trim() ?? "";
 
     return {
       lastName: !form.lastName.trim(),
@@ -137,6 +144,9 @@ export default function EmployeeRegistrationDialog({
       joinedAt: !form.joinedAt.trim(),
       postalCode:
         hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
+      prefecture: !prefecture,
+      city: !city,
+      street: !street,
     };
   }, [form]);
 
@@ -161,6 +171,7 @@ export default function EmployeeRegistrationDialog({
       postalCodeSecondHalf: normalizeOptionalText(form.postalCodeSecondHalf),
       prefecture: normalizeOptionalText(form.prefecture),
       city: normalizeOptionalText(form.city),
+      street: normalizeOptionalText(form.street),
       building: normalizeOptionalText(form.building),
       roles: form.roles,
       joinedAt: form.joinedAt.trim(),
@@ -331,7 +342,9 @@ export default function EmployeeRegistrationDialog({
               value={form.prefecture}
               onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
               fullWidth
-              helperText=" "
+              required
+              error={hasSubmitted && validation.prefecture}
+              helperText={hasSubmitted && validation.prefecture ? "必須項目です" : " "}
             >
               <MenuItem value="">未選択</MenuItem>
               {JAPAN_PREFECTURES.map((prefecture) => (
@@ -342,7 +355,7 @@ export default function EmployeeRegistrationDialog({
             </TextField>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_minmax(0,1.4fr)_minmax(0,1fr)] md:items-start">
+          <div className="grid gap-4 md:grid-cols-[140px_24px_160px_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1fr)] md:items-start">
             <TextField
               label="郵便番号(前半)"
               value={form.postalCodeFirstHalf}
@@ -373,11 +386,22 @@ export default function EmployeeRegistrationDialog({
               helperText={hasSubmitted && validation.postalCode ? "郵便番号は 3 桁と 4 桁で入力してください" : " "}
             />
             <TextField
-              label="市区町村・丁目・番地"
+              label="市区町村"
               value={form.city}
               onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               fullWidth
-              helperText=" "
+              required
+              error={hasSubmitted && validation.city}
+              helperText={hasSubmitted && validation.city ? "必須項目です" : " "}
+            />
+            <TextField
+              label="丁目・番地"
+              value={form.street}
+              onChange={(event) => setForm((current) => ({ ...current, street: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.street}
+              helperText={hasSubmitted && validation.street ? "必須項目です" : " "}
             />
             <TextField
               label="建物名・部屋番号"

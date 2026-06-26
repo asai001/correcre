@@ -14,6 +14,7 @@ import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-imag
 import type { ExchangeHistoryItem, ExchangeHistoryStatus, Merchant } from "@correcre/types";
 
 import type {
+  MerchantMonthlyFinanceItemRow,
   MerchantMonthlyFinanceRow,
   MerchantOverallStats,
   MerchantOverallSummary,
@@ -121,7 +122,14 @@ function buildMerchantMonthlyFinance(
   exchanges: ExchangeHistoryItem[],
   exchangeFeePercent: number,
 ): MerchantMonthlyFinanceRow[] {
-  const byMonth = new Map<string, { salesYen: number; count: number }>();
+  const byMonth = new Map<
+    string,
+    {
+      salesYen: number;
+      count: number;
+      itemsByMerchandise: Map<string, MerchantMonthlyFinanceItemRow>;
+    }
+  >();
 
   for (const exchange of exchanges) {
     const status = normalizeExchangeStatus(exchange.status);
@@ -129,9 +137,22 @@ function buildMerchantMonthlyFinance(
       continue;
     }
     const month = exchange.exchangedAt.slice(0, 7);
-    const entry = byMonth.get(month) ?? { salesYen: 0, count: 0 };
-    entry.salesYen += (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
+    const entry = byMonth.get(month) ?? { salesYen: 0, count: 0, itemsByMerchandise: new Map() };
+    const salesYen = (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
+    const merchandiseId = exchange.merchandiseId ?? `unknown:${exchange.merchandiseNameSnapshot}`;
+    const merchandiseName = exchange.merchandiseNameSnapshot || exchange.merchandiseId || "未設定";
+    const item = entry.itemsByMerchandise.get(merchandiseId) ?? {
+      merchandiseId,
+      merchandiseName,
+      exchangeCount: 0,
+      salesYen: 0,
+    };
+
+    entry.salesYen += salesYen;
     entry.count += 1;
+    item.exchangeCount += 1;
+    item.salesYen += salesYen;
+    entry.itemsByMerchandise.set(merchandiseId, item);
     byMonth.set(month, entry);
   }
 
@@ -144,6 +165,11 @@ function buildMerchantMonthlyFinance(
       salesYen,
       exchangeFeeYen: calculateExchangeFeeYen(salesYen, exchangeFeePercent),
       payableYen: calculateMerchantInvoiceYen(salesYen, exchangeFeePercent),
+      items: entry
+        ? Array.from(entry.itemsByMerchandise.values()).sort(
+            (left, right) => right.salesYen - left.salesYen || right.exchangeCount - left.exchangeCount,
+          )
+        : [],
     };
   });
 }
@@ -214,6 +240,7 @@ function buildOverallMonthlyFinance(summaries: MerchantSummaryDetail[]): Merchan
       salesYen: number;
       exchangeFeeYen: number;
       payableYen: number;
+      itemsByMerchandise: Map<string, MerchantMonthlyFinanceItemRow>;
     }
   >();
 
@@ -224,11 +251,26 @@ function buildOverallMonthlyFinance(summaries: MerchantSummaryDetail[]): Merchan
         salesYen: 0,
         exchangeFeeYen: 0,
         payableYen: 0,
+        itemsByMerchandise: new Map(),
       };
       entry.exchangeCount += row.exchangeCount;
       entry.salesYen += row.salesYen;
       entry.exchangeFeeYen += row.exchangeFeeYen;
       entry.payableYen += row.payableYen;
+
+      for (const item of row.items) {
+        const key = `${summary.merchantId}:${item.merchandiseId}`;
+        const current = entry.itemsByMerchandise.get(key) ?? {
+          merchandiseId: key,
+          merchandiseName: `${summary.merchantName} / ${item.merchandiseName}`,
+          exchangeCount: 0,
+          salesYen: 0,
+        };
+        current.exchangeCount += item.exchangeCount;
+        current.salesYen += item.salesYen;
+        entry.itemsByMerchandise.set(key, current);
+      }
+
       byMonth.set(row.month, entry);
     }
   }
@@ -239,6 +281,11 @@ function buildOverallMonthlyFinance(summaries: MerchantSummaryDetail[]): Merchan
     salesYen: byMonth.get(month)?.salesYen ?? 0,
     exchangeFeeYen: byMonth.get(month)?.exchangeFeeYen ?? 0,
     payableYen: byMonth.get(month)?.payableYen ?? 0,
+    items: byMonth.get(month)
+      ? Array.from(byMonth.get(month)!.itemsByMerchandise.values()).sort(
+          (left, right) => right.salesYen - left.salesYen || right.exchangeCount - left.exchangeCount,
+        )
+      : [],
   }));
 }
 

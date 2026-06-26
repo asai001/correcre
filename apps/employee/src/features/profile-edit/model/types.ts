@@ -2,6 +2,7 @@ export type EditableEmployeeAddress = {
   postalCode?: string;
   prefecture?: string;
   city?: string;
+  street?: string;
   building?: string;
 };
 
@@ -26,5 +27,6 @@ export type UpdateOwnProfileInput = {
   postalCodeSecondHalf?: string;
   prefecture?: string;
   city?: string;
+  street?: string;
   building?: string;
 };

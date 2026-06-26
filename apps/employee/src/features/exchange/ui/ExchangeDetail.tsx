@@ -81,6 +81,7 @@ export default function ExchangeDetail({ item, initialPointBalance, pendingPoint
       || profile.address?.postalCode?.trim()
       || profile.address?.prefecture?.trim()
       || profile.address?.city?.trim()
+      || profile.address?.street?.trim()
       || profile.address?.building?.trim(),
   );
   const confirmSubmitDisabled = submitting || !profileReadyForExchange;
@@ -249,6 +250,7 @@ export default function ExchangeDetail({ item, initialPointBalance, pendingPoint
                   <div>
                     {profile.address?.prefecture ?? ""}
                     {profile.address?.city ?? ""}
+                    {profile.address?.street ?? ""}
                   </div>
                   {profile.address?.building ? <div>{profile.address.building}</div> : null}
                   {profile.phoneNumber ? <div>{profile.phoneNumber}</div> : null}
@@ -256,7 +258,7 @@ export default function ExchangeDetail({ item, initialPointBalance, pendingPoint
               ) : (
                 <div className="mt-3 flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
                   <FontAwesomeIcon icon={faTriangleExclamation} className="mt-[2px]" />
-                  <span>郵便番号・都道府県・市区町村/丁目/番地・電話番号を登録してから申請してください。</span>
+                  <span>郵便番号・都道府県・市区町村・丁目/番地・電話番号を登録してから申請してください。</span>
                 </div>
               )}
             </div>

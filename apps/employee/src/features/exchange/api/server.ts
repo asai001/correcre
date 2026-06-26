@@ -382,7 +382,7 @@ export async function requestExchangeForEmployee(params: {
   const currentBalance = reflected.spendablePoint;
   if (!hasCompleteExchangeRequestProfile({ phoneNumber: user.phoneNumber, address: user.address })) {
     throw new IncompleteExchangeProfileError(
-      "郵便番号・都道府県・市区町村/丁目/番地・電話番号を登録してから申請してください",
+      "郵便番号・都道府県・市区町村・丁目/番地・電話番号を登録してから申請してください",
     );
   }
 

@@ -13,6 +13,7 @@ import { deleteMerchandise, updateMerchandiseStatus } from "../api/client";
 type Props = {
   initialItems: MerchandiseSummary[];
   merchantName: string;
+  merchantDisplayName?: string;
 };
 
 const STATUS_LABELS: Record<MerchandiseSummary["status"], string> = {
@@ -31,7 +32,7 @@ function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
-export default function MerchandiseList({ initialItems, merchantName }: Props) {
+export default function MerchandiseList({ initialItems, merchantName, merchantDisplayName }: Props) {
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function MerchandiseList({ initialItems, merchantName }: Props) {
       <AdminPageHeader
         title="商品・サービス管理"
         adminName={merchantName}
+        merchantDisplayName={merchantDisplayName}
         subtitle="掲載商品・サービスの登録、編集、公開状態の管理"
         backHref="/dashboard"
       />

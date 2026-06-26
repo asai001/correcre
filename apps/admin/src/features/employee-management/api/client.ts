@@ -82,6 +82,30 @@ export async function updateEmployee(
   return (await res.json()) as EmployeeManagementEmployee;
 }
 
+export async function resendEmployeeInvitation(
+  companyId: string,
+  userId: string
+): Promise<EmployeeManagementEmployee> {
+  const res = await fetch("/api/employee-management/resend-invitation", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      companyId,
+      userId,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "招待メールの再送に失敗しました");
+  }
+
+  return (await res.json()) as EmployeeManagementEmployee;
+}
+
 async function toMutationResult(
   request: Promise<Response>,
   fallbackMessage: string

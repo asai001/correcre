@@ -6,7 +6,7 @@ import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-h
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { POINT_YEN_VALUE } from "@correcre/lib/points";
-import type { ExchangeHistoryStatus } from "@correcre/types";
+import type { Company, ExchangeHistoryStatus } from "@correcre/types";
 
 import type {
   CompanyIncomeRow,
@@ -54,6 +54,40 @@ function toYearMonth(value: string): string {
   return value.slice(0, 7);
 }
 
+function getCompanyStartMonth(company: Company): string | null {
+  const source = company.contractStartsAt || company.createdAt;
+  return source ? toYearMonth(source) : null;
+}
+
+function buildCompanyIncomeRowForMonth(company: Company, month: string): CompanyIncomeRow | null {
+  const startMonth = getCompanyStartMonth(company);
+  if (startMonth && month < startMonth) {
+    return null;
+  }
+
+  const snapshot = company.monthlyBillingSnapshots?.[month];
+  const status = snapshot?.status ?? company.status;
+
+  if (status === "INACTIVE") {
+    return null;
+  }
+
+  const activeEmployees = snapshot?.activeEmployees ?? company.activeEmployees ?? 0;
+  const perEmployeeMonthlyFee = snapshot?.perEmployeeMonthlyFee ?? company.perEmployeeMonthlyFee ?? 0;
+  const monthlyIncomeYen = snapshot?.monthlyIncomeYen ?? activeEmployees * perEmployeeMonthlyFee;
+
+  return {
+    companyId: company.companyId,
+    companyName: company.shortName || company.name,
+    status,
+    month,
+    activeEmployees,
+    perEmployeeMonthlyFee,
+    monthlyIncomeYen,
+    snapshotCapturedAt: snapshot?.capturedAt,
+  };
+}
+
 export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
   const config = getRuntimeConfig();
   const months = buildRecentMonths(MONTH_WINDOW);
@@ -64,24 +98,25 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
     listMerchants({ region: config.region, tableName: config.merchantTableName }),
   ]);
 
-  // 収入: 導入企業ごと（無効化された企業は除外）。
-  const companyRows: CompanyIncomeRow[] = companies
-    .filter((company) => company.status !== "INACTIVE")
-    .map((company) => {
-      const activeEmployees = company.activeEmployees ?? 0;
-      const perEmployeeMonthlyFee = company.perEmployeeMonthlyFee ?? 0;
-      return {
-        companyId: company.companyId,
-        companyName: company.shortName || company.name,
-        status: company.status,
-        activeEmployees,
-        perEmployeeMonthlyFee,
-        monthlyIncomeYen: activeEmployees * perEmployeeMonthlyFee,
-      };
-    })
-    .sort((left, right) => right.monthlyIncomeYen - left.monthlyIncomeYen);
-
-  const monthlyIncomeYen = companyRows.reduce((sum, row) => sum + row.monthlyIncomeYen, 0);
+  // 収入: 導入企業ごとの月次スナップショット。未作成月は 0 として扱う。
+  const companyIncomeByMonth = Object.fromEntries(
+    months.map((month) => [
+      month,
+      companies
+        .map((company) => buildCompanyIncomeRowForMonth(company, month))
+        .filter((row): row is CompanyIncomeRow => row !== null)
+        .sort((left, right) => right.monthlyIncomeYen - left.monthlyIncomeYen),
+    ]),
+  );
+  const monthlyIncomeByMonth = Object.fromEntries(
+    months.map((month) => [
+      month,
+      (companyIncomeByMonth[month] ?? []).reduce((sum, row) => sum + row.monthlyIncomeYen, 0),
+    ]),
+  );
+  const currentMonth = months[months.length - 1] ?? "";
+  const companyRows = companyIncomeByMonth[currentMonth] ?? [];
+  const monthlyIncomeYen = monthlyIncomeByMonth[currentMonth] ?? 0;
 
   // 支出: 提携企業ごと・月ごと。
   const merchantRows: MerchantExpenseRow[] = await Promise.all(
@@ -119,14 +154,15 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
 
   merchantRows.sort((left, right) => right.totalExpenseYen - left.totalExpenseYen);
 
-  // 月ごとの収支。収入は現在のスナップショットを各月に適用する。
+  // 月ごとの収支。収入は月次スナップショットを優先し、企業作成前の月には適用しない。
   const monthly: MonthlyFinance[] = months.map((month) => {
     const expenseYen = merchantRows.reduce((sum, row) => sum + (row.byMonth[month] ?? 0), 0);
+    const incomeYen = monthlyIncomeByMonth[month] ?? 0;
     return {
       month,
-      incomeYen: monthlyIncomeYen,
+      incomeYen,
       expenseYen,
-      balanceYen: monthlyIncomeYen - expenseYen,
+      balanceYen: incomeYen - expenseYen,
     };
   });
 
@@ -134,6 +170,8 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
     months,
     monthly,
     companies: companyRows,
+    companyIncomeByMonth,
+    monthlyIncomeByMonth,
     merchants: merchantRows,
     monthlyIncomeYen,
   };

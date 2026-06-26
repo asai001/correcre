@@ -33,6 +33,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
 
   // 精算セクションの対象月（初期値は当月）。
   const [settlementMonth, setSettlementMonth] = useState(data.months[data.months.length - 1] ?? "");
+  const [incomeMonth, setIncomeMonth] = useState(data.months[data.months.length - 1] ?? "");
 
   // 月ごとの収支テーブルで内訳を展開している月。
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
@@ -63,6 +64,8 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
     }),
     { salesYen: 0, exchangeFeeYen: 0, payableYen: 0 },
   );
+  const selectedCompanyRows = data.companyIncomeByMonth[incomeMonth] ?? [];
+  const selectedMonthlyIncomeYen = data.monthlyIncomeByMonth[incomeMonth] ?? 0;
 
   return (
     <div className="space-y-6 pb-10">
@@ -96,7 +99,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
       ) : null}
 
       <p className="text-xs text-slate-500">
-        ※ 収入は現在の従業員数・月額単価のスナップショットを各月に適用して算出しています（過去時点の従業員数は保持していません）。
+        ※ 収入は会社レコードに保存された月次スナップショットを優先して算出します。スナップショットがない既存月は現在値を補完しますが、企業作成前の月には収入を計上しません。
         支出は各交換の申請月をもとに集計しています。
       </p>
 
@@ -157,12 +160,12 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
                               <div className="text-xs font-semibold text-slate-500">
                                 収入の内訳（導入企業ごと）
                               </div>
-                              {data.companies.length === 0 ? (
+                              {(data.companyIncomeByMonth[row.month] ?? []).length === 0 ? (
                                 <p className="mt-2 text-xs text-slate-400">対象の企業がありません。</p>
                               ) : (
                                 <table className="mt-2 w-full border-collapse text-xs">
                                   <tbody>
-                                    {data.companies.map((company) => (
+                                    {(data.companyIncomeByMonth[row.month] ?? []).map((company) => (
                                       <tr
                                         key={company.companyId}
                                         className="border-b border-slate-200/60 last:border-b-0"
@@ -215,8 +218,24 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
 
       {/* 導入企業ごとの収入 */}
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
-        <h2 className="text-lg font-bold text-slate-900">導入企業ごとの月間収入</h2>
-        <p className="mt-1 text-xs text-slate-500">無効化された企業は除外しています。</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-bold text-slate-900">導入企業ごとの月間収入</h2>
+          <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+            対象月
+            <select
+              value={incomeMonth}
+              onChange={(event) => setIncomeMonth(event.target.value)}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+            >
+              {[...data.months].reverse().map((month) => (
+                <option key={month} value={month}>
+                  {formatMonthLabel(month)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">企業作成前の月と、対象月時点で無効の企業は除外しています。</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
@@ -228,14 +247,14 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
               </tr>
             </thead>
             <tbody>
-              {data.companies.length === 0 ? (
+              {selectedCompanyRows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="py-4 text-center text-slate-400">
                     対象の企業がありません。
                   </td>
                 </tr>
               ) : (
-                data.companies.map((company) => (
+                selectedCompanyRows.map((company) => (
                   <tr key={company.companyId} className="border-b border-slate-100 last:border-b-0">
                     <td className="py-2 pr-4 font-semibold text-slate-700">{company.companyName}</td>
                     <td className="py-2 pr-4 text-right text-slate-700">
@@ -247,13 +266,13 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
                 ))
               )}
             </tbody>
-            {data.companies.length > 0 ? (
+            {selectedCompanyRows.length > 0 ? (
               <tfoot>
                 <tr className="border-t border-slate-200 font-bold text-slate-900">
                   <td className="py-2 pr-4">合計</td>
                   <td className="py-2 pr-4" />
                   <td className="py-2 pr-4" />
-                  <td className="py-2 text-right text-sky-700">{formatYen(data.monthlyIncomeYen)}</td>
+                  <td className="py-2 text-right text-sky-700">{formatYen(selectedMonthlyIncomeYen)}</td>
                 </tr>
               </tfoot>
             ) : null}

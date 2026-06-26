@@ -181,6 +181,7 @@ function formatApplicantAddress(address?: ApplicantAddress) {
     postalCode ? `〒${postalCode}` : undefined,
     address.prefecture,
     address.city,
+    address.street,
     address.building,
   ].filter(Boolean);
 

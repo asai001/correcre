@@ -11,9 +11,11 @@ export type CompanyIncomeRow = {
   companyId: string;
   companyName: string;
   status: string;
+  month: string;
   activeEmployees: number;
   perEmployeeMonthlyFee: number;
   monthlyIncomeYen: number;
+  snapshotCapturedAt?: string;
 };
 
 // 提携企業ごと・月ごとの支出（交換ポイント × 5円）。
@@ -30,6 +32,8 @@ export type FinanceDashboardData = {
   months: string[]; // 表示対象の月（昇順）
   monthly: MonthlyFinance[];
   companies: CompanyIncomeRow[];
+  companyIncomeByMonth: Record<string, CompanyIncomeRow[]>;
+  monthlyIncomeByMonth: Record<string, number>;
   merchants: MerchantExpenseRow[];
   // 1か月あたりの収入合計（現在の従業員数・単価のスナップショット）。
   monthlyIncomeYen: number;

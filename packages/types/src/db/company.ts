@@ -1,6 +1,15 @@
 type CompanyItemStatus = "ACTIVE" | "INACTIVE" | "TRIAL";
 type CompanyPlan = "TRIAL" | "STANDARD" | "ENTERPRISE";
 
+export type CompanyMonthlyBillingSnapshot = {
+  month: string; // YYYY-MM
+  status: CompanyItemStatus;
+  activeEmployees: number;
+  perEmployeeMonthlyFee: number;
+  monthlyIncomeYen: number;
+  capturedAt: string;
+};
+
 export type CompanyPhilosophyValue = {
   title: string;
   description?: string;
@@ -58,6 +67,7 @@ export type Company = {
   // Employee counts.
   totalEmployees?: number;
   activeEmployees: number;
+  monthlyBillingSnapshots?: Record<string, CompanyMonthlyBillingSnapshot>;
 
   // Settings and presentation.
   pointExpirationMonths?: number;

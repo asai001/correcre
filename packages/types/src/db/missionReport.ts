@@ -2,7 +2,7 @@ import type { MissionImageFieldValue } from "./mission";
 
 export type MissionReportStatus = "PENDING" | "APPROVED" | "REJECTED";
 
-export type MissionReportFieldValue = string | number | boolean | MissionImageFieldValue;
+export type MissionReportFieldValue = string | string[] | number | boolean | MissionImageFieldValue;
 
 export type MissionReport = {
   companyId: string;
