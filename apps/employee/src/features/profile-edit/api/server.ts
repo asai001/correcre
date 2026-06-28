@@ -69,25 +69,28 @@ function buildAddress(
     UpdateOwnProfileInput,
     "postalCodeFirstHalf" | "postalCodeSecondHalf" | "prefecture" | "city" | "street" | "building"
   >,
-) {
+): DBUserAddress | undefined {
   const postalCodeFirstHalf = input.postalCodeFirstHalf?.trim() ?? "";
   const postalCodeSecondHalf = input.postalCodeSecondHalf?.trim() ?? "";
-  const prefecture = input.prefecture?.trim() ?? "";
-  const city = input.city?.trim() ?? "";
-  const street = input.street?.trim() ?? "";
+  const prefecture = normalizeOptionalText(input.prefecture);
+  const city = normalizeOptionalText(input.city);
+  const street = normalizeOptionalText(input.street);
   const building = normalizeOptionalText(input.building);
-
-  if (!prefecture || !city || !street) {
-    throw new Error("都道府県・市区町村・丁目・番地を入力してください");
-  }
 
   const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
   if (hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf))) {
     throw new Error("郵便番号は 3 桁と 4 桁の数字で入力してください");
   }
 
+  const postalCode = hasAnyPostalCodeField ? `${postalCodeFirstHalf}${postalCodeSecondHalf}` : undefined;
+
+  // 住所は基本的に任意。すべて未入力なら住所自体を保存しない（交換時の必須チェックは別途行う）。
+  if (!postalCode && !prefecture && !city && !street && !building) {
+    return undefined;
+  }
+
   return {
-    postalCode: hasAnyPostalCodeField ? `${postalCodeFirstHalf}${postalCodeSecondHalf}` : undefined,
+    postalCode,
     prefecture,
     city,
     street,

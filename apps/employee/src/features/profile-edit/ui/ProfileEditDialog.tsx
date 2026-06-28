@@ -23,6 +23,9 @@ type ProfileEditDialogProps = {
   profile: EditableEmployeeProfile | null;
   submitting: boolean;
   error: string | null;
+  // 商品・サービス交換時は配送先（郵便番号・都道府県・市区町村・丁目番地）と電話番号を必須にする。
+  // 通常の登録情報変更などでは未指定（=任意）。
+  requireDeliveryAddress?: boolean;
   onClose: () => void;
   onSubmit: (input: UpdateOwnProfileInput) => Promise<void>;
 };
@@ -79,7 +82,7 @@ function createInitialFormState(profile: EditableEmployeeProfile | null): FormSt
   };
 }
 
-export default function ProfileEditDialog({ open, profile, submitting, error, onClose, onSubmit }: ProfileEditDialogProps) {
+export default function ProfileEditDialog({ open, profile, submitting, error, requireDeliveryAddress = false, onClose, onSubmit }: ProfileEditDialogProps) {
   const [form, setForm] = useState<FormState>(() => createInitialFormState(profile));
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [addressAutoFilling, setAddressAutoFilling] = useState(false);
@@ -99,6 +102,7 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
     const postalCodeFirstHalf = form.postalCodeFirstHalf?.trim() ?? "";
     const postalCodeSecondHalf = form.postalCodeSecondHalf?.trim() ?? "";
     const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
+    const isPostalCodeFormatValid = /^\d{3}$/.test(postalCodeFirstHalf) && /^\d{4}$/.test(postalCodeSecondHalf);
     const prefecture = form.prefecture?.trim() ?? "";
     const city = form.city?.trim() ?? "";
     const street = form.street?.trim() ?? "";
@@ -109,13 +113,16 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
       lastNameKana: !form.lastNameKana.trim() || !isValidKana(form.lastNameKana.trim()),
       firstNameKana: !form.firstNameKana.trim() || !isValidKana(form.firstNameKana.trim()),
       email: !email || !isValidEmail(email),
-      phoneNumber: Boolean(phoneNumber) && !isValidPhoneNumber(phoneNumber),
-      postalCode: hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
-      prefecture: !prefecture,
-      city: !city,
-      street: !street,
+      // 交換時は電話番号・郵便番号・住所を必須にする。通常は任意（入力された場合のみ形式チェック）。
+      phoneNumber: requireDeliveryAddress
+        ? !phoneNumber || !isValidPhoneNumber(phoneNumber)
+        : Boolean(phoneNumber) && !isValidPhoneNumber(phoneNumber),
+      postalCode: requireDeliveryAddress ? !isPostalCodeFormatValid : hasAnyPostalCodeField && !isPostalCodeFormatValid,
+      prefecture: requireDeliveryAddress && !prefecture,
+      city: requireDeliveryAddress && !city,
+      street: requireDeliveryAddress && !street,
     };
-  }, [form]);
+  }, [form, requireDeliveryAddress]);
 
   const hasError = Object.values(validation).some(Boolean);
 
@@ -291,7 +298,7 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
                 value={form.prefecture}
                 onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
                 fullWidth
-                required
+                required={requireDeliveryAddress}
                 error={hasSubmitted && validation.prefecture}
                 helperText={hasSubmitted && validation.prefecture ? "必須項目です" : " "}
               >
@@ -307,7 +314,7 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
                 value={form.city}
                 onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
                 fullWidth
-                required
+                required={requireDeliveryAddress}
                 error={hasSubmitted && validation.city}
                 helperText={hasSubmitted && validation.city ? "必須項目です" : " "}
               />
@@ -316,7 +323,7 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
                 value={form.street}
                 onChange={(event) => setForm((current) => ({ ...current, street: event.target.value }))}
                 fullWidth
-                required
+                required={requireDeliveryAddress}
                 error={hasSubmitted && validation.street}
                 helperText={hasSubmitted && validation.street ? "必須項目です" : " "}
               />
@@ -346,8 +353,15 @@ export default function ProfileEditDialog({ open, profile, submitting, error, on
               value={form.phoneNumber}
               onChange={(event) => setForm((current) => ({ ...current, phoneNumber: event.target.value }))}
               fullWidth
+              required={requireDeliveryAddress}
               error={hasSubmitted && validation.phoneNumber}
-              helperText={hasSubmitted && validation.phoneNumber ? "電話番号は 10 桁または 11 桁の数字で入力してください" : " "}
+              helperText={
+                hasSubmitted && validation.phoneNumber
+                  ? form.phoneNumber?.trim()
+                    ? "電話番号は 10 桁または 11 桁の数字で入力してください"
+                    : "電話番号を入力してください"
+                  : " "
+              }
             />
             </div>
           </Stack>

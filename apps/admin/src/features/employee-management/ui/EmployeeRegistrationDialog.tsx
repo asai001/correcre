@@ -128,9 +128,6 @@ export default function EmployeeRegistrationDialog({
     const postalCodeFirstHalf = form.postalCodeFirstHalf?.trim() ?? "";
     const postalCodeSecondHalf = form.postalCodeSecondHalf?.trim() ?? "";
     const hasAnyPostalCodeField = Boolean(postalCodeFirstHalf || postalCodeSecondHalf);
-    const prefecture = form.prefecture?.trim() ?? "";
-    const city = form.city?.trim() ?? "";
-    const street = form.street?.trim() ?? "";
 
     return {
       lastName: !form.lastName.trim(),
@@ -144,9 +141,10 @@ export default function EmployeeRegistrationDialog({
       joinedAt: !form.joinedAt.trim(),
       postalCode:
         hasAnyPostalCodeField && (!/^\d{3}$/.test(postalCodeFirstHalf) || !/^\d{4}$/.test(postalCodeSecondHalf)),
-      prefecture: !prefecture,
-      city: !city,
-      street: !street,
+      // 住所は基本的に任意（必須にしない）
+      prefecture: false,
+      city: false,
+      street: false,
     };
   }, [form]);
 
@@ -342,7 +340,6 @@ export default function EmployeeRegistrationDialog({
               value={form.prefecture}
               onChange={(event) => setForm((current) => ({ ...current, prefecture: event.target.value }))}
               fullWidth
-              required
               error={hasSubmitted && validation.prefecture}
               helperText={hasSubmitted && validation.prefecture ? "必須項目です" : " "}
             >
@@ -390,7 +387,6 @@ export default function EmployeeRegistrationDialog({
               value={form.city}
               onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))}
               fullWidth
-              required
               error={hasSubmitted && validation.city}
               helperText={hasSubmitted && validation.city ? "必須項目です" : " "}
             />
@@ -399,7 +395,6 @@ export default function EmployeeRegistrationDialog({
               value={form.street}
               onChange={(event) => setForm((current) => ({ ...current, street: event.target.value }))}
               fullWidth
-              required
               error={hasSubmitted && validation.street}
               helperText={hasSubmitted && validation.street ? "必須項目です" : " "}
             />
