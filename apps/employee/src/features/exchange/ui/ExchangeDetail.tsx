@@ -292,6 +292,7 @@ export default function ExchangeDetail({ item, initialPointBalance, pendingPoint
           profile={profile}
           submitting={profileSubmitting}
           error={profileError}
+          requireDeliveryAddress
           onClose={handleCloseProfileDialog}
           onSubmit={handleUpdateProfile}
         />

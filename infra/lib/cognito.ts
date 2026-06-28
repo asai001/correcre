@@ -54,10 +54,11 @@ const DEFAULT_CUSTOM_EMAIL_SENDER_CONFIG: CustomEmailSenderConfig = {
 
 // Keep production separate so only this object needs to change once the
 // dedicated sender address is finalized.
+// 本番は correcre.jp ドメインから送信する（SES で correcre.jp のドメイン ID 検証 + DKIM 設定が前提）。
 const PROD_CUSTOM_EMAIL_SENDER_CONFIG: CustomEmailSenderConfig = {
-  fromEmail: "correcre-info@efficient-technology.com",
+  fromEmail: "no-reply@correcre.jp",
   fromName: "コレクレ",
-  sesVerifiedDomain: "efficient-technology.com",
+  sesVerifiedDomain: "correcre.jp",
 };
 
 const PASSWORD_RESET_EMAIL_SUBJECT = "【コレクレ】パスワード再設定用コードのお知らせ";

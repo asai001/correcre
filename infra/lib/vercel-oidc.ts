@@ -8,7 +8,13 @@ import type { InfraStage } from "./infra-stack";
 
 const VERCEL_TEAM_SLUG = "asai001s-projects-3e71fbe6";
 const VERCEL_PROJECT_NAMES = ["correcre-admin", "correcre-employee", "correcre-operator", "correcre-merchant"] as const;
-const APPLICATION_SES_IDENTITY_DOMAIN = "efficient-technology.com";
+// アプリ（Vercel ランタイム）が SES 送信を許可されるドメイン ID。
+// 本番は correcre.jp へ移行。移行期間中に送信が落ちないよう旧ドメインも一時的に併せて許可する。
+const APPLICATION_SES_IDENTITY_DOMAINS_BY_STAGE: Record<InfraStage, readonly string[]> = {
+  dev: ["efficient-technology.com"],
+  stg: ["efficient-technology.com"],
+  prod: ["correcre.jp", "efficient-technology.com"],
+};
 
 type VercelEnvironment = "development" | "preview" | "production";
 
@@ -132,13 +138,13 @@ export function createVercelOidcAccess(scope: Construct, props: VercelOidcAccess
   role.addToPolicy(
     new iam.PolicyStatement({
       actions: ["ses:SendEmail"],
-      resources: [
+      resources: APPLICATION_SES_IDENTITY_DOMAINS_BY_STAGE[props.stage].map((domain) =>
         cdk.Stack.of(scope).formatArn({
           service: "ses",
           resource: "identity",
-          resourceName: APPLICATION_SES_IDENTITY_DOMAIN,
+          resourceName: domain,
         }),
-      ],
+      ),
     }),
   );
 

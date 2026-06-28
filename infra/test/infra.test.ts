@@ -277,7 +277,7 @@ describe("InfraStack", () => {
   test("uses SES-backed forgot-password email customization in production", () => {
     const template = Template.fromStack(createStack("prod"));
 
-    expectCustomMessageEmailCustomization(template, "correcre-info@efficient-technology.com");
+    expectCustomMessageEmailCustomization(template, "no-reply@correcre.jp");
   });
 
   test("embeds development admin-create-user routing in the custom message lambda", () => {
@@ -306,9 +306,9 @@ describe("InfraStack", () => {
     const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
     const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
 
-    expect(internalCode).toContain("https://correcre-admin.example.com/login");
-    expect(internalCode).toContain("https://correcre-employee.example.com/login");
-    expect(merchantCode).toContain("https://correcre-merchant.example.com/login");
+    expect(internalCode).toContain("https://admin.correcre.jp/login");
+    expect(internalCode).toContain("https://app.correcre.jp/login");
+    expect(merchantCode).toContain("https://merchant.correcre.jp/login");
   });
 
   test("separates the merchant user pool from the internal admin/employee/operator pool", () => {
@@ -456,6 +456,41 @@ describe("InfraStack", () => {
         action === "ses:SendEmail" &&
         stmt.Effect === "Allow" &&
         resources.some((resource) => JSON.stringify(resource).includes("identity/efficient-technology.com"))
+      );
+    });
+
+    expect(sesStatement).toBeDefined();
+  });
+
+  test("grants the production Vercel OIDC role SES sending from the correcre.jp identity", () => {
+    const template = Template.fromStack(createStack("prod"));
+
+    type PolicyResource = {
+      Properties: {
+        PolicyDocument: {
+          Statement: Array<{ Action?: unknown; Effect?: string; Resource?: unknown }>;
+        };
+      };
+    };
+
+    // 本番は IAM ポリシーが大きく、CDK が一部を ManagedPolicy(Overflow) に分割するため両方を見る。
+    const policyResources = {
+      ...template.findResources("AWS::IAM::Policy"),
+      ...template.findResources("AWS::IAM::ManagedPolicy"),
+    };
+
+    const allStatements = Object.values(policyResources).flatMap(
+      (resource) => (resource as PolicyResource).Properties.PolicyDocument.Statement ?? [],
+    );
+
+    const sesStatement = allStatements.find((stmt) => {
+      const action = stmt.Action;
+      const resources = Array.isArray(stmt.Resource) ? stmt.Resource : [stmt.Resource];
+
+      return (
+        action === "ses:SendEmail" &&
+        stmt.Effect === "Allow" &&
+        resources.some((resource) => JSON.stringify(resource).includes("identity/correcre.jp"))
       );
     });
 
