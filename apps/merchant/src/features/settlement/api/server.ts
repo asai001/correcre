@@ -9,7 +9,7 @@ import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-h
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { POINT_YEN_VALUE } from "@correcre/lib/points";
-import type { ExchangeHistoryStatus } from "@correcre/types";
+import type { ExchangeHistoryStatus, Merchant } from "@correcre/types";
 
 import type { SettlementData, SettlementItemRow, SettlementMonthRow } from "../model/types";
 
@@ -42,7 +42,12 @@ type MonthAggregate = {
   itemsByMerchandise: Map<string, SettlementItemRow>;
 };
 
-function buildRow(month: string, exchangeFeePercent: number, aggregate?: MonthAggregate): SettlementMonthRow {
+function buildRow(
+  month: string,
+  exchangeFeePercent: number,
+  aggregate?: MonthAggregate,
+  invoiceEmailSentAt?: string,
+): SettlementMonthRow {
   const salesYen = aggregate?.salesYen ?? 0;
   const items = [...(aggregate?.itemsByMerchandise.values() ?? [])].sort(
     (left, right) => right.salesYen - left.salesYen,
@@ -53,16 +58,15 @@ function buildRow(month: string, exchangeFeePercent: number, aggregate?: MonthAg
     salesYen,
     exchangeFeeYen: calculateExchangeFeeYen(salesYen, exchangeFeePercent),
     invoiceYen: calculateMerchantInvoiceYen(salesYen, exchangeFeePercent),
+    invoiceEmailSentAt,
     items,
   };
 }
 
-// 提携企業に設定された交換手数料率（%）を取得する。未設定の場合は既定値。
-async function getExchangeFeePercent(merchantId: string): Promise<number> {
+async function getMerchantForSettlement(merchantId: string): Promise<Merchant | null> {
   const region = readRequiredServerEnv("AWS_REGION");
   const tableName = readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME");
-  const merchant = await getMerchantById({ region, tableName }, merchantId);
-  return resolveExchangeFeePercent(merchant?.exchangeFeePercent);
+  return getMerchantById({ region, tableName }, merchantId);
 }
 
 async function aggregateSalesByMonth(merchantId: string): Promise<Map<string, MonthAggregate>> {
@@ -99,13 +103,14 @@ async function aggregateSalesByMonth(merchantId: string): Promise<Map<string, Mo
 }
 
 export async function getMerchantSettlementData(merchantId: string): Promise<SettlementData> {
-  const [byMonth, exchangeFeePercent] = await Promise.all([
+  const [byMonth, merchant] = await Promise.all([
     aggregateSalesByMonth(merchantId),
-    getExchangeFeePercent(merchantId),
+    getMerchantForSettlement(merchantId),
   ]);
+  const exchangeFeePercent = resolveExchangeFeePercent(merchant?.exchangeFeePercent);
 
   const months: SettlementMonthRow[] = buildRecentMonths(MONTH_WINDOW).map((month) =>
-    buildRow(month, exchangeFeePercent, byMonth.get(month)),
+    buildRow(month, exchangeFeePercent, byMonth.get(month), merchant?.invoiceEmailSentMonths?.[month]),
   );
 
   return {
@@ -120,9 +125,13 @@ export async function getSettlementForMonth(
   merchantId: string,
   month: string,
 ): Promise<{ settlement: SettlementMonthRow; exchangeFeePercent: number }> {
-  const [byMonth, exchangeFeePercent] = await Promise.all([
+  const [byMonth, merchant] = await Promise.all([
     aggregateSalesByMonth(merchantId),
-    getExchangeFeePercent(merchantId),
+    getMerchantForSettlement(merchantId),
   ]);
-  return { settlement: buildRow(month, exchangeFeePercent, byMonth.get(month)), exchangeFeePercent };
+  const exchangeFeePercent = resolveExchangeFeePercent(merchant?.exchangeFeePercent);
+  return {
+    settlement: buildRow(month, exchangeFeePercent, byMonth.get(month), merchant?.invoiceEmailSentMonths?.[month]),
+    exchangeFeePercent,
+  };
 }

@@ -39,6 +39,10 @@ function isValidSlotIndex(slotIndex: number): boolean {
   return Number.isInteger(slotIndex) && slotIndex >= 1 && slotIndex <= MISSION_SLOT_COUNT;
 }
 
+function isOptionalNonNegativeInteger(value?: number) {
+  return value === undefined || (Number.isInteger(value) && value >= 0);
+}
+
 function validateMissionFields(fields: MissionField[]): void {
   const keys = new Set<string>();
 
@@ -59,6 +63,26 @@ function validateMissionFields(fields: MissionField[]): void {
 
     if ((field.type === "select" || field.type === "multiSelect") && (!field.options || field.options.length === 0)) {
       throw new Error(`フィールド「${field.label}」の選択肢が設定されていません。`);
+    }
+
+    if (field.type === "text" || field.type === "textarea") {
+      if (!isOptionalNonNegativeInteger(field.minLength) || !isOptionalNonNegativeInteger(field.maxLength)) {
+        throw new Error(`フィールド「${field.label}」の文字数制限は 0 以上の整数で入力してください。`);
+      }
+
+      if (field.minLength !== undefined && field.maxLength !== undefined && field.minLength > field.maxLength) {
+        throw new Error(`フィールド「${field.label}」の最小文字数は最大文字数以下にしてください。`);
+      }
+    }
+
+    if (field.type === "multiSelect") {
+      if (!isOptionalNonNegativeInteger(field.minSelected) || !isOptionalNonNegativeInteger(field.maxSelected)) {
+        throw new Error(`フィールド「${field.label}」の選択数制限は 0 以上の整数で入力してください。`);
+      }
+
+      if (field.minSelected !== undefined && field.maxSelected !== undefined && field.minSelected > field.maxSelected) {
+        throw new Error(`フィールド「${field.label}」の最小選択数は最大選択数以下にしてください。`);
+      }
     }
   }
 }
@@ -81,7 +105,7 @@ function validateUpdateInput(input: UpdateMissionInput): void {
   }
 
   if (!Number.isInteger(input.score) || input.score < 1) {
-    throw new Error("スコアは 1 以上の整数で入力してください。");
+    throw new Error("点数は 1 以上の整数で入力してください。");
   }
 
   validateMissionFields(input.fields);
@@ -120,7 +144,7 @@ export async function updateMissionInDynamo(
 
   const config = getRuntimeConfig();
 
-  // 有効な全ミッションの「月間実施回数 × スコア」の合計が 100 点を超えないようにする。
+  // 有効な全ミッションの「月間実施回数 × 点数」の合計が 100 点を超えないようにする。
   // （無効なミッションは従業員が獲得できないため合計に含めない）
   const allMissions = await listMissionsByCompany(
     { region: config.region, tableName: config.missionTableName },
@@ -134,7 +158,7 @@ export async function updateMissionInDynamo(
 
   if (projectedTotalPoints > MISSION_TOTAL_POINTS_CAP) {
     throw new Error(
-      `全ミッションの「月間実施回数 × スコア」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
+      `全ミッションの「月間実施回数 × 点数」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
     );
   }
 

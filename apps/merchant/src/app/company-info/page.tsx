@@ -12,7 +12,8 @@ export default async function CompanyInfoPage() {
   return (
     <CompanyInfoForm
       initialData={companyInfo}
-      merchantUserName={joinNameParts(user.lastName, user.firstName)}
+      merchantUserName={companyInfo.contactPersonName || joinNameParts(user.lastName, user.firstName)}
+      merchantDisplayName={companyInfo.displayName ?? companyInfo.name}
     />
   );
 }

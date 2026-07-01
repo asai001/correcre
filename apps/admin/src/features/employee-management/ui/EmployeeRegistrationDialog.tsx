@@ -302,12 +302,10 @@ export default function EmployeeRegistrationDialog({
               label="入社日"
               type="date"
               value={form.joinedAt}
-              onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
               fullWidth
-              required
+              disabled
               slotProps={{ inputLabel: { shrink: true } }}
-              error={hasSubmitted && validation.joinedAt}
-              helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
+              helperText="登録日が自動設定されます"
             />
           </div>
 

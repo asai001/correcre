@@ -4,6 +4,10 @@ import type { UpdateMissionInput } from "./types";
 
 const FIELD_KEY_PATTERN = /^[a-zA-Z0-9_]+$/;
 
+function isOptionalNonNegativeInteger(value?: number) {
+  return value === undefined || (Number.isInteger(value) && value >= 0);
+}
+
 export function validateMissionInput(input: UpdateMissionInput): string | null {
   if (!input.title.trim()) {
     return "ミッションタイトルは必須です。";
@@ -22,7 +26,7 @@ export function validateMissionInput(input: UpdateMissionInput): string | null {
   }
 
   if (!Number.isInteger(input.score) || input.score < 1) {
-    return "スコアは 1 以上の整数で入力してください。";
+    return "点数は 1 以上の整数で入力してください。";
   }
 
   return validateMissionFields(input.fields);
@@ -51,6 +55,26 @@ export function validateMissionFields(fields: MissionField[]): string | null {
       (!field.options || field.options.length === 0 || field.options.every((o) => !o.trim()))
     ) {
       return `フィールド「${field.label}」の選択肢が設定されていません。`;
+    }
+
+    if (field.type === "text" || field.type === "textarea") {
+      if (!isOptionalNonNegativeInteger(field.minLength) || !isOptionalNonNegativeInteger(field.maxLength)) {
+        return `フィールド「${field.label}」の文字数制限は 0 以上の整数で入力してください。`;
+      }
+
+      if (field.minLength !== undefined && field.maxLength !== undefined && field.minLength > field.maxLength) {
+        return `フィールド「${field.label}」の最小文字数は最大文字数以下にしてください。`;
+      }
+    }
+
+    if (field.type === "multiSelect") {
+      if (!isOptionalNonNegativeInteger(field.minSelected) || !isOptionalNonNegativeInteger(field.maxSelected)) {
+        return `フィールド「${field.label}」の選択数制限は 0 以上の整数で入力してください。`;
+      }
+
+      if (field.minSelected !== undefined && field.maxSelected !== undefined && field.minSelected > field.maxSelected) {
+        return `フィールド「${field.label}」の最小選択数は最大選択数以下にしてください。`;
+      }
     }
   }
 

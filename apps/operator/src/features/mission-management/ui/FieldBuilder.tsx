@@ -63,6 +63,19 @@ function createEmptyField(order: number, key: string): MissionField {
   };
 }
 
+function toOptionalNonNegativeInteger(value: string) {
+  if (value === "") {
+    return undefined;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.floor(numeric));
+}
+
 export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
   const nextAutoFieldKeySequenceRef = useRef(getNextAutoFieldKeySequence(fields));
 
@@ -152,6 +165,54 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
     const field = fields[fieldIndex];
     const options = (field.options ?? []).filter((_, i) => i !== optionIndex);
     handleUpdate(fieldIndex, { options });
+  };
+
+  const handleMinLengthChange = (index: number, value: string) => {
+    const field = fields[index];
+    const minLength = toOptionalNonNegativeInteger(value);
+    const patch: Partial<MissionField> = { minLength };
+
+    if (minLength !== undefined && field.maxLength !== undefined && field.maxLength < minLength) {
+      patch.maxLength = minLength;
+    }
+
+    handleUpdate(index, patch);
+  };
+
+  const handleMaxLengthChange = (index: number, value: string) => {
+    const field = fields[index];
+    const maxLength = toOptionalNonNegativeInteger(value);
+    const patch: Partial<MissionField> = { maxLength };
+
+    if (maxLength !== undefined && field.minLength !== undefined && field.minLength > maxLength) {
+      patch.minLength = maxLength;
+    }
+
+    handleUpdate(index, patch);
+  };
+
+  const handleMinSelectedChange = (index: number, value: string) => {
+    const field = fields[index];
+    const minSelected = toOptionalNonNegativeInteger(value);
+    const patch: Partial<MissionField> = { minSelected };
+
+    if (minSelected !== undefined && field.maxSelected !== undefined && field.maxSelected < minSelected) {
+      patch.maxSelected = minSelected;
+    }
+
+    handleUpdate(index, patch);
+  };
+
+  const handleMaxSelectedChange = (index: number, value: string) => {
+    const field = fields[index];
+    const maxSelected = toOptionalNonNegativeInteger(value);
+    const patch: Partial<MissionField> = { maxSelected };
+
+    if (maxSelected !== undefined && field.minSelected !== undefined && field.minSelected > maxSelected) {
+      patch.minSelected = maxSelected;
+    }
+
+    handleUpdate(index, patch);
   };
 
   return (
@@ -264,17 +325,19 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
                 label="最小文字数"
                 type="number"
                 value={field.minLength ?? ""}
-                onChange={(e) => handleUpdate(index, { minLength: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) => handleMinLengthChange(index, e.target.value)}
                 size="small"
                 fullWidth
+                slotProps={{ htmlInput: { min: 0 } }}
               />
               <TextField
                 label="最大文字数"
                 type="number"
                 value={field.maxLength ?? ""}
-                onChange={(e) => handleUpdate(index, { maxLength: e.target.value ? Number(e.target.value) : undefined })}
+                onChange={(e) => handleMaxLengthChange(index, e.target.value)}
                 size="small"
                 fullWidth
+                slotProps={{ htmlInput: { min: 0 } }}
               />
             </div>
           ) : null}
@@ -342,17 +405,19 @@ export default function FieldBuilder({ fields, onChange }: FieldBuilderProps) {
                     label="最小選択数"
                     type="number"
                     value={field.minSelected ?? ""}
-                    onChange={(e) => handleUpdate(index, { minSelected: e.target.value ? Number(e.target.value) : undefined })}
+                    onChange={(e) => handleMinSelectedChange(index, e.target.value)}
                     size="small"
                     fullWidth
+                    slotProps={{ htmlInput: { min: 0 } }}
                   />
                   <TextField
                     label="最大選択数"
                     type="number"
                     value={field.maxSelected ?? ""}
-                    onChange={(e) => handleUpdate(index, { maxSelected: e.target.value ? Number(e.target.value) : undefined })}
+                    onChange={(e) => handleMaxSelectedChange(index, e.target.value)}
                     size="small"
                     fullWidth
+                    slotProps={{ htmlInput: { min: 0 } }}
                   />
                 </div>
               ) : null}

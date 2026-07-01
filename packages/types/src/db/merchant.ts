@@ -22,6 +22,7 @@ export type Merchant = {
 
   bankTransferAccount?: string;
   paymentCycle?: string;
+  invoiceEmailSentMonths?: Record<string, string>;
 
   // 交換手数料率（%）。請求時に売上から差し引く手数料。未設定の場合は既定値（5%）を適用する。
   exchangeFeePercent?: number;

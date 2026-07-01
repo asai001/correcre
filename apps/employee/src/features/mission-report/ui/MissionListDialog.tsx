@@ -60,7 +60,7 @@ export default function MissionListDialog({ open, onOpenChange, missions }: Miss
                 <TableRow>
                   <TableCell sx={{ minWidth: 180 }}>ミッション</TableCell>
                   <TableCell sx={{ minWidth: 120 }}>カテゴリ</TableCell>
-                  <TableCell sx={{ minWidth: 100 }}>スコア</TableCell>
+                  <TableCell sx={{ minWidth: 100 }}>点数</TableCell>
                   <TableCell sx={{ minWidth: 120 }}>月間実施回数</TableCell>
                   <TableCell sx={{ minWidth: 240 }}>説明</TableCell>
                   <TableCell sx={{ minWidth: 260 }}>報告項目</TableCell>

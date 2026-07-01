@@ -110,14 +110,24 @@ export default function AdminPageHeader({
               );
             })}
           </ul>
-          <form action={logout} className="py-2">
-            <button
-              type="submit"
-              className="rounded-full border border-white/30 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+          <div className="flex items-center gap-2 py-2">
+            <Link
+              href={"/terms" as Route}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full px-4 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
             >
-              ログアウト
-            </button>
-          </form>
+              利用規約
+            </Link>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="rounded-full border border-white/30 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                ログアウト
+              </button>
+            </form>
+          </div>
         </div>
       </nav>
     </section>

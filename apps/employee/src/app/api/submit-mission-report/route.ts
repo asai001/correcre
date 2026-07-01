@@ -85,6 +85,10 @@ function isValidOptionValue(value: string, options?: string[]) {
   return !options?.length || options.includes(value);
 }
 
+function buildFieldValidationError(error: string, fieldKey: string, message: string) {
+  return NextResponse.json({ error, field: fieldKey, message }, { status: 400 });
+}
+
 export async function POST(req: Request) {
   const session = await getEmployeeSession();
 
@@ -203,11 +207,19 @@ export async function POST(req: Request) {
         }
 
         if (field.minLength !== undefined && incoming.length < field.minLength) {
-          return NextResponse.json({ error: "field_too_short", field: field.key }, { status: 400 });
+          return buildFieldValidationError(
+            "field_too_short",
+            field.key,
+            `「${field.label}」の文字数が不正です。${field.minLength}文字以上で入力してください（現在${incoming.length}文字）。`,
+          );
         }
 
         if (field.maxLength !== undefined && incoming.length > field.maxLength) {
-          return NextResponse.json({ error: "field_too_long", field: field.key }, { status: 400 });
+          return buildFieldValidationError(
+            "field_too_long",
+            field.key,
+            `「${field.label}」の文字数が不正です。${field.maxLength}文字以内で入力してください（現在${incoming.length}文字）。`,
+          );
         }
 
         finalizedFieldValues[field.key] = incoming;
@@ -234,11 +246,19 @@ export async function POST(req: Request) {
         const selectedValues = incoming as string[];
 
         if (field.minSelected !== undefined && selectedValues.length < field.minSelected) {
-          return NextResponse.json({ error: "too_few_selected", field: field.key }, { status: 400 });
+          return buildFieldValidationError(
+            "too_few_selected",
+            field.key,
+            `「${field.label}」の選択数が不正です。${field.minSelected}個以上選択してください（現在${selectedValues.length}個）。`,
+          );
         }
 
         if (field.maxSelected !== undefined && selectedValues.length > field.maxSelected) {
-          return NextResponse.json({ error: "too_many_selected", field: field.key }, { status: 400 });
+          return buildFieldValidationError(
+            "too_many_selected",
+            field.key,
+            `「${field.label}」の選択数が不正です。${field.maxSelected}個以内で選択してください（現在${selectedValues.length}個）。`,
+          );
         }
 
         finalizedFieldValues[field.key] = selectedValues;
@@ -313,7 +333,7 @@ export async function POST(req: Request) {
       perEmployeeMonthlyFee: company.perEmployeeMonthlyFee,
     });
 
-    // レビューフローは廃止。提出時点で即承認扱いとし、スコア/ポイントを確定させる。
+    // レビューフローは廃止。提出時点で即承認扱いとし、点数/ポイントを確定させる。
     const report: MissionReport = {
       companyId,
       userId: user.userId,

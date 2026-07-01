@@ -16,6 +16,7 @@ export type SubmitMerchantRegistrationInput = {
   contactPersonFirstName: string;
   contactPersonLastNameKana?: string;
   contactPersonFirstNameKana?: string;
+  termsAgreed: boolean;
 };
 
 export type SubmitMerchantRegistrationResult = {

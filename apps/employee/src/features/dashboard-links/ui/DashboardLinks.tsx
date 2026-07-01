@@ -110,7 +110,7 @@ export default function DashboardLinks({ initialProfile, showPointExchangeLink }
     {
       kind: "link",
       title: "過去の実績",
-      description: "月別スコア履歴",
+      description: "月別点数履歴",
       href: "/past-performance" as Route,
       icon: faChartLine,
       iconColor: "#2563EB",

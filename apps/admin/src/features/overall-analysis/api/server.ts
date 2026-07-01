@@ -87,6 +87,16 @@ function isWithinDateRange(dateTime: string, startDate: string, endDate: string)
   return date >= startDate && date <= endDate;
 }
 
+function getUserJoinedYearMonth(user: { joinedAt?: string; createdAt?: string }) {
+  const joinedDate = user.joinedAt?.trim() || user.createdAt?.slice(0, 10) || "";
+  return /^\d{4}-\d{2}/.test(joinedDate) ? joinedDate.slice(0, 7) : "";
+}
+
+function isUserJoinedByMonth(user: { joinedAt?: string; createdAt?: string }, yearMonth: string) {
+  const joinedYearMonth = getUserJoinedYearMonth(user);
+  return !joinedYearMonth || joinedYearMonth <= yearMonth;
+}
+
 function getMonthlyStatsDateRange(items: UserMonthlyStats[]): DateRange | null {
   if (items.length === 0) {
     return null;
@@ -240,9 +250,14 @@ export async function getOverallAnalysisSummaryFromDynamo(
       )
     : allCurrentUsers;
   const targetUserIds = new Set(currentUsers.map((item) => item.userId));
-  const filteredMonthlyStatsAll = departmentId
+  const currentUserById = new Map(currentUsers.map((item) => [item.userId, item]));
+  const filteredMonthlyStatsAll = (departmentId
     ? monthlyStatsAll.filter((item) => targetUserIds.has(item.userId))
-    : monthlyStatsAll;
+    : monthlyStatsAll
+  ).filter((item) => {
+    const user = currentUserById.get(item.userId);
+    return !user || isUserJoinedByMonth(user, item.yearMonth);
+  });
   const filteredMissionReportsAll = departmentId
     ? missionReportsAll.filter((item) => targetUserIds.has(item.userId))
     : missionReportsAll;
@@ -308,8 +323,6 @@ export async function getOverallAnalysisSummaryFromDynamo(
   const averageScore =
     monthlyStats.length > 0 ? round(monthlyStats.reduce((sum, item) => sum + item.earnedScore, 0) / monthlyStats.length, 1) : 0;
   const totalEarnedPoints = monthlyStats.reduce((sum, item) => sum + item.earnedPoints, 0);
-  const userCount =
-    currentUsers.length > 0 ? currentUsers.length : new Set(filteredMonthlyStatsAll.map((item) => item.userId)).size;
   const approvedReportsInRange = filteredMissionReportsAll.filter((item) =>
     isWithinDateRange(item.reportedAt, effectiveRange.startDate, effectiveRange.endDate),
   );
@@ -327,6 +340,7 @@ export async function getOverallAnalysisSummaryFromDynamo(
         continue;
       }
 
+      const userCount = currentUsers.filter((user) => isUserJoinedByMonth(user, yearMonth)).length;
       targetCount += (mission.monthlyCount * userCount * coveredDays) / getDaysInMonth(yearMonth);
     }
 
