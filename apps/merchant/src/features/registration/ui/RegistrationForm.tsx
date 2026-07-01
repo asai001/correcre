@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useState } from "react";
-import { Alert, Button, MenuItem, TextField } from "@mui/material";
+import { Alert, Button, Checkbox, FormControlLabel, MenuItem, TextField } from "@mui/material";
 
 import { MERCHANT_LOGIN_PATH } from "@merchant/lib/auth/constants";
 import { submitRegistration } from "../api/client";
@@ -55,6 +55,7 @@ function createInitialFormState(): FormState {
 export default function RegistrationForm() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createInitialFormState());
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +69,11 @@ export default function RegistrationForm() {
     event.preventDefault();
 
     if (submitting) return;
+
+    if (!termsAgreed) {
+      setError("規約への同意が必要です。");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -91,6 +97,7 @@ export default function RegistrationForm() {
         contactPersonFirstName: form.contactPersonFirstName,
         contactPersonLastNameKana: form.contactPersonLastNameKana || undefined,
         contactPersonFirstNameKana: form.contactPersonFirstNameKana || undefined,
+        termsAgreed,
       });
 
       router.push("/register/complete" as Route);
@@ -231,6 +238,30 @@ export default function RegistrationForm() {
         </section>
 
         <div className="flex flex-col gap-3 pt-4">
+          <FormControlLabel
+            className="!m-0 items-start rounded border border-slate-200 bg-slate-50 px-3 py-2"
+            control={
+              <Checkbox
+                required
+                checked={termsAgreed}
+                onChange={(event) => setTermsAgreed(event.target.checked)}
+                className="!-ml-1 !pt-0"
+              />
+            }
+            label={
+              <span className="text-sm leading-6 text-slate-700">
+                <Link
+                  href={"/terms" as Route}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+                >
+                  コレクレ アイテム提携企業向け規約
+                </Link>
+                に同意して登録申請します。
+              </span>
+            }
+          />
           <Button type="submit" variant="contained" color="primary" fullWidth disabled={submitting} sx={{ py: 1.5 }}>
             {submitting ? "送信中..." : "登録申請"}
           </Button>

@@ -1,7 +1,7 @@
 import { toYYYYMM } from "@correcre/lib";
-import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompanyAndStatus } from "@correcre/lib/dynamodb/mission-report";
+import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import type { AvgItemCompletionItem } from "../model/types";
@@ -15,12 +15,22 @@ function shiftYearMonth(baseYm: string, monthOffset: number): string {
   return toYYYYMM(date);
 }
 
+function getUserJoinedYearMonth(user: { joinedAt?: string; createdAt?: string }) {
+  const joinedDate = user.joinedAt?.trim() || user.createdAt?.slice(0, 10) || "";
+  return /^\d{4}-\d{2}/.test(joinedDate) ? joinedDate.slice(0, 7) : "";
+}
+
+function isUserJoinedByMonth(user: { joinedAt?: string; createdAt?: string }, yearMonth: string) {
+  const joinedYearMonth = getUserJoinedYearMonth(user);
+  return !joinedYearMonth || joinedYearMonth <= yearMonth;
+}
+
 export async function getAvgItemCompletionFromDynamo(
   companyId: string,
   thisYearMonth: string,
 ): Promise<AvgItemCompletionItem[] | null> {
   const region = readRequiredServerEnv("AWS_REGION");
-  const [missions, company, missionReports] = await Promise.all([
+  const [missions, users, missionReports] = await Promise.all([
     listEnabledLatestMissionsByCompany(
       {
         region,
@@ -28,10 +38,10 @@ export async function getAvgItemCompletionFromDynamo(
       },
       companyId,
     ),
-    getCompanyById(
+    listUsersByCompany(
       {
         region,
-        tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+        tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
       },
       companyId,
     ),
@@ -49,8 +59,10 @@ export async function getAvgItemCompletionFromDynamo(
     return [];
   }
 
-  const activeEmployees = company?.activeEmployees ?? 0;
   const targetYearMonth = shiftYearMonth(thisYearMonth, -1);
+  const activeEmployees = users.filter(
+    (user) => user.status === "ACTIVE" && isUserJoinedByMonth(user, targetYearMonth),
+  ).length;
   const reportCountByMissionId = new Map<string, number>();
 
   for (const report of missionReports) {

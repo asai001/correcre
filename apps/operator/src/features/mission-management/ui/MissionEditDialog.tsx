@@ -24,7 +24,7 @@ type MissionEditDialogProps = {
   open: boolean;
   companyId: string;
   mission: OperatorMissionSummary;
-  // 編集中のスロットを除いた、有効なミッションの「月間実施回数 × スコア」の合計。
+  // 編集中のスロットを除いた、有効なミッションの「月間実施回数 × 点数」の合計。
   otherMissionsTotalPoints: number;
   onClose: () => void;
   onUpdated: (mission: OperatorMissionSummary) => void;
@@ -102,13 +102,13 @@ export default function MissionEditDialog({
       return;
     }
 
-    // 有効な全ミッションの「月間実施回数 × スコア」の合計が上限を超えないかをチェックする。
+    // 有効な全ミッションの「月間実施回数 × 点数」の合計が上限を超えないかをチェックする。
     const editedMissionPoints = nextInput.enabled ? nextInput.monthlyCount * nextInput.score : 0;
     const projectedTotalPoints = otherMissionsTotalPoints + editedMissionPoints;
 
     if (projectedTotalPoints > MISSION_TOTAL_POINTS_CAP) {
       setError(
-        `全ミッションの「月間実施回数 × スコア」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
+        `全ミッションの「月間実施回数 × 点数」の合計が ${MISSION_TOTAL_POINTS_CAP} 点を超えています（この設定では合計 ${projectedTotalPoints} 点）。`,
       );
       return;
     }
@@ -212,7 +212,7 @@ export default function MissionEditDialog({
                 </div>
                 <div className="pt-2">
                   <TextField
-                    label="スコア"
+                    label="点数"
                     type="number"
                     value={form.score}
                     onChange={(e) => {

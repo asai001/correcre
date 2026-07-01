@@ -19,6 +19,50 @@ type FormValues = Record<string, FormValue>;
 
 const makeDraftKey = (companyId: string, missionId?: string) => (missionId ? `missionReport:${companyId}:${missionId}` : "");
 
+function validateFieldValue(field: FieldConfig, value: FormValue | undefined): string | null {
+  const isEmptyValue = value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
+  if (!field.required && isEmptyValue) {
+    return null;
+  }
+
+  if (field.type === "text" || field.type === "textarea") {
+    const text = typeof value === "string" ? value : "";
+
+    if (field.minLength !== undefined && text.length < field.minLength) {
+      return `「${field.label}」の文字数が不正です。${field.minLength}文字以上で入力してください（現在${text.length}文字）。`;
+    }
+
+    if (field.maxLength !== undefined && text.length > field.maxLength) {
+      return `「${field.label}」の文字数が不正です。${field.maxLength}文字以内で入力してください（現在${text.length}文字）。`;
+    }
+  }
+
+  if (field.type === "multiSelect") {
+    const selectedValues = Array.isArray(value) ? value : [];
+
+    if (field.minSelected !== undefined && selectedValues.length < field.minSelected) {
+      return `「${field.label}」の選択数が不正です。${field.minSelected}個以上選択してください（現在${selectedValues.length}個）。`;
+    }
+
+    if (field.maxSelected !== undefined && selectedValues.length > field.maxSelected) {
+      return `「${field.label}」の選択数が不正です。${field.maxSelected}個以内で選択してください（現在${selectedValues.length}個）。`;
+    }
+  }
+
+  return null;
+}
+
+function validateFormValues(fields: FieldConfig[], values: FormValues): string | null {
+  for (const field of fields) {
+    const error = validateFieldValue(field, values[field.id]);
+    if (error) {
+      return error;
+    }
+  }
+
+  return null;
+}
+
 /* ----------------------------------------------------------------
  *  下書き（localStorage）を本機能分まとめて削除
  *  - キー命名: missionReport:${companyId}:${missionId}
@@ -131,8 +175,15 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
     if (submitting) {
       return;
     }
-    setSubmitting(true);
+
     setError(null);
+    const validationError = validateFormValues(missionConfig.fields, values);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const payload: SubmitPayload = {
@@ -154,7 +205,10 @@ export function useMissionReportDialog({ companyId, missionId, missionConfig, on
       setValues({});
     } catch (e) {
       console.error(e);
-      setError("送信に失敗しました。時間をおいて再度お試しください。");
+      const message = e instanceof Error ? e.message : "";
+      setError(message && !message.startsWith("failed to submit mission report")
+        ? message
+        : "送信に失敗しました。時間をおいて再度お試しください。");
     } finally {
       setSubmitting(false);
     }

@@ -94,6 +94,11 @@ export type SubmitMissionReportResult = {
   pointGranted: number;
 };
 
+type SubmitMissionReportErrorBody = {
+  error?: string;
+  message?: string;
+};
+
 export async function submitMissionReport(payload: SubmitPayload): Promise<SubmitMissionReportResult> {
   const res = await fetch("/api/submit-mission-report", {
     method: "POST",
@@ -109,6 +114,15 @@ export async function submitMissionReport(payload: SubmitPayload): Promise<Submi
 
   if (!res.ok) {
     const errorBody = await res.text();
+    let parsed: SubmitMissionReportErrorBody | null = null;
+    try {
+      parsed = JSON.parse(errorBody) as SubmitMissionReportErrorBody;
+    } catch {
+      parsed = null;
+    }
+    if (parsed?.message) {
+      throw new Error(parsed.message);
+    }
     throw new Error(`failed to submit mission report: ${res.status} ${errorBody}`);
   }
 

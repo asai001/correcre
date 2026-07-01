@@ -13,6 +13,7 @@ export type SettlementMonthRow = {
   salesYen: number;
   exchangeFeeYen: number;
   invoiceYen: number;
+  invoiceEmailSentAt?: string;
   items: SettlementItemRow[];
 };
 

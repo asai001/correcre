@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 
 import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchandiseForm } from "@merchant/features/merchandise";
-import { getMerchandiseForMerchant, getMerchantCompanyName } from "@merchant/features/merchandise/api/server";
-import { requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import { getMerchandiseForMerchant } from "@merchant/features/merchandise/api/server";
+import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +14,9 @@ type PageProps = {
 export default async function MerchandiseEditPage({ params }: PageProps) {
   const [user, { merchandiseId }] = await Promise.all([requireCurrentMerchantUser(), params]);
 
-  const [item, merchantCompanyName] = await Promise.all([
+  const [item, headerInfo] = await Promise.all([
     getMerchandiseForMerchant(user.merchantId, merchandiseId),
-    getMerchantCompanyName(user.merchantId),
+    getMerchantHeaderInfo(user.merchantId),
   ]);
 
   if (!item) {
@@ -26,9 +26,9 @@ export default async function MerchandiseEditPage({ params }: PageProps) {
   return (
     <MerchandiseForm
       mode="edit"
-      merchantName={joinNameParts(user.lastName, user.firstName)}
-      merchantDisplayName={merchantCompanyName ?? ""}
-      merchantCompanyName={merchantCompanyName ?? ""}
+      merchantName={headerInfo.contactPersonName || joinNameParts(user.lastName, user.firstName)}
+      merchantDisplayName={headerInfo.displayName}
+      merchantCompanyName={headerInfo.displayName}
       initial={item}
     />
   );

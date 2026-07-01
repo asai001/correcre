@@ -36,7 +36,7 @@ export default function OverallAnalysisStatsCards({
 }: OverallAnalysisStatsCardsProps) {
   return (
     <div className={`grid h-full grid-cols-1 gap-4 md:grid-cols-3 ${className ?? ""}`}>
-      <StatCard label="平均達成率" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
+      <StatCard label="平均獲得点数" value={`${formatMetric(averageScore)}点`} color="#3b82f6" />
       <StatCard label="総獲得ポイント" value={`${totalEarnedPoints.toLocaleString()}pt`} color="#3b82f6" />
       <StatCard label="使用済みポイント" value={`${totalUsedPoints.toLocaleString()}pt`} color="#3b82f6" />
     </div>

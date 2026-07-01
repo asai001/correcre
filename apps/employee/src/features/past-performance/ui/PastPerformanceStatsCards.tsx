@@ -39,7 +39,7 @@ export default function PastPerformanceStatsCards({
       <StatCard label="獲得ポイント" value={`${earnedPoints.toLocaleString()}pt`} color="#3b82f6" />
       <StatCard label="達成点数 (/100点)" value={formatMetric(achievementScore)} color="#10b981" />
       <StatCard label="達成率 (%)" value={formatMetric(achievementRate)} color="#8b5cf6" />
-      <StatCard label="平均スコア" value={formatMetric(averageScore)} color="#1f2937" />
+      <StatCard label="平均点数" value={formatMetric(averageScore)} color="#1f2937" />
     </div>
   );
 }

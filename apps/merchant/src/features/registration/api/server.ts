@@ -66,6 +66,10 @@ export async function submitMerchantRegistration(
   const contactPersonLastName = input.contactPersonLastName.trim();
   const contactPersonFirstName = input.contactPersonFirstName.trim();
 
+  if (!input.termsAgreed) {
+    throw new Error("規約への同意が必要です");
+  }
+
   if (
     !name ||
     !companyLocation ||

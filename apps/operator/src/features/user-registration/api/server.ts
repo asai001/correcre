@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { nowYYYYMMDD } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -559,7 +560,8 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const normalizedInput = normalizeEmployeeInput(input);
+  const registeredAt = nowYYYYMMDD();
+  const normalizedInput = normalizeEmployeeInput({ ...input, joinedAt: registeredAt });
   await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();

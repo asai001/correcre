@@ -63,6 +63,24 @@ export async function getMerchantDisplayName(merchantId: string): Promise<string
   return merchant?.displayName?.trim() || merchant?.name?.trim() || "";
 }
 
+export async function getMerchantHeaderInfo(merchantId: string): Promise<{
+  displayName: string;
+  contactPersonName: string;
+}> {
+  const merchant = await getMerchantById(
+    {
+      region: readRequiredServerEnv("AWS_REGION"),
+      tableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
+    },
+    merchantId,
+  );
+
+  return {
+    displayName: merchant?.displayName?.trim() || merchant?.name?.trim() || "",
+    contactPersonName: merchant?.contactPersonName?.trim() || "",
+  };
+}
+
 export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {
   const session = await getMerchantSession();
 

@@ -608,8 +608,23 @@ export async function resetMerchantUserEmailForOperator(
   }
 
   let cognitoEmailUpdated = false;
+  let merchantContactEmailUpdated = false;
+  const beforeMerchantContactEmail = merchant.contactEmail;
 
   try {
+    await putMerchant(
+      {
+        region: config.region,
+        tableName: config.merchantTableName,
+      },
+      {
+        ...merchant,
+        contactEmail: newEmail,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+    merchantContactEmailUpdated = true;
+
     await updateCognitoUserEmail(
       {
         region: cognitoConfig.cognitoRegion,
@@ -631,6 +646,24 @@ export async function resetMerchantUserEmailForOperator(
       },
     );
   } catch (error) {
+    if (merchantContactEmailUpdated) {
+      try {
+        await putMerchant(
+          {
+            region: config.region,
+            tableName: config.merchantTableName,
+          },
+          {
+            ...merchant,
+            contactEmail: beforeMerchantContactEmail,
+            updatedAt: new Date().toISOString(),
+          },
+        );
+      } catch (rollbackMerchantError) {
+        console.error("Failed to roll back merchant contact email after reset failure", rollbackMerchantError);
+      }
+    }
+
     if (cognitoEmailUpdated) {
       try {
         await updateCognitoUserEmail(

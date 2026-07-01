@@ -31,6 +31,9 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
   const [sendingMonth, setSendingMonth] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
+  const [sentMonths, setSentMonths] = useState<Record<string, string>>(() =>
+    Object.fromEntries(data.months.flatMap((row) => (row.invoiceEmailSentAt ? [[row.month, row.invoiceEmailSentAt]] : []))),
+  );
 
   const current = data.current;
   const feePercentLabel = `${data.exchangeFeePercent}%`;
@@ -50,7 +53,8 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
     setSendingMonth(month);
     setFeedback(null);
     try {
-      await sendInvoiceEmail(month);
+      const result = await sendInvoiceEmail(month);
+      setSentMonths((prev) => ({ ...prev, [month]: result.sentAt }));
       setFeedback({
         type: "success",
         text: `${formatMonthLabel(month)}分の請求メールを運用者に送信しました。`,
@@ -157,10 +161,18 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
                         <button
                           type="button"
                           onClick={() => handleSendInvoice(row.month)}
-                          disabled={row.salesYen <= 0 || sendingMonth !== null}
+                          disabled={
+                            row.salesYen <= 0 ||
+                            sendingMonth !== null ||
+                            Boolean(sentMonths[row.month] ?? row.invoiceEmailSentAt)
+                          }
                           className="rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                         >
-                          {sendingMonth === row.month ? "送信中…" : "請求メールを送信"}
+                          {sentMonths[row.month] ?? row.invoiceEmailSentAt
+                            ? "送信済み"
+                            : sendingMonth === row.month
+                              ? "送信中…"
+                              : "請求メールを送信"}
                         </button>
                       )}
                     </td>

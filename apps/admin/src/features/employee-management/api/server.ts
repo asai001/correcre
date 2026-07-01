@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { nowYYYYMMDD } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -652,7 +653,8 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const normalizedInput = normalizeEmployeeInput(input, departments);
+  const registeredAt = nowYYYYMMDD();
+  const normalizedInput = normalizeEmployeeInput({ ...input, joinedAt: registeredAt }, departments);
 
   if (normalizedInput.roles.includes("OPERATOR")) {
     throw new Error("運用者権限のユーザーは作成できません");
