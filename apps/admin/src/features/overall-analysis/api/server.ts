@@ -375,9 +375,7 @@ export async function getOverallAnalysisSummaryFromDynamo(
 
   const averageScore = totalUserMonthCount > 0 ? round(totalScoreForAverage / totalUserMonthCount, 1) : 0;
   const totalEarnedPoints = monthlyStats.reduce((sum, item) => sum + item.earnedPoints, 0);
-  const approvedReportsInRange = filteredMissionReportsAll.filter((item) =>
-    isWithinDateRange(item.reportedAt, effectiveRange.startDate, effectiveRange.endDate),
-  );
+  const approvedReportsInRange = filteredMissionReportsAll.filter((item) => isWithinDateRange(item.reportedAt, startDate, endDate));
   const reportCountByMissionId = new Map<string, number>();
   for (const report of approvedReportsInRange) {
     reportCountByMissionId.set(report.missionId, (reportCountByMissionId.get(report.missionId) ?? 0) + 1);
@@ -386,16 +384,15 @@ export async function getOverallAnalysisSummaryFromDynamo(
   const achievementData: OverallAnalysisAchievementItem[] = missions.map((mission) => {
     let targetCount = 0;
 
-    for (const yearMonth of months) {
-      const coveredDays = getCoveredDaysInMonth(yearMonth, effectiveRange.startDate, effectiveRange.endDate);
+    for (const yearMonth of displayMonths) {
+      const coveredDays = getCoveredDaysInMonth(yearMonth, startDate, endDate);
       if (coveredDays === 0) {
         continue;
       }
 
       const daysInMonth = getDaysInMonth(yearMonth);
       const userMonthWeight = currentUsers.reduce(
-        (sum, user) =>
-          sum + getUserCoveredDaysInMonth(user, yearMonth, effectiveRange.startDate, effectiveRange.endDate) / daysInMonth,
+        (sum, user) => sum + getUserCoveredDaysInMonth(user, yearMonth, startDate, endDate) / daysInMonth,
         0,
       );
       targetCount += mission.monthlyCount * userMonthWeight;

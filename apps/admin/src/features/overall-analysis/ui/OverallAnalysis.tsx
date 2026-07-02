@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { SkeletonBlock, SkeletonCardGrid, SkeletonTableCard } from "@admin/components/LoadingSkeleton";
 import MissionAnalysisSection from "@admin/features/individual-analysis/ui/MissionAnalysisSection";
-import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
+import { getDefaultAnalysisMonthDateRange } from "@admin/lib/analysis-date-range";
 
 import { useOverallAnalysisSummary } from "../hooks/useOverallAnalysisSummary";
 import type { OverallAnalysisDepartmentOption, OverallAnalysisSummary } from "../model/types";
@@ -32,7 +32,7 @@ const emptySummary: OverallAnalysisSummary = {
 };
 
 export default function OverallAnalysis({ companyId, departments, hasUnassignedUsers }: OverallAnalysisProps) {
-  const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
+  const initialDateRange = useMemo(() => getDefaultAnalysisMonthDateRange(), []);
   const exchangeHistoryPagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],
