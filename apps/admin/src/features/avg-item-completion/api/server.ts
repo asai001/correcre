@@ -43,6 +43,10 @@ function isUserStartedByDate(user: Pick<AnalysisUser, "joinedAt" | "createdAt">,
   return !startDate || startDate <= date;
 }
 
+function buildUserMissionKey(userId: string, missionId: string) {
+  return `${userId}:${missionId}`;
+}
+
 function getUserCoveredDaysInMonth(user: Pick<AnalysisUser, "joinedAt" | "createdAt">, yearMonth: string) {
   const monthStart = `${yearMonth}-01`;
   const monthEnd = `${yearMonth}-${String(getDaysInMonth(yearMonth)).padStart(2, "0")}`;
@@ -96,11 +100,7 @@ export async function getAvgItemCompletionFromDynamo(
   const analysisUsers = users.filter(isAnalysisTargetUser);
   const analysisUserById = new Map(analysisUsers.map((user) => [user.userId, user]));
   const daysInTargetMonth = getDaysInMonth(targetYearMonth);
-  const userMonthWeight = analysisUsers.reduce(
-    (sum, user) => sum + getUserCoveredDaysInMonth(user, targetYearMonth) / daysInTargetMonth,
-    0,
-  );
-  const reportCountByMissionId = new Map<string, number>();
+  const reportCountByUserMission = new Map<string, number>();
 
   for (const report of missionReports) {
     if (report.reportedAt.slice(0, 7) !== targetYearMonth) {
@@ -112,13 +112,28 @@ export async function getAvgItemCompletionFromDynamo(
       continue;
     }
 
-    reportCountByMissionId.set(report.missionId, (reportCountByMissionId.get(report.missionId) ?? 0) + 1);
+    const key = buildUserMissionKey(report.userId, report.missionId);
+    reportCountByUserMission.set(key, (reportCountByUserMission.get(key) ?? 0) + 1);
   }
 
   return missions.map((mission) => {
-    const denominator = mission.monthlyCount * userMonthWeight;
-    const numerator = reportCountByMissionId.get(mission.missionId) ?? 0;
-    const completionRate = denominator === 0 ? 0 : Math.min(100, Math.round((numerator / denominator) * 100));
+    let totalCompletionRate = 0;
+    let targetUserCount = 0;
+
+    for (const user of analysisUsers) {
+      const coveredDays = getUserCoveredDaysInMonth(user, targetYearMonth);
+      const targetCount = (mission.monthlyCount * coveredDays) / daysInTargetMonth;
+
+      if (targetCount <= 0) {
+        continue;
+      }
+
+      const reportCount = reportCountByUserMission.get(buildUserMissionKey(user.userId, mission.missionId)) ?? 0;
+      totalCompletionRate += Math.min(100, (reportCount / targetCount) * 100);
+      targetUserCount += 1;
+    }
+
+    const completionRate = targetUserCount === 0 ? 0 : Math.round(totalCompletionRate / targetUserCount);
 
     return {
       title: mission.title,
