@@ -5,8 +5,6 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
 import type { DashboardSummary } from "../model/types";
 
-const MONTHLY_FULL_SCORE = 100;
-
 function shiftYearMonth(baseYm: string, monthOffset: number) {
   const [year, month] = baseYm.split("-").map(Number);
   const date = new Date(year, month - 1 + monthOffset, 1);
@@ -14,12 +12,12 @@ function shiftYearMonth(baseYm: string, monthOffset: number) {
   return toYYYYMM(date);
 }
 
-function toEarnedScoreRate(earnedScore: number | undefined): number {
+function toEarnedScore(earnedScore: number | undefined): number {
   if (typeof earnedScore !== "number" || !Number.isFinite(earnedScore)) {
     return 0;
   }
 
-  return Math.min(MONTHLY_FULL_SCORE, Math.max(0, Math.round(earnedScore)));
+  return Math.max(0, Math.round(earnedScore));
 }
 
 export async function getDashboardSummaryFromDynamo(
@@ -72,7 +70,7 @@ export async function getDashboardSummaryFromDynamo(
   const reflected = reflectPoints(user);
 
   return {
-    thisMonthCompletionRate: toEarnedScoreRate(currentMonthStats?.earnedScore),
+    thisMonthEarnedScore: toEarnedScore(currentMonthStats?.earnedScore),
     currentPointBalance: reflected.spendablePoint,
     pendingPointBalance: reflected.pendingPoint,
     lastMonthEarnedPoints: lastMonthStats?.earnedPoints ?? 0,

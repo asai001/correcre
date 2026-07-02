@@ -223,26 +223,14 @@ export async function getIndividualAnalysisSummaryFromDynamo(
     const earnedPointsInRange =
       monthlyStat && totalMonthScore > 0 ? round((monthlyStat.earnedPoints * selectedMonthScore) / totalMonthScore, 0) : 0;
 
-    let targetMonthScore = 0;
-    for (const mission of missions) {
-      const coveredDays = getCoveredDaysInMonth(yearMonth, effectiveStartDate, endDate);
-      if (coveredDays === 0) {
-        continue;
-      }
-
-      targetMonthScore += (mission.monthlyCount * mission.score * coveredDays) / getDaysInMonth(yearMonth);
-    }
-
-    const score = toRate(selectedMonthScore, targetMonthScore);
     totalEarnedPoints += earnedPointsInRange;
 
     return {
       month: formatYearMonth(yearMonth),
-      score,
+      score: selectedMonthScore,
     };
   });
 
-  let totalTargetScore = 0;
   let totalActualScore = 0;
   let totalTargetCount = 0;
   let totalActualCount = 0;
@@ -261,11 +249,9 @@ export async function getIndividualAnalysisSummaryFromDynamo(
 
     const actualCount = reportCountByMissionId.get(mission.missionId) ?? 0;
     const actualScore = reportScoreByMissionId.get(mission.missionId) ?? 0;
-    const targetScore = targetCount * mission.score;
 
     totalTargetCount += targetCount;
     totalActualCount += actualCount;
-    totalTargetScore += targetScore;
     totalActualScore += actualScore;
 
     return {
@@ -292,7 +278,7 @@ export async function getIndividualAnalysisSummaryFromDynamo(
 
   return {
     earnedPoints: totalEarnedPoints,
-    achievementScore: toRate(totalActualScore, totalTargetScore),
+    achievementScore: totalActualScore,
     achievementRate: toRate(totalActualCount, totalTargetCount),
     averageScore,
     radarData,

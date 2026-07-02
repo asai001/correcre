@@ -6,7 +6,7 @@ import { SkeletonBlock, SkeletonCardGrid } from "@employee/components/LoadingSke
 import { useLoginInfo } from "@employee/features/login-info/hooks/useLoginInfo";
 import {
   EarnedScoreTrendChart,
-  getDefaultAnalysisDateRange,
+  getDefaultAnalysisMonthDateRange,
   type IndividualAnalysisSummary,
   MissionAnalysisSection,
   MonthlyAchievementRadar,
@@ -38,7 +38,7 @@ const emptySummary: IndividualAnalysisSummary = {
 };
 
 export default function PastPerformance({ companyId, userId, showPointExchangeLink }: PastPerformanceProps) {
-  const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
+  const initialDateRange = useMemo(() => getDefaultAnalysisMonthDateRange(), []);
   const reportTablePagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],

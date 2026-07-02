@@ -41,9 +41,9 @@ export default function DashboardSummary({ companyId, userId, targetYearMonth }:
         icon={faTrophy}
         iconColor="#2563EB"
         iconBgColor="#dbeafe"
-        label="今月の達成率"
-        value={summary.thisMonthCompletionRate ?? "-"}
-        unit="パーセント"
+        label="今月の獲得点数"
+        value={summary.thisMonthEarnedScore}
+        unit="点"
         color="#2563EB"
       />
       <ScoreTile

@@ -1,6 +1,6 @@
 export type DashboardSummary = {
-  /** 今月の達成割合（0〜100 のパーセント） */
-  thisMonthCompletionRate: number | null;
+  /** 今月の獲得点数 */
+  thisMonthEarnedScore: number;
 
   /** 現在の保有ポイント（利用可能・反映済み） */
   currentPointBalance: number;

@@ -1,8 +1,15 @@
 export type { CsvCell } from "./lib/csv";
 export { downloadCsv } from "./lib/csv";
 
-export type { AnalysisDateRange } from "./lib/analysis-date-range";
-export { getDefaultAnalysisDateRange } from "./lib/analysis-date-range";
+export type { AnalysisDateRange, AnalysisMonthOption } from "./lib/analysis-date-range";
+export {
+  getAnalysisMonthEndDate,
+  getAnalysisMonthSelectOptions,
+  getAnalysisMonthStartDate,
+  getDefaultAnalysisDateRange,
+  getDefaultAnalysisMonthDateRange,
+  toAnalysisYearMonth,
+} from "./lib/analysis-date-range";
 
 export type {
   AnalysisFilter,
