@@ -8,7 +8,7 @@ import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
-import type { UserMonthlyStats } from "@correcre/types";
+import type { DBUserItem, UserMonthlyStats } from "@correcre/types";
 
 import type {
   OverallAnalysisAchievementItem,
@@ -23,6 +23,8 @@ type DateRange = {
   startDate: string;
   endDate: string;
 };
+
+type AnalysisUser = Pick<DBUserItem, "userId" | "status" | "roles" | "joinedAt" | "createdAt" | "departmentId">;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -87,14 +89,43 @@ function isWithinDateRange(dateTime: string, startDate: string, endDate: string)
   return date >= startDate && date <= endDate;
 }
 
-function getUserJoinedYearMonth(user: { joinedAt?: string; createdAt?: string }) {
-  const joinedDate = user.joinedAt?.trim() || user.createdAt?.slice(0, 10) || "";
-  return /^\d{4}-\d{2}/.test(joinedDate) ? joinedDate.slice(0, 7) : "";
+function isAnalysisTargetUser(user: AnalysisUser) {
+  return user.status === "ACTIVE" && user.roles.includes("EMPLOYEE");
 }
 
-function isUserJoinedByMonth(user: { joinedAt?: string; createdAt?: string }, yearMonth: string) {
-  const joinedYearMonth = getUserJoinedYearMonth(user);
-  return !joinedYearMonth || joinedYearMonth <= yearMonth;
+function getUserStartDate(user: Pick<AnalysisUser, "joinedAt" | "createdAt">) {
+  const startDate = user.joinedAt?.trim() || user.createdAt?.slice(0, 10) || "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : "";
+}
+
+function getUserStartYearMonth(user: Pick<AnalysisUser, "joinedAt" | "createdAt">) {
+  const startDate = getUserStartDate(user);
+  return startDate ? startDate.slice(0, 7) : "";
+}
+
+function isUserStartedByMonth(user: Pick<AnalysisUser, "joinedAt" | "createdAt">, yearMonth: string) {
+  const startYearMonth = getUserStartYearMonth(user);
+  return !startYearMonth || startYearMonth <= yearMonth;
+}
+
+function isUserStartedByDate(user: Pick<AnalysisUser, "joinedAt" | "createdAt">, date: string) {
+  const startDate = getUserStartDate(user);
+  return !startDate || startDate <= date;
+}
+
+function getUserCoveredDaysInMonth(
+  user: Pick<AnalysisUser, "joinedAt" | "createdAt">,
+  yearMonth: string,
+  startDate: string,
+  endDate: string,
+) {
+  const userStartDate = getUserStartDate(user);
+  const effectiveStartDate = userStartDate && userStartDate > startDate ? userStartDate : startDate;
+  return getCoveredDaysInMonth(yearMonth, effectiveStartDate, endDate);
+}
+
+function buildUserMonthKey(userId: string, yearMonth: string) {
+  return `${userId}:${yearMonth}`;
 }
 
 function getMonthlyStatsDateRange(items: UserMonthlyStats[]): DateRange | null {
@@ -242,28 +273,27 @@ export async function getOverallAnalysisSummaryFromDynamo(
 
   const departmentIds = new Set(departments.map((item) => item.departmentId));
   const allCurrentUsers = users.filter((item) => item.status !== "DELETED");
+  const analysisUsers = users.filter(isAnalysisTargetUser);
   const currentUsers = departmentId
-    ? allCurrentUsers.filter((item) =>
+    ? analysisUsers.filter((item) =>
         departmentId === UNASSIGNED_DEPARTMENT_FILTER
           ? isUserWithoutAssignedDepartment(item, departmentIds)
           : item.departmentId === departmentId,
       )
-    : allCurrentUsers;
-  const targetUserIds = new Set(currentUsers.map((item) => item.userId));
+    : analysisUsers;
   const currentUserById = new Map(currentUsers.map((item) => [item.userId, item]));
-  const filteredMonthlyStatsAll = (departmentId
-    ? monthlyStatsAll.filter((item) => targetUserIds.has(item.userId))
-    : monthlyStatsAll
-  ).filter((item) => {
+  const filteredMonthlyStatsAll = monthlyStatsAll.filter((item) => {
     const user = currentUserById.get(item.userId);
-    return !user || isUserJoinedByMonth(user, item.yearMonth);
+    return Boolean(user && isUserStartedByMonth(user, item.yearMonth));
   });
-  const filteredMissionReportsAll = departmentId
-    ? missionReportsAll.filter((item) => targetUserIds.has(item.userId))
-    : missionReportsAll;
-  const filteredExchangeHistoryAll = departmentId
-    ? exchangeHistoryAll.filter((item) => targetUserIds.has(item.userId))
-    : exchangeHistoryAll;
+  const filteredMissionReportsAll = missionReportsAll.filter((item) => {
+    const user = currentUserById.get(item.userId);
+    return Boolean(user && isUserStartedByDate(user, item.reportedAt.slice(0, 10)));
+  });
+  const filteredExchangeHistoryAll = exchangeHistoryAll.filter((item) => {
+    const user = currentUserById.get(item.userId);
+    return Boolean(user && isUserStartedByDate(user, item.exchangedAt.slice(0, 10)));
+  });
   const displayMonths = listYearMonthsBetween(startDate, endDate);
 
   if (!company) {
@@ -295,24 +325,35 @@ export async function getOverallAnalysisSummaryFromDynamo(
 
   const months = listYearMonthsBetween(effectiveRange.startDate, effectiveRange.endDate);
   const monthlyStats = filteredMonthlyStatsAll.filter((item) => months.includes(item.yearMonth));
-  const monthlyStatsByMonth = new Map<string, UserMonthlyStats[]>();
+  const monthlyStatsByUserMonth = new Map<string, UserMonthlyStats>();
   for (const item of monthlyStats) {
-    const rows = monthlyStatsByMonth.get(item.yearMonth) ?? [];
-    rows.push(item);
-    monthlyStatsByMonth.set(item.yearMonth, rows);
+    monthlyStatsByUserMonth.set(buildUserMonthKey(item.userId, item.yearMonth), item);
   }
 
   const trendData: OverallAnalysisTrendItem[] = displayMonths.map((yearMonth) => {
-    const statsInMonth = monthlyStatsByMonth.get(yearMonth) ?? [];
-
-    if (statsInMonth.length === 0) {
+    if (!months.includes(yearMonth)) {
       return {
         month: formatYearMonth(yearMonth),
         averageScore: 0,
       };
     }
 
-    const averageScore = statsInMonth.reduce((sum, item) => sum + item.earnedScore, 0) / statsInMonth.length;
+    const eligibleUsers = currentUsers.filter(
+      (user) => getUserCoveredDaysInMonth(user, yearMonth, effectiveRange.startDate, effectiveRange.endDate) > 0,
+    );
+
+    if (eligibleUsers.length === 0) {
+      return {
+        month: formatYearMonth(yearMonth),
+        averageScore: 0,
+      };
+    }
+
+    const averageScore =
+      eligibleUsers.reduce(
+        (sum, user) => sum + (monthlyStatsByUserMonth.get(buildUserMonthKey(user.userId, yearMonth))?.earnedScore ?? 0),
+        0,
+      ) / eligibleUsers.length;
 
     return {
       month: formatYearMonth(yearMonth),
@@ -320,8 +361,19 @@ export async function getOverallAnalysisSummaryFromDynamo(
     };
   });
 
-  const averageScore =
-    monthlyStats.length > 0 ? round(monthlyStats.reduce((sum, item) => sum + item.earnedScore, 0) / monthlyStats.length, 1) : 0;
+  let totalScoreForAverage = 0;
+  let totalUserMonthCount = 0;
+  for (const yearMonth of months) {
+    const eligibleUsers = currentUsers.filter(
+      (user) => getUserCoveredDaysInMonth(user, yearMonth, effectiveRange.startDate, effectiveRange.endDate) > 0,
+    );
+    for (const user of eligibleUsers) {
+      totalScoreForAverage += monthlyStatsByUserMonth.get(buildUserMonthKey(user.userId, yearMonth))?.earnedScore ?? 0;
+      totalUserMonthCount += 1;
+    }
+  }
+
+  const averageScore = totalUserMonthCount > 0 ? round(totalScoreForAverage / totalUserMonthCount, 1) : 0;
   const totalEarnedPoints = monthlyStats.reduce((sum, item) => sum + item.earnedPoints, 0);
   const approvedReportsInRange = filteredMissionReportsAll.filter((item) =>
     isWithinDateRange(item.reportedAt, effectiveRange.startDate, effectiveRange.endDate),
@@ -340,8 +392,13 @@ export async function getOverallAnalysisSummaryFromDynamo(
         continue;
       }
 
-      const userCount = currentUsers.filter((user) => isUserJoinedByMonth(user, yearMonth)).length;
-      targetCount += (mission.monthlyCount * userCount * coveredDays) / getDaysInMonth(yearMonth);
+      const daysInMonth = getDaysInMonth(yearMonth);
+      const userMonthWeight = currentUsers.reduce(
+        (sum, user) =>
+          sum + getUserCoveredDaysInMonth(user, yearMonth, effectiveRange.startDate, effectiveRange.endDate) / daysInMonth,
+        0,
+      );
+      targetCount += mission.monthlyCount * userMonthWeight;
     }
 
     const actualCount = reportCountByMissionId.get(mission.missionId) ?? 0;
