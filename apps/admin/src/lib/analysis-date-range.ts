@@ -1,1 +1,5 @@
-export { getDefaultAnalysisDateRange, type AnalysisDateRange } from "@correcre/individual-analysis";
+export {
+  getDefaultAnalysisDateRange,
+  getDefaultAnalysisMonthDateRange,
+  type AnalysisDateRange,
+} from "@correcre/individual-analysis";

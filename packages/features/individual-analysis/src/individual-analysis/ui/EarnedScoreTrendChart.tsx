@@ -67,9 +67,8 @@ export default function EarnedScoreTrendChart({ data }: EarnedScoreTrendChartPro
     scales: {
       y: {
         beginAtZero: true,
-        max: 100,
         ticks: {
-          stepSize: 20,
+          precision: 0,
         },
       },
       x: {

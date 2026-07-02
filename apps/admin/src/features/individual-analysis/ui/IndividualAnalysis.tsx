@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { SkeletonBlock } from "@admin/components/LoadingSkeleton";
 import RecentReports from "@admin/features/recent-reports";
-import { getDefaultAnalysisDateRange } from "@admin/lib/analysis-date-range";
+import { getDefaultAnalysisMonthDateRange } from "@admin/lib/analysis-date-range";
 
 import { useIndividualAnalysisSummary } from "../hooks/useIndividualAnalysisSummary";
 import type { EmployeeOption, IndividualAnalysisSummary } from "../model/types";
@@ -33,7 +33,7 @@ const emptySummary: IndividualAnalysisSummary = {
 };
 
 export default function IndividualAnalysis({ companyId, employees }: IndividualAnalysisProps) {
-  const initialDateRange = useMemo(() => getDefaultAnalysisDateRange(), []);
+  const initialDateRange = useMemo(() => getDefaultAnalysisMonthDateRange(), []);
   const reportTablePagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],
