@@ -15,6 +15,7 @@ import type { OverallAnalysisDepartmentOption } from "../model/types";
 type OverallAnalysisFilterSectionProps = {
   selectedStartDate: string;
   selectedEndDate: string;
+  startYearMonth?: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
   departments: OverallAnalysisDepartmentOption[];
@@ -26,6 +27,7 @@ type OverallAnalysisFilterSectionProps = {
 export default function OverallAnalysisFilterSection({
   selectedStartDate,
   selectedEndDate,
+  startYearMonth,
   onStartDateChange,
   onEndDateChange,
   departments,
@@ -43,8 +45,9 @@ export default function OverallAnalysisFilterSection({
     () =>
       getAnalysisMonthSelectOptions({
         includeYearMonths: [selectedStartMonth, selectedEndMonth],
+        startYearMonth,
       }),
-    [selectedStartMonth, selectedEndMonth],
+    [selectedStartMonth, selectedEndMonth, startYearMonth],
   );
 
   const handleStartMonthChange = (event: SelectChangeEvent) => {

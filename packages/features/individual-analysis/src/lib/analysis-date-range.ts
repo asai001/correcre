@@ -26,6 +26,10 @@ function formatMonthLabel(yearMonth: string) {
   return `${year}年${Number(month)}月`;
 }
 
+function isValidYearMonth(yearMonth: string | undefined): yearMonth is string {
+  return Boolean(yearMonth && YEAR_MONTH_PATTERN.test(yearMonth));
+}
+
 export function getDefaultAnalysisDateRange(now: Date = new Date()): AnalysisDateRange {
   return {
     startDate: formatLocalDate(new Date(now.getFullYear(), now.getMonth() - 6, 1)),
@@ -33,9 +37,15 @@ export function getDefaultAnalysisDateRange(now: Date = new Date()): AnalysisDat
   };
 }
 
-export function getDefaultAnalysisMonthDateRange(now: Date = new Date()): AnalysisDateRange {
+export function getDefaultAnalysisMonthDateRange(now: Date = new Date(), startYearMonth?: string): AnalysisDateRange {
+  const defaultStartDate = formatLocalDate(new Date(now.getFullYear(), now.getMonth() - 6, 1));
+  const startDate =
+    isValidYearMonth(startYearMonth) && startYearMonth > toAnalysisYearMonth(defaultStartDate)
+      ? getAnalysisMonthStartDate(startYearMonth)
+      : defaultStartDate;
+
   return {
-    startDate: formatLocalDate(new Date(now.getFullYear(), now.getMonth() - 6, 1)),
+    startDate,
     endDate: formatLocalDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   };
 }
@@ -57,21 +67,30 @@ export function getAnalysisMonthEndDate(yearMonth: string) {
 export function getAnalysisMonthSelectOptions({
   now = new Date(),
   includeYearMonths = [],
+  startYearMonth,
   monthCount = DEFAULT_MONTH_OPTION_COUNT,
 }: {
   now?: Date;
   includeYearMonths?: string[];
+  startYearMonth?: string;
   monthCount?: number;
 } = {}): AnalysisMonthOption[] {
   const safeMonthCount = Number.isFinite(monthCount) && monthCount > 0 ? Math.floor(monthCount) : DEFAULT_MONTH_OPTION_COUNT;
+  const currentYearMonth = formatYearMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+  const earliestYearMonth = isValidYearMonth(startYearMonth) ? startYearMonth : undefined;
   const yearMonths = new Set<string>();
 
-  for (let index = 0; index < safeMonthCount; index += 1) {
-    yearMonths.add(formatYearMonth(new Date(now.getFullYear(), now.getMonth() - index, 1)));
+  for (let index = 0; earliestYearMonth ? true : index < safeMonthCount; index += 1) {
+    const yearMonth = formatYearMonth(new Date(now.getFullYear(), now.getMonth() - index, 1));
+    if (earliestYearMonth && yearMonth < earliestYearMonth) {
+      break;
+    }
+
+    yearMonths.add(yearMonth);
   }
 
   for (const yearMonth of includeYearMonths) {
-    if (YEAR_MONTH_PATTERN.test(yearMonth)) {
+    if (isValidYearMonth(yearMonth) && yearMonth <= currentYearMonth && (!earliestYearMonth || yearMonth >= earliestYearMonth)) {
       yearMonths.add(yearMonth);
     }
   }

@@ -23,6 +23,7 @@ import PastPerformanceStatsCards from "./PastPerformanceStatsCards";
 type PastPerformanceProps = {
   companyId: string;
   userId: string;
+  companyRegisteredYearMonth?: string;
   showPointExchangeLink: boolean;
 };
 
@@ -37,8 +38,16 @@ const emptySummary: IndividualAnalysisSummary = {
   improvementMissions: [],
 };
 
-export default function PastPerformance({ companyId, userId, showPointExchangeLink }: PastPerformanceProps) {
-  const initialDateRange = useMemo(() => getDefaultAnalysisMonthDateRange(), []);
+export default function PastPerformance({
+  companyId,
+  userId,
+  companyRegisteredYearMonth,
+  showPointExchangeLink,
+}: PastPerformanceProps) {
+  const initialDateRange = useMemo(
+    () => getDefaultAnalysisMonthDateRange(new Date(), companyRegisteredYearMonth),
+    [companyRegisteredYearMonth],
+  );
   const reportTablePagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],
@@ -91,6 +100,7 @@ export default function PastPerformance({ companyId, userId, showPointExchangeLi
           <PastPerformanceFilterSection
             selectedStartDate={selectedStartDate}
             selectedEndDate={selectedEndDate}
+            startYearMonth={companyRegisteredYearMonth}
             onStartDateChange={handleStartDateChange}
             onEndDateChange={handleEndDateChange}
           />

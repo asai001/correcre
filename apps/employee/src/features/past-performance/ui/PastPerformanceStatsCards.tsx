@@ -37,9 +37,9 @@ export default function PastPerformanceStatsCards({
   return (
     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard label="獲得ポイント" value={`${earnedPoints.toLocaleString()}pt`} color="#3b82f6" />
-      <StatCard label="達成点数" value={formatMetric(achievementScore)} color="#10b981" />
-      <StatCard label="達成率 (%)" value={formatMetric(achievementRate)} color="#8b5cf6" />
-      <StatCard label="平均点数" value={formatMetric(averageScore)} color="#1f2937" />
+      <StatCard label="達成点数" value={`${formatMetric(achievementScore)}点`} color="#10b981" />
+      <StatCard label="達成率 (%)" value={`${formatMetric(achievementRate)}%`} color="#8b5cf6" />
+      <StatCard label="平均点数" value={`${formatMetric(averageScore)}点`} color="#1f2937" />
     </div>
   );
 }

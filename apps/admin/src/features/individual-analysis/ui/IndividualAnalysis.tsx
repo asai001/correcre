@@ -18,6 +18,7 @@ import PointExchangeHistoryCard from "./PointExchangeHistoryCard";
 
 type IndividualAnalysisProps = {
   companyId: string;
+  companyRegisteredYearMonth?: string;
   employees: EmployeeOption[];
 };
 
@@ -32,8 +33,11 @@ const emptySummary: IndividualAnalysisSummary = {
   improvementMissions: [],
 };
 
-export default function IndividualAnalysis({ companyId, employees }: IndividualAnalysisProps) {
-  const initialDateRange = useMemo(() => getDefaultAnalysisMonthDateRange(), []);
+export default function IndividualAnalysis({ companyId, companyRegisteredYearMonth, employees }: IndividualAnalysisProps) {
+  const initialDateRange = useMemo(
+    () => getDefaultAnalysisMonthDateRange(new Date(), companyRegisteredYearMonth),
+    [companyRegisteredYearMonth],
+  );
   const reportTablePagination = useMemo(
     () => ({
       rowsPerPageOptions: [5, 10, 25, 50],
@@ -83,6 +87,7 @@ export default function IndividualAnalysis({ companyId, employees }: IndividualA
         selectedUserId={selectedUserId}
         selectedStartDate={selectedStartDate}
         selectedEndDate={selectedEndDate}
+        startYearMonth={companyRegisteredYearMonth}
         onUserChange={setSelectedUserId}
         onStartDateChange={handleStartDateChange}
         onEndDateChange={handleEndDateChange}

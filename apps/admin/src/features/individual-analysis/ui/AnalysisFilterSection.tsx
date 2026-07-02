@@ -15,6 +15,7 @@ type AnalysisFilterSectionProps = {
   selectedUserId: string;
   selectedStartDate: string;
   selectedEndDate: string;
+  startYearMonth?: string;
   onUserChange: (userId: string) => void;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
@@ -25,6 +26,7 @@ export default function AnalysisFilterSection({
   selectedUserId,
   selectedStartDate,
   selectedEndDate,
+  startYearMonth,
   onUserChange,
   onStartDateChange,
   onEndDateChange,
@@ -39,8 +41,9 @@ export default function AnalysisFilterSection({
     () =>
       getAnalysisMonthSelectOptions({
         includeYearMonths: [selectedStartMonth, selectedEndMonth],
+        startYearMonth,
       }),
-    [selectedStartMonth, selectedEndMonth],
+    [selectedStartMonth, selectedEndMonth, startYearMonth],
   );
 
   const handleStartMonthChange = (event: SelectChangeEvent) => {
