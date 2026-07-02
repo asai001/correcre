@@ -40,6 +40,7 @@ export default function MonthlyPointsHistoryView({ icon, iconColor = "#2563EB", 
         scales: {
           y: {
             beginAtZero: true,
+            max: 100,
             grid: {
               color: "rgba(0,0,0,0.05)",
             },
