@@ -14,11 +14,13 @@ export default async function PastPerformancePage() {
     currentUser.companyId,
   );
   const showPointExchangeLink = company?.showPointExchangeLink === true;
+  const companyRegisteredYearMonth = company?.createdAt.slice(0, 7);
 
   return (
     <PastPerformance
       companyId={currentUser.companyId}
       userId={currentUser.userId}
+      companyRegisteredYearMonth={companyRegisteredYearMonth}
       showPointExchangeLink={showPointExchangeLink}
     />
   );

@@ -12,6 +12,7 @@ import {
 type PastPerformanceFilterSectionProps = {
   selectedStartDate: string;
   selectedEndDate: string;
+  startYearMonth?: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
 };
@@ -19,6 +20,7 @@ type PastPerformanceFilterSectionProps = {
 export default function PastPerformanceFilterSection({
   selectedStartDate,
   selectedEndDate,
+  startYearMonth,
   onStartDateChange,
   onEndDateChange,
 }: PastPerformanceFilterSectionProps) {
@@ -28,8 +30,9 @@ export default function PastPerformanceFilterSection({
     () =>
       getAnalysisMonthSelectOptions({
         includeYearMonths: [selectedStartMonth, selectedEndMonth],
+        startYearMonth,
       }),
-    [selectedStartMonth, selectedEndMonth],
+    [selectedStartMonth, selectedEndMonth, startYearMonth],
   );
 
   const handleStartMonthChange = (event: SelectChangeEvent) => {

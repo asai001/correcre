@@ -3,6 +3,7 @@ import CustomTabs from "@admin/components/CustomTabs";
 import { IndividualAnalysis } from "@admin/features/individual-analysis";
 import { OverallAnalysis } from "@admin/features/overall-analysis";
 import { requireCurrentAdminUser } from "@admin/lib/auth/current-user";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -15,7 +16,14 @@ function isEmployeeUser(user: { roles: string[] }) {
 export default async function AnalysisReportPage() {
   const currentAdminUser = await requireCurrentAdminUser();
   const region = readRequiredServerEnv("AWS_REGION");
-  const [users, departments] = await Promise.all([
+  const [company, users, departments] = await Promise.all([
+    getCompanyById(
+      {
+        region,
+        tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+      },
+      currentAdminUser.companyId,
+    ),
     listUsersByCompany(
       {
         region,
@@ -51,6 +59,7 @@ export default async function AnalysisReportPage() {
   const hasUnassignedUsers = users.some(
     (user) => user.status === "ACTIVE" && isEmployeeUser(user) && (!user.departmentId || !departmentIds.has(user.departmentId)),
   );
+  const companyRegisteredYearMonth = company?.createdAt.slice(0, 7);
 
   return (
     <div className="space-y-1 pb-5">
@@ -62,6 +71,7 @@ export default async function AnalysisReportPage() {
             content: (
               <OverallAnalysis
                 companyId={currentAdminUser.companyId}
+                companyRegisteredYearMonth={companyRegisteredYearMonth}
                 departments={departmentOptions}
                 hasUnassignedUsers={hasUnassignedUsers}
               />
@@ -69,7 +79,13 @@ export default async function AnalysisReportPage() {
           },
           {
             label: "個人分析",
-            content: <IndividualAnalysis companyId={currentAdminUser.companyId} employees={employeeOptions} />,
+            content: (
+              <IndividualAnalysis
+                companyId={currentAdminUser.companyId}
+                companyRegisteredYearMonth={companyRegisteredYearMonth}
+                employees={employeeOptions}
+              />
+            ),
           },
         ]}
       />
