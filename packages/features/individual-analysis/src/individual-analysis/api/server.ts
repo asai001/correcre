@@ -1,9 +1,10 @@
 import { listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompanyAndUser } from "@correcre/lib/dynamodb/mission-report";
+import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { listUserMonthlyStatsByCompanyAndUser } from "@correcre/lib/dynamodb/user-monthly-stats";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
-import type { MissionReport, UserMonthlyStats } from "@correcre/types";
+import type { DBUserItem, MissionReport, UserMonthlyStats } from "@correcre/types";
 
 import type {
   AnalysisMissionItem,
@@ -16,8 +17,11 @@ type RuntimeConfig = {
   region: string;
   missionTableName: string;
   missionReportTableName: string;
+  userTableName: string;
   userMonthlyStatsTableName: string;
 };
+
+type AnalysisUser = Pick<DBUserItem, "status" | "roles" | "joinedAt" | "createdAt">;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,6 +30,7 @@ function getRuntimeConfig(): RuntimeConfig {
     region: readRequiredServerEnv("AWS_REGION"),
     missionTableName: readRequiredServerEnv("DDB_MISSION_TABLE_NAME"),
     missionReportTableName: readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME"),
+    userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     userMonthlyStatsTableName: readRequiredServerEnv("DDB_USER_MONTHLY_STATS_TABLE_NAME"),
   };
 }
@@ -103,6 +108,28 @@ function toRate(numerator: number, denominator: number) {
   return Math.min(100, round((numerator / denominator) * 100, 1));
 }
 
+function isAnalysisTargetUser(user: AnalysisUser) {
+  return user.status === "ACTIVE" && user.roles.includes("EMPLOYEE");
+}
+
+function getUserStartDate(user: Pick<AnalysisUser, "joinedAt" | "createdAt">) {
+  const startDate = user.joinedAt?.trim() || user.createdAt?.slice(0, 10) || "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : "";
+}
+
+function buildEmptySummary(): IndividualAnalysisSummary {
+  return {
+    earnedPoints: 0,
+    achievementScore: 0,
+    achievementRate: 0,
+    averageScore: 0,
+    radarData: [],
+    trendData: [],
+    goodMissions: [],
+    improvementMissions: [],
+  };
+}
+
 export async function getIndividualAnalysisSummaryFromDynamo(
   companyId: string,
   userId: string,
@@ -110,9 +137,16 @@ export async function getIndividualAnalysisSummaryFromDynamo(
   endDate: string,
 ): Promise<IndividualAnalysisSummary> {
   const config = getRuntimeConfig();
-  const months = listYearMonthsBetween(startDate, endDate);
 
-  const [missions, allReports, allMonthlyStats] = await Promise.all([
+  const [user, missions, allReports, allMonthlyStats] = await Promise.all([
+    getUserByCompanyAndUserId(
+      {
+        region: config.region,
+        tableName: config.userTableName,
+      },
+      companyId,
+      userId,
+    ),
     listEnabledLatestMissionsByCompany(
       {
         region: config.region,
@@ -138,13 +172,29 @@ export async function getIndividualAnalysisSummaryFromDynamo(
     ),
   ]);
 
+  if (!user || !isAnalysisTargetUser(user)) {
+    return buildEmptySummary();
+  }
+
+  const userStartDate = getUserStartDate(user);
+  const effectiveStartDate = userStartDate && userStartDate > startDate ? userStartDate : startDate;
+
+  if (effectiveStartDate > endDate) {
+    return buildEmptySummary();
+  }
+
+  const months = listYearMonthsBetween(effectiveStartDate, endDate);
+
   const monthlyStats = allMonthlyStats.filter((item) => months.includes(item.yearMonth));
   const monthlyStatByYearMonth = new Map<string, UserMonthlyStats>(
     monthlyStats.map((item) => [item.yearMonth, item]),
   );
-  const allApprovedReports = allReports.filter((report) => report.status === "APPROVED");
+  const allApprovedReports = allReports.filter((report) => {
+    const reportedDate = report.reportedAt.slice(0, 10);
+    return report.status === "APPROVED" && (!userStartDate || reportedDate >= userStartDate);
+  });
   const approvedReportsInRange = allApprovedReports.filter((report) =>
-    isWithinDateRange(report.reportedAt, startDate, endDate),
+    isWithinDateRange(report.reportedAt, effectiveStartDate, endDate),
   );
 
   const monthlyApprovedReports = new Map<string, MissionReport[]>();
@@ -167,7 +217,7 @@ export async function getIndividualAnalysisSummaryFromDynamo(
     const monthlyStat = monthlyStatByYearMonth.get(yearMonth);
     const reportsInMonth = monthlyApprovedReports.get(yearMonth) ?? [];
     const totalMonthScore = reportsInMonth.reduce((sum, report) => sum + (report.scoreGranted ?? 0), 0);
-    const selectedMonthReports = reportsInMonth.filter((report) => isWithinDateRange(report.reportedAt, startDate, endDate));
+    const selectedMonthReports = reportsInMonth.filter((report) => isWithinDateRange(report.reportedAt, effectiveStartDate, endDate));
     const selectedMonthScore = selectedMonthReports.reduce((sum, report) => sum + (report.scoreGranted ?? 0), 0);
 
     const earnedPointsInRange =
@@ -175,7 +225,7 @@ export async function getIndividualAnalysisSummaryFromDynamo(
 
     let targetMonthScore = 0;
     for (const mission of missions) {
-      const coveredDays = getCoveredDaysInMonth(yearMonth, startDate, endDate);
+      const coveredDays = getCoveredDaysInMonth(yearMonth, effectiveStartDate, endDate);
       if (coveredDays === 0) {
         continue;
       }
@@ -201,7 +251,7 @@ export async function getIndividualAnalysisSummaryFromDynamo(
     let targetCount = 0;
 
     for (const yearMonth of months) {
-      const coveredDays = getCoveredDaysInMonth(yearMonth, startDate, endDate);
+      const coveredDays = getCoveredDaysInMonth(yearMonth, effectiveStartDate, endDate);
       if (coveredDays === 0) {
         continue;
       }

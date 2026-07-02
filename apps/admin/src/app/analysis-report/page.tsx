@@ -8,6 +8,10 @@ import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 
+function isEmployeeUser(user: { roles: string[] }) {
+  return user.roles.includes("EMPLOYEE");
+}
+
 export default async function AnalysisReportPage() {
   const currentAdminUser = await requireCurrentAdminUser();
   const region = readRequiredServerEnv("AWS_REGION");
@@ -28,7 +32,7 @@ export default async function AnalysisReportPage() {
     ),
   ]);
   const employeeOptions = users
-    .filter((user) => user.status !== "DELETED")
+    .filter((user) => user.status !== "DELETED" && isEmployeeUser(user))
     .map((user) => ({
       userId: user.userId,
       name: joinNameParts(user.lastName, user.firstName),
@@ -45,7 +49,7 @@ export default async function AnalysisReportPage() {
     }));
   const departmentIds = new Set(departments.map((department) => department.departmentId));
   const hasUnassignedUsers = users.some(
-    (user) => user.status !== "DELETED" && (!user.departmentId || !departmentIds.has(user.departmentId)),
+    (user) => user.status === "ACTIVE" && isEmployeeUser(user) && (!user.departmentId || !departmentIds.has(user.departmentId)),
   );
 
   return (
