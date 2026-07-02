@@ -128,6 +128,10 @@ function buildUserMonthKey(userId: string, yearMonth: string) {
   return `${userId}:${yearMonth}`;
 }
 
+function buildUserMissionKey(userId: string, missionId: string) {
+  return `${userId}:${missionId}`;
+}
+
 function getMonthlyStatsDateRange(items: UserMonthlyStats[]): DateRange | null {
   if (items.length === 0) {
     return null;
@@ -376,30 +380,38 @@ export async function getOverallAnalysisSummaryFromDynamo(
   const averageScore = totalUserMonthCount > 0 ? round(totalScoreForAverage / totalUserMonthCount, 1) : 0;
   const totalEarnedPoints = monthlyStats.reduce((sum, item) => sum + item.earnedPoints, 0);
   const approvedReportsInRange = filteredMissionReportsAll.filter((item) => isWithinDateRange(item.reportedAt, startDate, endDate));
-  const reportCountByMissionId = new Map<string, number>();
+  const reportCountByUserMission = new Map<string, number>();
   for (const report of approvedReportsInRange) {
-    reportCountByMissionId.set(report.missionId, (reportCountByMissionId.get(report.missionId) ?? 0) + 1);
+    const key = buildUserMissionKey(report.userId, report.missionId);
+    reportCountByUserMission.set(key, (reportCountByUserMission.get(key) ?? 0) + 1);
   }
 
   const achievementData: OverallAnalysisAchievementItem[] = missions.map((mission) => {
-    let targetCount = 0;
+    let totalAchievementRate = 0;
+    let targetUserCount = 0;
 
-    for (const yearMonth of displayMonths) {
-      const coveredDays = getCoveredDaysInMonth(yearMonth, startDate, endDate);
-      if (coveredDays === 0) {
+    for (const user of currentUsers) {
+      let targetCount = 0;
+
+      for (const yearMonth of displayMonths) {
+        const coveredDays = getUserCoveredDaysInMonth(user, yearMonth, startDate, endDate);
+        if (coveredDays === 0) {
+          continue;
+        }
+
+        targetCount += (mission.monthlyCount * coveredDays) / getDaysInMonth(yearMonth);
+      }
+
+      if (targetCount <= 0) {
         continue;
       }
 
-      const daysInMonth = getDaysInMonth(yearMonth);
-      const userMonthWeight = currentUsers.reduce(
-        (sum, user) => sum + getUserCoveredDaysInMonth(user, yearMonth, startDate, endDate) / daysInMonth,
-        0,
-      );
-      targetCount += mission.monthlyCount * userMonthWeight;
+      const actualCount = reportCountByUserMission.get(buildUserMissionKey(user.userId, mission.missionId)) ?? 0;
+      totalAchievementRate += Math.min(100, (actualCount / targetCount) * 100);
+      targetUserCount += 1;
     }
 
-    const actualCount = reportCountByMissionId.get(mission.missionId) ?? 0;
-    const percentage = targetCount > 0 ? Math.min(100, round((actualCount / targetCount) * 100, 1)) : 0;
+    const percentage = targetUserCount === 0 ? 0 : Math.round(totalAchievementRate / targetUserCount);
 
     return {
       label: mission.title,
