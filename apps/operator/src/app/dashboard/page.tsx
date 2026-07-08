@@ -5,6 +5,7 @@ import {
   faBuilding,
   faBullseye,
   faChartLine,
+  faHeadset,
   faRightLeft,
   faStore,
   faUsers,
@@ -64,6 +65,13 @@ const dashboardCards = [
     description: "導入企業からの収入と商品交換による支出を、提携企業ごと・月ごとに集計して確認します。",
     icon: faChartLine,
     accentClassName: "from-slate-600 to-slate-800",
+  },
+  {
+    href: "/support-inquiries",
+    title: "問い合わせ一覧",
+    description: "企業側・提携企業側から送信された問い合わせを確認し、対応状況を更新します。",
+    icon: faHeadset,
+    accentClassName: "from-teal-500 to-cyan-600",
   },
 ] as const;
 

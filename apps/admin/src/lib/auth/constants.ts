@@ -11,4 +11,5 @@ export const ADMIN_PROTECTED_PATH_PREFIXES = [
   "/analysis-report",
   "/employee-management",
   "/info",
+  "/support",
 ] as const;

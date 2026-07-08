@@ -25,6 +25,7 @@ export interface ApplicationDynamoTables {
   operatorAuditLogTable: dynamodb.Table;
   sessionTable: dynamodb.Table;
   systemSettingTable: dynamodb.Table;
+  supportInquiryTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -378,6 +379,34 @@ function createSystemSettingTable(scope: Construct, stage: InfraStage): dynamodb
   );
 }
 
+// SupportInquiry
+// - pk = INQUIRY#<inquiryId>
+// - gsi1pk = SUPPORT_INQUIRY
+// - gsi1sk = CREATED_AT#<ISO8601>#INQUIRY#<inquiryId>
+// - gsi2pk = STATUS#<status>
+// - gsi2sk = CREATED_AT#<ISO8601>#INQUIRY#<inquiryId>
+function createSupportInquiryTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  const table = new dynamodb.Table(
+    scope,
+    "SupportInquiryTable",
+    buildTableProps(stage, buildTableName("support-inquiry", stage), "pk"),
+  );
+
+  table.addGlobalSecondaryIndex({
+    indexName: "SupportInquiryByCreatedAt",
+    partitionKey: stringAttribute("gsi1pk"),
+    sortKey: stringAttribute("gsi1sk"),
+  });
+
+  table.addGlobalSecondaryIndex({
+    indexName: "SupportInquiryByStatusCreatedAt",
+    partitionKey: stringAttribute("gsi2pk"),
+    sortKey: stringAttribute("gsi2sk"),
+  });
+
+  return table;
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -399,5 +428,6 @@ export function createApplicationDynamoTables(
     operatorAuditLogTable: createOperatorAuditLogTable(scope, props.stage),
     sessionTable: createSessionTable(scope, props.stage),
     systemSettingTable: createSystemSettingTable(scope, props.stage),
+    supportInquiryTable: createSupportInquiryTable(scope, props.stage),
   };
 }

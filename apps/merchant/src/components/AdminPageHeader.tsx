@@ -10,6 +10,7 @@ import {
   faBuilding,
   faFileInvoice,
   faGauge,
+  faHeadset,
   faRightLeft,
   faUserShield,
 } from "@fortawesome/free-solid-svg-icons";
@@ -30,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
   { label: "収支・精算", href: "/settlement" as Route, icon: faFileInvoice },
   { label: "会社情報", href: "/company-info" as Route, icon: faBuilding },
+  { label: "問い合わせ", href: "/support" as Route, icon: faHeadset },
 ];
 
 function isActiveNav(pathname: string | null, href: string): boolean {
