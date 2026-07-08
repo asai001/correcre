@@ -8,6 +8,7 @@ import {
   faChartBar,
   faCog,
   faGauge,
+  faHeadset,
   faUsers,
   faUserShield,
 } from "@fortawesome/free-solid-svg-icons";
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "ユーザー管理", href: "/employee-management" as Route, icon: faUsers },
   { label: "分析・レポート", href: "/analysis-report" as Route, icon: faChartBar },
   { label: "各種情報", href: "/info" as Route, icon: faCog },
+  { label: "問い合わせ", href: "/support" as Route, icon: faHeadset },
 ];
 
 function isActiveNav(pathname: string | null, href: string): boolean {

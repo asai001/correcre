@@ -1,11 +1,11 @@
 "use client";
 
 import MenuTile from "@admin/components/dashboard/MenuTile";
-import { faChartBar, faCog, faUsers } from "@fortawesome/free-solid-svg-icons";
+import { faChartBar, faCog, faHeadset, faUsers } from "@fortawesome/free-solid-svg-icons";
 
 export default function DashboardMenuTile() {
   return (
-    <div className="-mx-6 flex gap-4 overflow-x-auto overflow-y-visible px-6 py-4 md:grid md:grid-cols-3">
+    <div className="-mx-6 flex gap-4 overflow-x-auto overflow-y-visible px-6 py-4 md:grid md:grid-cols-4">
       <MenuTile
         link="/employee-management"
         className="md:min-w-0"
@@ -29,6 +29,14 @@ export default function DashboardMenuTile() {
         iconColor="#6B7280"
         menuName="各種情報画面"
         desc="理念体系、会社情報、ポイント設定、部署、ミッション定義、アカウント情報をまとめて確認・更新できます。"
+      />
+      <MenuTile
+        link="/support"
+        className="md:min-w-0"
+        icon={faHeadset}
+        iconColor="#0F766E"
+        menuName="問い合わせ"
+        desc="運用者へ確認したい内容を送信します。会社、ユーザー、現在のURLは自動で添付されます。"
       />
     </div>
   );

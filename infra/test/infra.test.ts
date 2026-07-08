@@ -87,7 +87,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 16);
+    template.resourceCountIs("AWS::DynamoDB::Table", 17);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -205,6 +205,27 @@ describe("InfraStack", () => {
         GlobalSecondaryIndexes: Match.arrayWith([
           Match.objectLike({
             IndexName: "PointTransactionByCompanyOccurredAt",
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-support-inquiry-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+        ]),
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({
+            IndexName: "SupportInquiryByCreatedAt",
+          }),
+          Match.objectLike({
+            IndexName: "SupportInquiryByStatusCreatedAt",
           }),
         ]),
       }),

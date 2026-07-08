@@ -10,6 +10,7 @@ import {
   faBullseye,
   faGauge,
   faGear,
+  faHeadset,
   faRightLeft,
   faStore,
   faUsers,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "ミッション管理", href: "/missions" as Route, icon: faBullseye },
   { label: "提携企業管理", href: "/merchants" as Route, icon: faStore },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
+  { label: "問い合わせ", href: "/support-inquiries" as Route, icon: faHeadset },
   { label: "設定", href: "/settings" as Route, icon: faGear },
 ];
 

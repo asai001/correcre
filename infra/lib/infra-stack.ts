@@ -288,5 +288,9 @@ export class InfraStack extends cdk.Stack {
     new cdk.CfnOutput(this, "SystemSettingTableName", {
       value: dynamoTables.systemSettingTable.tableName,
     });
+
+    new cdk.CfnOutput(this, "SupportInquiryTableName", {
+      value: dynamoTables.supportInquiryTable.tableName,
+    });
   }
 }

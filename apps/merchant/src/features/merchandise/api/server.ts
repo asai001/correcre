@@ -17,6 +17,10 @@ import {
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
+  sendOperatorMerchandiseCreatedEmail,
+  sendOperatorMerchandisePublishedEmail,
+} from "@correcre/lib/notification/merchant-events";
+import {
   buildMerchandiseDraftImageKey,
   buildMerchandiseFinalImageKey,
   createMerchandiseImageUploadUrl,
@@ -31,6 +35,7 @@ import {
   type MerchandiseImageTarget,
 } from "@correcre/lib/s3/merchandise-image";
 import type {
+  Merchant,
   Merchandise,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
@@ -101,6 +106,53 @@ export async function getMerchantCompanyName(merchantId: string): Promise<string
   );
 
   return (merchant?.displayName?.trim() || merchant?.name) ?? null;
+}
+
+async function getMerchantNotificationInfo(
+  config: RuntimeConfig,
+  merchantId: string,
+): Promise<Pick<Merchant, "merchantId" | "name" | "displayName">> {
+  const merchant = await getMerchantById(
+    {
+      region: config.region,
+      tableName: config.merchantTableName,
+    },
+    merchantId,
+  );
+
+  return merchant ?? { merchantId, name: merchantId };
+}
+
+async function notifyOperatorMerchandiseCreated(params: {
+  config: RuntimeConfig;
+  merchantId: string;
+  merchandise: Merchandise;
+  occurredAt: string;
+}) {
+  const merchant = await getMerchantNotificationInfo(params.config, params.merchantId);
+
+  await sendOperatorMerchandiseCreatedEmail({
+    region: params.config.region,
+    merchant,
+    merchandise: params.merchandise,
+    occurredAt: params.occurredAt,
+  });
+}
+
+async function notifyOperatorMerchandisePublished(params: {
+  config: RuntimeConfig;
+  merchantId: string;
+  merchandise: Merchandise;
+  occurredAt: string;
+}) {
+  const merchant = await getMerchantNotificationInfo(params.config, params.merchantId);
+
+  await sendOperatorMerchandisePublishedEmail({
+    region: params.config.region,
+    merchant,
+    merchandise: params.merchandise,
+    occurredAt: params.occurredAt,
+  });
 }
 
 function getNextMerchandiseId(items: Merchandise[]) {
@@ -349,6 +401,19 @@ export async function createMerchandiseForMerchant(
     item,
   );
 
+  await notifyOperatorMerchandiseCreated({
+    config,
+    merchantId,
+    merchandise: item,
+    occurredAt: now,
+  }).catch((notifyError) => {
+    console.error("Failed to send merchandise-created notification.", {
+      error: notifyError,
+      merchantId,
+      merchandiseId,
+    });
+  });
+
   return buildMerchandiseSummary(config, item);
 }
 
@@ -442,6 +507,8 @@ export async function setMerchandiseStatusForMerchant(
     throw new Error("Merchandise not found");
   }
 
+  const shouldNotifyPublished = status === "PUBLISHED" && existing.status !== "PUBLISHED";
+
   await updateMerchandiseStatus(
     {
       region: config.region,
@@ -463,6 +530,21 @@ export async function setMerchandiseStatusForMerchant(
 
   if (!refreshed) {
     throw new Error("Merchandise not found after update");
+  }
+
+  if (shouldNotifyPublished) {
+    await notifyOperatorMerchandisePublished({
+      config,
+      merchantId,
+      merchandise: refreshed,
+      occurredAt: refreshed.publishedAt ?? refreshed.updatedAt,
+    }).catch((notifyError) => {
+      console.error("Failed to send merchandise-published notification.", {
+        error: notifyError,
+        merchantId,
+        merchandiseId,
+      });
+    });
   }
 
   return buildMerchandiseSummary(config, refreshed);

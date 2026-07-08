@@ -11,4 +11,5 @@ export const MERCHANT_PROTECTED_PATH_PREFIXES = [
   "/merchandise",
   "/exchanges",
   "/settlement",
+  "/support",
 ] as const;

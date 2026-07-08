@@ -8,6 +8,10 @@ import {
   putMerchantUser,
 } from "@correcre/lib/dynamodb/merchant-user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import {
+  sendMerchantRegistrationAcceptedEmail,
+  sendOperatorMerchantRegistrationSubmittedEmail,
+} from "@correcre/lib/notification/merchant-events";
 import type { Merchant, MerchantUserItem } from "@correcre/types";
 
 import type {
@@ -50,6 +54,38 @@ function getNextMerchantId(merchants: Merchant[]) {
 function normalizeOptionalText(value?: string) {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+async function notifyMerchantRegistrationSubmitted(params: {
+  config: RuntimeConfig;
+  merchant: Merchant;
+  merchantUser: MerchantUserItem;
+  submittedAt: string;
+}) {
+  const results = await Promise.allSettled([
+    sendMerchantRegistrationAcceptedEmail({
+      region: params.config.region,
+      merchant: params.merchant,
+      merchantUser: params.merchantUser,
+      submittedAt: params.submittedAt,
+    }),
+    sendOperatorMerchantRegistrationSubmittedEmail({
+      region: params.config.region,
+      merchant: params.merchant,
+      merchantUser: params.merchantUser,
+      submittedAt: params.submittedAt,
+    }),
+  ]);
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error("Failed to send merchant registration notification.", {
+        target: index === 0 ? "registrant" : "operator",
+        merchantId: params.merchant.merchantId,
+        error: result.reason,
+      });
+    }
+  });
 }
 
 export async function submitMerchantRegistration(
@@ -164,6 +200,13 @@ export async function submitMerchantRegistration(
     },
     merchantUser,
   );
+
+  await notifyMerchantRegistrationSubmitted({
+    config,
+    merchant,
+    merchantUser,
+    submittedAt: now,
+  });
 
   return { merchantId };
 }
