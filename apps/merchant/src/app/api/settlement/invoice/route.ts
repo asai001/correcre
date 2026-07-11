@@ -116,10 +116,22 @@ async function markInvoiceEmailSent(params: {
   sentAt: string;
 }) {
   const client = getDynamoDocumentClient(params.region);
-  const invoiceEmailSentMonths = {
-    ...(params.merchant.invoiceEmailSentMonths ?? {}),
-    [params.month]: params.sentAt,
-  };
+
+  // マップ全体を読み込み値から再構築して SET すると、別月の同時送信でお互いのマーカーを消してしまい
+  // 請求メールが重複送信され得る。属性(キー)単位で更新し、他の月のエントリに触れないようにする。
+  // ネストしたキーを設定するには親マップが存在している必要があるため、まず if_not_exists で初期化する。
+  await client.send(
+    new UpdateCommand({
+      TableName: params.tableName,
+      Key: {
+        merchantId: params.merchant.merchantId,
+      },
+      UpdateExpression: "SET invoiceEmailSentMonths = if_not_exists(invoiceEmailSentMonths, :emptyMap)",
+      ExpressionAttributeValues: {
+        ":emptyMap": {},
+      },
+    }),
+  );
 
   await client.send(
     new UpdateCommand({
@@ -128,12 +140,12 @@ async function markInvoiceEmailSent(params: {
         merchantId: params.merchant.merchantId,
       },
       ConditionExpression: "attribute_not_exists(invoiceEmailSentMonths.#month)",
-      UpdateExpression: "SET invoiceEmailSentMonths = :invoiceEmailSentMonths, updatedAt = :updatedAt",
+      UpdateExpression: "SET invoiceEmailSentMonths.#month = :sentAt, updatedAt = :updatedAt",
       ExpressionAttributeNames: {
         "#month": params.month,
       },
       ExpressionAttributeValues: {
-        ":invoiceEmailSentMonths": invoiceEmailSentMonths,
+        ":sentAt": params.sentAt,
         ":updatedAt": params.sentAt,
       },
     }),

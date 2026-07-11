@@ -38,8 +38,11 @@ export type CreateCompanyInput = {
   philosophyItems: CompanyPhilosophyItem[];
 };
 
-export type UpdateCompanyInput = CreateCompanyInput & {
+// 更新は部分更新を許容する。未指定のフィールドは既存値を維持する
+// （各画面が自分の管理外フィールドを古いスナップショットで巻き戻さないため）。
+export type UpdateCompanyInput = Partial<Omit<CreateCompanyInput, "showPointExchangeLink">> & {
   companyId: string;
+  showPointExchangeLink?: boolean;
   pointAdjustment?: number;
 };
 

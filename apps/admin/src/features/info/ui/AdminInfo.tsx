@@ -21,7 +21,6 @@ import {
   createCompanyFormStateFromCompany,
   createEmptyCompanyPhilosophyItem,
   getCompanyFormState,
-  toUpdateCompanyInput,
   type CompanyFormState,
 } from "@correcre/lib/company-management-form";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
@@ -61,11 +60,6 @@ function formatDateTime(value?: string) {
   }
 
   return toYYYYMMDDHHmm(date).replace("T", " ");
-}
-
-function normalizeOptionalText(value?: string) {
-  const normalizedValue = value?.trim() ?? "";
-  return normalizedValue ? normalizedValue : undefined;
 }
 
 function createCompanyDetailsFormState(data: AdminInfoData["company"]): CompanyDetailsFormState {
@@ -132,35 +126,24 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
     setError(null);
     setNotice(null);
 
-    const baseCompanyForm = createCompanyFormStateFromCompany(initialData.editableCompany);
-    const companyInfoForm: CompanyFormState = {
-      ...baseCompanyForm,
-      name: companyForm.name,
-      status: companyForm.status,
-      plan: companyForm.plan,
-    };
-
     try {
       setSubmitting(true);
+      // この画面が管理するフィールドのみを送信する。月額単価・ポイント単位・保有ポイント・理念体系・
+      // billing/logo/primaryColor/換算レートなどは送らず、サーバー側で既存値が維持される。
+      // （送ってしまうとページ読み込み時点の古い値で他画面の変更を巻き戻してしまうため。）
       await updateAdminCompanyInfo({
-        ...toUpdateCompanyInput(
-          initialData.editableCompany.companyId,
-          companyInfoForm,
-          Number.parseInt(baseCompanyForm.perEmployeeMonthlyFee, 10),
-          Number.parseInt(baseCompanyForm.companyPointBalance, 10),
-        ),
-        shortName: normalizeOptionalText(companyDetails.shortName),
-        contactName: normalizeOptionalText(companyDetails.contactName),
-        contactEmail: normalizeOptionalText(companyDetails.contactEmail),
-        contactPhone: normalizeOptionalText(companyDetails.contactPhone),
-        billingEmail: initialData.company.billingEmail,
-        logoImageUrl: initialData.company.logoImageUrl,
-        primaryColor: initialData.company.primaryColor,
-        pointConversionRate: initialData.company.pointConversionRate ?? null,
-        address: normalizeOptionalText(companyDetails.address),
-        representativeName: normalizeOptionalText(companyDetails.representativeName),
-        representativePhone: normalizeOptionalText(companyDetails.representativePhone),
-        representativeEmail: normalizeOptionalText(companyDetails.representativeEmail),
+        companyId: initialData.editableCompany.companyId,
+        name: companyForm.name,
+        status: companyForm.status,
+        plan: companyForm.plan,
+        shortName: companyDetails.shortName,
+        contactName: companyDetails.contactName,
+        contactEmail: companyDetails.contactEmail,
+        contactPhone: companyDetails.contactPhone,
+        address: companyDetails.address,
+        representativeName: companyDetails.representativeName,
+        representativePhone: companyDetails.representativePhone,
+        representativeEmail: companyDetails.representativeEmail,
       });
 
       setNotice("各種情報を更新しました");
@@ -184,33 +167,13 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
       return;
     }
 
-    const baseCompanyForm = createCompanyFormStateFromCompany(initialData.editableCompany);
-    const philosophyForm: CompanyFormState = {
-      ...baseCompanyForm,
-      philosophyItems: companyForm.philosophyItems,
-    };
-
     try {
       setSubmitting(true);
+      // \u7406\u5ff5\u4f53\u7cfb\u306e\u307f\u3092\u9001\u4fe1\u3059\u308b\u3002\u4f1a\u793e\u540d\u30fb\u30b9\u30c6\u30fc\u30bf\u30b9\u30fb\u30d7\u30e9\u30f3\u30fb\u5951\u7d04\u6761\u4ef6\u30fb\u8a73\u7d30\u60c5\u5831\u306a\u3069\u306f\u9001\u3089\u305a\u3001
+      // \u30b5\u30fc\u30d0\u30fc\u5074\u3067\u65e2\u5b58\u5024\u304c\u7dad\u6301\u3055\u308c\u308b\uff08\u4ed6\u753b\u9762\u3067\u306e\u5909\u66f4\u3092\u5dfb\u304d\u623b\u3055\u306a\u3044\u305f\u3081\uff09\u3002
       await updateAdminCompanyInfo({
-        ...toUpdateCompanyInput(
-          initialData.editableCompany.companyId,
-          philosophyForm,
-          Number.parseInt(baseCompanyForm.perEmployeeMonthlyFee, 10),
-          Number.parseInt(baseCompanyForm.companyPointBalance, 10),
-        ),
-        shortName: normalizeOptionalText(initialData.company.shortName),
-        contactName: initialData.company.contactName,
-        contactEmail: initialData.company.contactEmail,
-        contactPhone: initialData.company.contactPhone,
-        billingEmail: initialData.company.billingEmail,
-        logoImageUrl: initialData.company.logoImageUrl,
-        primaryColor: initialData.company.primaryColor,
-        pointConversionRate: initialData.company.pointConversionRate ?? null,
-        address: initialData.company.address,
-        representativeName: initialData.company.representativeName,
-        representativePhone: initialData.company.representativePhone,
-        representativeEmail: initialData.company.representativeEmail,
+        companyId: initialData.editableCompany.companyId,
+        philosophyItems: companyForm.philosophyItems,
       });
 
       setNotice("\u7406\u5ff5\u4f53\u7cfb\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f");

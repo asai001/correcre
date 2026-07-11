@@ -202,6 +202,12 @@ function getNextUserId(users: DBUserItem[]) {
   return `u-${String(nextNumber).padStart(3, "0")}`;
 }
 
+function isConditionalCheckFailure(error: unknown): boolean {
+  return (
+    Boolean(error) && typeof error === "object" && (error as { name?: string }).name === "ConditionalCheckFailedException"
+  );
+}
+
 function getNextDepartmentId(departments: Department[]) {
   const nextNumber =
     departments.reduce((max, department) => {
@@ -878,6 +884,21 @@ export async function updateEmployeeInDynamo(
 
   const normalizedInput = normalizeEmployeeInput(input, departments);
 
+  // 運用者アカウントは管理者（企業側）から編集させない。
+  // 作成時と同様のガードを更新時にも適用し、運用者のメール変更（共有 Cognito プールの
+  // アカウント書き換え）・ロール剥奪・ポイント操作による乗っ取り/ロックアウトを防ぐ。
+  if (targetUser.roles?.includes("OPERATOR")) {
+    throw new Error("運用者権限のユーザーは編集できません");
+  }
+  if (normalizedInput.roles.includes("OPERATOR")) {
+    throw new Error("運用者権限を付与することはできません");
+  }
+
+  // UI で割り当て不可能なロール（MANAGER など）は、編集ダイアログが送信対象から除外するため、
+  // そのまま SET すると黙って剥がれてしまう。既存ユーザーが持つこれらのロールは維持する。
+  const preservedRoles = (targetUser.roles ?? []).filter((role) => role === "MANAGER");
+  const finalRoles = Array.from(new Set([...normalizedInput.roles, ...preservedRoles]));
+
   if (!Number.isInteger(input.pointAdjustment)) {
     throw new Error("ポイント調整は整数で入力してください");
   }
@@ -946,7 +967,7 @@ export async function updateEmployeeInDynamo(
     ":email": normalizedInput.email,
     ":departmentId": normalizedInput.department.departmentId,
     ":departmentName": normalizedInput.department.name,
-    ":roles": normalizedInput.roles,
+    ":roles": finalRoles,
     ":joinedAt": normalizedInput.joinedAt,
     ":nextUserPointBalance": nextUserPointBalance,
     ":updatedAt": now,
@@ -1057,7 +1078,7 @@ export async function updateEmployeeInDynamo(
     address: normalizedInput.address,
     departmentId: normalizedInput.department.departmentId,
     departmentName: normalizedInput.department.name,
-    roles: normalizedInput.roles,
+    roles: finalRoles,
     joinedAt: normalizedInput.joinedAt,
     currentPointBalance: nextUserPointBalance,
     updatedAt: now,
@@ -1133,24 +1154,56 @@ export async function createDepartmentInDynamo(companyId: string, input: CreateD
   }
 
   const now = new Date().toISOString();
-  const departmentId = getNextDepartmentId(departments);
-  await putDepartment(
-    {
-      region: config.region,
-      tableName: config.departmentTableName,
-    },
-    {
-      companyId,
-      sk: buildDepartmentSk(departmentId),
-      departmentId,
-      name,
-      status: "ACTIVE",
-      sortOrder: departments.length,
-      createdAt: now,
-      updatedAt: now,
-    },
-  );
-  await touchCompany(config, companyId, now);
+
+  // ID 採番（最大値+1）は並行作成で衝突し得る。条件付き Put で既存部署の黙った上書きを防ぎ、
+  // 衝突時は再一覧して「同名部署の重複回避」または「別IDでの採番」をやり直す。
+  const MAX_ID_ATTEMPTS = 5;
+  let currentDepartments = departments;
+
+  for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt += 1) {
+    if (currentDepartments.some((department) => department.name === name)) {
+      throw new Error("同じ部署名がすでに登録されています");
+    }
+
+    const departmentId = getNextDepartmentId(currentDepartments);
+
+    try {
+      await putDepartment(
+        {
+          region: config.region,
+          tableName: config.departmentTableName,
+        },
+        {
+          companyId,
+          sk: buildDepartmentSk(departmentId),
+          departmentId,
+          name,
+          status: "ACTIVE",
+          sortOrder: currentDepartments.length,
+          createdAt: now,
+          updatedAt: now,
+        },
+        { conditionExpression: "attribute_not_exists(sk)" },
+      );
+    } catch (error) {
+      if (isConditionalCheckFailure(error) && attempt < MAX_ID_ATTEMPTS - 1) {
+        currentDepartments = await listDepartmentsByCompany(
+          {
+            region: config.region,
+            tableName: config.departmentTableName,
+          },
+          companyId,
+        );
+        continue;
+      }
+      throw error;
+    }
+
+    await touchCompany(config, companyId, now);
+    return;
+  }
+
+  throw new Error("部署IDの採番に失敗しました。もう一度お試しください。");
 }
 
 export async function renameDepartmentInDynamo(companyId: string, input: RenameDepartmentInput): Promise<void> {

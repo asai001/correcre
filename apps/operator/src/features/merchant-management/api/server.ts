@@ -128,6 +128,12 @@ async function recordOperatorAuditLog(
   }
 }
 
+function isConditionalCheckFailure(error: unknown): boolean {
+  return (
+    Boolean(error) && typeof error === "object" && (error as { name?: string }).name === "ConditionalCheckFailedException"
+  );
+}
+
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -292,42 +298,57 @@ export async function listPendingMerchantApplicationsForOperator(): Promise<Merc
 export async function createMerchantForOperator(input: CreateMerchantInput): Promise<MerchantSummary> {
   const config = getRuntimeConfig();
   const normalized = normalizeMerchantInput(input);
-  const merchants = await listMerchants({
-    region: config.region,
-    tableName: config.merchantTableName,
-  });
-
-  const merchantId = getNextMerchantId(merchants);
   const now = new Date().toISOString();
 
-  const merchant: Merchant = {
-    merchantId,
-    name: normalized.name,
-    kanaName: normalized.kanaName,
-    status: input.status ?? "ACTIVE",
-    companyLocation: normalized.companyLocation,
-    storeAddressMode: normalized.storeAddressMode,
-    storeAddressOther: normalized.storeAddressOther,
-    customerInquiryContact: normalized.customerInquiryContact,
-    contactPersonName: normalized.contactPersonName,
-    contactPersonPhone: normalized.contactPersonPhone,
-    contactEmail: normalized.contactEmail,
-    bankTransferAccount: normalized.bankTransferAccount,
-    paymentCycle: normalized.paymentCycle,
-    exchangeFeePercent: normalized.exchangeFeePercent,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await putMerchant(
-    {
+  // ID 採番（最大値+1）は並行作成で衝突し得る。条件付き Put で他社レコードの黙った上書きを防ぎ、
+  // 衝突時は採番からやり直す。
+  const MAX_ID_ATTEMPTS = 5;
+  for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt += 1) {
+    const merchants = await listMerchants({
       region: config.region,
       tableName: config.merchantTableName,
-    },
-    merchant,
-  );
+    });
+    const merchantId = getNextMerchantId(merchants);
 
-  return merchant;
+    const merchant: Merchant = {
+      merchantId,
+      name: normalized.name,
+      kanaName: normalized.kanaName,
+      status: input.status ?? "ACTIVE",
+      companyLocation: normalized.companyLocation,
+      storeAddressMode: normalized.storeAddressMode,
+      storeAddressOther: normalized.storeAddressOther,
+      customerInquiryContact: normalized.customerInquiryContact,
+      contactPersonName: normalized.contactPersonName,
+      contactPersonPhone: normalized.contactPersonPhone,
+      contactEmail: normalized.contactEmail,
+      bankTransferAccount: normalized.bankTransferAccount,
+      paymentCycle: normalized.paymentCycle,
+      exchangeFeePercent: normalized.exchangeFeePercent,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await putMerchant(
+        {
+          region: config.region,
+          tableName: config.merchantTableName,
+        },
+        merchant,
+        { conditionExpression: "attribute_not_exists(merchantId)" },
+      );
+    } catch (error) {
+      if (isConditionalCheckFailure(error) && attempt < MAX_ID_ATTEMPTS - 1) {
+        continue;
+      }
+      throw error;
+    }
+
+    return merchant;
+  }
+
+  throw new Error("加盟店IDの採番に失敗しました。もう一度お試しください。");
 }
 
 export async function updateMerchantForOperator(input: UpdateMerchantInput): Promise<MerchantSummary> {
@@ -347,10 +368,13 @@ export async function updateMerchantForOperator(input: UpdateMerchantInput): Pro
   const normalized = normalizeMerchantInput(input);
   const now = new Date().toISOString();
 
+  // 任意項目は、リクエストにフィールドが含まれる場合のみ更新し、含まれない場合は既存値を維持する。
+  // （部分的なボディを送るクライアントが、送っていない運用者管理項目（手数料率・振込先など）を
+  //  removeUndefinedValues により黙って削除してしまうのを防ぐ。）
   const merchant: Merchant = {
     ...existing,
     name: normalized.name,
-    kanaName: normalized.kanaName,
+    kanaName: input.kanaName !== undefined ? normalized.kanaName : existing.kanaName,
     status: input.status ?? existing.status,
     companyLocation: normalized.companyLocation,
     storeAddressMode: normalized.storeAddressMode,
@@ -358,10 +382,12 @@ export async function updateMerchantForOperator(input: UpdateMerchantInput): Pro
     customerInquiryContact: normalized.customerInquiryContact,
     contactPersonName: normalized.contactPersonName,
     contactPersonPhone: normalized.contactPersonPhone,
-    contactEmail: normalized.contactEmail,
-    bankTransferAccount: normalized.bankTransferAccount,
-    paymentCycle: normalized.paymentCycle,
-    exchangeFeePercent: normalized.exchangeFeePercent,
+    contactEmail: input.contactEmail !== undefined ? normalized.contactEmail : existing.contactEmail,
+    bankTransferAccount:
+      input.bankTransferAccount !== undefined ? normalized.bankTransferAccount : existing.bankTransferAccount,
+    paymentCycle: input.paymentCycle !== undefined ? normalized.paymentCycle : existing.paymentCycle,
+    exchangeFeePercent:
+      input.exchangeFeePercent !== undefined ? normalized.exchangeFeePercent : existing.exchangeFeePercent,
     updatedAt: now,
   };
 
@@ -489,6 +515,7 @@ export async function createMerchantUserForOperator(
         tableName: config.merchantUserTableName,
       },
       merchantUser,
+      { conditionExpression: "attribute_not_exists(sk)" },
     );
 
     return toMerchantUserSummary(merchantUser);
@@ -610,20 +637,25 @@ export async function resetMerchantUserEmailForOperator(
   let cognitoEmailUpdated = false;
   let merchantContactEmailUpdated = false;
   const beforeMerchantContactEmail = merchant.contactEmail;
+  // 代表メールアドレス(contactEmail)は、リセット対象ユーザーの現在のメールと一致する場合のみ同期する。
+  // 別ユーザーのリセットや、意図的に別アドレス(共有受信箱など)を設定している場合に上書きしないため。
+  const shouldSyncMerchantContactEmail = merchant.contactEmail === beforeEmail;
 
   try {
-    await putMerchant(
-      {
-        region: config.region,
-        tableName: config.merchantTableName,
-      },
-      {
-        ...merchant,
-        contactEmail: newEmail,
-        updatedAt: new Date().toISOString(),
-      },
-    );
-    merchantContactEmailUpdated = true;
+    if (shouldSyncMerchantContactEmail) {
+      await putMerchant(
+        {
+          region: config.region,
+          tableName: config.merchantTableName,
+        },
+        {
+          ...merchant,
+          contactEmail: newEmail,
+          updatedAt: new Date().toISOString(),
+        },
+      );
+      merchantContactEmailUpdated = true;
+    }
 
     await updateCognitoUserEmail(
       {

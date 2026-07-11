@@ -81,6 +81,7 @@ async function syncAdminLastLoginAt(cognitoSub: string) {
     {
       region: readRequiredServerEnv("AWS_REGION"),
       tableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+      companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     },
     trimmed,
   );

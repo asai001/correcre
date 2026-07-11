@@ -212,6 +212,12 @@ function getNextUserId(users: DBUserItem[]) {
   return `u-${String(nextNumber).padStart(3, "0")}`;
 }
 
+function isConditionalCheckFailure(error: unknown): boolean {
+  return (
+    Boolean(error) && typeof error === "object" && (error as { name?: string }).name === "ConditionalCheckFailedException"
+  );
+}
+
 function getNextDepartmentId(departments: Department[]) {
   const nextNumber =
     departments.reduce((max, department) => {
@@ -319,34 +325,59 @@ async function resolveDepartment(
   availableDepartments: Department[],
 ): Promise<Pick<Department, "departmentId" | "name">> {
   const normalizedDepartmentName = normalizeDepartmentName(departmentName);
-  const existingDepartment = availableDepartments.find((department) => department.name === normalizedDepartmentName);
+  const now = new Date().toISOString();
 
-  if (existingDepartment) {
-    if (existingDepartment.status === "INACTIVE") {
-      throw new Error("同名の休止部署が存在します。部署管理を確認してください");
+  // ID 採番（最大値+1）は並行作成で衝突し得る。条件付き Put で既存部署の黙った上書きを防ぎ、
+  // 衝突時は再一覧して「同名部署の再利用」または「別IDでの採番」をやり直す。
+  const MAX_ID_ATTEMPTS = 5;
+  let departments = availableDepartments;
+
+  for (let attempt = 0; attempt < MAX_ID_ATTEMPTS; attempt += 1) {
+    const existingDepartment = departments.find((department) => department.name === normalizedDepartmentName);
+
+    if (existingDepartment) {
+      if (existingDepartment.status === "INACTIVE") {
+        throw new Error("同名の休止部署が存在します。部署管理を確認してください");
+      }
+
+      return {
+        departmentId: existingDepartment.departmentId,
+        name: existingDepartment.name,
+      };
+    }
+
+    const createdDepartment = createDepartmentRecord(companyId, normalizedDepartmentName, departments, now);
+
+    try {
+      await putDepartment(
+        {
+          region: config.region,
+          tableName: config.departmentTableName,
+        },
+        createdDepartment,
+        { conditionExpression: "attribute_not_exists(sk)" },
+      );
+    } catch (error) {
+      if (isConditionalCheckFailure(error) && attempt < MAX_ID_ATTEMPTS - 1) {
+        departments = await listDepartmentsByCompany(
+          {
+            region: config.region,
+            tableName: config.departmentTableName,
+          },
+          companyId,
+        );
+        continue;
+      }
+      throw error;
     }
 
     return {
-      departmentId: existingDepartment.departmentId,
-      name: existingDepartment.name,
+      departmentId: createdDepartment.departmentId,
+      name: createdDepartment.name,
     };
   }
 
-  const now = new Date().toISOString();
-  const createdDepartment = createDepartmentRecord(companyId, normalizedDepartmentName, availableDepartments, now);
-
-  await putDepartment(
-    {
-      region: config.region,
-      tableName: config.departmentTableName,
-    },
-    createdDepartment,
-  );
-
-  return {
-    departmentId: createdDepartment.departmentId,
-    name: createdDepartment.name,
-  };
+  throw new Error("部署IDの採番に失敗しました。もう一度お試しください。");
 }
 
 function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput): NormalizedEmployeeInput {
@@ -766,6 +797,11 @@ export async function updateEmployeeInDynamo(
   const normalizedInput = normalizeEmployeeInput(input);
   const nextStatus = normalizeOperatorManagedStatus(targetUser.status, input.status);
 
+  // UI で割り当て不可能なロール（MANAGER など）は、編集ダイアログが送信対象から除外するため、
+  // そのまま SET すると黙って剥がれてしまう。既存ユーザーが持つこれらのロールは維持する。
+  const preservedRoles = (targetUser.roles ?? []).filter((role) => role === "MANAGER");
+  const finalRoles = Array.from(new Set([...normalizedInput.roles, ...preservedRoles]));
+
   if (!Number.isInteger(input.pointAdjustment)) {
     throw new Error("ポイント調整は整数で入力してください");
   }
@@ -838,7 +874,7 @@ export async function updateEmployeeInDynamo(
     ":departmentId": department.departmentId,
     ":departmentName": department.name,
     ":status": nextStatus,
-    ":roles": normalizedInput.roles,
+    ":roles": finalRoles,
     ":joinedAt": normalizedInput.joinedAt,
     ":nextUserPointBalance": nextUserPointBalance,
     ":updatedAt": now,
@@ -938,6 +974,13 @@ export async function updateEmployeeInDynamo(
     throw error;
   }
 
+  // ステータスが変わった場合は、会社の在籍者数・当月課金スナップショットを再集計する。
+  // （従来は作成/削除時のみ同期しており、有効/無効の切り替えで activeEmployees と請求額が
+  //  次の作成・削除まで古いままになっていた。）
+  if (targetUser.status !== nextStatus) {
+    await syncCompanyUserCounts(config, companyId, now);
+  }
+
   const updatedEmployee = toEmployee({
     ...targetUser,
     lastName: normalizedInput.lastName,
@@ -950,7 +993,7 @@ export async function updateEmployeeInDynamo(
     departmentId: department.departmentId,
     departmentName: department.name,
     status: nextStatus,
-    roles: normalizedInput.roles,
+    roles: finalRoles,
     joinedAt: normalizedInput.joinedAt,
     currentPointBalance: nextUserPointBalance,
     updatedAt: now,
@@ -1066,13 +1109,22 @@ export async function createDepartmentInDynamo(companyId: string, input: CreateD
   }
 
   const now = new Date().toISOString();
-  await putDepartment(
-    {
-      region: config.region,
-      tableName: config.departmentTableName,
-    },
-    createDepartmentRecord(companyId, name, departments, now),
-  );
+  try {
+    await putDepartment(
+      {
+        region: config.region,
+        tableName: config.departmentTableName,
+      },
+      createDepartmentRecord(companyId, name, departments, now),
+      // ID 採番（最大値+1）の並行作成による既存部署の黙った上書きを防ぐ。
+      { conditionExpression: "attribute_not_exists(sk)" },
+    );
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) {
+      throw new Error("部署の登録が競合しました。もう一度お試しください。");
+    }
+    throw error;
+  }
   await touchCompany(config, companyId, now);
 }
 

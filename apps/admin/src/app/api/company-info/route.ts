@@ -39,44 +39,74 @@ export async function PATCH(req: Request) {
     const region = readRequiredServerEnv("AWS_REGION");
     const tableName = readRequiredServerEnv("DDB_COMPANY_TABLE_NAME");
     const companyId = currentAdminUser.companyId;
+    // 未指定のフィールドは updateCompanyInDynamo 側で既存値が維持される。
+    // 保有ポイント（companyPointBalance）は管理者画面では管理しないため送らず、
+    // 従業員へのポイント付与などの残高更新を巻き戻さないようにする。
     const baseCompanyInput: UpdateCompanyInput = {
       companyId,
       name: body.name,
       status: body.status,
       plan: body.plan,
       perEmployeeMonthlyFee: body.perEmployeeMonthlyFee,
-      companyPointBalance: body.companyPointBalance,
       pointUnitLabel: body.pointUnitLabel,
       philosophyItems: body.philosophyItems,
     };
 
     await updateCompanyInDynamo(companyId, baseCompanyInput);
 
-    const company = await getCompanyById({ region, tableName }, companyId);
-
-    if (!company) {
-      throw new Error("Company not found");
-    }
+    // 詳細情報（連絡先・代表者・billing など）は、リクエストボディにキーが含まれるフィールドのみ更新し、
+    // 含まれないフィールドは既存値を維持する。これにより、詳細情報を管理しないタブ（理念体系など）の
+    // 保存で詳細情報が巻き戻る問題を防ぐ。
+    const detailKeys = [
+      "shortName",
+      "contactName",
+      "contactEmail",
+      "contactPhone",
+      "billingEmail",
+      "logoImageUrl",
+      "primaryColor",
+      "pointConversionRate",
+      "address",
+      "representativeName",
+      "representativePhone",
+      "representativeEmail",
+    ] as const;
+    const hasDetailUpdate = detailKeys.some((key) => key in body);
 
     const updatedAt = new Date().toISOString();
-    const updatedCompany: Company = {
-      ...company,
-      shortName: normalizeOptionalText(body.shortName),
-      contactName: normalizeOptionalText(body.contactName),
-      contactEmail: normalizeOptionalText(body.contactEmail),
-      contactPhone: normalizeOptionalText(body.contactPhone),
-      billingEmail: normalizeOptionalText(body.billingEmail),
-      logoImageUrl: normalizeOptionalText(body.logoImageUrl),
-      primaryColor: normalizeOptionalText(body.primaryColor),
-      pointConversionRate: normalizePointConversionRate(body.pointConversionRate),
-      address: normalizeOptionalText(body.address),
-      representativeName: normalizeOptionalText(body.representativeName),
-      representativePhone: normalizeOptionalText(body.representativePhone),
-      representativeEmail: normalizeOptionalText(body.representativeEmail),
-      updatedAt,
-    };
 
-    await putCompany({ region, tableName }, updatedCompany);
+    if (hasDetailUpdate) {
+      const company = await getCompanyById({ region, tableName }, companyId);
+
+      if (!company) {
+        throw new Error("Company not found");
+      }
+
+      const updatedCompany: Company = {
+        ...company,
+        shortName: "shortName" in body ? normalizeOptionalText(body.shortName) : company.shortName,
+        contactName: "contactName" in body ? normalizeOptionalText(body.contactName) : company.contactName,
+        contactEmail: "contactEmail" in body ? normalizeOptionalText(body.contactEmail) : company.contactEmail,
+        contactPhone: "contactPhone" in body ? normalizeOptionalText(body.contactPhone) : company.contactPhone,
+        billingEmail: "billingEmail" in body ? normalizeOptionalText(body.billingEmail) : company.billingEmail,
+        logoImageUrl: "logoImageUrl" in body ? normalizeOptionalText(body.logoImageUrl) : company.logoImageUrl,
+        primaryColor: "primaryColor" in body ? normalizeOptionalText(body.primaryColor) : company.primaryColor,
+        pointConversionRate:
+          "pointConversionRate" in body
+            ? normalizePointConversionRate(body.pointConversionRate)
+            : company.pointConversionRate,
+        address: "address" in body ? normalizeOptionalText(body.address) : company.address,
+        representativeName:
+          "representativeName" in body ? normalizeOptionalText(body.representativeName) : company.representativeName,
+        representativePhone:
+          "representativePhone" in body ? normalizeOptionalText(body.representativePhone) : company.representativePhone,
+        representativeEmail:
+          "representativeEmail" in body ? normalizeOptionalText(body.representativeEmail) : company.representativeEmail,
+        updatedAt,
+      };
+
+      await putCompany({ region, tableName }, updatedCompany);
+    }
 
     return NextResponse.json({ ok: true, updatedAt });
   } catch (err) {

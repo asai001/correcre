@@ -43,6 +43,24 @@ type SubmitBody = {
   values?: unknown;
 };
 
+function isTransactionConditionalCheckFailure(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const e = error as { name?: string; CancellationReasons?: Array<{ Code?: string }> };
+
+  if (e.name === "ConditionalCheckFailedException") {
+    return true;
+  }
+
+  if (e.name === "TransactionCanceledException" && Array.isArray(e.CancellationReasons)) {
+    return e.CancellationReasons.some((reason) => reason?.Code === "ConditionalCheckFailed");
+  }
+
+  return false;
+}
+
 function isImageDraftValue(value: unknown): value is MissionImageFieldValue {
   return (
     typeof value === "object" &&
@@ -327,6 +345,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_field_value", field: field.key }, { status: 400 });
     }
 
+    // 月間実施上限（monthlyCount）をサーバー側でも検証する。
+    // クライアントの「達成済み」無効化は直叩き等でバイパス可能なため、報酬ポイントの上限逸脱をここで防ぐ。
+    const approvedReportsThisMonthForMission = existingReports.filter(
+      (item) =>
+        item.status === "APPROVED" &&
+        item.missionId === missionId &&
+        toYearMonth(item.reportedAt) === currentYearMonth,
+    );
+    if (approvedReportsThisMonthForMission.length >= mission.monthlyCount) {
+      return NextResponse.json(
+        { error: "monthly_count_exceeded", message: "このミッションは今月の実施回数の上限に達しています。" },
+        { status: 409 },
+      );
+    }
+
     const scoreGranted = mission.score;
     const pointGranted = calculateMissionRewardPoint({
       score: scoreGranted,
@@ -386,65 +419,104 @@ export async function POST(req: Request) {
           });
     const client = getDynamoDocumentClient(region);
 
-    await client.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Put: {
-              TableName: missionReportTableName,
-              Item: {
-                ...report,
-                pk: buildMissionReportPk(report.companyId, report.userId),
-                sk: buildMissionReportSk(report.reportedAt, report.reportId),
-                gsi1pk: buildMissionReportByCompanyGsiPk(report.companyId),
-                gsi1sk: buildMissionReportGsi1Sk(report.reportedAt, report.userId, report.reportId),
-                gsi2pk: buildMissionReportByCompanyStatusGsiPk(report.companyId, report.status),
-                gsi2sk: buildMissionReportGsi2Sk(report.reportedAt, report.userId, report.reportId),
+    // 楽観ロック: 読み込み時点のポイント残高から変化していない場合のみ確定する。
+    // ポイント残高は交換・返金・運用者/管理者の手動調整など他経路からも更新されるため、
+    // 条件を付けずに絶対値で SET すると、それらの更新を古いスナップショットで黙って巻き戻してしまう。
+    const userConditionExpressions = ["currentPointBalance = :expectedCurrentPointBalance"];
+    const userConditionValues: Record<string, unknown> = {
+      ":expectedCurrentPointBalance": user.currentPointBalance ?? 0,
+    };
+
+    if (user.pendingPointBalance === undefined) {
+      userConditionExpressions.push("attribute_not_exists(pendingPointBalance)");
+    } else {
+      userConditionExpressions.push("pendingPointBalance = :expectedPendingPointBalance");
+      userConditionValues[":expectedPendingPointBalance"] = user.pendingPointBalance;
+    }
+
+    if (user.pendingPointYearMonth === undefined) {
+      userConditionExpressions.push("attribute_not_exists(pendingPointYearMonth)");
+    } else {
+      userConditionExpressions.push("pendingPointYearMonth = :expectedPendingPointYearMonth");
+      userConditionValues[":expectedPendingPointYearMonth"] = user.pendingPointYearMonth;
+    }
+
+    try {
+      await client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: missionReportTableName,
+                Item: {
+                  ...report,
+                  pk: buildMissionReportPk(report.companyId, report.userId),
+                  sk: buildMissionReportSk(report.reportedAt, report.reportId),
+                  gsi1pk: buildMissionReportByCompanyGsiPk(report.companyId),
+                  gsi1sk: buildMissionReportGsi1Sk(report.reportedAt, report.userId, report.reportId),
+                  gsi2pk: buildMissionReportByCompanyStatusGsiPk(report.companyId, report.status),
+                  gsi2sk: buildMissionReportGsi2Sk(report.reportedAt, report.userId, report.reportId),
+                },
               },
             },
-          },
-          ...(pointTransaction ? [createPointTransactionPutTransactItem(pointTransactionTableName, pointTransaction)] : []),
-          {
-            Update: {
-              TableName: userTableName,
-              Key: {
-                companyId,
-                sk: buildUserSk(user.userId),
-              },
-              UpdateExpression:
-                "SET currentPointBalance = :currentPointBalance, pendingPointBalance = :pendingPointBalance, pendingPointYearMonth = :pendingPointYearMonth, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
-              ExpressionAttributeValues: {
-                ":currentPointBalance": nextSpendablePointBalance,
-                ":pendingPointBalance": nextPendingPointBalance,
-                ":pendingPointYearMonth": currentYearMonth,
-                ":currentMonthCompletionRate": nextCompletionRate,
-                ":updatedAt": statsUpdatedAt,
-              },
-            },
-          },
-          {
-            Put: {
-              TableName: userMonthlyStatsTableName,
-              Item: {
-                pk: buildUserMonthlyStatsPk(companyId, user.userId),
-                sk: buildUserMonthlyStatsSk(currentYearMonth),
-                companyId,
-                userId: user.userId,
-                yearMonth: currentYearMonth,
-                earnedPoints: nextEarnedPoints,
-                usedPoints: currentMonthStats?.usedPoints ?? 0,
-                earnedScore: nextEarnedScore,
-                completionRate: nextCompletionRate,
-                missionCompletedCount: nextMissionCompletedCount,
-                updatedAt: statsUpdatedAt,
-                gsi1pk: buildUserMonthlyStatsByCompanyGsiPk(companyId),
-                gsi1sk: buildUserMonthlyStatsByCompanyGsiSk(currentYearMonth, user.userId),
+            ...(pointTransaction ? [createPointTransactionPutTransactItem(pointTransactionTableName, pointTransaction)] : []),
+            {
+              Update: {
+                TableName: userTableName,
+                Key: {
+                  companyId,
+                  sk: buildUserSk(user.userId),
+                },
+                ConditionExpression: userConditionExpressions.join(" AND "),
+                UpdateExpression:
+                  "SET currentPointBalance = :currentPointBalance, pendingPointBalance = :pendingPointBalance, pendingPointYearMonth = :pendingPointYearMonth, currentMonthCompletionRate = :currentMonthCompletionRate, updatedAt = :updatedAt",
+                ExpressionAttributeValues: {
+                  ...userConditionValues,
+                  ":currentPointBalance": nextSpendablePointBalance,
+                  ":pendingPointBalance": nextPendingPointBalance,
+                  ":pendingPointYearMonth": currentYearMonth,
+                  ":currentMonthCompletionRate": nextCompletionRate,
+                  ":updatedAt": statsUpdatedAt,
+                },
               },
             },
+            {
+              Put: {
+                TableName: userMonthlyStatsTableName,
+                Item: {
+                  pk: buildUserMonthlyStatsPk(companyId, user.userId),
+                  sk: buildUserMonthlyStatsSk(currentYearMonth),
+                  companyId,
+                  userId: user.userId,
+                  yearMonth: currentYearMonth,
+                  earnedPoints: nextEarnedPoints,
+                  usedPoints: currentMonthStats?.usedPoints ?? 0,
+                  earnedScore: nextEarnedScore,
+                  completionRate: nextCompletionRate,
+                  missionCompletedCount: nextMissionCompletedCount,
+                  updatedAt: statsUpdatedAt,
+                  gsi1pk: buildUserMonthlyStatsByCompanyGsiPk(companyId),
+                  gsi1sk: buildUserMonthlyStatsByCompanyGsiSk(currentYearMonth, user.userId),
+                },
+              },
+            },
+          ],
+        }),
+      );
+    } catch (error) {
+      if (isTransactionConditionalCheckFailure(error)) {
+        // 送信中に残高が他経路で更新された。クライアントに再試行を促す。
+        return NextResponse.json(
+          {
+            error: "point_balance_conflict",
+            message: "ポイント残高が更新されたため、送信できませんでした。画面を更新してもう一度お試しください。",
           },
-        ],
-      }),
-    );
+          { status: 409 },
+        );
+      }
+
+      throw error;
+    }
 
     return NextResponse.json({
       reportId,
