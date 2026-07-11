@@ -334,7 +334,10 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     companyPointBalance: nextCompanyPointBalance,
     monthlyBillingSnapshots: upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
     pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
-    showPointExchangeLink: input.showPointExchangeLink === true,
+    showPointExchangeLink:
+      typeof input.showPointExchangeLink === "boolean"
+        ? input.showPointExchangeLink
+        : company.showPointExchangeLink === true,
     philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),
     updatedAt,
   };
