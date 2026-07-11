@@ -455,6 +455,9 @@ export async function requestExchangeForEmployee(params: {
         // nextBalance は「反映後の利用可能残高 − 必要ポイント」。反映分もこの1更新でまとめて確定する。
         nextCurrentPointBalance: nextBalance,
         updatedAt: now,
+        // pending を書き換える際の楽観ロック用に、読み込み時点の pending 状態を渡す。
+        expectedPendingPointBalance: user.pendingPointBalance,
+        expectedPendingPointYearMonth: user.pendingPointYearMonth,
         // 反映が発生した場合は pending を 0 にし、年月マーカーを削除する。
         ...(reflected.changed ? { nextPendingPointBalance: 0, clearPendingPointYearMonth: true } : {}),
       },

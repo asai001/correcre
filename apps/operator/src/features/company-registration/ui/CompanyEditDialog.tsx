@@ -207,15 +207,9 @@ export default function CompanyEditDialog({
               label="保有ポイント"
               type="number"
               value={form.companyPointBalance}
-              onChange={(event) => setForm((current) => ({ ...current, companyPointBalance: event.target.value }))}
               fullWidth
-              required
-              error={hasSubmitted && validation.companyPointBalance}
-              helperText={
-                hasSubmitted && validation.companyPointBalance
-                  ? "0 以上の整数で入力してください。"
-                  : "現在の企業保有ポイント残高です。"
-              }
+              slotProps={{ input: { readOnly: true } }}
+              helperText="現在の企業保有ポイント残高です。増減は下の「調整値」で行ってください。"
             />
           </div>
 

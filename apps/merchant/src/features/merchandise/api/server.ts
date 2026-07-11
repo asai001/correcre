@@ -399,6 +399,8 @@ export async function createMerchandiseForMerchant(
       tableName: config.merchandiseTableName,
     },
     item,
+    // ID 採番（最大値+1）の並行作成による他レコードの黙った上書きを防ぐ。
+    { conditionExpression: "attribute_not_exists(sk)" },
   );
 
   await notifyOperatorMerchandiseCreated({

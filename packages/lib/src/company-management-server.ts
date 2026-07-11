@@ -303,52 +303,100 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
 export async function updateCompanyInDynamo(companyId: string, input: UpdateCompanyInput): Promise<CompanySummary> {
   const config = getCompanyManagementConfig();
   const company = await getCompanyOrThrow(config, companyId);
-  const normalizedPhilosophyItems = normalizeCompanyPhilosophyItems(input.philosophyItems);
 
-  validateCreateCompanyInput(input);
+  // 未指定のフィールドは既存値を維持する。
+  // 各画面（運用者=全項目 / 管理者=一部のみ）が、自分が管理していないフィールドを
+  // ページ読み込み時点の古い値で黙って巻き戻すのを防ぐ。
+  const effectiveName = (input.name ?? company.name).trim();
+  const effectiveStatus = input.status ?? company.status;
+  const effectivePlan = input.plan ?? company.plan;
+  const effectivePerEmployeeMonthlyFee = input.perEmployeeMonthlyFee ?? company.perEmployeeMonthlyFee ?? 0;
+  const effectivePointUnitLabel = input.pointUnitLabel?.trim() || company.pointUnitLabel?.trim() || "pt";
+
+  if (!effectiveName) {
+    throw new Error("会社名は必須です");
+  }
+  if (!isValidCompanyStatus(effectiveStatus)) {
+    throw new Error("会社ステータスが不正です");
+  }
+  if (!isValidCompanyPlan(effectivePlan)) {
+    throw new Error("プランが不正です");
+  }
+  if (!Number.isInteger(effectivePerEmployeeMonthlyFee) || effectivePerEmployeeMonthlyFee < 0) {
+    throw new Error("月額単価は 0 以上の整数で入力してください");
+  }
 
   const pointAdjustment = input.pointAdjustment ?? 0;
   if (!Number.isInteger(pointAdjustment)) {
     throw new Error("ポイント調整は整数で入力してください");
   }
 
-  const nextCompanyPointBalance = input.companyPointBalance + pointAdjustment;
+  // 残高の基準値: 呼び出し側が認識していた残高（省略時は既存値）。この値に調整を加える。
+  const expectedCompanyPointBalance = input.companyPointBalance ?? company.companyPointBalance ?? 0;
+  if (!Number.isInteger(expectedCompanyPointBalance) || expectedCompanyPointBalance < 0) {
+    throw new Error("会社ポイント残高は 0 以上の整数で入力してください");
+  }
+  const nextCompanyPointBalance = expectedCompanyPointBalance + pointAdjustment;
   if (nextCompanyPointBalance < 0) {
     throw new Error("調整後のポイントが 0 未満になるため更新できません");
   }
 
   const updatedAt = new Date().toISOString();
+  const effectivePhilosophy =
+    input.philosophyItems === undefined
+      ? company.philosophy
+      : buildCompanyPhilosophy(normalizeCompanyPhilosophyItems(input.philosophyItems), updatedAt, company.philosophy);
+
   const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
     month: toBillingSnapshotMonth(updatedAt),
-    status: input.status,
+    status: effectiveStatus,
     activeEmployees: company.activeEmployees ?? 0,
-    perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
+    perEmployeeMonthlyFee: effectivePerEmployeeMonthlyFee,
     capturedAt: updatedAt,
   });
   const updatedCompany: Company = {
     ...company,
-    name: input.name.trim(),
-    status: input.status,
-    plan: input.plan,
-    perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
+    name: effectiveName,
+    status: effectiveStatus,
+    plan: effectivePlan,
+    perEmployeeMonthlyFee: effectivePerEmployeeMonthlyFee,
     companyPointBalance: nextCompanyPointBalance,
     monthlyBillingSnapshots: upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
-    pointUnitLabel: input.pointUnitLabel?.trim() || "pt",
+    pointUnitLabel: effectivePointUnitLabel,
     showPointExchangeLink:
       typeof input.showPointExchangeLink === "boolean"
         ? input.showPointExchangeLink
         : company.showPointExchangeLink === true,
-    philosophy: buildCompanyPhilosophy(normalizedPhilosophyItems, updatedAt, company.philosophy),
+    philosophy: effectivePhilosophy,
     updatedAt,
   };
 
-  await putCompany(
-    {
-      region: config.region,
-      tableName: config.companyTableName,
-    },
-    updatedCompany,
-  );
+  try {
+    // 楽観ロック: 呼び出し側が認識していた残高から変化していない場合のみ全レコードを保存する。
+    // 保存直前に他経路（従業員へのポイント付与など）で会社残高が変わった場合は、
+    // それを全レコード上書きで巻き戻さずに保存を失敗させ、再読み込みを促す。
+    await putCompany(
+      {
+        region: config.region,
+        tableName: config.companyTableName,
+      },
+      updatedCompany,
+      {
+        conditionExpression:
+          "attribute_not_exists(companyPointBalance) OR companyPointBalance = :expectedCompanyPointBalance",
+        expressionAttributeValues: { ":expectedCompanyPointBalance": expectedCompanyPointBalance },
+      },
+    );
+  } catch (error) {
+    if (isConditionalCheckFailure(error)) {
+      throw new Error("会社ポイント残高が他の操作で更新されたため保存できませんでした。画面を再読み込みして、もう一度お試しください。");
+    }
+    throw error;
+  }
 
   return toCompanySummary(updatedCompany);
+}
+
+function isConditionalCheckFailure(error: unknown): boolean {
+  return Boolean(error) && typeof error === "object" && (error as { name?: string }).name === "ConditionalCheckFailedException";
 }

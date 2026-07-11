@@ -42,12 +42,21 @@ export async function listDepartmentsByCompany(config: DepartmentTableConfig, co
   return departments;
 }
 
-export async function putDepartment(config: DepartmentTableConfig, department: Department): Promise<void> {
+export type PutDepartmentOptions = {
+  conditionExpression?: string;
+};
+
+export async function putDepartment(
+  config: DepartmentTableConfig,
+  department: Department,
+  options?: PutDepartmentOptions,
+): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
   await client.send(
     new PutCommand({
       TableName: config.tableName,
       Item: department,
+      ConditionExpression: options?.conditionExpression,
     }),
   );
 }

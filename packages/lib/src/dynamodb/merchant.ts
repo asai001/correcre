@@ -48,12 +48,21 @@ export async function listMerchants(config: MerchantTableConfig): Promise<Mercha
   return merchants;
 }
 
-export async function putMerchant(config: MerchantTableConfig, merchant: Merchant): Promise<void> {
+export type PutMerchantOptions = {
+  conditionExpression?: string;
+};
+
+export async function putMerchant(
+  config: MerchantTableConfig,
+  merchant: Merchant,
+  options?: PutMerchantOptions,
+): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
   await client.send(
     new PutCommand({
       TableName: config.tableName,
       Item: merchant,
+      ConditionExpression: options?.conditionExpression,
     }),
   );
 }

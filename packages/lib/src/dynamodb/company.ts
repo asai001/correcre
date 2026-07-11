@@ -84,12 +84,23 @@ export async function listCompanies(config: CompanyTableConfig): Promise<Company
   return companies;
 }
 
-export async function putCompany(config: CompanyTableConfig, company: Company): Promise<void> {
+export type PutCompanyOptions = {
+  conditionExpression?: string;
+  expressionAttributeValues?: Record<string, unknown>;
+};
+
+export async function putCompany(
+  config: CompanyTableConfig,
+  company: Company,
+  options?: PutCompanyOptions,
+): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
   await client.send(
     new PutCommand({
       TableName: config.tableName,
       Item: company,
+      ConditionExpression: options?.conditionExpression,
+      ExpressionAttributeValues: options?.expressionAttributeValues,
     }),
   );
 }

@@ -131,12 +131,21 @@ export async function listMerchantUsersByEmail(
   return (Items as MerchantUserItem[] | undefined) ?? [];
 }
 
-export async function putMerchantUser(config: MerchantUserTableConfig, user: MerchantUserItem): Promise<void> {
+export type PutMerchantUserOptions = {
+  conditionExpression?: string;
+};
+
+export async function putMerchantUser(
+  config: MerchantUserTableConfig,
+  user: MerchantUserItem,
+  options?: PutMerchantUserOptions,
+): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
   await client.send(
     new PutCommand({
       TableName: config.tableName,
       Item: user,
+      ConditionExpression: options?.conditionExpression,
     }),
   );
 }

@@ -269,6 +269,9 @@ export type PutExchangeHistoryWithReservationInput = {
     // 翌月反映(reflect)で pending を利用可能残高へ繰り入れた場合、その結果を同一トランザクションで永続化する。
     nextPendingPointBalance?: number;
     clearPendingPointYearMonth?: boolean;
+    // pending を書き換える際の楽観ロック用。読み込み時点の pending 状態を渡す。
+    expectedPendingPointBalance?: number;
+    expectedPendingPointYearMonth?: string;
   };
   pointTransaction?: {
     tableName: string;
@@ -316,6 +319,27 @@ export async function putExchangeHistoryWithReservation(
     ? `SET ${userSetExpressions.join(", ")} REMOVE pendingPointYearMonth`
     : `SET ${userSetExpressions.join(", ")}`;
 
+  // 利用可能残高は常に楽観ロックする。
+  const userConditionExpressions = ["currentPointBalance = :expectedPointBalance"];
+
+  // pending を書き換える場合は、読み込み時の pending 状態も一致することを条件に加える。
+  // これにより、並行して確定したミッション報酬付与（pending への加算）を 0 で黙って上書きするのを防ぐ。
+  if (input.user.nextPendingPointBalance !== undefined || input.user.clearPendingPointYearMonth) {
+    if (input.user.expectedPendingPointBalance === undefined) {
+      userConditionExpressions.push("attribute_not_exists(pendingPointBalance)");
+    } else {
+      userConditionExpressions.push("pendingPointBalance = :expectedPendingPointBalance");
+      userExpressionValues[":expectedPendingPointBalance"] = input.user.expectedPendingPointBalance;
+    }
+
+    if (input.user.expectedPendingPointYearMonth === undefined) {
+      userConditionExpressions.push("attribute_not_exists(pendingPointYearMonth)");
+    } else {
+      userConditionExpressions.push("pendingPointYearMonth = :expectedPendingPointYearMonth");
+      userExpressionValues[":expectedPendingPointYearMonth"] = input.user.expectedPendingPointYearMonth;
+    }
+  }
+
   try {
     await client.send(
       new TransactWriteCommand({
@@ -327,7 +351,7 @@ export async function putExchangeHistoryWithReservation(
                 companyId: input.user.companyId,
                 sk: buildUserSk(input.user.userId),
               },
-              ConditionExpression: "currentPointBalance = :expectedPointBalance",
+              ConditionExpression: userConditionExpressions.join(" AND "),
               UpdateExpression: userUpdateExpression,
               ExpressionAttributeValues: userExpressionValues,
             },
@@ -352,6 +376,21 @@ export async function putExchangeHistoryWithReservation(
 
     throw error;
   }
+}
+
+// 読み込み時のステータスに対する楽観ロック条件式を組み立てる。
+// ステータス属性が存在しない旧レコードは REQUESTED 相当のため attribute_not_exists で照合する。
+// 呼び出し側は ExpressionAttributeNames に "#status" を登録しておくこと。
+function buildExchangeStatusConditionExpression(
+  expectedStatus: ExchangeHistoryStatus | undefined,
+  expressionAttributeValues: Record<string, unknown>,
+): string {
+  if (expectedStatus === undefined) {
+    return "attribute_not_exists(#status)";
+  }
+
+  expressionAttributeValues[":expectedFromStatus"] = expectedStatus;
+  return "#status = :expectedFromStatus";
 }
 
 export async function updateExchangeHistoryStatus(
@@ -409,6 +448,11 @@ export async function updateExchangeHistoryStatus(
     expressionAttributeValues[":zero"] = 0;
   }
 
+  // 楽観ロック: 読み込み時のステータスと DB の現在値が一致する場合のみ更新する。
+  // これにより、他アプリのキャンセル/返金など並行して確定した遷移を前進遷移が黙って上書き
+  // （交換の「復活」）するのを防ぐ。ステータス属性が無い旧レコードは REQUESTED 相当として扱う。
+  const conditionExpression = buildExchangeStatusConditionExpression(params.item.status, expressionAttributeValues);
+
   await client.send(
     new UpdateCommand({
       TableName: config.tableName,
@@ -416,6 +460,7 @@ export async function updateExchangeHistoryStatus(
         pk: params.item.pk,
         sk: params.item.sk,
       },
+      ConditionExpression: conditionExpression,
       UpdateExpression: `SET ${setExpressions.join(", ")}`,
       ExpressionAttributeNames: expressionAttributeNames,
       ExpressionAttributeValues: expressionAttributeValues,
@@ -507,7 +552,6 @@ export async function transitionExchangeStatus(
     ":updatedAt": occurredAt,
     ":canceledAt": occurredAt,
     ":zero": 0,
-    ":expectedFromStatus": fromStatus,
   };
 
   if (input.item.merchantId) {
@@ -517,6 +561,9 @@ export async function transitionExchangeStatus(
       input.nextStatus,
     );
   }
+
+  // 楽観ロック: 読み込み時のステータスと一致する場合のみ返金遷移を確定する。
+  const statusConditionExpression = buildExchangeStatusConditionExpression(input.item.status, expressionAttributeValues);
 
   const client = getDynamoDocumentClient(config.region);
 
@@ -528,7 +575,7 @@ export async function transitionExchangeStatus(
           pk: input.item.pk,
           sk: input.item.sk,
         },
-        ConditionExpression: "#status = :expectedFromStatus",
+        ConditionExpression: statusConditionExpression,
         UpdateExpression: `SET ${setExpressions.join(", ")}`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,

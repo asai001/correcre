@@ -5,6 +5,12 @@ import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from
 import type { DBUserItem, DBUserStatus } from "@correcre/types";
 
 import { getDynamoDocumentClient } from "./client";
+import {
+  buildCompanyMonthlyBillingSnapshot,
+  getCompanyById,
+  toBillingSnapshotMonth,
+  upsertCompanyMonthlyBillingSnapshot,
+} from "./company";
 
 export type UserTableConfig = {
   region: string;
@@ -177,8 +183,55 @@ export async function putUser(config: UserTableConfig, user: DBUserItem): Promis
   );
 }
 
-export async function updateUserLastLoginAtByCognitoSub(
+// 初回ログイン等で INVITED→ACTIVE に昇格した会社の在籍者数・当月課金スナップショットを再集計する。
+// 昇格は 1 ユーザーにつき一度きりのため、ログインのホットパスに毎回スキャンを課すことはない。
+// 課金額に影響するが致命的ではないため、失敗してもログイン自体は継続させる（best-effort）。
+async function resyncCompanyEmployeeCounts(
   config: UserTableConfig,
+  companyTableName: string,
+  companyId: string,
+  updatedAt: string,
+): Promise<void> {
+  const [company, users] = await Promise.all([
+    getCompanyById({ region: config.region, tableName: companyTableName }, companyId),
+    listUsersByCompany(config, companyId),
+  ]);
+
+  if (!company) {
+    return;
+  }
+
+  const currentUsers = users.filter((user) => user.status !== "DELETED");
+  const activeUsers = currentUsers.filter((user) => user.status === "ACTIVE");
+  const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
+    month: toBillingSnapshotMonth(updatedAt),
+    status: company.status,
+    activeEmployees: activeUsers.length,
+    perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
+    capturedAt: updatedAt,
+  });
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: companyTableName,
+      Key: {
+        companyId,
+      },
+      UpdateExpression:
+        "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":totalEmployees": currentUsers.length,
+        ":activeEmployees": activeUsers.length,
+        ":monthlyBillingSnapshots": upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
+        ":updatedAt": updatedAt,
+      },
+    }),
+  );
+}
+
+export async function updateUserLastLoginAtByCognitoSub(
+  config: UserTableConfig & { companyTableName?: string },
   cognitoSub: string,
   loggedInAt: string = new Date().toISOString(),
 ): Promise<DBUserItem | null> {
@@ -215,6 +268,16 @@ export async function updateUserLastLoginAtByCognitoSub(
       ExpressionAttributeValues: expressionAttributeValues,
     }),
   );
+
+  // 昇格が発生した場合のみ、会社の在籍者数・当月課金スナップショットを再集計する。
+  if (shouldPromoteToActive && config.companyTableName) {
+    try {
+      await resyncCompanyEmployeeCounts(config, config.companyTableName, user.companyId, loggedInAt);
+    } catch (error) {
+      // 再集計の失敗はログインを妨げない。次の従業員作成/削除/ステータス変更時に是正される。
+      console.error("Failed to resync company employee counts after activation", error);
+    }
+  }
 
   return {
     ...user,

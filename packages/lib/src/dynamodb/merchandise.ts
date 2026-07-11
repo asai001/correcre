@@ -105,12 +105,21 @@ export async function listMerchandiseByStatus(
   return items;
 }
 
-export async function putMerchandise(config: MerchandiseTableConfig, item: Merchandise): Promise<void> {
+export type PutMerchandiseOptions = {
+  conditionExpression?: string;
+};
+
+export async function putMerchandise(
+  config: MerchandiseTableConfig,
+  item: Merchandise,
+  options?: PutMerchandiseOptions,
+): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
   await client.send(
     new PutCommand({
       TableName: config.tableName,
       Item: item,
+      ConditionExpression: options?.conditionExpression,
     }),
   );
 }
