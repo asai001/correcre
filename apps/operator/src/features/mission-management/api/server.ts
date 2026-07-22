@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { nextMonthYYYYMM, nowYYYYMM, reflectMission } from "@correcre/lib";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
-import { buildMissionSk, listMissionsByCompany, getMissionBySlot } from "@correcre/lib/dynamodb/mission";
+import {
+  buildMissionSk,
+  listMissionsByCompany,
+  getMissionBySlot,
+  promoteScheduledMissionIfDue,
+} from "@correcre/lib/dynamodb/mission";
 import {
   buildMissionHistoryPk,
   buildMissionHistorySk,
@@ -9,7 +15,9 @@ import {
 } from "@correcre/lib/dynamodb/mission-history";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
-import type { Mission, MissionField, MissionHistory } from "@correcre/types";
+import type { Mission, MissionField, MissionHistory, ScheduledMissionChange } from "@correcre/types";
+
+export type MissionApplyMode = "immediate" | "scheduled";
 import {
   MISSION_SLOT_COUNT,
   MISSION_TOTAL_POINTS_CAP,
@@ -119,7 +127,26 @@ export async function listMissionsForCompany(companyId: string): Promise<Operato
     companyId,
   );
 
-  const missionMap = new Map(missions.map((mission) => [mission.slotIndex, mission]));
+  // 反映予定月に達した予約(pendingChange)があれば、この読み取り機会に昇格して永続化する。
+  const reconciledMissions = await Promise.all(
+    missions.map(async (mission) => {
+      if (!reflectMission(mission).changed) {
+        return mission;
+      }
+      const promoted = await promoteScheduledMissionIfDue(
+        {
+          region: config.region,
+          missionTableName: config.missionTableName,
+          missionHistoryTableName: config.missionHistoryTableName,
+        },
+        companyId,
+        mission.slotIndex,
+      );
+      return promoted ?? mission;
+    }),
+  );
+
+  const missionMap = new Map(reconciledMissions.map((mission) => [mission.slotIndex, mission]));
 
   return Array.from({ length: MISSION_SLOT_COUNT }, (_, index) => {
     const slotIndex = index + 1;
@@ -130,11 +157,14 @@ export async function listMissionsForCompany(companyId: string): Promise<Operato
 }
 
 // ミッションの新規作成・編集（Mission + MissionHistory を更新）
+// applyMode="immediate": 即時に新版へ差し替え（従来挙動）。予約(pendingChange)があれば同時に打ち消す。
+// applyMode="scheduled": 翌月月初(00:00 JST)から反映する予約として pendingChange に載せる（版は上げない）。
 export async function updateMissionInDynamo(
   companyId: string,
   slotIndex: number,
   input: UpdateMissionInput,
   changedByUserId: string,
+  applyMode: MissionApplyMode = "immediate",
 ): Promise<OperatorMissionSummary> {
   if (!isValidSlotIndex(slotIndex)) {
     throw new Error("スロット番号が不正です。");
@@ -169,6 +199,41 @@ export async function updateMissionInDynamo(
   );
 
   const now = new Date().toISOString();
+
+  // 「翌月月初から反映」予約: 版は上げず、現行アイテムに pendingChange を載せるだけ。
+  // 実際の反映（版up＋History）は反映予定月に達した後の読み取り/提出時に昇格させる。
+  if (applyMode === "scheduled") {
+    if (!currentMission) {
+      throw new Error("新規スロットは即時反映のみ可能です。まず作成してから翌月反映を予約してください。");
+    }
+
+    const pendingChange: ScheduledMissionChange = {
+      effectiveYearMonth: nextMonthYYYYMM(nowYYYYMM()),
+      title: input.title.trim(),
+      description: input.description.trim(),
+      category: input.category.trim(),
+      monthlyCount: input.monthlyCount,
+      score: input.score,
+      enabled: input.enabled,
+      fields: input.fields,
+      scheduledByUserId: changedByUserId,
+      scheduledAt: now,
+    };
+
+    const client = getDynamoDocumentClient(config.region);
+    await client.send(
+      new UpdateCommand({
+        TableName: config.missionTableName,
+        Key: { companyId, sk: buildMissionSk(slotIndex) },
+        UpdateExpression: "SET pendingChange = :pc, updatedAt = :now",
+        ConditionExpression: "attribute_exists(companyId) AND attribute_exists(sk)",
+        ExpressionAttributeValues: { ":pc": pendingChange, ":now": now },
+      }),
+    );
+
+    return toMissionSummary({ ...currentMission, pendingChange, updatedAt: now });
+  }
+
   const nextVersion = currentMission ? currentMission.version + 1 : 1;
   const missionId = currentMission?.missionId ?? randomUUID();
 
@@ -257,6 +322,37 @@ export async function updateMissionInDynamo(
   await client.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
   return toMissionSummary(updatedMission);
+}
+
+// 「翌月月初から反映」予約を取り消す（pendingChange を除去）。
+export async function cancelScheduledMissionChange(
+  companyId: string,
+  slotIndex: number,
+): Promise<OperatorMissionSummary> {
+  if (!isValidSlotIndex(slotIndex)) {
+    throw new Error("スロット番号が不正です。");
+  }
+
+  const config = getRuntimeConfig();
+  const client = getDynamoDocumentClient(config.region);
+  const now = new Date().toISOString();
+
+  const { Attributes } = await client.send(
+    new UpdateCommand({
+      TableName: config.missionTableName,
+      Key: { companyId, sk: buildMissionSk(slotIndex) },
+      UpdateExpression: "SET updatedAt = :now REMOVE pendingChange",
+      ConditionExpression: "attribute_exists(companyId) AND attribute_exists(sk)",
+      ExpressionAttributeValues: { ":now": now },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+
+  if (!Attributes) {
+    throw new Error("対象のミッションが見つかりません。");
+  }
+
+  return toMissionSummary(Attributes as Mission);
 }
 
 // ミッション編集履歴を取得

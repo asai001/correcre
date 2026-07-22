@@ -13,10 +13,11 @@ import {
   TextField,
 } from "@mui/material";
 
+import { nextMonthYYYYMM, nowYYYYMM } from "@correcre/lib";
 import type { MissionField } from "@correcre/types";
 import { updateMission } from "../api/client";
 import { MISSION_TOTAL_POINTS_CAP } from "../model/types";
-import type { OperatorMissionSummary, UpdateMissionInput } from "../model/types";
+import type { MissionApplyMode, OperatorMissionSummary, UpdateMissionInput } from "../model/types";
 import { validateMissionInput } from "../model/validation";
 import FieldBuilder from "./FieldBuilder";
 
@@ -75,12 +76,15 @@ export default function MissionEditDialog({
   const [form, setForm] = useState<FormState>(() => initFormState(mission));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  // 確認ダイアログで反映モードを保持（null = 未確認）。
+  const [pendingMode, setPendingMode] = useState<MissionApplyMode | null>(null);
+  // 予約反映の対象月（翌月 YYYY-MM）。表示・確認文言に使う。
+  const scheduledYearMonth = nextMonthYYYYMM(nowYYYYMM());
 
   useEffect(() => {
     setForm(initFormState(mission));
     setError(null);
-    setConfirmOpen(false);
+    setPendingMode(null);
   }, [mission]);
 
   const buildInput = (): UpdateMissionInput => ({
@@ -93,7 +97,7 @@ export default function MissionEditDialog({
     fields: form.fields,
   });
 
-  const handleSave = () => {
+  const handleSave = (mode: MissionApplyMode) => {
     const nextInput = buildInput();
     const validationError = validateMissionInput(nextInput);
 
@@ -114,16 +118,17 @@ export default function MissionEditDialog({
     }
 
     setError(null);
-    setConfirmOpen(true);
+    setPendingMode(mode);
   };
 
   const handleConfirm = async () => {
-    setConfirmOpen(false);
+    const mode = pendingMode ?? "immediate";
+    setPendingMode(null);
 
     try {
       setSubmitting(true);
       setError(null);
-      const updated = await updateMission(companyId, mission.slotIndex, buildInput());
+      const updated = await updateMission(companyId, mission.slotIndex, buildInput(), mode);
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ミッションの保存に失敗しました。");
@@ -257,38 +262,71 @@ export default function MissionEditDialog({
           <Button onClick={onClose} disabled={submitting}>
             キャンセル
           </Button>
-          <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={submitting}
-            sx={{
-              borderRadius: "12px",
-              backgroundColor: "#0f766e",
-              "&:hover": { backgroundColor: "#115e59" },
-            }}
-          >
-            {submitting ? "保存中..." : isNewMission ? "登録" : "保存"}
-          </Button>
+          {isNewMission ? (
+            <Button
+              variant="contained"
+              onClick={() => handleSave("immediate")}
+              disabled={submitting}
+              sx={{
+                borderRadius: "12px",
+                backgroundColor: "#0f766e",
+                "&:hover": { backgroundColor: "#115e59" },
+              }}
+            >
+              {submitting ? "保存中..." : "登録"}
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outlined"
+                onClick={() => handleSave("scheduled")}
+                disabled={submitting}
+                sx={{
+                  borderRadius: "12px",
+                  color: "#0f766e",
+                  borderColor: "#0f766e",
+                  "&:hover": { borderColor: "#115e59", backgroundColor: "rgba(15,118,110,0.04)" },
+                }}
+              >
+                翌月月初から反映
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleSave("immediate")}
+                disabled={submitting}
+                sx={{
+                  borderRadius: "12px",
+                  backgroundColor: "#0f766e",
+                  "&:hover": { backgroundColor: "#115e59" },
+                }}
+              >
+                {submitting ? "保存中..." : "即時反映"}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
       {/* 確認ダイアログ */}
       <Dialog
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
+        open={pendingMode !== null}
+        onClose={() => setPendingMode(null)}
         PaperProps={{ sx: { borderRadius: "20px" } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>{isNewMission ? "登録内容の確認" : "編集内容の確認"}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {pendingMode === "scheduled" ? "翌月反映の確認" : isNewMission ? "登録内容の確認" : "即時反映の確認"}
+        </DialogTitle>
         <DialogContent>
           <p className="text-sm text-slate-600">
-            {isNewMission
-              ? `スロット ${mission.slotIndex} にミッション「${form.title}」を登録します。初版（v1）が作成されます。`
-              : `ミッション「${form.title}」を更新します。新しいバージョン（v${mission.version + 1}）が作成され、現在のバージョンは履歴に保存されます。`}
-            この操作は取り消せません。
+            {pendingMode === "scheduled"
+              ? `ミッション「${form.title}」の編集内容を ${scheduledYearMonth} の月初（00:00）から自動反映するよう予約します。現在の内容は変わりません。反映時に新しいバージョンが作成されます。予約は「即時反映」または「予約取消」で上書き・取り消しできます。`
+              : isNewMission
+                ? `スロット ${mission.slotIndex} にミッション「${form.title}」を登録します。初版（v1）が作成されます。この操作は取り消せません。`
+                : `ミッション「${form.title}」を今すぐ更新します。新しいバージョン（v${mission.version + 1}）が作成され、現在のバージョンは履歴に保存されます。予約中の翌月反映があれば取り消されます。この操作は取り消せません。`}
           </p>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setConfirmOpen(false)}>キャンセル</Button>
+          <Button onClick={() => setPendingMode(null)}>キャンセル</Button>
           <Button
             variant="contained"
             onClick={handleConfirm}
@@ -298,7 +336,7 @@ export default function MissionEditDialog({
               "&:hover": { backgroundColor: "#115e59" },
             }}
           >
-            {isNewMission ? "登録する" : "更新する"}
+            {pendingMode === "scheduled" ? "予約する" : isNewMission ? "登録する" : "即時反映する"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1,7 +1,7 @@
 "use client";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClockRotateLeft, faPenToSquare } from "@fortawesome/free-solid-svg-icons";
+import { faClockRotateLeft, faPenToSquare, faCalendarCheck } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@mui/material";
 
 import type { OperatorMissionSummary } from "../model/types";
@@ -10,10 +10,13 @@ type MissionCardProps = {
   mission: OperatorMissionSummary;
   onEdit: () => void;
   onHistory: () => void;
+  onCancelSchedule: () => void;
+  cancelingSchedule?: boolean;
 };
 
-export default function MissionCard({ mission, onEdit, onHistory }: MissionCardProps) {
+export default function MissionCard({ mission, onEdit, onHistory, onCancelSchedule, cancelingSchedule }: MissionCardProps) {
   const actionLabel = mission.configured ? "編集" : "新規設定";
+  const pending = mission.pendingChange;
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-200/50">
@@ -50,6 +53,34 @@ export default function MissionCard({ mission, onEdit, onHistory }: MissionCardP
               {mission.fields.length} フィールド
             </span>
           </div>
+
+          {pending ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+                <FontAwesomeIcon icon={faCalendarCheck} />
+                <span>{pending.effectiveYearMonth} の月初から反映予定</span>
+              </div>
+              <p className="mt-1 line-clamp-1 text-sm text-amber-900">
+                予約中の内容: {pending.title}
+              </p>
+              <Button
+                variant="text"
+                size="small"
+                onClick={onCancelSchedule}
+                disabled={cancelingSchedule}
+                sx={{
+                  mt: 0.5,
+                  px: 0,
+                  minWidth: 0,
+                  textTransform: "none",
+                  color: "#b45309",
+                  "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
+                }}
+              >
+                {cancelingSchedule ? "取り消し中..." : "予約を取り消す"}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5">

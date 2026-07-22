@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { updateMissionInDynamo } from "@operator/features/mission-management/api/server";
-import type { MissionApplyMode, UpdateMissionInput } from "@operator/features/mission-management/model/types";
+import { cancelScheduledMissionChange } from "@operator/features/mission-management/api/server";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
 async function authorizeOperator() {
@@ -17,9 +16,10 @@ async function authorizeOperator() {
   return { error: NextResponse.json({ error: errorCode }, { status }), userId: null };
 }
 
-// PUT /api/missions/:slotIndex?companyId=xxx
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ slotIndex: string }> }) {
-  const { error, userId } = await authorizeOperator();
+// DELETE /api/missions/:slotIndex/scheduled?companyId=xxx
+// 「翌月月初から反映」予約(pendingChange)を取り消す。
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ slotIndex: string }> }) {
+  const { error } = await authorizeOperator();
   if (error) return error;
 
   const { slotIndex: slotIndexParam } = await params;
@@ -34,26 +34,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ slot
     return NextResponse.json({ error: "invalid slotIndex" }, { status: 400 });
   }
 
-  let body: (UpdateMissionInput & { applyMode?: MissionApplyMode }) | null = null;
-
   try {
-    body = (await req.json()) as UpdateMissionInput & { applyMode?: MissionApplyMode };
-  } catch {
-    return NextResponse.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  if (!body) {
-    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  }
-
-  const applyMode: MissionApplyMode = body.applyMode === "scheduled" ? "scheduled" : "immediate";
-  const { applyMode: _ignoredApplyMode, ...input } = body;
-
-  try {
-    const updated = await updateMissionInDynamo(companyId, slotIndex, input, userId!, applyMode);
+    const updated = await cancelScheduledMissionChange(companyId, slotIndex);
     return NextResponse.json(updated);
   } catch (err) {
-    console.error(`PUT /api/missions/${slotIndex} error`, err);
+    console.error(`DELETE /api/missions/${slotIndex}/scheduled error`, err);
 
     if (err instanceof Error) {
       return NextResponse.json({ error: err.message }, { status: 400 });

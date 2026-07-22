@@ -35,6 +35,23 @@ export type MissionField = {
   helpText?: string;
 };
 
+// ミッションの「翌月月初(00:00 JST)から反映」予約。
+// 実体は Mission アイテムに載せ、読み取り時に reflectMission() で反映判定する
+// （ポイントの翌月反映 reflectPoints と同じ遅延反映モデル）。
+// 予約は版番号を消費せず、実際に反映される時点で採番する。
+export type ScheduledMissionChange = {
+  effectiveYearMonth: string; // YYYY-MM（翌月）。現在月 >= これ で反映される
+  title: string;
+  description: string;
+  category: string;
+  monthlyCount: number;
+  score: number;
+  enabled: boolean;
+  fields: MissionField[];
+  scheduledByUserId: string;
+  scheduledAt: string; // ISO 8601
+};
+
 // DynamoDB Mission テーブルのアイテム型
 // PK: companyId, SK: MISSION#<slotIndex>
 export type Mission = {
@@ -51,6 +68,8 @@ export type Mission = {
   fields: MissionField[];
   createdAt: string;
   updatedAt: string;
+  // 「翌月月初から反映」予約。未反映のスケジュール変更が1件だけ載る（無ければ undefined）。
+  pendingChange?: ScheduledMissionChange;
 };
 
 // DynamoDB MissionHistory テーブルのアイテム型

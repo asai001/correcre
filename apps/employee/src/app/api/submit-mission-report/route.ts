@@ -2,10 +2,14 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { calculateMissionRewardPoint, nowYYYYMM, reflectPoints } from "@correcre/lib";
+import { calculateMissionRewardPoint, nowYYYYMM, reflectMission, reflectPoints } from "@correcre/lib";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
-import { getMissionBySlot, listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
+import {
+  getMissionBySlot,
+  listEnabledLatestMissionsByCompany,
+  promoteScheduledMissionIfDue,
+} from "@correcre/lib/dynamodb/mission";
 import {
   buildMissionReportByCompanyGsiPk,
   buildMissionReportByCompanyStatusGsiPk,
@@ -76,6 +80,17 @@ async function findMissionForCompany(companyId: string, missionId: string): Prom
   for (let slotIndex = 1; slotIndex <= 5; slotIndex += 1) {
     const mission = await getMissionBySlot({ region, tableName: missionTableName }, companyId, slotIndex);
     if (mission && mission.missionId === missionId) {
+      // 「翌月月初から反映」予約が反映予定月に達していれば、この提出機会に昇格して永続化する。
+      // 以降のスナップショット（version/title/score/fields/enabled）は昇格後の内容を使う。
+      if (reflectMission(mission).changed) {
+        const missionHistoryTableName = readRequiredServerEnv("DDB_MISSION_HISTORY_TABLE_NAME");
+        const promoted = await promoteScheduledMissionIfDue(
+          { region, missionTableName, missionHistoryTableName },
+          companyId,
+          slotIndex,
+        );
+        return promoted ?? mission;
+      }
       return mission;
     }
   }
