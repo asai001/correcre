@@ -87,7 +87,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 17);
+    template.resourceCountIs("AWS::DynamoDB::Table", 18);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -226,6 +226,23 @@ describe("InfraStack", () => {
           }),
           Match.objectLike({
             IndexName: "SupportInquiryByStatusCreatedAt",
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-seminar-registration-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
           }),
         ]),
       }),

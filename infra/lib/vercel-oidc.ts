@@ -87,6 +87,7 @@ function getApplicationTables(dynamoTables: ApplicationDynamoTables) {
     dynamoTables.sessionTable,
     dynamoTables.systemSettingTable,
     dynamoTables.supportInquiryTable,
+    dynamoTables.seminarRegistrationTable,
   ];
 }
 
