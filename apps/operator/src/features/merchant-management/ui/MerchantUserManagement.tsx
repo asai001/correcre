@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Alert, Button, TextField, Tooltip } from "@mui/material";
+import { Alert, Button, Checkbox, FormControlLabel, TextField, Tooltip } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft, faPaperPlane, faUsers } from "@fortawesome/free-solid-svg-icons";
 
@@ -11,6 +11,7 @@ import {
   inviteMerchantUser,
   resetMerchantUserEmail,
   resetMerchantUserPassword,
+  updateMerchantUserRole,
 } from "../api/client";
 import type { MerchantSummary, MerchantUserSummary } from "../model/types";
 import ResetMerchantUserEmailDialog from "./ResetMerchantUserEmailDialog";
@@ -29,9 +30,10 @@ type InviteFormState = {
   firstNameKana: string;
   email: string;
   phoneNumber: string;
+  isAdmin: boolean;
 };
 
-function createInitialInviteFormState(): InviteFormState {
+function createInitialInviteFormState(defaultIsAdmin: boolean): InviteFormState {
   return {
     lastName: "",
     firstName: "",
@@ -39,7 +41,12 @@ function createInitialInviteFormState(): InviteFormState {
     firstNameKana: "",
     email: "",
     phoneNumber: "",
+    isAdmin: defaultIsAdmin,
   };
+}
+
+function hasNoActiveUsers(users: MerchantUserSummary[]) {
+  return users.every((user) => user.status === "DELETED");
 }
 
 const STATUS_LABELS: Record<MerchantUserSummary["status"], string> = {
@@ -52,10 +59,12 @@ const STATUS_LABELS: Record<MerchantUserSummary["status"], string> = {
 
 export default function MerchantUserManagement({ merchant, initialUsers, operatorName }: Props) {
   const [users, setUsers] = useState(initialUsers);
-  const [form, setForm] = useState<InviteFormState>(() => createInitialInviteFormState());
+  // 最初の 1 人は自社ユーザーを追加できる管理者にするのが基本のため、既定でチェックを入れる。
+  const [form, setForm] = useState<InviteFormState>(() => createInitialInviteFormState(hasNoActiveUsers(initialUsers)));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [roleUpdatingUserId, setRoleUpdatingUserId] = useState<string | null>(null);
 
   const [emailDialogUser, setEmailDialogUser] = useState<MerchantUserSummary | null>(null);
   const [emailDialogSubmitting, setEmailDialogSubmitting] = useState(false);
@@ -65,7 +74,7 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
   const [passwordDialogSubmitting, setPasswordDialogSubmitting] = useState(false);
   const [passwordDialogError, setPasswordDialogError] = useState<string | null>(null);
 
-  const handleChange = (field: keyof InviteFormState) => (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (field: keyof Omit<InviteFormState, "isAdmin">) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -85,15 +94,50 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
         firstNameKana: form.firstNameKana || undefined,
         email: form.email,
         phoneNumber: form.phoneNumber || undefined,
+        isAdmin: form.isAdmin,
       });
 
       setUsers((current) => [created, ...current.filter((user) => user.userId !== created.userId)]);
-      setForm(createInitialInviteFormState());
+      setForm(createInitialInviteFormState(false));
       setNotice(`${created.lastName} ${created.firstName} さんへ招待メールを送信しました。`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "提携企業ユーザーの招待に失敗しました。");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleToggleRole = async (user: MerchantUserSummary) => {
+    if (roleUpdatingUserId) return;
+
+    const nextIsAdmin = !user.isAdmin;
+    const confirmMessage = nextIsAdmin
+      ? `${user.lastName} ${user.firstName} さんを管理者にします。提携企業側のユーザー管理画面で自社ユーザーを追加できるようになります。よろしいですか？`
+      : `${user.lastName} ${user.firstName} さんを一般ユーザーにします。提携企業側でユーザーを追加できなくなります。よろしいですか？`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setRoleUpdatingUserId(user.userId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const updated = await updateMerchantUserRole({
+        merchantId: user.merchantId,
+        userId: user.userId,
+        isAdmin: nextIsAdmin,
+      });
+
+      setUsers((current) => current.map((item) => (item.userId === updated.userId ? updated : item)));
+      setNotice(
+        `${updated.lastName} ${updated.firstName} さんを${updated.isAdmin ? "管理者" : "一般ユーザー"}に変更しました。`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "権限の変更に失敗しました。");
+    } finally {
+      setRoleUpdatingUserId(null);
     }
   };
 
@@ -214,6 +258,18 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
           <TextField label="電話番号" fullWidth value={form.phoneNumber} onChange={handleChange("phoneNumber")} />
         </div>
 
+        <div className="mt-4">
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.isAdmin}
+                onChange={(event) => setForm((prev) => ({ ...prev, isAdmin: event.target.checked }))}
+              />
+            }
+            label="管理者として招待する（提携企業側で自社ユーザーを追加できるようになります）"
+          />
+        </div>
+
         <div className="mt-6 flex justify-end">
           <Button variant="contained" onClick={handleSubmit} disabled={submitting} className="!rounded-full !px-7 !py-2.5">
             {submitting ? "送信中..." : "招待メールを送信"}
@@ -243,11 +299,31 @@ export default function MerchantUserManagement({ merchant, initialUsers, operato
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      user.isAdmin ? "bg-cyan-100 text-cyan-800" : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {user.isAdmin ? "管理者" : "一般"}
+                  </span>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                     {STATUS_LABELS[user.status]}
                   </span>
                   {user.status !== "DELETED" ? (
                     <>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={roleUpdatingUserId === user.userId}
+                        onClick={() => handleToggleRole(user)}
+                        sx={{ borderRadius: "999px", textTransform: "none" }}
+                      >
+                        {roleUpdatingUserId === user.userId
+                          ? "変更中..."
+                          : user.isAdmin
+                            ? "一般にする"
+                            : "管理者にする"}
+                      </Button>
                       <Button
                         size="small"
                         variant="outlined"

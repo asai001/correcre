@@ -15,14 +15,18 @@ import {
 } from "@correcre/lib/dynamodb/merchant";
 import {
   buildMerchantUserByCognitoSubGsiPk,
-  buildMerchantUserByEmailGsiPk,
-  buildMerchantUserSk,
   getMerchantUserByMerchantAndUserId,
   listMerchantUsersByEmail,
   listMerchantUsersByMerchant,
   putMerchantUser,
   updateMerchantUserEmail,
+  updateMerchantUserRoles,
 } from "@correcre/lib/dynamodb/merchant-user";
+import {
+  buildMerchantUserRoles,
+  isMerchantAdminRoles,
+  provisionMerchantUser,
+} from "@correcre/lib/merchant-user/provision";
 import {
   buildOperatorAuditLogByMerchantGsiPk,
   buildOperatorAuditLogPk,
@@ -52,6 +56,7 @@ import type {
   ResetMerchantUserEmailInput,
   ResetMerchantUserPasswordInput,
   UpdateMerchantInput,
+  UpdateMerchantUserRoleInput,
 } from "../model/types";
 
 type RuntimeConfig = {
@@ -152,20 +157,6 @@ function getNextMerchantId(merchants: Merchant[]) {
   return `m-${String(nextNumber).padStart(3, "0")}`;
 }
 
-function getNextMerchantUserId(users: MerchantUserItem[]) {
-  const nextNumber =
-    users.reduce((max, user) => {
-      const match = /^mu-(\d+)$/.exec(user.userId);
-      if (!match) {
-        return max;
-      }
-
-      return Math.max(max, Number(match[1]));
-    }, 0) + 1;
-
-  return `mu-${String(nextNumber).padStart(3, "0")}`;
-}
-
 function normalizeOptionalText(value?: string) {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
@@ -235,6 +226,7 @@ function toMerchantUserSummary(user: MerchantUserItem): MerchantUserSummary {
     email: user.email,
     phoneNumber: user.phoneNumber,
     status: user.status,
+    isAdmin: isMerchantAdminRoles(user.roles),
     invitedAt: user.invitedAt,
     joinedAt: user.joinedAt,
     lastLoginAt: user.lastLoginAt,
@@ -422,129 +414,68 @@ export async function createMerchantUserForOperator(
 ): Promise<MerchantUserSummary> {
   const config = getRuntimeConfig();
   const cognitoConfig = getMerchantCognitoConfig();
-  const lastName = input.lastName.trim();
-  const firstName = input.firstName.trim();
-  const email = input.email.trim().toLowerCase();
-  const phoneNumber = normalizeOptionalText(input.phoneNumber);
-  const lastNameKana = normalizeOptionalText(input.lastNameKana);
-  const firstNameKana = normalizeOptionalText(input.firstNameKana);
 
-  if (!lastName || !firstName || !email) {
-    throw new Error("姓名とメールアドレスを入力してください");
-  }
-
-  if (!isValidEmail(email)) {
-    throw new Error("メールアドレスの形式が正しくありません");
-  }
-
-  const merchant = await getMerchantById(
+  const created = await provisionMerchantUser(
     {
       region: config.region,
-      tableName: config.merchantTableName,
+      merchantTableName: config.merchantTableName,
+      merchantUserTableName: config.merchantUserTableName,
+      cognitoRegion: cognitoConfig.cognitoRegion,
+      cognitoUserPoolId: cognitoConfig.cognitoUserPoolId,
     },
-    input.merchantId,
-  );
-
-  if (!merchant) {
-    throw new Error("Merchant not found");
-  }
-
-  const existingByEmail = await listMerchantUsersByEmail(
     {
-      region: config.region,
-      tableName: config.merchantUserTableName,
-    },
-    email,
-  );
-
-  if (existingByEmail.some((user) => user.status !== "DELETED")) {
-    throw new Error("同じメールアドレスのユーザーがすでに登録されています");
-  }
-
-  const existingUsers = await listMerchantUsersByMerchant(
-    {
-      region: config.region,
-      tableName: config.merchantUserTableName,
-    },
-    input.merchantId,
-  );
-
-  const userId = getNextMerchantUserId(existingUsers);
-  const now = new Date().toISOString();
-
-  let createdCognitoUser: { cognitoSub: string; username: string } | null = null;
-
-  try {
-    createdCognitoUser = await createCognitoUser(
-      {
-        region: cognitoConfig.cognitoRegion,
-        userPoolId: cognitoConfig.cognitoUserPoolId,
-      },
-      {
-        email,
-        firstName,
-        lastName,
-        fullName: joinNameParts(lastName, firstName),
-        roles: ["MERCHANT"],
-      },
-    );
-
-    const merchantUser: MerchantUserItem = {
       merchantId: input.merchantId,
-      sk: buildMerchantUserSk(userId),
-      userId,
-      cognitoSub: createdCognitoUser.cognitoSub,
-      lastName,
-      firstName,
-      lastNameKana,
-      firstNameKana,
-      email,
-      phoneNumber,
-      roles: ["MERCHANT"],
-      status: "INVITED",
-      invitedAt: now,
-      createdAt: now,
-      updatedAt: now,
-      gsi1pk: buildMerchantUserByCognitoSubGsiPk(createdCognitoUser.cognitoSub),
-      gsi2pk: buildMerchantUserByEmailGsiPk(email),
-    };
+      lastName: input.lastName,
+      firstName: input.firstName,
+      lastNameKana: input.lastNameKana,
+      firstNameKana: input.firstNameKana,
+      email: input.email,
+      phoneNumber: input.phoneNumber,
+      isAdmin: input.isAdmin,
+    },
+  );
 
-    await putMerchantUser(
-      {
-        region: config.region,
-        tableName: config.merchantUserTableName,
-      },
-      merchantUser,
-      { conditionExpression: "attribute_not_exists(sk)" },
-    );
+  return toMerchantUserSummary(created);
+}
 
-    return toMerchantUserSummary(merchantUser);
-  } catch (error) {
-    if (createdCognitoUser) {
-      try {
-        await deleteCognitoUser(
-          {
-            region: cognitoConfig.cognitoRegion,
-            userPoolId: cognitoConfig.cognitoUserPoolId,
-          },
-          createdCognitoUser.username,
-        );
-      } catch (rollbackError) {
-        console.error("Failed to roll back Cognito user after MerchantUser put failure", rollbackError);
-        throw new Error("Cognito ユーザー作成後のロールバックに失敗しました。手動確認が必要です。");
-      }
+// 提携企業ユーザーの管理者ロール（MERCHANT_ADMIN）を付与・剥奪する。
+export async function updateMerchantUserRoleForOperator(
+  input: UpdateMerchantUserRoleInput,
+): Promise<MerchantUserSummary> {
+  const config = getRuntimeConfig();
 
-      throw new Error(
-        "DB へのユーザー登録に失敗したため Cognito ユーザー登録のロールバックを行いました。再度登録してください。",
-      );
-    }
+  const user = await getMerchantUserByMerchantAndUserId(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+    input.userId,
+  );
 
-    if (error instanceof Error && (error.name === "UsernameExistsException" || error.name === "AliasExistsException")) {
-      throw new Error("同じメールアドレスの Cognito ユーザーが既に存在します");
-    }
-
-    throw error;
+  if (!user || user.status === "DELETED") {
+    throw new Error("対象のユーザーが見つかりません");
   }
+
+  if (isMerchantAdminRoles(user.roles) === input.isAdmin) {
+    return toMerchantUserSummary(user);
+  }
+
+  const updatedUser = await updateMerchantUserRoles(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    input.merchantId,
+    input.userId,
+    buildMerchantUserRoles(input.isAdmin),
+  );
+
+  if (!updatedUser) {
+    throw new Error("対象のユーザーが見つかりません");
+  }
+
+  return toMerchantUserSummary(updatedUser);
 }
 
 export async function resetMerchantUserEmailForOperator(
@@ -935,7 +866,8 @@ export async function approveMerchantApplicationForOperator(
         firstName: pendingUser.firstName,
         lastName: pendingUser.lastName,
         fullName: joinNameParts(pendingUser.lastName, pendingUser.firstName),
-        roles: ["MERCHANT"],
+        // 申請時に決めたロール（担当者は管理者）をそのまま引き継ぐ。
+        roles: pendingUser.roles,
       },
     );
   } catch (error) {

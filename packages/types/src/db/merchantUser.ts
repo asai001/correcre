@@ -1,4 +1,6 @@
-export type MerchantUserRole = "MERCHANT";
+// MERCHANT: 提携企業アプリへログインできる基本ロール（全ユーザーが持つ）。
+// MERCHANT_ADMIN: 自社のユーザーを追加できる管理者ロール（MERCHANT と併せて持つ）。
+export type MerchantUserRole = "MERCHANT" | "MERCHANT_ADMIN";
 
 export type MerchantUserStatus = "PENDING" | "INVITED" | "ACTIVE" | "INACTIVE" | "DELETED";
 

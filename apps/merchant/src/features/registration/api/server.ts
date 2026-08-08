@@ -208,7 +208,8 @@ export async function submitMerchantRegistration(
       firstNameKana: normalizeOptionalText(input.contactPersonFirstNameKana),
       email: contactEmail,
       phoneNumber: contactPersonPhone,
-      roles: ["MERCHANT"],
+      // 登録申請の担当者は承認後に自社ユーザーを追加できる管理者とする。
+      roles: ["MERCHANT", "MERCHANT_ADMIN"],
       status: "PENDING",
       createdAt: now,
       updatedAt: now,

@@ -1,0 +1,11 @@
+import { SkeletonBlock } from "@merchant/components/LoadingSkeleton";
+
+export default function Loading() {
+  return (
+    <div className="space-y-6 pb-10">
+      <SkeletonBlock className="h-24 rounded-[28px]" />
+      <SkeletonBlock className="h-[24rem] rounded-[28px]" />
+      <SkeletonBlock className="h-[16rem] rounded-[28px]" />
+    </div>
+  );
+}

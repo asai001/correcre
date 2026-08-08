@@ -88,6 +88,8 @@ export type MerchantUserSummary = {
   email: string;
   phoneNumber?: string;
   status: MerchantUserStatus;
+  // 自社ユーザーを追加できる管理者ロール（MERCHANT_ADMIN）を持つかどうか。
+  isAdmin: boolean;
   invitedAt?: string;
   joinedAt?: string;
   lastLoginAt?: string;
@@ -122,6 +124,14 @@ export type CreateMerchantUserInput = {
   firstNameKana?: string;
   email: string;
   phoneNumber?: string;
+  // true の場合、管理者（MERCHANT_ADMIN）として招待する。
+  isAdmin?: boolean;
+};
+
+export type UpdateMerchantUserRoleInput = {
+  merchantId: string;
+  userId: string;
+  isAdmin: boolean;
 };
 
 export type ResetMerchantUserEmailInput = {

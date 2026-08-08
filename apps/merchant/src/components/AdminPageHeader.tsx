@@ -13,11 +13,13 @@ import {
   faHeadset,
   faRightLeft,
   faUserShield,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { logout } from "@merchant/app/lib/actions/authenticate";
+import { useMerchantViewer } from "@merchant/components/MerchantViewerContext";
 
 type NavItem = {
   label: string;
@@ -33,6 +35,9 @@ const NAV_ITEMS: NavItem[] = [
   { label: "会社情報", href: "/company-info" as Route, icon: faBuilding },
   { label: "問い合わせ", href: "/support" as Route, icon: faHeadset },
 ];
+
+// 管理者ロールを持つユーザーにのみ表示するナビ項目。
+const ADMIN_NAV_ITEM: NavItem = { label: "ユーザー管理", href: "/users" as Route, icon: faUsers };
 
 function isActiveNav(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
@@ -56,6 +61,8 @@ export default function AdminPageHeader({
   subtitle = "提携企業向け 商品・サービス管理",
 }: AdminPageHeaderProps) {
   const pathname = usePathname();
+  const { canManageUsers } = useMerchantViewer();
+  const navItems = canManageUsers ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   return (
     <section className="relative left-1/2 -mx-[50vw] w-screen bg-[linear-gradient(90deg,#0f766e_0%,#0f4c81_100%)] text-white">
@@ -92,7 +99,7 @@ export default function AdminPageHeader({
       <nav aria-label="グローバルメニュー" className="border-t border-white/15 bg-black/20">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-6">
           <ul className="flex flex-wrap items-center gap-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = isActiveNav(pathname, item.href);
               return (
                 <li key={item.href}>

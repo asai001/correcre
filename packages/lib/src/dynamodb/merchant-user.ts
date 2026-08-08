@@ -2,7 +2,7 @@ import "server-only";
 
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
-import type { MerchantUserItem, MerchantUserStatus } from "@correcre/types";
+import type { MerchantUserItem, MerchantUserRole, MerchantUserStatus } from "@correcre/types";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -234,6 +234,46 @@ export async function updateMerchantUserEmail(
     ...user,
     email: normalizedEmail,
     gsi2pk: buildMerchantUserByEmailGsiPk(normalizedEmail),
+    updatedAt,
+  };
+}
+
+export async function updateMerchantUserRoles(
+  config: MerchantUserTableConfig,
+  merchantId: string,
+  userId: string,
+  roles: MerchantUserRole[],
+  updatedAt: string = new Date().toISOString(),
+): Promise<MerchantUserItem | null> {
+  const user = await getMerchantUserByMerchantAndUserId(config, merchantId, userId);
+
+  if (!user) {
+    return null;
+  }
+
+  const client = getDynamoDocumentClient(config.region);
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: {
+        merchantId,
+        sk: buildMerchantUserSk(userId),
+      },
+      UpdateExpression: "SET #roles = :roles, updatedAt = :updatedAt",
+      ExpressionAttributeNames: {
+        "#roles": "roles",
+      },
+      ExpressionAttributeValues: {
+        ":roles": roles,
+        ":updatedAt": updatedAt,
+      },
+    }),
+  );
+
+  return {
+    ...user,
+    roles,
     updatedAt,
   };
 }

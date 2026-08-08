@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
@@ -81,7 +83,9 @@ export async function getMerchantHeaderInfo(merchantId: string): Promise<{
   };
 }
 
-export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {
+// レイアウト（ナビ表示判定）とページの双方から呼ばれるため、
+// 同一リクエスト内では React cache でセッション検証と DB 参照を 1 回にまとめる。
+export const getMerchantAccessStatus = cache(async (): Promise<MerchantAccessStatus> => {
   const session = await getMerchantSession();
 
   if (!session) {
@@ -99,6 +103,10 @@ export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {
     session,
     user,
   };
+});
+
+export function isMerchantAdminUser(user: MerchantUserItem): boolean {
+  return user.roles.includes("MERCHANT_ADMIN");
 }
 
 export async function requireMerchantSession() {
@@ -121,4 +129,16 @@ export async function requireCurrentMerchantUser() {
   }
 
   return access.user;
+}
+
+// 管理者ロール（MERCHANT_ADMIN）を持つユーザーのみ許可する。
+// 未ログインはログイン画面へ、一般ユーザーはダッシュボードへ戻す。
+export async function requireCurrentMerchantAdminUser() {
+  const user = await requireCurrentMerchantUser();
+
+  if (!isMerchantAdminUser(user)) {
+    redirect("/dashboard");
+  }
+
+  return user;
 }

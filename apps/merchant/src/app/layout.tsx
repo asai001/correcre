@@ -5,6 +5,8 @@ import { SessionExpiryGuard } from "@correcre/ui";
 import "./globals.css";
 import Providers from "./providers";
 import LayoutShell from "./layout-shell";
+import { MerchantViewerProvider } from "@merchant/components/MerchantViewerContext";
+import { getMerchantAccessStatus, isMerchantAdminUser } from "@merchant/lib/auth/merchant";
 
 import "@fortawesome/fontawesome-svg-core/styles.css";
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -29,18 +31,25 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // ナビの「ユーザー管理」表示判定。未ログイン画面（ログイン・登録申請など）では
+  // セッション Cookie が無ければ DB 参照なしで即 false になる。
+  const access = await getMerchantAccessStatus();
+  const canManageUsers = access.allowed && isMerchantAdminUser(access.user);
+
   return (
     <html lang="ja">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-dvh !bg-gray-50`}>
         <AppRouterCacheProvider options={{ enableCssLayer: true }}>
           <Providers>
             <SessionExpiryGuard />
-            <LayoutShell>{children}</LayoutShell>
+            <MerchantViewerProvider canManageUsers={canManageUsers}>
+              <LayoutShell>{children}</LayoutShell>
+            </MerchantViewerProvider>
           </Providers>
         </AppRouterCacheProvider>
       </body>
