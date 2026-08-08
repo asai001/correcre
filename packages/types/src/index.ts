@@ -14,3 +14,4 @@ export * from "./db/session";
 export * from "./db/pointTransaction";
 export * from "./db/systemSetting";
 export * from "./db/supportInquiry";
+export * from "./db/seminarRegistration";

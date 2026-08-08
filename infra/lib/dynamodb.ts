@@ -26,6 +26,7 @@ export interface ApplicationDynamoTables {
   sessionTable: dynamodb.Table;
   systemSettingTable: dynamodb.Table;
   supportInquiryTable: dynamodb.Table;
+  seminarRegistrationTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -80,8 +81,12 @@ function buildTableProps(
     sortKey: sortKeyName ? stringAttribute(sortKeyName) : undefined,
     billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
     pointInTimeRecoverySpecification: resolvePointInTimeRecovery(stage),
+    // Contributor Insights はテーブル/インデックスごとに CloudWatch のマネージドルールを作り、
+    // DynamoDB 本体の利用料とは別に 1 本 $0.50/月 が課金される。prod の全テーブルで有効に
+    // していた結果、本体利用料（月 $0.01 未満）に対して月 $25 前後を払い続けていたため無効にする。
+    // ホットキー調査が必要なときだけ対象テーブルを一時的に有効化し、調査後は必ず無効へ戻すこと。
     contributorInsightsSpecification: {
-      enabled: isProductionStage(stage),
+      enabled: false,
     },
     encryption: dynamodb.TableEncryption.AWS_MANAGED,
     removalPolicy: resolveRemovalPolicy(stage),
@@ -407,6 +412,18 @@ function createSupportInquiryTable(scope: Construct, stage: InfraStage): dynamod
   return table;
 }
 
+// SeminarRegistration
+// - pk = SEMINAR#<seminarId>
+// - sk = EMAIL#<email>
+// - GSI なし（説明会は数が少なく、PK ごとの Query で申込者一覧を取得できる）
+function createSeminarRegistrationTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "SeminarRegistrationTable",
+    buildTableProps(stage, buildTableName("seminar-registration", stage), "pk", "sk"),
+  );
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -429,5 +446,6 @@ export function createApplicationDynamoTables(
     sessionTable: createSessionTable(scope, props.stage),
     systemSettingTable: createSystemSettingTable(scope, props.stage),
     supportInquiryTable: createSupportInquiryTable(scope, props.stage),
+    seminarRegistrationTable: createSeminarRegistrationTable(scope, props.stage),
   };
 }

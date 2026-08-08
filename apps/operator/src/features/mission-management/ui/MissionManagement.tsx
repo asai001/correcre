@@ -7,7 +7,7 @@ import { faBullseye } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import type { OperatorCompanySummary } from "@operator/features/company-registration/model/types";
-import { fetchMissions } from "../api/client";
+import { cancelScheduledChange, fetchMissions } from "../api/client";
 import type { OperatorMissionSummary } from "../model/types";
 import MissionCard from "./MissionCard";
 import MissionEditDialog from "./MissionEditDialog";
@@ -25,6 +25,7 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
   const [error, setError] = useState<string | null>(null);
   const [editingMission, setEditingMission] = useState<OperatorMissionSummary | null>(null);
   const [historySlotIndex, setHistorySlotIndex] = useState<number | null>(null);
+  const [cancelingSlotIndex, setCancelingSlotIndex] = useState<number | null>(null);
   const historyMission = historySlotIndex !== null ? missions.find((m) => m.slotIndex === historySlotIndex) : null;
 
   const loadMissions = useCallback(async (companyId: string) => {
@@ -63,6 +64,23 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
     setSelectedCompanyId(companyId);
     setEditingMission(null);
     setHistorySlotIndex(null);
+  };
+
+  const handleCancelSchedule = async (slotIndex: number) => {
+    if (!selectedCompanyId) {
+      return;
+    }
+
+    try {
+      setCancelingSlotIndex(slotIndex);
+      setError(null);
+      const updated = await cancelScheduledChange(selectedCompanyId, slotIndex);
+      setMissions((current) => current.map((m) => (m.slotIndex === updated.slotIndex ? updated : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "予約の取り消しに失敗しました。");
+    } finally {
+      setCancelingSlotIndex(null);
+    }
   };
 
   return (
@@ -127,6 +145,8 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
               mission={mission}
               onEdit={() => setEditingMission(mission)}
               onHistory={() => setHistorySlotIndex(mission.slotIndex)}
+              onCancelSchedule={() => handleCancelSchedule(mission.slotIndex)}
+              cancelingSchedule={cancelingSlotIndex === mission.slotIndex}
             />
           ))}
         </section>

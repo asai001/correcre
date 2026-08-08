@@ -1,5 +1,5 @@
-import { nowYYYYMM, toYYYYMM } from "@correcre/lib";
-import { listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
+import { nowYYYYMM, reflectMission, toYYYYMM } from "@correcre/lib";
+import { listLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompanyAndUser } from "@correcre/lib/dynamodb/mission-report";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
@@ -81,8 +81,8 @@ export async function getMissionFromDynamo(
   const missionReportTableName = readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME");
   const thisYearMonth = nowYYYYMM();
 
-  const [missions, missionReports] = await Promise.all([
-    listEnabledLatestMissionsByCompany(
+  const [rawMissions, missionReports] = await Promise.all([
+    listLatestMissionsByCompany(
       {
         region,
         tableName: missionTableName,
@@ -98,6 +98,12 @@ export async function getMissionFromDynamo(
       userId,
     ),
   ]);
+
+  // 「翌月月初から反映」予約が反映予定月に達していれば、表示上は反映後の内容にする（非永続）。
+  // enabled も予約で変わり得るため、反映後に enabled を判定してから絞り込む。
+  const missions = rawMissions
+    .map((mission) => reflectMission(mission).mission)
+    .filter((mission) => mission.enabled);
 
   return {
     mission: missions.map(toMission),

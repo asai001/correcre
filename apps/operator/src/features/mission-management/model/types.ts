@@ -1,6 +1,9 @@
-import type { Mission, MissionField, MissionHistory } from "@correcre/types";
+import type { Mission, MissionField, MissionHistory, ScheduledMissionChange } from "@correcre/types";
 
 export const MISSION_SLOT_COUNT = 5;
+
+// ミッション保存の反映モード（即時 / 翌月月初から反映）
+export type MissionApplyMode = "immediate" | "scheduled";
 
 // 有効な全ミッションの「月間実施回数 × 点数」の合計の上限（点）。
 export const MISSION_TOTAL_POINTS_CAP = 100;
@@ -19,6 +22,8 @@ export type OperatorMissionSummary = {
   fields: MissionField[];
   updatedAt: string | null;
   configured: boolean;
+  // 「翌月月初から反映」予約（未反映のスケジュール変更）。無ければ null。
+  pendingChange: ScheduledMissionChange | null;
 };
 
 // ミッション編集 API の入力
@@ -61,6 +66,7 @@ export function createEmptyMissionSummary(slotIndex: number): OperatorMissionSum
     fields: [],
     updatedAt: null,
     configured: false,
+    pendingChange: null,
   };
 }
 
@@ -78,6 +84,7 @@ export function toMissionSummary(mission: Mission): OperatorMissionSummary {
     fields: mission.fields,
     updatedAt: mission.updatedAt,
     configured: true,
+    pendingChange: mission.pendingChange ?? null,
   };
 }
 

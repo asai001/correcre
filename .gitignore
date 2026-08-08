@@ -64,3 +64,4 @@ infra/cdk.out
 **/*.zip
 
 .claude
+.codex/
