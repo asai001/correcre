@@ -31,6 +31,8 @@ SES_FROM_EMAIL=correcre-info@efficient-technology.com
 
 ログイン不要の公開ページです。申込を受け付けると、申込者へ Zoom 参加情報を自動送信し、運用者にも申込内容を通知します。申込内容は `correcre-seminar-registration-<stage>` テーブルに「説明会 ID × メールアドレス」で 1 件に集約して保存します（同じ人が再送信しても重複せず、初回申込日時と申込回数が残ります）。
 
+同じ日に複数回開催するため、フォームでは「参加を希望する回」を必須のラジオボタンで選んでもらいます。選ばれた回は申込内容として保存し、申込者への自動返信メールの「開催日時」と運用者への通知メールにも反映します。
+
 ```bash
 # 必須。未設定だとフォームは「準備中」表示になり、申込を受け付けない
 SEMINAR_ZOOM_URL=https://us06web.zoom.us/j/xxxxxxxxxx?pwd=xxxxxxxx
@@ -40,10 +42,14 @@ SEMINAR_ZOOM_PASSCODE=000000
 SEMINAR_SCHEDULE_TEXT=2026年9月10日（水）14:00〜15:00
 SEMINAR_TITLE=コレクレ 提携企業向け説明会
 SEMINAR_EVENT_ID=merchant-briefing
+# 参加を希望する回の選択肢。`<ID>:<ラベル>` を `|` 区切りで並べる（未設定なら下記が既定値）
+SEMINAR_SESSION_OPTIONS=2026-08-24-1330:2026年8月24日（月）13:30〜|2026-08-24-1900:2026年8月24日（月）19:00〜
 DDB_SEMINAR_REGISTRATION_TABLE_NAME=correcre-seminar-registration-dev
 ```
 
 Zoom 情報は環境変数で持つため、開催回ごとの差し替えはコード変更なしで行えます。別日程で再度開催する場合は `SEMINAR_EVENT_ID` も変更すると、申込者を回ごとに分けて集計できます。
+
+`SEMINAR_SESSION_OPTIONS` のラベルは `13:30` のように `:` を含められます（区切りとして扱うのは最初の `:` だけです）。ID は DynamoDB の `sessionId` として保存するので、開催回ごとに一意な値にしてください。ラベルは申込時点の値を `sessionLabel` として保存するため、あとから設定を差し替えても過去の申込内容は読めます。
 
 申込者一覧は DynamoDB を直接参照して取得します。
 

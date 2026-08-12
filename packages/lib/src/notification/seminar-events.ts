@@ -20,7 +20,7 @@ export type SeminarInfo = {
 
 type Registrant = Pick<
   SeminarRegistrationItem,
-  "email" | "name" | "companyName" | "phoneNumber" | "attendeeCount" | "question"
+  "email" | "name" | "companyName" | "sessionLabel" | "phoneNumber" | "attendeeCount" | "question"
 >;
 
 function readOptionalServerEnv(name: string) {
@@ -67,8 +67,11 @@ function buildRegistrantEmailBody(params: { seminar: SeminarInfo; registrant: Re
     "",
   ];
 
-  if (seminar.scheduleText) {
-    lines.push("▼開催日時", seminar.scheduleText, "");
+  // 開催回を選べる場合は、共通の開催日時ではなく申込者が選んだ回を案内する。
+  const scheduleText = registrant.sessionLabel ?? seminar.scheduleText;
+
+  if (scheduleText) {
+    lines.push("▼開催日時", scheduleText, "");
   }
 
   lines.push(...buildZoomLines(seminar), "");
@@ -78,6 +81,10 @@ function buildRegistrantEmailBody(params: { seminar: SeminarInfo; registrant: Re
     `お名前: ${registrant.name}`,
     `メールアドレス: ${registrant.email}`,
   );
+
+  if (registrant.sessionLabel) {
+    lines.push(`参加を希望する回: ${registrant.sessionLabel}`);
+  }
 
   if (registrant.attendeeCount) {
     lines.push(`参加人数: ${registrant.attendeeCount}名`);
@@ -111,6 +118,7 @@ function buildOperatorEmailBody(params: {
     `会社名（店舗名）: ${registration.companyName}`,
     `お名前: ${registration.name}`,
     `メールアドレス: ${registration.email}`,
+    `参加を希望する回: ${registration.sessionLabel ?? "-"}`,
     `電話番号: ${registration.phoneNumber ?? "-"}`,
     `参加人数: ${registration.attendeeCount ? `${registration.attendeeCount}名` : "-"}`,
     `初回申込日時: ${formatDateTime(registration.registeredAt)}`,
