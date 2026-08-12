@@ -16,6 +16,8 @@ export type UpsertSeminarRegistrationInput = {
   email: string;
   name: string;
   companyName: string;
+  sessionId?: string;
+  sessionLabel?: string;
   phoneNumber?: string;
   attendeeCount?: number;
   question?: string;
@@ -26,7 +28,14 @@ export type UpsertSeminarRegistrationInput = {
 const TABLE_NAME_STAGE_PATTERN = /^correcre-(user|company|merchant|exchange-history|system-setting)-(.+)$/;
 
 const REQUIRED_FIELDS = ["seminarId", "email", "name", "companyName"] as const;
-const OPTIONAL_FIELDS = ["phoneNumber", "attendeeCount", "question", "userAgent"] as const;
+const OPTIONAL_FIELDS = [
+  "sessionId",
+  "sessionLabel",
+  "phoneNumber",
+  "attendeeCount",
+  "question",
+  "userAgent",
+] as const;
 
 export function buildSeminarRegistrationPk(seminarId: string) {
   return `SEMINAR#${seminarId}` as const;

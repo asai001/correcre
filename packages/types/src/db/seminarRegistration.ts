@@ -5,6 +5,10 @@ export type SeminarRegistrationItem = {
   email: string;
   name: string;
   companyName: string;
+  /** 申込者が選んだ開催回の ID。開催回選択より前の申込には存在しない。 */
+  sessionId?: string;
+  /** 申込時点の開催回ラベル。開催回の設定を差し替えても申込内容を読めるように保存する。 */
+  sessionLabel?: string;
   phoneNumber?: string;
   attendeeCount?: number;
   question?: string;

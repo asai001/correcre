@@ -15,10 +15,21 @@ import {
 } from "@correcre/lib/notification/seminar-events";
 import type { SeminarRegistrationItem } from "@correcre/types";
 
-import type { SeminarPageInfo, SubmitSeminarRegistrationInput, SubmitSeminarRegistrationResult } from "../model/types";
+import type {
+  SeminarPageInfo,
+  SeminarSessionOption,
+  SubmitSeminarRegistrationInput,
+  SubmitSeminarRegistrationResult,
+} from "../model/types";
 
 const DEFAULT_SEMINAR_ID = "merchant-briefing";
 const DEFAULT_SEMINAR_TITLE = "コレクレ 提携企業向け説明会";
+
+/** 同じ日に 2 回開催するため、申込者にどちらへ参加するかを選んでもらう。 */
+const DEFAULT_SEMINAR_SESSIONS: SeminarSessionOption[] = [
+  { id: "2026-08-24-1330", label: "2026年8月24日（月）13:30〜" },
+  { id: "2026-08-24-1900", label: "2026年8月24日（月）19:00〜" },
+];
 
 const MAX_NAME_LENGTH = 50;
 const MAX_COMPANY_NAME_LENGTH = 100;
@@ -26,6 +37,8 @@ const MAX_EMAIL_LENGTH = 254;
 const MAX_PHONE_NUMBER_LENGTH = 30;
 const MAX_QUESTION_LENGTH = 1000;
 const MAX_ATTENDEE_COUNT = 99;
+const MAX_SESSION_ID_LENGTH = 60;
+const MAX_SESSION_LABEL_LENGTH = 100;
 
 export class SeminarRegistrationValidationError extends Error {}
 export class SeminarNotConfiguredError extends Error {}
@@ -105,6 +118,43 @@ function readSeminarConfig(): SeminarInfo | null {
   };
 }
 
+/**
+ * 開催回の選択肢を読む。`SEMINAR_SESSION_OPTIONS` は `<ID>:<ラベル>` を `|` で区切った形式。
+ * ラベルに含まれる `:`（13:30 など）を壊さないよう、区切りは最初の `:` だけとして扱う。
+ */
+function readSeminarSessions(): SeminarSessionOption[] {
+  const configured = readOptionalServerEnv("SEMINAR_SESSION_OPTIONS");
+
+  if (!configured) {
+    return DEFAULT_SEMINAR_SESSIONS;
+  }
+
+  const sessions: SeminarSessionOption[] = [];
+
+  for (const entry of configured.split("|")) {
+    const separatorIndex = entry.indexOf(":");
+
+    if (separatorIndex < 0) {
+      continue;
+    }
+
+    const id = normalizeSingleLine(entry.slice(0, separatorIndex), MAX_SESSION_ID_LENGTH);
+    const label = normalizeSingleLine(entry.slice(separatorIndex + 1), MAX_SESSION_LABEL_LENGTH);
+
+    if (id && label && !sessions.some((session) => session.id === id)) {
+      sessions.push({ id, label });
+    }
+  }
+
+  // 設定を書き損じたときに選択肢ゼロのフォームを出さないよう、既定の開催回に落とす。
+  if (sessions.length === 0) {
+    console.error("SEMINAR_SESSION_OPTIONS is set but no valid session could be parsed. Fell back to the defaults.");
+    return DEFAULT_SEMINAR_SESSIONS;
+  }
+
+  return sessions;
+}
+
 export function getSeminarPageInfo(): SeminarPageInfo {
   const seminar = readSeminarConfig();
 
@@ -112,6 +162,7 @@ export function getSeminarPageInfo(): SeminarPageInfo {
     configured: Boolean(seminar),
     title: seminar?.title ?? DEFAULT_SEMINAR_TITLE,
     scheduleText: seminar?.scheduleText,
+    sessions: readSeminarSessions(),
   };
 }
 
@@ -123,6 +174,8 @@ async function persistRegistration(params: {
     email: string;
     name: string;
     companyName: string;
+    sessionId?: string;
+    sessionLabel?: string;
     phoneNumber?: string;
     attendeeCount?: number;
     question?: string;
@@ -171,6 +224,7 @@ export async function submitSeminarRegistration(
   const phoneNumber = normalizeSingleLine(input.phoneNumber, MAX_PHONE_NUMBER_LENGTH) || undefined;
   const question = normalizeMultiLine(input.question, MAX_QUESTION_LENGTH) || undefined;
   const attendeeCount = normalizeAttendeeCount(input.attendeeCount);
+  const sessionId = normalizeSingleLine(input.sessionId, MAX_SESSION_ID_LENGTH);
 
   if (!name || !companyName || !email) {
     throw new SeminarRegistrationValidationError("お名前・会社名（店舗名）・メールアドレスを入力してください。");
@@ -180,10 +234,26 @@ export async function submitSeminarRegistration(
     throw new SeminarRegistrationValidationError("メールアドレスの形式が正しくありません。");
   }
 
+  // ラベルは選択肢側から取り直す。申込者の送信値をそのままメールや保存に流さないため。
+  const session = readSeminarSessions().find((candidate) => candidate.id === sessionId);
+
+  if (!session) {
+    throw new SeminarRegistrationValidationError("参加を希望する回を選択してください。");
+  }
+
   const region = readRequiredServerEnv("AWS_REGION");
   const tableName = resolveSeminarRegistrationTableName();
   const now = new Date().toISOString();
-  const registrant = { email, name, companyName, phoneNumber, attendeeCount, question };
+  const registrant = {
+    email,
+    name,
+    companyName,
+    sessionId: session.id,
+    sessionLabel: session.label,
+    phoneNumber,
+    attendeeCount,
+    question,
+  };
   const stored = await persistRegistration({
     region,
     tableName,
@@ -242,6 +312,7 @@ export async function submitSeminarRegistration(
   return {
     title: seminar.title,
     scheduleText: seminar.scheduleText,
+    sessionLabel: session.label,
     zoom: {
       url: seminar.zoomUrl,
       meetingId: seminar.zoomMeetingId,

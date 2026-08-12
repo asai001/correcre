@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Button, TextField } from "@mui/material";
+import {
+  Alert,
+  Button,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Radio,
+  RadioGroup,
+  TextField,
+} from "@mui/material";
 
 import { submitSeminarRegistration } from "../api/client";
 import type { SeminarPageInfo, SubmitSeminarRegistrationResult } from "../model/types";
@@ -14,6 +23,7 @@ type FormState = {
   name: string;
   companyName: string;
   email: string;
+  sessionId: string;
   phoneNumber: string;
   attendeeCount: string;
   question: string;
@@ -25,6 +35,8 @@ function createInitialFormState(): FormState {
     name: "",
     companyName: "",
     email: "",
+    // 未選択で始めて、どちらの回に参加するかを必ず申込者に選んでもらう。
+    sessionId: "",
     phoneNumber: "",
     attendeeCount: "1",
     question: "",
@@ -33,12 +45,15 @@ function createInitialFormState(): FormState {
 }
 
 function ZoomInfo({ result }: { result: SubmitSeminarRegistrationResult }) {
+  // 申込者が選んだ回を優先して案内する。開催回の設定がない運用に備えて共通の開催日時にも落とせるようにする。
+  const scheduleText = result.sessionLabel ?? result.scheduleText;
+
   return (
     <dl className="mt-4 space-y-3 rounded border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-      {result.scheduleText ? (
+      {scheduleText ? (
         <div>
           <dt className="font-semibold text-slate-900">開催日時</dt>
-          <dd className="mt-1">{result.scheduleText}</dd>
+          <dd className="mt-1">{scheduleText}</dd>
         </div>
       ) : null}
       <div>
@@ -87,6 +102,11 @@ export default function SeminarRegistrationForm({ seminar }: Props) {
 
     if (submitting) return;
 
+    if (!form.sessionId) {
+      setError("参加を希望する回を選択してください。");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -95,6 +115,7 @@ export default function SeminarRegistrationForm({ seminar }: Props) {
         name: form.name,
         companyName: form.companyName,
         email: form.email,
+        sessionId: form.sessionId,
         phoneNumber: form.phoneNumber || undefined,
         attendeeCount: Number(form.attendeeCount) || undefined,
         question: form.question || undefined,
@@ -159,6 +180,27 @@ export default function SeminarRegistrationForm({ seminar }: Props) {
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-6">
         <div className="flex flex-col gap-6">
+          {seminar.sessions.length > 0 ? (
+            <FormControl required>
+              <FormLabel id="seminar-session-label">参加を希望する回</FormLabel>
+              <RadioGroup
+                aria-labelledby="seminar-session-label"
+                name="sessionId"
+                value={form.sessionId}
+                onChange={handleChange("sessionId")}
+              >
+                {seminar.sessions.map((session) => (
+                  <FormControlLabel
+                    key={session.id}
+                    value={session.id}
+                    // 必須は input 側に付ける。Radio の required は選択肢ごとに必須マークを並べてしまうため。
+                    control={<Radio slotProps={{ input: { required: true } }} />}
+                    label={session.label}
+                  />
+                ))}
+              </RadioGroup>
+            </FormControl>
+          ) : null}
           <TextField
             label="お名前"
             required

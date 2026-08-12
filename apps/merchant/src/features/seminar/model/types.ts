@@ -1,7 +1,15 @@
+/** 申込フォームで選べる開催回。 */
+export type SeminarSessionOption = {
+  id: string;
+  label: string;
+};
+
 export type SubmitSeminarRegistrationInput = {
   name: string;
   companyName: string;
   email: string;
+  /** 参加を希望する開催回の ID。`SeminarPageInfo.sessions` のいずれかであること。 */
+  sessionId: string;
   phoneNumber?: string;
   attendeeCount?: number;
   question?: string;
@@ -18,6 +26,8 @@ export type SeminarZoomInfo = {
 export type SubmitSeminarRegistrationResult = {
   title: string;
   scheduleText?: string;
+  /** 申込者が選んだ開催回のラベル。 */
+  sessionLabel?: string;
   zoom: SeminarZoomInfo;
   /** Zoom 情報メールを送信できたか。false ならフォーム上の Zoom 情報を控えてもらう。 */
   emailDelivered: boolean;
@@ -28,4 +38,5 @@ export type SeminarPageInfo = {
   configured: boolean;
   title: string;
   scheduleText?: string;
+  sessions: SeminarSessionOption[];
 };
