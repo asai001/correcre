@@ -294,6 +294,8 @@ export async function transitionExchangeForOperator(params: {
   merchantId: string;
   exchangeId: string;
   actorUserId: string;
+  // 履歴に残す操作者名のスナップショット。後から「誰が操作したか」を追えるようにする。
+  actorName?: string;
   nextStatus: ExchangeHistoryStatus;
   comment?: string;
 }): Promise<OperatorExchangeDetail> {
@@ -316,6 +318,7 @@ export async function transitionExchangeForOperator(params: {
       nextStatus: params.nextStatus,
       actorType: "OPERATOR",
       actorId: params.actorUserId,
+      actorName: params.actorName,
       comment: params.comment,
       userTableName: config.userTableName,
       pointTransactionTableName: config.pointTransactionTableName,

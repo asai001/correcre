@@ -6,6 +6,7 @@ import {
   deleteMerchandiseForMerchant,
   getMerchandiseForMerchant,
   MerchandiseHasActiveExchangesError,
+  toMerchandiseAuditActor,
   updateMerchandiseForMerchant,
 } from "@merchant/features/merchandise/api/server";
 import type { UpdateMerchandiseRequest } from "@merchant/features/merchandise/model/types";
@@ -105,7 +106,12 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   try {
-    const item = await updateMerchandiseForMerchant(user!.merchantId, merchandiseId, body);
+    const item = await updateMerchandiseForMerchant(
+      user!.merchantId,
+      merchandiseId,
+      body,
+      toMerchandiseAuditActor(user!),
+    );
     return NextResponse.json(item);
   } catch (err) {
     console.error("PATCH /api/merchandise/[merchandiseId] error", err);

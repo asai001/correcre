@@ -31,6 +31,11 @@ import type {
   MerchandiseFormPayload,
   MerchandiseSummary,
 } from "../model/types";
+import {
+  formatMerchandiseActor,
+  formatMerchandiseDateTime,
+  formatMerchandiseHistoryLabel,
+} from "../model/audit";
 import MerchandiseFormPreview from "./MerchandiseFormPreview";
 
 const deliveryMethodOptions = ["来店", "出張", "発送", "オンライン"] as const;
@@ -254,6 +259,8 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   };
 
   const previewTitle = useMemo(() => form.merchandiseName || "商品名", [form.merchandiseName]);
+  // 履歴は古い順に追記されるため、新しい操作が上に来るよう反転して表示する。
+  const historyEvents = useMemo(() => [...(initial?.history ?? [])].reverse(), [initial?.history]);
 
   return (
     <div className="space-y-6 pb-10">
@@ -478,6 +485,52 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           })}
         </div>
       </Paper>
+
+      {/* 誰がいつこの商品を登録・編集・公開状態変更したかを、後から追えるように表示する。 */}
+      {mode === "edit" && initial ? (
+        <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <Typography variant="h6" className="font-semibold text-slate-900">
+            操作履歴
+          </Typography>
+          <Typography variant="body2" className="!mt-1 text-slate-500">
+            この商品・サービスを操作した担当者と日時です。
+          </Typography>
+
+          <dl className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <dt className="text-xs font-semibold text-slate-500">登録</dt>
+              <dd className="mt-1 text-slate-900">{formatMerchandiseActor(initial.createdBy)}</dd>
+              <dd className="mt-0.5 text-xs text-slate-500">{formatMerchandiseDateTime(initial.createdAt)}</dd>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <dt className="text-xs font-semibold text-slate-500">最終更新</dt>
+              <dd className="mt-1 text-slate-900">{formatMerchandiseActor(initial.updatedBy)}</dd>
+              <dd className="mt-0.5 text-xs text-slate-500">{formatMerchandiseDateTime(initial.updatedAt)}</dd>
+            </div>
+          </dl>
+
+          {historyEvents.length === 0 ? (
+            <Typography variant="body2" className="!mt-4 text-slate-500">
+              この機能の追加より前に登録された商品のため、詳細な操作履歴は残っていません。
+            </Typography>
+          ) : (
+            <ol className="mt-4 space-y-2">
+              {historyEvents.map((event, index) => (
+                <li
+                  key={`${event.occurredAt}-${index}`}
+                  className="flex flex-col gap-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <span className="font-semibold text-slate-900">{formatMerchandiseHistoryLabel(event)}</span>
+                    <span className="ml-3 text-slate-700">{formatMerchandiseActor(event.actor)}</span>
+                  </div>
+                  <div className="text-xs text-slate-500">{formatMerchandiseDateTime(event.occurredAt)}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Paper>
+      ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button

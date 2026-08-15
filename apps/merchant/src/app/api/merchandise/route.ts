@@ -5,6 +5,7 @@ import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import {
   createMerchandiseForMerchant,
   listMerchandiseForMerchant,
+  toMerchandiseAuditActor,
 } from "@merchant/features/merchandise/api/server";
 import type { CreateMerchandiseRequest } from "@merchant/features/merchandise/model/types";
 import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const item = await createMerchandiseForMerchant(user!.merchantId, body);
+    const item = await createMerchandiseForMerchant(user!.merchantId, body, toMerchandiseAuditActor(user!));
     return NextResponse.json(item, { status: 201 });
   } catch (err) {
     console.error("POST /api/merchandise error", err);

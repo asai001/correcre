@@ -46,6 +46,25 @@ function formatPoint(value: number) {
   return `${value.toLocaleString("ja-JP")}pt`;
 }
 
+const ACTOR_LABEL: Record<string, string> = {
+  EMPLOYEE: "従業員",
+  MERCHANT: "提携企業",
+  OPERATOR: "運用者",
+  SYSTEM: "システム",
+};
+
+// 一覧から「最後に誰がいつ状態を更新したか」を追えるようにする。
+function formatLastAction(item: ExchangeSummary) {
+  if (!item.lastActionAt) {
+    return null;
+  }
+
+  const typeLabel = item.lastActionActorType ? ACTOR_LABEL[item.lastActionActorType] ?? item.lastActionActorType : "";
+  const actor = [typeLabel, item.lastActionActorName].filter(Boolean).join(" ") || "不明";
+
+  return `${formatDateTime(item.lastActionAt)} ／ ${actor}`;
+}
+
 export default function ExchangeList({ initialItems, initialFilter, merchantName, merchantDisplayName }: Props) {
   const [filter, setFilter] = useState<ExchangeListFilter>(initialFilter);
   const [items, setItems] = useState(initialItems);
@@ -141,6 +160,7 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
         <ul className="space-y-3">
           {items.map((item) => {
             const badge = getExchangeStatusBadge(item.status);
+            const lastAction = formatLastAction(item);
             return (
               <li key={item.exchangeId}>
                 <Link
@@ -162,6 +182,9 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
                       <div className="mt-1 text-xs text-slate-500">
                         申請者: {item.userName ?? item.userId} ／ ポイント: {formatPoint(item.usedPoint)}
                       </div>
+                      {lastAction ? (
+                        <div className="mt-1 text-xs text-slate-500">最終更新: {lastAction}</div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-sm font-semibold text-slate-700 transition group-hover:text-slate-900">

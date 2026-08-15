@@ -194,6 +194,18 @@ const ACTOR_LABEL: Record<string, string> = {
   SYSTEM: "システム",
 };
 
+// 「誰が操作したか」の表示。名前が判る場合は名前を主体にし、ID は補助情報として添える。
+function formatEventActor(event: ExchangeHistoryEvent) {
+  const typeLabel = ACTOR_LABEL[event.actorType] ?? event.actorType;
+  const name = event.actorName?.trim();
+
+  if (name) {
+    return `${typeLabel} ${name}`;
+  }
+
+  return event.actorId ? `${typeLabel} (${event.actorId})` : typeLabel;
+}
+
 export default function ExchangeDetail({ initial, merchantName, merchantDisplayName }: Props) {
   const [detail, setDetail] = useState(initial);
   const [comment, setComment] = useState("");
@@ -203,6 +215,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
   const [, startTransition] = useTransition();
 
   const badge = getExchangeStatusBadge(detail.status);
+  const lastEvent = detail.history.at(-1);
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
     const button = resolveTransitionButton(detail.status, nextStatus);
@@ -302,6 +315,9 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
           <div>
             <dt className="text-xs font-semibold text-slate-500">最終更新</dt>
             <dd className="mt-1 text-slate-900">{formatDateTime(detail.updatedAt)}</dd>
+            {lastEvent ? (
+              <dd className="mt-0.5 text-xs text-slate-500">操作者: {formatEventActor(lastEvent)}</dd>
+            ) : null}
           </div>
           {detail.completedAt ? (
             <div>
@@ -379,10 +395,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
                   <div>
                     {/* ログ行のステータスラベルは色付けせず、背景色なし・黒文字で統一する。 */}
                     <span className="text-xs font-semibold text-slate-900">{eventBadge.label}</span>
-                    <span className="ml-3 text-sm text-slate-700">
-                      {ACTOR_LABEL[event.actorType] ?? event.actorType}
-                      {event.actorId ? ` (${event.actorId})` : ""}
-                    </span>
+                    <span className="ml-3 text-sm text-slate-700">{formatEventActor(event)}</span>
                     {event.comment ? (
                       <div className="mt-2 whitespace-pre-wrap text-xs text-slate-500">{event.comment}</div>
                     ) : null}

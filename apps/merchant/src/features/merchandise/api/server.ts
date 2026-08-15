@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { deleteFavoritesByMerchandise } from "@correcre/lib/dynamodb/exchange-favorite";
 import { listExchangeHistoryByMerchantAndStatus } from "@correcre/lib/dynamodb/exchange-history";
 import {
+  appendMerchandiseHistory,
   buildMerchandiseByStatusGsiPk,
   buildMerchandiseByStatusGsiSk,
   buildMerchandiseSk,
@@ -16,6 +17,7 @@ import {
 } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 import {
   sendOperatorMerchandiseCreatedEmail,
   sendOperatorMerchandisePublishedEmail,
@@ -37,10 +39,12 @@ import {
 import type {
   Merchant,
   Merchandise,
+  MerchandiseAuditActor,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
   MerchandiseImageRef,
   MerchandiseStatus,
+  MerchantUserItem,
 } from "@correcre/types";
 
 import type {
@@ -66,6 +70,16 @@ export class MerchandiseHasActiveExchangesError extends Error {
     super("Merchandise has active exchanges");
     this.name = "MerchandiseHasActiveExchangesError";
   }
+}
+
+// 商品を操作したログイン中ユーザーを、履歴に残す形へ変換する。
+// 表示名はスナップショットとして保存し、後で改名・削除されても「誰が操作したか」を追えるようにする。
+export function toMerchandiseAuditActor(user: MerchantUserItem): MerchandiseAuditActor {
+  return {
+    userId: user.userId,
+    name: joinNameParts(user.lastName, user.firstName) || undefined,
+    email: user.email,
+  };
 }
 
 const ALLOWED_DELIVERY_METHODS: readonly MerchandiseDeliveryMethod[] = [
@@ -341,6 +355,7 @@ export async function getMerchandiseForMerchant(
 export async function createMerchandiseForMerchant(
   merchantId: string,
   input: CreateMerchandiseRequest,
+  actor?: MerchandiseAuditActor,
 ): Promise<MerchandiseSummary> {
   const config = getRuntimeConfig();
   const normalized = normalizeFormPayload(input);
@@ -387,6 +402,14 @@ export async function createMerchandiseForMerchant(
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
+    createdBy: actor,
+    updatedBy: actor,
+    history: appendMerchandiseHistory(undefined, {
+      action: "CREATED",
+      occurredAt: now,
+      status,
+      actor,
+    }),
     createdAt: now,
     updatedAt: now,
     gsi1pk: buildMerchandiseByStatusGsiPk(status),
@@ -423,6 +446,7 @@ export async function updateMerchandiseForMerchant(
   merchantId: string,
   merchandiseId: string,
   input: UpdateMerchandiseRequest,
+  actor?: MerchandiseAuditActor,
 ): Promise<MerchandiseSummary> {
   const config = getRuntimeConfig();
   const existing = await getMerchandise(
@@ -476,6 +500,13 @@ export async function updateMerchandiseForMerchant(
     notes: normalized.notes,
     cardImage,
     detailImage,
+    updatedBy: actor ?? existing.updatedBy,
+    history: appendMerchandiseHistory(existing.history, {
+      action: "UPDATED",
+      occurredAt: now,
+      status: existing.status,
+      actor,
+    }),
     updatedAt: now,
   };
 
@@ -494,6 +525,7 @@ export async function setMerchandiseStatusForMerchant(
   merchantId: string,
   merchandiseId: string,
   status: MerchandiseStatus,
+  actor?: MerchandiseAuditActor,
 ): Promise<MerchandiseSummary> {
   const config = getRuntimeConfig();
   const existing = await getMerchandise(
@@ -510,6 +542,7 @@ export async function setMerchandiseStatusForMerchant(
   }
 
   const shouldNotifyPublished = status === "PUBLISHED" && existing.status !== "PUBLISHED";
+  const now = new Date().toISOString();
 
   await updateMerchandiseStatus(
     {
@@ -519,6 +552,16 @@ export async function setMerchandiseStatusForMerchant(
     merchantId,
     merchandiseId,
     status,
+    {
+      updatedAt: now,
+      actor,
+      history: appendMerchandiseHistory(existing.history, {
+        action: "STATUS_CHANGED",
+        occurredAt: now,
+        status,
+        actor,
+      }),
+    },
   );
 
   const refreshed = await getMerchandise(

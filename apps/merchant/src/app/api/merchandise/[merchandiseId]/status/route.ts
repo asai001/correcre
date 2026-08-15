@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 
-import { setMerchandiseStatusForMerchant } from "@merchant/features/merchandise/api/server";
+import {
+  setMerchandiseStatusForMerchant,
+  toMerchandiseAuditActor,
+} from "@merchant/features/merchandise/api/server";
 import type { UpdateMerchandiseStatusRequest } from "@merchant/features/merchandise/model/types";
 import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
 
@@ -44,7 +47,12 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   try {
-    const item = await setMerchandiseStatusForMerchant(user!.merchantId, merchandiseId, body.status);
+    const item = await setMerchandiseStatusForMerchant(
+      user!.merchantId,
+      merchandiseId,
+      body.status,
+      toMerchandiseAuditActor(user!),
+    );
     return NextResponse.json(item);
   } catch (err) {
     console.error("PATCH /api/merchandise/[merchandiseId]/status error", err);

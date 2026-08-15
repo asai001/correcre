@@ -17,6 +17,9 @@ export type ExchangeHistoryStatusEvent = {
   occurredAt: string;
   actorType: ExchangeHistoryActorType;
   actorId?: string;
+  // 操作した担当者の表示名スナップショット。後で改名・退職しても「誰が操作したか」を追える。
+  // actorName を持たない過去のイベントは、表示側で actorId から名前を引き当てる。
+  actorName?: string;
   comment?: string;
 };
 

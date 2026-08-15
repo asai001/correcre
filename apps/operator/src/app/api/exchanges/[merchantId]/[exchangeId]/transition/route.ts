@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { InvalidExchangeStatusTransitionError } from "@correcre/lib/dynamodb/exchange-history";
+import { joinNameParts } from "@correcre/lib/user-profile";
 import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { transitionExchangeForOperator } from "@operator/features/exchange-management/api/server";
@@ -55,6 +56,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       merchantId,
       exchangeId,
       actorUserId: access.user.userId,
+      actorName: joinNameParts(access.user.lastName, access.user.firstName) || access.user.email,
       nextStatus: body.nextStatus,
       comment: body.comment,
     });
