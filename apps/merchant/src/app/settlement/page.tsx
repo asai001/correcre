@@ -1,7 +1,9 @@
-import { joinNameParts } from "@correcre/lib/user-profile";
-
 import { getMerchantSettlementData, SettlementView } from "@merchant/features/settlement";
-import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  requireCurrentMerchantUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ export default async function SettlementPage() {
   return (
     <SettlementView
       data={data}
-      merchantUserName={headerInfo.contactPersonName || joinNameParts(currentUser.lastName, currentUser.firstName)}
+      merchantUserName={getMerchantViewerName(currentUser)}
       merchantDisplayName={headerInfo.displayName}
     />
   );

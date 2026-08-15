@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
 
-import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchandiseForm } from "@merchant/features/merchandise";
 import { getMerchandiseForMerchant } from "@merchant/features/merchandise/api/server";
-import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  requireCurrentMerchantUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +29,7 @@ export default async function MerchandiseEditPage({ params }: PageProps) {
   return (
     <MerchandiseForm
       mode="edit"
-      merchantName={headerInfo.contactPersonName || joinNameParts(user.lastName, user.firstName)}
+      merchantName={getMerchantViewerName(user)}
       merchantDisplayName={headerInfo.displayName}
       merchantCompanyName={headerInfo.displayName}
       initial={item}

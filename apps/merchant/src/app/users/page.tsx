@@ -1,7 +1,9 @@
-import { joinNameParts } from "@correcre/lib/user-profile";
-
 import { UserManagement, listOwnMerchantUsers } from "@merchant/features/user-management";
-import { getMerchantHeaderInfo, requireCurrentMerchantAdminUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  requireCurrentMerchantAdminUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ export default async function UsersPage() {
   return (
     <UserManagement
       initialUsers={users}
-      merchantUserName={headerInfo.contactPersonName || joinNameParts(currentUser.lastName, currentUser.firstName)}
+      merchantUserName={getMerchantViewerName(currentUser)}
       merchantDisplayName={headerInfo.displayName}
     />
   );

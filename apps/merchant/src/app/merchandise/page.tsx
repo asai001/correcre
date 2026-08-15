@@ -1,7 +1,10 @@
-import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchandiseList } from "@merchant/features/merchandise";
 import { listMerchandiseForMerchant } from "@merchant/features/merchandise/api/server";
-import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  requireCurrentMerchantUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +18,7 @@ export default async function MerchandisePage() {
   return (
     <MerchandiseList
       initialItems={items}
-      merchantName={headerInfo.contactPersonName || joinNameParts(user.lastName, user.firstName)}
+      merchantName={getMerchantViewerName(user)}
       merchantDisplayName={headerInfo.displayName}
     />
   );

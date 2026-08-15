@@ -1,6 +1,9 @@
-import { joinNameParts } from "@correcre/lib/user-profile";
 import { MerchandiseForm } from "@merchant/features/merchandise";
-import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  requireCurrentMerchantUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +15,7 @@ export default async function MerchandiseNewPage() {
   return (
     <MerchandiseForm
       mode="create"
-      merchantName={headerInfo.contactPersonName || joinNameParts(user.lastName, user.firstName)}
+      merchantName={getMerchantViewerName(user)}
       merchantDisplayName={headerInfo.displayName}
       merchantCompanyName={merchantCompanyName}
     />
