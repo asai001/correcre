@@ -7,6 +7,7 @@ import { DashboardCards, getMerchantDashboardData } from "@merchant/features/das
 import {
   getMerchantHeaderInfo,
   getMerchantViewerName,
+  isMerchantAdminUser,
   requireCurrentMerchantUser,
 } from "@merchant/lib/auth/merchant";
 
@@ -33,6 +34,7 @@ const dashboardCards = [
     description: "月ごとの売上と運用者へのご請求額を確認し、請求メールを送信します。",
     icon: faFileInvoice,
     accentClassName: "from-amber-500 to-orange-600",
+    adminOnly: true,
   },
   {
     href: "/support" as const,
@@ -49,6 +51,9 @@ export default async function DashboardPage() {
     getMerchantDashboardData(currentUser.merchantId),
     getMerchantHeaderInfo(currentUser.merchantId),
   ]);
+  // 収支・精算は管理者ロール（MERCHANT_ADMIN）専用のため、一般ユーザーには導線を出さない。
+  const isAdmin = isMerchantAdminUser(currentUser);
+  const visibleCards = isAdmin ? dashboardCards : dashboardCards.filter((card) => !card.adminOnly);
 
   return (
     <div className="space-y-6 pb-5">
@@ -62,7 +67,7 @@ export default async function DashboardPage() {
       <DashboardCards data={dashboard} />
 
       <section className="grid gap-6 lg:grid-cols-2">
-        {dashboardCards.map((card) => (
+        {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}

@@ -4,25 +4,27 @@ import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 
 import { updateMerchantCompanyInfo } from "@merchant/features/company-info";
 import type { UpdateMerchantCompanyInfoInput } from "@merchant/features/company-info";
-import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
+import { getMerchantAccessStatus, isMerchantAdminUser } from "@merchant/lib/auth/merchant";
 
 const FAILED_MESSAGE = "会社情報の処理に失敗しました。時間をおいて再度お試しください。";
 
-async function authorize() {
+// 会社情報の更新は管理者ロール（MERCHANT_ADMIN）のみ許可する。
+async function authorizeAdmin() {
   const access = await getMerchantAccessStatus();
 
-  if (access.allowed) {
+  if (access.allowed && isMerchantAdminUser(access.user)) {
     return { user: access.user, error: null as null | NextResponse };
   }
 
-  const status = access.reason === "unauthenticated" ? 401 : 403;
-  const error = access.reason === "unauthenticated" ? "unauthorized" : "merchant_only";
+  if (!access.allowed && access.reason === "unauthenticated") {
+    return { user: null, error: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };
+  }
 
-  return { user: null, error: NextResponse.json({ error }, { status }) };
+  return { user: null, error: NextResponse.json({ error: "admin_only" }, { status: 403 }) };
 }
 
 export async function PATCH(req: Request) {
-  const { user, error } = await authorize();
+  const { user, error } = await authorizeAdmin();
   if (error) return error;
 
   let body: UpdateMerchantCompanyInfoInput | null = null;

@@ -6,16 +6,17 @@ import { createContext, useContext } from "react";
 // 権限の強制はサーバー側（requireCurrentMerchantAdminUser / API の authorize）が担い、
 // ここはナビ表示の出し分けにのみ使う。
 type MerchantViewer = {
-  canManageUsers: boolean;
+  // MERCHANT_ADMIN ロールを持つか。収支・精算 / 会社情報 / ユーザー管理の表示可否を決める。
+  isAdmin: boolean;
 };
 
-const MerchantViewerContext = createContext<MerchantViewer>({ canManageUsers: false });
+const MerchantViewerContext = createContext<MerchantViewer>({ isAdmin: false });
 
 export function MerchantViewerProvider({
-  canManageUsers,
+  isAdmin,
   children,
-}: Readonly<{ canManageUsers: boolean; children: React.ReactNode }>) {
-  return <MerchantViewerContext.Provider value={{ canManageUsers }}>{children}</MerchantViewerContext.Provider>;
+}: Readonly<{ isAdmin: boolean; children: React.ReactNode }>) {
+  return <MerchantViewerContext.Provider value={{ isAdmin }}>{children}</MerchantViewerContext.Provider>;
 }
 
 export function useMerchantViewer() {
