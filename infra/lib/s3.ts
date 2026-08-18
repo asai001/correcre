@@ -10,6 +10,8 @@ export interface ApplicationS3BucketsProps {
   employeeAppUrl: string;
   operatorAppUrl?: string;
   merchantAppUrl?: string;
+  // ドメイン移行中の旧 URL など、アプリ URL 以外にも CORS を許可したいオリジン。
+  additionalCorsOrigins?: readonly string[];
 }
 
 export interface ApplicationS3Buckets {
@@ -46,6 +48,10 @@ function buildAllowedOrigins(props: ApplicationS3BucketsProps): string[] {
     origins.push(props.merchantAppUrl);
   }
 
+  if (props.additionalCorsOrigins) {
+    origins.push(...props.additionalCorsOrigins);
+  }
+
   if (!isProductionStage(props.stage)) {
     origins.push(
       "http://localhost:3000",
@@ -55,7 +61,8 @@ function buildAllowedOrigins(props: ApplicationS3BucketsProps): string[] {
     );
   }
 
-  return origins.map(trimTrailingSlash);
+  // 旧ドメインを併記した際に同じオリジンが重複しないようにする。
+  return Array.from(new Set(origins.map(trimTrailingSlash)));
 }
 
 // MissionReportImageBucket

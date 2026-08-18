@@ -11,6 +11,8 @@ type EnvironmentConfig = {
   employeeUrl: string;
   operatorUrl: string;
   merchantUrl: string;
+  // ドメイン移行中に旧 URL でもアクセスされる場合、S3 の CORS だけ併せて許可するためのオリジン。
+  legacyOrigins?: string[];
   sourceContext: string;
 };
 
@@ -29,13 +31,21 @@ const environments: EnvironmentConfig[] = [
     stage: "stg",
     account: "622550700840",
     region: "ap-northeast-1",
-    // 実際にデプロイされている Vercel の git-stage URL を指定する。
-    // ここが実 URL と一致していないと S3 バケットの CORS 許可オリジンが合わず、
+    // 保守環境は stage.<アプリ>.correcre.jp のカスタムドメインで配信している
+    // （cognito.ts のログイン URL と一致させる）。
+    // ここが実アクセス元のオリジンと一致していないと S3 バケットの CORS 許可オリジンが合わず、
     // presigned URL への直 PUT がプリフライトで弾かれて画像アップロードに失敗する。
-    adminUrl: "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
-    employeeUrl: "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
-    operatorUrl: "https://correcre-operator-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
-    merchantUrl: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/",
+    adminUrl: "https://stage.admin.correcre.jp/",
+    employeeUrl: "https://stage.app.correcre.jp/",
+    operatorUrl: "https://stage.operator.correcre.jp/",
+    merchantUrl: "https://stage.merchant.correcre.jp/",
+    // Vercel が stage ブランチに自動発行する URL も引き続き開けるため、CORS だけ併せて許可する。
+    legacyOrigins: [
+      "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app",
+      "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app",
+      "https://correcre-operator-git-stage-asai001s-projects-3e71fbe6.vercel.app",
+      "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app",
+    ],
     sourceContext: "stage",
   },
   {
@@ -67,6 +77,7 @@ for (const environment of environments) {
     employeeAppUrl: environment.employeeUrl,
     operatorAppUrl: environment.operatorUrl,
     merchantAppUrl: environment.merchantUrl,
+    additionalCorsOrigins: environment.legacyOrigins,
     sourceContext: environment.sourceContext,
     description: `Correcre ${environment.stage} infrastructure stack`,
   });

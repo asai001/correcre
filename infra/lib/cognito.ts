@@ -91,10 +91,10 @@ const LOGIN_URLS = {
     merchant: "http://localhost:3003/login",
   },
   stg: {
-    admin: "https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
-    employee: "https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
-    operator: "https://correcre-operator-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
-    merchant: "https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login",
+    admin: "https://stage.admin.correcre.jp/login",
+    employee: "https://stage.app.correcre.jp/login",
+    operator: "https://stage.operator.correcre.jp/login",
+    merchant: "https://stage.merchant.correcre.jp/login",
   },
   prod: {
     admin: "https://admin.correcre.jp/login",
