@@ -11,7 +11,7 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { Merchant } from "@correcre/types";
 
 import { getSettlementForMonth } from "@merchant/features/settlement/api/server";
-import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
+import { getMerchantAccessStatus, isMerchantAdminUser } from "@merchant/lib/auth/merchant";
 
 const FAILED_MESSAGE = "請求メールの送信に失敗しました。時間をおいて再度お試しください。";
 // 運用者画面の設定（system-setting テーブル）が未設定の場合のフォールバック宛先。
@@ -179,21 +179,23 @@ async function rollbackInvoiceEmailSent(params: {
   );
 }
 
-async function authorize() {
+// 請求メールの送信は収支・精算画面の操作なので、管理者ロール（MERCHANT_ADMIN）のみ許可する。
+async function authorizeAdmin() {
   const access = await getMerchantAccessStatus();
 
-  if (access.allowed) {
+  if (access.allowed && isMerchantAdminUser(access.user)) {
     return { user: access.user, error: null as null | NextResponse };
   }
 
-  const status = access.reason === "unauthenticated" ? 401 : 403;
-  const error = access.reason === "unauthenticated" ? "unauthorized" : "merchant_only";
+  if (!access.allowed && access.reason === "unauthenticated") {
+    return { user: null, error: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };
+  }
 
-  return { user: null, error: NextResponse.json({ error }, { status }) };
+  return { user: null, error: NextResponse.json({ error: "admin_only" }, { status: 403 }) };
 }
 
 export async function POST(req: Request) {
-  const { user, error } = await authorize();
+  const { user, error } = await authorizeAdmin();
   if (error) return error;
 
   let month: string;

@@ -77,7 +77,6 @@ function formatDateTime(value?: string) {
 export default function CompanyInfoForm({ initialData, merchantUserName, merchantDisplayName }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => createFormState(initialData));
-  const [headerUserName, setHeaderUserName] = useState(merchantUserName);
   const [headerDisplayName, setHeaderDisplayName] = useState(merchantDisplayName ?? initialData.displayName ?? initialData.name);
   const [updatedAt, setUpdatedAt] = useState(initialData.updatedAt);
   const [submitting, setSubmitting] = useState(false);
@@ -114,7 +113,8 @@ export default function CompanyInfoForm({ initialData, merchantUserName, merchan
       });
 
       setForm(createFormState(updated));
-      setHeaderUserName(updated.contactPersonName);
+      // ヘッダーはログイン中ユーザー本人の名前を表示する。会社の代表担当者名
+      // (contactPersonName) を編集しても、そこへ差し替えてはいけない。
       setHeaderDisplayName(updated.displayName ?? updated.name);
       setUpdatedAt(updated.updatedAt);
       setNotice("会社情報を更新しました");
@@ -132,7 +132,7 @@ export default function CompanyInfoForm({ initialData, merchantUserName, merchan
     <div className="space-y-6 pb-10">
       <AdminPageHeader
         title="会社情報"
-        adminName={headerUserName}
+        adminName={merchantUserName}
         merchantDisplayName={headerDisplayName}
         subtitle="提携企業の会社情報を確認・編集します。"
         backHref="/dashboard"

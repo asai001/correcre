@@ -1,11 +1,14 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { listMerchantUsersByCognitoSub } from "@correcre/lib/dynamodb/merchant-user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { joinNameParts } from "@correcre/lib/user-profile";
 import type { MerchantUserItem } from "@correcre/types";
 
 import { MERCHANT_LOGIN_PATH } from "./constants";
@@ -63,9 +66,10 @@ export async function getMerchantDisplayName(merchantId: string): Promise<string
   return merchant?.displayName?.trim() || merchant?.name?.trim() || "";
 }
 
+// ヘッダーに表示する会社名。ユーザー名は getMerchantViewerName（ログイン中ユーザー本人）を使う。
+// 会社の代表担当者名（contactPersonName）は、複数ユーザーでは閲覧者と別人になるため返さない。
 export async function getMerchantHeaderInfo(merchantId: string): Promise<{
   displayName: string;
-  contactPersonName: string;
 }> {
   const merchant = await getMerchantById(
     {
@@ -77,11 +81,12 @@ export async function getMerchantHeaderInfo(merchantId: string): Promise<{
 
   return {
     displayName: merchant?.displayName?.trim() || merchant?.name?.trim() || "",
-    contactPersonName: merchant?.contactPersonName?.trim() || "",
   };
 }
 
-export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {
+// レイアウト（ナビ表示判定）とページの双方から呼ばれるため、
+// 同一リクエスト内では React cache でセッション検証と DB 参照を 1 回にまとめる。
+export const getMerchantAccessStatus = cache(async (): Promise<MerchantAccessStatus> => {
   const session = await getMerchantSession();
 
   if (!session) {
@@ -99,6 +104,16 @@ export async function getMerchantAccessStatus(): Promise<MerchantAccessStatus> {
     session,
     user,
   };
+});
+
+export function isMerchantAdminUser(user: MerchantUserItem): boolean {
+  return user.roles.includes("MERCHANT_ADMIN");
+}
+
+// ヘッダーに表示する「ログイン中ユーザー本人」の名前。
+// 会社レコードの contactPersonName（代表担当者）は別人になり得るためここでは使わない。
+export function getMerchantViewerName(user: MerchantUserItem): string {
+  return joinNameParts(user.lastName, user.firstName) || user.email;
 }
 
 export async function requireMerchantSession() {
@@ -121,4 +136,16 @@ export async function requireCurrentMerchantUser() {
   }
 
   return access.user;
+}
+
+// 管理者ロール（MERCHANT_ADMIN）を持つユーザーのみ許可する。
+// 未ログインはログイン画面へ、一般ユーザーはダッシュボードへ戻す。
+export async function requireCurrentMerchantAdminUser() {
+  const user = await requireCurrentMerchantUser();
+
+  if (!isMerchantAdminUser(user)) {
+    redirect("/dashboard");
+  }
+
+  return user;
 }

@@ -400,6 +400,7 @@ export async function updateExchangeHistoryStatus(
     nextStatus: ExchangeHistoryStatus;
     actorType: ExchangeHistoryActorType;
     actorId?: string;
+    actorName?: string;
     occurredAt?: string;
     comment?: string;
   },
@@ -411,6 +412,7 @@ export async function updateExchangeHistoryStatus(
     occurredAt,
     actorType: params.actorType,
     actorId: params.actorId,
+    actorName: params.actorName,
     comment: params.comment,
   };
 
@@ -495,6 +497,8 @@ export type TransitionExchangeStatusInput = {
   nextStatus: ExchangeHistoryStatus;
   actorType: ExchangeHistoryActorType;
   actorId?: string;
+  // 履歴に残す操作者の表示名スナップショット。
+  actorName?: string;
   comment?: string;
   occurredAt?: string;
   userTableName: string;
@@ -519,6 +523,7 @@ export async function transitionExchangeStatus(
       nextStatus: input.nextStatus,
       actorType: input.actorType,
       actorId: input.actorId,
+      actorName: input.actorName,
       comment: input.comment,
       occurredAt: input.occurredAt,
     });
@@ -531,6 +536,7 @@ export async function transitionExchangeStatus(
     occurredAt,
     actorType: input.actorType,
     actorId: input.actorId,
+    actorName: input.actorName,
     comment: input.comment,
   };
 

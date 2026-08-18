@@ -3,9 +3,13 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faBoxesStacked, faFileInvoice, faHeadset, faRightLeft } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
-import { joinNameParts } from "@correcre/lib/user-profile";
 import { DashboardCards, getMerchantDashboardData } from "@merchant/features/dashboard";
-import { getMerchantHeaderInfo, requireCurrentMerchantUser } from "@merchant/lib/auth/merchant";
+import {
+  getMerchantHeaderInfo,
+  getMerchantViewerName,
+  isMerchantAdminUser,
+  requireCurrentMerchantUser,
+} from "@merchant/lib/auth/merchant";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +34,7 @@ const dashboardCards = [
     description: "月ごとの売上と運用者へのご請求額を確認し、請求メールを送信します。",
     icon: faFileInvoice,
     accentClassName: "from-amber-500 to-orange-600",
+    adminOnly: true,
   },
   {
     href: "/support" as const,
@@ -46,12 +51,15 @@ export default async function DashboardPage() {
     getMerchantDashboardData(currentUser.merchantId),
     getMerchantHeaderInfo(currentUser.merchantId),
   ]);
+  // 収支・精算は管理者ロール（MERCHANT_ADMIN）専用のため、一般ユーザーには導線を出さない。
+  const isAdmin = isMerchantAdminUser(currentUser);
+  const visibleCards = isAdmin ? dashboardCards : dashboardCards.filter((card) => !card.adminOnly);
 
   return (
     <div className="space-y-6 pb-5">
       <AdminPageHeader
         title="提携企業ダッシュボード"
-        adminName={headerInfo.contactPersonName || joinNameParts(currentUser.lastName, currentUser.firstName)}
+        adminName={getMerchantViewerName(currentUser)}
         merchantDisplayName={headerInfo.displayName}
         subtitle="商品・サービスの掲載状況と直近の交換申請を集約します。"
       />
@@ -59,7 +67,7 @@ export default async function DashboardPage() {
       <DashboardCards data={dashboard} />
 
       <section className="grid gap-6 lg:grid-cols-2">
-        {dashboardCards.map((card) => (
+        {visibleCards.map((card) => (
           <Link
             key={card.href}
             href={card.href}

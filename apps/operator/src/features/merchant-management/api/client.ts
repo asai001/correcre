@@ -7,6 +7,7 @@ import type {
   ResetMerchantUserEmailInput,
   ResetMerchantUserPasswordInput,
   UpdateMerchantInput,
+  UpdateMerchantUserRoleInput,
 } from "../model/types";
 
 export async function fetchMerchants(): Promise<MerchantSummary[]> {
@@ -76,6 +77,25 @@ export async function inviteMerchantUser(input: CreateMerchantUserInput): Promis
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(data?.error ?? "提携企業ユーザーの招待に失敗しました。");
+  }
+
+  return (await res.json()) as MerchantUserSummary;
+}
+
+export async function updateMerchantUserRole(input: UpdateMerchantUserRoleInput): Promise<MerchantUserSummary> {
+  const res = await fetch(
+    `/api/merchants/${encodeURIComponent(input.merchantId)}/users/${encodeURIComponent(input.userId)}/role`,
+    {
+      method: "PATCH",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isAdmin: input.isAdmin }),
+    },
+  );
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "権限の変更に失敗しました。");
   }
 
   return (await res.json()) as MerchantUserSummary;

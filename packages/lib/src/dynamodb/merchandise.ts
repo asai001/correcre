@@ -2,7 +2,13 @@ import "server-only";
 
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
-import type { Merchandise, MerchandiseStatus } from "@correcre/types";
+import type {
+  Merchandise,
+  MerchandiseAuditActor,
+  MerchandiseHistoryEvent,
+  MerchandiseStatus,
+} from "@correcre/types";
+import { MERCHANDISE_HISTORY_MAX_ENTRIES } from "@correcre/types";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -165,14 +171,31 @@ export async function adjustMerchandiseFavoriteCount(
   );
 }
 
+// 操作履歴に 1 件追記する。1 レコードが際限なく太らないよう、古いものから捨てて上限件数に収める。
+export function appendMerchandiseHistory(
+  history: MerchandiseHistoryEvent[] | undefined,
+  event: MerchandiseHistoryEvent,
+): MerchandiseHistoryEvent[] {
+  return [...(history ?? []), event].slice(-MERCHANDISE_HISTORY_MAX_ENTRIES);
+}
+
+export type UpdateMerchandiseStatusOptions = {
+  updatedAt?: string;
+  // 公開状態を切り替えた提携企業ユーザー。誰がいつ公開／非公開にしたかを残す。
+  actor?: MerchandiseAuditActor;
+  // appendMerchandiseHistory で組み立て済みの履歴。渡された場合のみ上書きする。
+  history?: MerchandiseHistoryEvent[];
+};
+
 export async function updateMerchandiseStatus(
   config: MerchandiseTableConfig,
   merchantId: string,
   merchandiseId: string,
   status: MerchandiseStatus,
-  updatedAt: string = new Date().toISOString(),
+  options?: UpdateMerchandiseStatusOptions,
 ): Promise<void> {
   const client = getDynamoDocumentClient(config.region);
+  const updatedAt = options?.updatedAt ?? new Date().toISOString();
   const setExpressions = [
     "#status = :status",
     "gsi1pk = :gsi1pk",
@@ -191,6 +214,16 @@ export async function updateMerchandiseStatus(
     expressionAttributeValues[":publishedAt"] = updatedAt;
   }
 
+  if (options?.actor) {
+    setExpressions.push("updatedBy = :updatedBy");
+    expressionAttributeValues[":updatedBy"] = options.actor;
+  }
+
+  if (options?.history) {
+    setExpressions.push("#history = :history");
+    expressionAttributeValues[":history"] = options.history;
+  }
+
   await client.send(
     new UpdateCommand({
       TableName: config.tableName,
@@ -201,6 +234,7 @@ export async function updateMerchandiseStatus(
       UpdateExpression: `SET ${setExpressions.join(", ")}`,
       ExpressionAttributeNames: {
         "#status": "status",
+        ...(options?.history ? { "#history": "history" } : {}),
       },
       ExpressionAttributeValues: expressionAttributeValues,
     }),

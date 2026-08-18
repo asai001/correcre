@@ -20,6 +20,10 @@ export type ExchangeSummary = {
   completedAt?: string;
   canceledAt?: string;
   updatedAt?: string;
+  // 直近の状態更新を「誰が・いつ」行ったか。一覧から操作者を追えるようにするための情報。
+  lastActionActorType?: ExchangeHistoryActorType;
+  lastActionActorName?: string;
+  lastActionAt?: string;
 };
 
 export type ExchangeDetail = ExchangeSummary & {

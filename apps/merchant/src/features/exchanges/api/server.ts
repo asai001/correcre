@@ -10,14 +10,17 @@ import {
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
+import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
+import { joinNameParts } from "@correcre/lib/user-profile";
 import type {
   DBUserAddress,
   ExchangeHistoryActorType,
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
+  ExchangeHistoryStatusEvent,
 } from "@correcre/types";
 
 import type {
@@ -33,6 +36,7 @@ type RuntimeConfig = {
   merchandiseImageBucketName: string;
   userTableName: string;
   companyTableName: string;
+  merchantUserTableName: string;
   pointTransactionTableName: string;
 };
 
@@ -51,8 +55,39 @@ function getRuntimeConfig(): RuntimeConfig {
     merchandiseImageBucketName: readRequiredServerEnv("S3_MERCHANDISE_IMAGE_BUCKET_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
+    merchantUserTableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
   };
+}
+
+// actorName を持たない過去のイベント向けに、actorId（提携企業ユーザー ID）から表示名を引き当てる。
+// 新しいイベントは遷移時に actorName スナップショットを持つため、この解決は不要になる。
+async function resolveMerchantActorNames(
+  config: RuntimeConfig,
+  merchantId: string,
+  events: ReadonlyArray<ExchangeHistoryStatusEvent>,
+): Promise<Map<string, string>> {
+  const unresolved = events.some(
+    (event) => event.actorType === "MERCHANT" && event.actorId && !event.actorName?.trim(),
+  );
+
+  if (!unresolved) {
+    return new Map();
+  }
+
+  const users = await listMerchantUsersByMerchant(
+    {
+      region: config.region,
+      tableName: config.merchantUserTableName,
+    },
+    merchantId,
+  );
+
+  return new Map(
+    users
+      .map((user) => [user.userId, joinNameParts(user.lastName, user.firstName) || user.email] as const)
+      .filter(([, name]) => Boolean(name)),
+  );
 }
 
 async function resolveCompanyName(config: RuntimeConfig, companyId: string): Promise<string | undefined> {
@@ -81,7 +116,37 @@ function compareExchangedAtDesc(left: ExchangeSummary, right: ExchangeSummary) {
   return right.exchangedAt.localeCompare(left.exchangedAt);
 }
 
-function toSummary(item: ExchangeHistoryItem, userName?: string): ExchangeSummary {
+// 履歴の最終イベントから、表示用の操作者名を解決する。
+// actorName スナップショットを持たない過去のイベントは、従業員なら申請者名、
+// 提携企業なら merchantActorNames（userId → 氏名）から引き当てる。
+function resolveEventActorName(
+  event: ExchangeHistoryStatusEvent,
+  applicantName?: string,
+  merchantActorNames?: Map<string, string>,
+): string | undefined {
+  const snapshot = event.actorName?.trim();
+  if (snapshot) {
+    return snapshot;
+  }
+
+  if (event.actorType === "EMPLOYEE") {
+    return applicantName;
+  }
+
+  if (event.actorType === "MERCHANT" && event.actorId) {
+    return merchantActorNames?.get(event.actorId);
+  }
+
+  return undefined;
+}
+
+function toSummary(
+  item: ExchangeHistoryItem,
+  userName?: string,
+  merchantActorNames?: Map<string, string>,
+): ExchangeSummary {
+  const lastEvent = item.history?.at(-1);
+
   return {
     exchangeId: item.exchangeId,
     companyId: item.companyId,
@@ -97,6 +162,9 @@ function toSummary(item: ExchangeHistoryItem, userName?: string): ExchangeSummar
     completedAt: item.completedAt,
     canceledAt: item.canceledAt,
     updatedAt: item.updatedAt,
+    lastActionActorType: lastEvent?.actorType,
+    lastActionActorName: lastEvent ? resolveEventActorName(lastEvent, userName, merchantActorNames) : undefined,
+    lastActionAt: lastEvent?.occurredAt,
   };
 }
 
@@ -163,12 +231,19 @@ export async function listExchangesForMerchant(
         filter,
       );
 
+  // 一覧に出す「最終操作者」の名前解決用。actorName スナップショットを持たない
+  // 過去のイベントのために、提携企業ユーザーを 1 度だけまとめて引く。
+  const lastEvents = items
+    .map((item) => item.history?.at(-1))
+    .filter((event): event is ExchangeHistoryStatusEvent => Boolean(event));
+  const merchantActorNames = await resolveMerchantActorNames(config, merchantId, lastEvents);
+
   const userNameCache = new Map<string, string>();
   const summaries: ExchangeSummary[] = [];
 
   for (const item of items) {
     const userName = await resolveUserName(config, item.companyId, item.userId, userNameCache);
-    summaries.push(toSummary(item, userName));
+    summaries.push(toSummary(item, userName, merchantActorNames));
   }
 
   return summaries.sort(compareExchangedAtDesc);
@@ -208,16 +283,26 @@ async function buildExchangeDetail(
 
   const status = normalizeStatus(item.status);
   const companyName = await resolveCompanyName(config, item.companyId);
+  const rawHistory = item.history ?? [];
+  const merchantActorNames = item.merchantId
+    ? await resolveMerchantActorNames(config, item.merchantId, rawHistory)
+    : new Map<string, string>();
+
+  // 表示用に操作者名を補う。従業員の操作は申請者本人なので申請者名を使う。
+  const history = rawHistory.map((event) => {
+    const actorName = resolveEventActorName(event, applicant.name, merchantActorNames);
+    return actorName ? { ...event, actorName } : event;
+  });
 
   return {
-    ...toSummary(item, applicant.name),
+    ...toSummary(item, applicant.name, merchantActorNames),
     merchantId: item.merchantId ?? "",
     companyName,
     applicantEmail: applicant.email,
     applicantPhoneNumber: applicant.phoneNumber,
     applicantAddress: applicant.address,
     merchandiseImageViewUrl,
-    history: item.history ?? [],
+    history,
     allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
     actorType,
   };
@@ -247,6 +332,8 @@ export async function transitionExchangeForMerchant(params: {
   merchantId: string;
   exchangeId: string;
   actorUserId: string;
+  // 履歴に残す操作者名のスナップショット。後で改名・退職しても誰が操作したかを追える。
+  actorName?: string;
   nextStatus: ExchangeHistoryStatus;
   comment?: string;
 }): Promise<ExchangeDetail> {
@@ -275,6 +362,7 @@ export async function transitionExchangeForMerchant(params: {
       nextStatus: params.nextStatus,
       actorType: "MERCHANT",
       actorId: params.actorUserId,
+      actorName: params.actorName,
       comment: params.comment,
       userTableName: config.userTableName,
       pointTransactionTableName: config.pointTransactionTableName,

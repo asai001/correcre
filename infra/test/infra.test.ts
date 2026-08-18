@@ -1,9 +1,9 @@
 import * as cdk from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 
-import { InfraStack, type InfraStage } from "../lib/infra-stack";
+import { InfraStack, type InfraStackProps, type InfraStage } from "../lib/infra-stack";
 
-function createStack(stage: InfraStage): InfraStack {
+function createStack(stage: InfraStage, overrides: Partial<InfraStackProps> = {}): InfraStack {
   const app = new cdk.App();
 
   return new InfraStack(app, `Correcre${stage}TestStack`, {
@@ -15,7 +15,28 @@ function createStack(stage: InfraStage): InfraStack {
     adminAppUrl: "https://admin.example.com/",
     employeeAppUrl: "https://employee.example.com/",
     sourceContext: "test",
+    ...overrides,
   });
+}
+
+function getAllowedOrigins(template: Template, bucketName: string): string[] {
+  const resources = template.findResources("AWS::S3::Bucket", {
+    Properties: {
+      BucketName: bucketName,
+    },
+  });
+  const matchedResources = Object.values(resources);
+
+  expect(matchedResources).toHaveLength(1);
+
+  const properties = (matchedResources[0] as {
+    Properties?: { CorsConfiguration?: { CorsRules?: { AllowedOrigins?: string[] }[] } };
+  }).Properties;
+  const corsRules = properties?.CorsConfiguration?.CorsRules ?? [];
+
+  expect(corsRules).toHaveLength(1);
+
+  return corsRules[0]?.AllowedOrigins ?? [];
 }
 
 function getSingleTableResource(template: Template, tableName: string): Record<string, unknown> {
@@ -334,9 +355,10 @@ describe("InfraStack", () => {
     const internalCode = getCustomMessageLambdaCode(template, INTERNAL_CUSTOM_MESSAGE_DESCRIPTION);
     const merchantCode = getCustomMessageLambdaCode(template, MERCHANT_CUSTOM_MESSAGE_DESCRIPTION);
 
-    expect(internalCode).toContain("https://correcre-admin-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
-    expect(internalCode).toContain("https://correcre-employee-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
-    expect(merchantCode).toContain("https://correcre-merchant-git-stage-asai001s-projects-3e71fbe6.vercel.app/login");
+    expect(internalCode).toContain("https://stage.admin.correcre.jp/login");
+    expect(internalCode).toContain("https://stage.app.correcre.jp/login");
+    expect(internalCode).toContain("https://stage.operator.correcre.jp/login");
+    expect(merchantCode).toContain("https://stage.merchant.correcre.jp/login");
   });
 
   test("embeds production admin-create-user routing in the custom message lambda", () => {
@@ -533,6 +555,60 @@ describe("InfraStack", () => {
     });
 
     expect(sesStatement).toBeDefined();
+  });
+
+  // アプリのドメインとバケットの CORS 許可オリジンがずれると、
+  // 署名付き URL への直 PUT がプリフライトで弾かれて画像アップロードが失敗する。
+  test("allows every app origin to upload images directly to the image buckets", () => {
+    const template = Template.fromStack(
+      createStack("stg", {
+        adminAppUrl: "https://stage.admin.example.com/",
+        employeeAppUrl: "https://stage.app.example.com/",
+        operatorAppUrl: "https://stage.operator.example.com/",
+        merchantAppUrl: "https://stage.merchant.example.com/",
+      }),
+    );
+
+    for (const bucketName of [
+      "correcre-mission-report-image-stg-123456789012",
+      "correcre-merchandise-image-stg-123456789012",
+    ]) {
+      const allowedOrigins = getAllowedOrigins(template, bucketName);
+
+      // 末尾スラッシュを含むとオリジンとして一致しないため、除去されている必要がある。
+      expect(allowedOrigins).toEqual(
+        expect.arrayContaining([
+          "https://stage.admin.example.com",
+          "https://stage.app.example.com",
+          "https://stage.operator.example.com",
+          "https://stage.merchant.example.com",
+        ]),
+      );
+    }
+  });
+
+  test("keeps legacy origins allowed while a domain migration is in progress", () => {
+    const template = Template.fromStack(
+      createStack("stg", {
+        adminAppUrl: "https://stage.admin.example.com/",
+        employeeAppUrl: "https://stage.app.example.com/",
+        additionalCorsOrigins: [
+          "https://stage.admin.example.com",
+          "https://legacy-admin.example.com",
+        ],
+      }),
+    );
+    const allowedOrigins = getAllowedOrigins(template, "correcre-merchandise-image-stg-123456789012");
+
+    expect(allowedOrigins).toContain("https://legacy-admin.example.com");
+    expect(allowedOrigins.filter((origin) => origin === "https://stage.admin.example.com")).toHaveLength(1);
+  });
+
+  test("does not allow localhost origins on the production image buckets", () => {
+    const template = Template.fromStack(createStack("prod"));
+    const allowedOrigins = getAllowedOrigins(template, "correcre-merchandise-image-prod-123456789012");
+
+    expect(allowedOrigins.some((origin) => origin.startsWith("http://localhost"))).toBe(false);
   });
 
   test("scopes the dev AWS account to development subjects only", () => {

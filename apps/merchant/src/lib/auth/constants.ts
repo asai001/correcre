@@ -12,4 +12,6 @@ export const MERCHANT_PROTECTED_PATH_PREFIXES = [
   "/exchanges",
   "/settlement",
   "/support",
+  "/company-info",
+  "/users",
 ] as const;

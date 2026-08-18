@@ -372,6 +372,16 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
     () => employees.filter((employee) => employee.status === "INVITED").length,
     [employees],
   );
+  // アクティブユーザー = 従業員ロールを持ち、状態が「有効」または「招待中」のユーザー。
+  // 管理者・運用者のみのアカウントや、休止中・論理削除済みは含めない。
+  const activeEmployeeCount = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.roles.includes("EMPLOYEE") && (employee.status === "ACTIVE" || employee.status === "INVITED"),
+      ).length,
+    [employees],
+  );
   const unlinkedEmployeeCount = useMemo(
     () =>
       employees.filter((employee) => employee.status !== "DELETED" && employee.authLinkStatus === "UNLINKED").length,
@@ -703,8 +713,8 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         />
         {companySelectorSection}
         <div className="h-32 animate-pulse rounded-[28px] bg-slate-200/70" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }, (_, index) => (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {Array.from({ length: 5 }, (_, index) => (
             <div key={index} className="h-40 animate-pulse rounded-[28px] bg-slate-200/70" />
           ))}
         </div>
@@ -864,12 +874,18 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
         ) : null}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="登録ユーザー数"
           value={`${summary.employeeCount}`}
           description="現在この会社で管理しているユーザー数"
           accentClassName="bg-gradient-to-r from-blue-500 to-cyan-400"
+        />
+        <StatCard
+          label="アクティブユーザー数"
+          value={`${activeEmployeeCount}`}
+          description="従業員権限で状態が「有効」または「招待中」のユーザー数"
+          accentClassName="bg-gradient-to-r from-sky-500 to-indigo-400"
         />
         <StatCard
           label="部署数"

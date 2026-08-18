@@ -14,6 +14,8 @@ export interface InfraStackProps extends cdk.StackProps {
   employeeAppUrl: string;
   operatorAppUrl?: string;
   merchantAppUrl?: string;
+  // ドメイン移行中の旧 URL など、アプリ URL 以外にも S3 の CORS を許可したいオリジン。
+  additionalCorsOrigins?: readonly string[];
   sourceContext: string;
 }
 
@@ -43,6 +45,7 @@ export class InfraStack extends cdk.Stack {
       employeeAppUrl: props.employeeAppUrl,
       operatorAppUrl: props.operatorAppUrl,
       merchantAppUrl: props.merchantAppUrl,
+      additionalCorsOrigins: props.additionalCorsOrigins,
     });
     const vercelOidcAccess = createVercelOidcAccess(this, {
       stage: props.stage,

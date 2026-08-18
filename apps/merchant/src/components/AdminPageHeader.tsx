@@ -13,25 +13,30 @@ import {
   faHeadset,
   faRightLeft,
   faUserShield,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
 import { logout } from "@merchant/app/lib/actions/authenticate";
+import { useMerchantViewer } from "@merchant/components/MerchantViewerContext";
 
 type NavItem = {
   label: string;
   href: Route;
   icon: IconDefinition;
+  // 管理者ロール（MERCHANT_ADMIN）を持つユーザーにのみ表示する項目。
+  adminOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "ダッシュボード", href: "/dashboard" as Route, icon: faGauge },
   { label: "商品・サービス管理", href: "/merchandise" as Route, icon: faBoxesStacked },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
-  { label: "収支・精算", href: "/settlement" as Route, icon: faFileInvoice },
-  { label: "会社情報", href: "/company-info" as Route, icon: faBuilding },
+  { label: "収支・精算", href: "/settlement" as Route, icon: faFileInvoice, adminOnly: true },
+  { label: "会社情報", href: "/company-info" as Route, icon: faBuilding, adminOnly: true },
   { label: "問い合わせ", href: "/support" as Route, icon: faHeadset },
+  { label: "ユーザー管理", href: "/users" as Route, icon: faUsers, adminOnly: true },
 ];
 
 function isActiveNav(pathname: string | null, href: string): boolean {
@@ -56,6 +61,8 @@ export default function AdminPageHeader({
   subtitle = "提携企業向け 商品・サービス管理",
 }: AdminPageHeaderProps) {
   const pathname = usePathname();
+  const { isAdmin } = useMerchantViewer();
+  const navItems = isAdmin ? NAV_ITEMS : NAV_ITEMS.filter((item) => !item.adminOnly);
 
   return (
     <section className="relative left-1/2 -mx-[50vw] w-screen bg-[linear-gradient(90deg,#0f766e_0%,#0f4c81_100%)] text-white">
@@ -92,7 +99,7 @@ export default function AdminPageHeader({
       <nav aria-label="グローバルメニュー" className="border-t border-white/15 bg-black/20">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-6">
           <ul className="flex flex-wrap items-center gap-1">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = isActiveNav(pathname, item.href);
               return (
                 <li key={item.href}>

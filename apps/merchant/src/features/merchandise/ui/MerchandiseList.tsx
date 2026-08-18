@@ -8,18 +8,17 @@ import { faCirclePlus, faPenToSquare, faTrash } from "@fortawesome/free-solid-sv
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
 import type { MerchandiseSummary } from "../model/types";
+import {
+  formatMerchandiseActor,
+  formatMerchandiseDateTime,
+  MERCHANDISE_STATUS_LABELS as STATUS_LABELS,
+} from "../model/audit";
 import { deleteMerchandise, updateMerchandiseStatus } from "../api/client";
 
 type Props = {
   initialItems: MerchandiseSummary[];
   merchantName: string;
   merchantDisplayName?: string;
-};
-
-const STATUS_LABELS: Record<MerchandiseSummary["status"], string> = {
-  DRAFT: "下書き",
-  PUBLISHED: "公開中",
-  UNPUBLISHED: "非公開",
 };
 
 const STATUS_BADGE_CLASSES: Record<MerchandiseSummary["status"], string> = {
@@ -143,6 +142,21 @@ export default function MerchandiseList({ initialItems, merchantName, merchantDi
                 <div>
                   <div className="line-clamp-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
                 </div>
+                {/* 誰がいつ登録・更新したかを一覧上で追えるようにする。 */}
+                <dl className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 font-semibold text-slate-600">最終更新</dt>
+                    <dd className="min-w-0 break-words">
+                      {formatMerchandiseDateTime(item.updatedAt)} ／ {formatMerchandiseActor(item.updatedBy)}
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 font-semibold text-slate-600">登録</dt>
+                    <dd className="min-w-0 break-words">
+                      {formatMerchandiseDateTime(item.createdAt)} ／ {formatMerchandiseActor(item.createdBy)}
+                    </dd>
+                  </div>
+                </dl>
                 <div className="flex items-center justify-end gap-4 pt-2">
                   <Link
                     href={`/merchandise/${encodeURIComponent(item.merchandiseId)}`}

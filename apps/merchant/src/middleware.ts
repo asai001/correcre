@@ -102,5 +102,7 @@ export const config = {
     "/exchanges/:path*",
     "/settlement/:path*",
     "/support/:path*",
+    "/company-info/:path*",
+    "/users/:path*",
   ],
 };

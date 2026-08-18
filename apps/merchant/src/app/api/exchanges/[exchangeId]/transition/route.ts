@@ -6,7 +6,7 @@ import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { transitionExchangeForMerchant } from "@merchant/features/exchanges/api/server";
 import type { TransitionExchangeRequest } from "@merchant/features/exchanges/model/types";
-import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
+import { getMerchantAccessStatus, getMerchantViewerName } from "@merchant/lib/auth/merchant";
 
 const FAILED_MESSAGE = "交換情報の更新に失敗しました。時間をおいて再度お試しください。";
 
@@ -64,6 +64,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       merchantId: user!.merchantId,
       exchangeId,
       actorUserId: user!.userId,
+      actorName: getMerchantViewerName(user!),
       nextStatus: body.nextStatus,
       comment: body.comment,
     });

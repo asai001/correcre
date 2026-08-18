@@ -22,6 +22,26 @@ export type MerchandiseImageRef = {
   uploadedAt: string;
 };
 
+// 商品を操作した提携企業ユーザー。表示名はスナップショット（後で改名・削除されても履歴が読める）。
+export type MerchandiseAuditActor = {
+  userId: string;
+  name?: string;
+  email?: string;
+};
+
+export type MerchandiseHistoryAction = "CREATED" | "UPDATED" | "STATUS_CHANGED";
+
+export type MerchandiseHistoryEvent = {
+  action: MerchandiseHistoryAction;
+  occurredAt: string;
+  // STATUS_CHANGED のときの遷移先。CREATED では初期ステータス。
+  status?: MerchandiseStatus;
+  actor?: MerchandiseAuditActor;
+};
+
+// 1 レコードが肥大化しないよう、保持する操作履歴の上限件数（超えた分は古いものから捨てる）。
+export const MERCHANDISE_HISTORY_MAX_ENTRIES = 50;
+
 export type Merchandise = {
   merchantId: string;
   sk: `MERCHANDISE#${string}`;
@@ -56,6 +76,11 @@ export type Merchandise = {
   notes?: string;
 
   favoriteCount?: number;
+
+  // 操作者の追跡用。既存レコードには存在しないため任意。
+  createdBy?: MerchandiseAuditActor;
+  updatedBy?: MerchandiseAuditActor;
+  history?: MerchandiseHistoryEvent[];
 
   createdAt: string;
   updatedAt: string;
