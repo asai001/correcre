@@ -3,6 +3,7 @@ import type {
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
   MerchandiseStatus,
+  ProductFulfillment,
 } from "@correcre/types";
 
 export type MerchandiseSummary = Merchandise & {
@@ -31,6 +32,7 @@ export type MerchandiseFormPayload = {
   expiration?: string;
   deliverySchedule?: string;
   notes?: string;
+  fulfillment?: ProductFulfillment;
 };
 
 export type CreateMerchandiseRequest = MerchandiseFormPayload;

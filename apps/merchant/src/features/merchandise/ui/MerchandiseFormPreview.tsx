@@ -11,6 +11,7 @@ import {
   type PublicMerchandiseSummary,
 } from "@correcre/merchandise-public";
 import type { MerchandiseDeliveryMethod, MerchandiseGenre } from "@correcre/types";
+import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 type Props = {
   merchandiseName: string;
@@ -49,6 +50,7 @@ export default function MerchandiseFormPreview(props: Props) {
     genre: props.genre as MerchandiseGenre,
     genreOther: props.genreOther || undefined,
     cardImageViewUrl: props.cardImagePreviewUrl,
+    fulfillment: resolveMerchandiseFulfillment(undefined),
   };
 
   // 詳細ページプレビューは従業員アプリの商品交換詳細ページと同じ MerchandiseDetailView を使い、

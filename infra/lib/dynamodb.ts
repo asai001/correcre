@@ -27,6 +27,8 @@ export interface ApplicationDynamoTables {
   systemSettingTable: dynamodb.Table;
   supportInquiryTable: dynamodb.Table;
   seminarRegistrationTable: dynamodb.Table;
+  merchantCalendarTable: dynamodb.Table;
+  scheduleEventTable: dynamodb.Table;
 }
 
 // Key naming policy:
@@ -239,6 +241,15 @@ function createExchangeHistoryTable(scope: Construct, stage: InfraStage): dynamo
     sortKey: stringAttribute("gsi3sk"),
   });
 
+  // 配送日程調整のスパース GSI。調整が進行中（AWAITING_* / CONFIRMED）のアイテムだけが
+  // gsi4pk = SCHEDULE#<scheduleStatus> を持つ。日次バッチの横断クエリ用。
+  // CONFIRMED 中の gsi4sk は ARRIVAL#<YYYY-MM-DD> で、確定日前日リマインドの範囲クエリに使う。
+  table.addGlobalSecondaryIndex({
+    indexName: "ExchangeHistoryByScheduleStatus",
+    partitionKey: stringAttribute("gsi4pk"),
+    sortKey: stringAttribute("gsi4sk"),
+  });
+
   return table;
 }
 
@@ -424,6 +435,31 @@ function createSeminarRegistrationTable(scope: Construct, stage: InfraStage): dy
   );
 }
 
+// MerchantCalendar
+// - merchantId = <merchantId>
+// - sort key なし（1 merchant = 1 カレンダー）
+// - GSI なし
+function createMerchantCalendarTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "MerchantCalendarTable",
+    buildTableProps(stage, buildTableName("merchant-calendar", stage), "merchantId"),
+  );
+}
+
+// ScheduleEvent（配送日程調整の操作ログ・追記のみ）
+// - pk = EXCHANGE#<exchangeId>
+// - sk = SEQ#<0 埋め 4 桁>
+// - GSI なし（交換単位の Query のみ）
+// 免責条項の根拠となるログのため、アプリ側に Update / Delete の経路を作らないこと。
+function createScheduleEventTable(scope: Construct, stage: InfraStage): dynamodb.Table {
+  return new dynamodb.Table(
+    scope,
+    "ScheduleEventTable",
+    buildTableProps(stage, buildTableName("schedule-event", stage), "pk", "sk"),
+  );
+}
+
 export function createApplicationDynamoTables(
   scope: Construct,
   props: ApplicationDynamoTablesProps,
@@ -447,5 +483,7 @@ export function createApplicationDynamoTables(
     systemSettingTable: createSystemSettingTable(scope, props.stage),
     supportInquiryTable: createSupportInquiryTable(scope, props.stage),
     seminarRegistrationTable: createSeminarRegistrationTable(scope, props.stage),
+    merchantCalendarTable: createMerchantCalendarTable(scope, props.stage),
+    scheduleEventTable: createScheduleEventTable(scope, props.stage),
   };
 }

@@ -195,6 +195,12 @@ GSI:
 | Index | キー | 用途 |
 | --- | --- | --- |
 | `ExchangeHistoryByCompanyExchangedAt` | `gsi1pk = COMPANY#<companyId>` / `gsi1sk = EXCHANGED_AT#<ISO8601>#USER#<userId>#EXCHANGE#<exchangeId>` | 会社全体の交換履歴一覧、時系列参照 |
+| `ExchangeHistoryByScheduleStatus` | `gsi4pk = SCHEDULE#<scheduleStatus>` / `gsi4sk = EXCHANGED_AT#<ISO8601>` または `ARRIVAL#<YYYY-MM-DD>` | 配送日程調整のスパース GSI。調整進行中（AWAITING_* / CONFIRMED）のみキーを持ち、日次バッチの横断クエリと確定日前日リマインド（`ARRIVAL#` の範囲クエリ）に使う |
+
+補足:
+
+- 配送日程調整の状態は `schedule` 属性（`scheduleStatus`, `candidates`, `proposalRoundCount` など）に内包します
+- `schedule` 属性を持たない既存レコードは「日程調整なし（NOT_REQUIRED）」として読み取り時に解釈します
 
 ### 8. PointTransaction
 
@@ -216,6 +222,28 @@ GSI:
 
 - `type` は `EARN` / `USE` / `ADJUST_PLUS` / `ADJUST_MINUS`
 - `reasonType` は `MISSION_APPROVED` / `EXCHANGE` / `MANUAL_ADJUST` / `CANCEL_EXCHANGE` / `REVOKE_MISSION` など、将来拡張しやすい形で持ちます
+
+### 9. MerchantCalendar
+
+提携企業の休業日カレンダーです。配送日程の候補日自動生成が参照します。
+
+| 項目 | 内容 |
+| --- | --- |
+| PK | `merchantId = <merchantId>` |
+| SK | なし（1 merchant = 1 カレンダー） |
+| 主な属性 | `closedDates`（YYYY-MM-DD の配列。期間指定は展開して保存）, `regularClosedWeekdays`（0=日 ... 6=土）, `treatPublicHolidaysAsClosed`（未設定は true）, `createdAt`, `updatedAt` |
+| GSI | なし |
+
+### 10. ScheduleEvent
+
+配送日程調整の操作ログです。免責条項の根拠となるため**追記のみ**とし、アプリ側に Update / Delete の経路を作りません。
+
+| 項目 | 内容 |
+| --- | --- |
+| PK | `pk = EXCHANGE#<exchangeId>` |
+| SK | `sk = SEQ#<0 埋め 4 桁>` |
+| 主な属性 | `exchangeRequestId`, `seq`, `occurredAt`, `actor`（MERCHANT / EMPLOYEE / SYSTEM）, `actorId`, `actorName`, `eventType`, `payload` |
+| GSI | なし（交換単位の Query のみ） |
 
 ## 認証・認可フロー
 

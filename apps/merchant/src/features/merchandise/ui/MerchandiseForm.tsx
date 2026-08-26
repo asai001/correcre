@@ -15,11 +15,14 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
+import type { FulfillmentType, ProductFulfillment, TemperatureZone } from "@correcre/types";
+import { AVAILABLE_TIME_SLOT_VALUES, resolveMerchandiseFulfillment } from "@correcre/types";
 import {
   createMerchandise,
   requestMerchandiseUploadUrl,
@@ -65,6 +68,63 @@ type FormState = {
   deliverySchedule: string;
   notes: string;
 };
+
+const temperatureZoneOptions: { value: TemperatureZone; label: string }[] = [
+  { value: "AMBIENT", label: "常温" },
+  { value: "REFRIGERATED", label: "冷蔵" },
+  { value: "FROZEN", label: "冷凍" },
+];
+
+const fulfillmentTypeOptions: { value: FulfillmentType; label: string }[] = [
+  { value: "SHIPPING", label: "配送" },
+  { value: "STORE_PICKUP", label: "店頭受け取り" },
+];
+
+const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
+
+type FulfillmentFormState = {
+  fulfillmentType: FulfillmentType;
+  temperatureZone: TemperatureZone;
+  requiresScheduling: boolean;
+  // merchant が手動でスイッチを触ったか。触るまでは温度帯に応じた既定値へ自動追従する。
+  requiresSchedulingTouched: boolean;
+  leadTimeBusinessDays: string;
+  transitDays: string;
+  shippableWeekdays: number[];
+  cutoffTime: string;
+  availableTimeSlots: string[];
+  candidateCount: string;
+};
+
+function getInitialFulfillmentState(initial: MerchandiseSummary | undefined): FulfillmentFormState {
+  const resolved = resolveMerchandiseFulfillment(initial?.fulfillment);
+  return {
+    fulfillmentType: resolved.fulfillmentType,
+    temperatureZone: resolved.temperatureZone,
+    requiresScheduling: resolved.requiresScheduling,
+    requiresSchedulingTouched: Boolean(initial?.fulfillment),
+    leadTimeBusinessDays: String(resolved.leadTimeBusinessDays),
+    transitDays: String(resolved.transitDays),
+    shippableWeekdays: [...resolved.shippableWeekdays],
+    cutoffTime: resolved.cutoffTime,
+    availableTimeSlots: [...resolved.availableTimeSlots],
+    candidateCount: String(resolved.candidateCount),
+  };
+}
+
+function buildFulfillmentPayload(state: FulfillmentFormState): ProductFulfillment {
+  return {
+    fulfillmentType: state.fulfillmentType,
+    temperatureZone: state.temperatureZone,
+    requiresScheduling: state.requiresScheduling,
+    leadTimeBusinessDays: Number(state.leadTimeBusinessDays),
+    transitDays: Number(state.transitDays),
+    shippableWeekdays: [...state.shippableWeekdays].sort((a, b) => a - b),
+    cutoffTime: state.cutoffTime,
+    availableTimeSlots: state.availableTimeSlots,
+    candidateCount: Number(state.candidateCount),
+  };
+}
 
 type Props = {
   mode: "create" | "edit";
@@ -133,6 +193,7 @@ function getInitialImageState(initial: MerchandiseSummary | undefined, target: I
 export default function MerchandiseForm({ mode, merchantName, merchantDisplayName, merchantCompanyName, initial }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => getInitialFormState(initial));
+  const [fulfillment, setFulfillment] = useState<FulfillmentFormState>(() => getInitialFulfillmentState(initial));
   const [cardImage, setCardImage] = useState<ImageState>(() => getInitialImageState(initial, "card"));
   const [detailImage, setDetailImage] = useState<ImageState>(() => getInitialImageState(initial, "detail"));
   const [submitting, setSubmitting] = useState(false);
@@ -150,6 +211,47 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   const handleField = (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFulfillmentField =
+    (field: "leadTimeBusinessDays" | "transitDays" | "cutoffTime" | "candidateCount") =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const value = event.target.value;
+      setFulfillment((prev) => ({ ...prev, [field]: value }));
+    };
+
+  const handleTemperatureZoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value as TemperatureZone;
+    setFulfillment((prev) => ({
+      ...prev,
+      temperatureZone: value,
+      // 冷蔵・冷凍は日程調整必須が既定。merchant が手動で切り替えるまでは自動追従する。
+      requiresScheduling: prev.requiresSchedulingTouched
+        ? prev.requiresScheduling
+        : value === "REFRIGERATED" || value === "FROZEN",
+    }));
+  };
+
+  const handleRequiresSchedulingToggle = (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({ ...prev, requiresScheduling: checked, requiresSchedulingTouched: true }));
+  };
+
+  const handleWeekdayToggle = (day: number) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({
+      ...prev,
+      shippableWeekdays: checked
+        ? Array.from(new Set([...prev.shippableWeekdays, day]))
+        : prev.shippableWeekdays.filter((entry) => entry !== day),
+    }));
+  };
+
+  const handleTimeSlotToggle = (slot: string) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({
+      ...prev,
+      availableTimeSlots: checked
+        ? AVAILABLE_TIME_SLOT_VALUES.filter((entry) => [...prev.availableTimeSlots, slot].includes(entry))
+        : prev.availableTimeSlots.filter((entry) => entry !== slot),
+    }));
   };
 
   const handleDeliveryToggle = (method: string) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
@@ -240,6 +342,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         expiration: form.expiration || undefined,
         deliverySchedule: form.deliverySchedule || undefined,
         notes: form.notes || undefined,
+        fulfillment: buildFulfillmentPayload(fulfillment),
       };
 
       if (mode === "create") {
@@ -427,6 +530,144 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
             onChange={handleField("notes")}
             placeholder="要冷蔵保存 / アレルギー表示 など"
           />
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <Typography variant="h6" className="font-semibold text-slate-900">
+          配送・日程調整
+        </Typography>
+        <Typography variant="body2" className="!mt-1 text-slate-500">
+          生鮮品など、お届け日の調整が必要な商品はここで設定します。冷蔵・冷凍を選ぶと日程調整が自動で有効になります。
+        </Typography>
+
+        <Stack spacing={2.5} className="!mt-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <TextField
+              select
+              label="受け渡し方法"
+              fullWidth
+              value={fulfillment.fulfillmentType}
+              onChange={(event) =>
+                setFulfillment((prev) => ({ ...prev, fulfillmentType: event.target.value as FulfillmentType }))
+              }
+            >
+              {fulfillmentTypeOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="温度帯"
+              fullWidth
+              value={fulfillment.temperatureZone}
+              onChange={handleTemperatureZoneChange}
+            >
+              {temperatureZoneOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </div>
+
+          <FormControlLabel
+            control={<Switch checked={fulfillment.requiresScheduling} onChange={handleRequiresSchedulingToggle} />}
+            label="お届け日の日程調整を行う（交換申請後に候補日を提示して、従業員に選んでもらいます）"
+          />
+
+          {fulfillment.requiresScheduling ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <TextField
+                  label="発送準備（営業日）"
+                  type="number"
+                  fullWidth
+                  value={fulfillment.leadTimeBusinessDays}
+                  onChange={handleFulfillmentField("leadTimeBusinessDays")}
+                  helperText="日程確定から発送までに必要な営業日数"
+                  slotProps={{ input: { endAdornment: <InputAdornment position="end">営業日</InputAdornment> } }}
+                />
+                <TextField
+                  label="配送日数（暦日）"
+                  type="number"
+                  fullWidth
+                  value={fulfillment.transitDays}
+                  onChange={handleFulfillmentField("transitDays")}
+                  helperText="発送から到着までの日数"
+                  slotProps={{ input: { endAdornment: <InputAdornment position="end">日</InputAdornment> } }}
+                />
+                <TextField
+                  label="当日受付の締切時刻"
+                  type="time"
+                  fullWidth
+                  value={fulfillment.cutoffTime}
+                  onChange={handleFulfillmentField("cutoffTime")}
+                  helperText="この時刻を過ぎた確定は翌営業日扱い"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                />
+              </div>
+
+              <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
+                <Typography variant="subtitle2" className="text-slate-800">
+                  発送可能曜日（製造サイクルに対応）
+                </Typography>
+                <FormGroup row className="mt-2">
+                  {weekdayLabels.map((label, day) => (
+                    <FormControlLabel
+                      key={day}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={fulfillment.shippableWeekdays.includes(day)}
+                          onChange={handleWeekdayToggle(day)}
+                        />
+                      }
+                      label={label}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+
+              <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
+                <Typography variant="subtitle2" className="text-slate-800">
+                  選択できる時間帯（任意）
+                </Typography>
+                <FormGroup row className="mt-2">
+                  {AVAILABLE_TIME_SLOT_VALUES.map((slot) => (
+                    <FormControlLabel
+                      key={slot}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={fulfillment.availableTimeSlots.includes(slot)}
+                          onChange={handleTimeSlotToggle(slot)}
+                        />
+                      }
+                      label={slot}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  label="提示する候補日の件数"
+                  type="number"
+                  fullWidth
+                  value={fulfillment.candidateCount}
+                  onChange={handleFulfillmentField("candidateCount")}
+                  helperText="自動生成する候補日の件数（1〜10、既定 4）"
+                />
+              </div>
+
+              <Alert severity="info">
+                臨時休業や出張などで発送できない日は、休業日カレンダーに登録しておくと候補日の自動生成から除外されます。
+              </Alert>
+            </>
+          ) : null}
         </Stack>
       </Paper>
 

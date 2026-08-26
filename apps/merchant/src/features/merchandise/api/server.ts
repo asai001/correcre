@@ -37,6 +37,7 @@ import {
   type MerchandiseImageTarget,
 } from "@correcre/lib/s3/merchandise-image";
 import type {
+  FulfillmentType,
   Merchant,
   Merchandise,
   MerchandiseAuditActor,
@@ -45,7 +46,10 @@ import type {
   MerchandiseImageRef,
   MerchandiseStatus,
   MerchantUserItem,
+  ProductFulfillment,
+  TemperatureZone,
 } from "@correcre/types";
+import { AVAILABLE_TIME_SLOT_VALUES, DEFAULT_CANDIDATE_COUNT } from "@correcre/types";
 
 import type {
   CreateMerchandiseRequest,
@@ -180,6 +184,71 @@ function getNextMerchandiseId(items: Merchandise[]) {
   return `md-${String(nextNumber).padStart(3, "0")}`;
 }
 
+const ALLOWED_FULFILLMENT_TYPES: FulfillmentType[] = ["SHIPPING", "STORE_PICKUP"];
+const ALLOWED_TEMPERATURE_ZONES: TemperatureZone[] = ["AMBIENT", "REFRIGERATED", "FROZEN"];
+const CUTOFF_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFulfillment | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  if (!ALLOWED_FULFILLMENT_TYPES.includes(input.fulfillmentType)) {
+    throw new Error("受け渡し方法が不正です");
+  }
+
+  if (!ALLOWED_TEMPERATURE_ZONES.includes(input.temperatureZone)) {
+    throw new Error("温度帯が不正です");
+  }
+
+  const requiresScheduling = input.requiresScheduling === true;
+
+  const leadTimeBusinessDays = Math.floor(Number(input.leadTimeBusinessDays));
+  if (!Number.isFinite(leadTimeBusinessDays) || leadTimeBusinessDays < 0 || leadTimeBusinessDays > 30) {
+    throw new Error("発送準備の営業日数は 0〜30 で入力してください");
+  }
+
+  const transitDays = Math.floor(Number(input.transitDays));
+  if (!Number.isFinite(transitDays) || transitDays < 0 || transitDays > 14) {
+    throw new Error("配送日数は 0〜14 で入力してください");
+  }
+
+  const shippableWeekdays = Array.from(
+    new Set((input.shippableWeekdays ?? []).map((day) => Math.floor(Number(day)))),
+  )
+    .filter((day) => day >= 0 && day <= 6)
+    .sort((a, b) => a - b);
+
+  if (requiresScheduling && shippableWeekdays.length === 0) {
+    throw new Error("発送可能曜日を1つ以上選択してください");
+  }
+
+  if (!CUTOFF_TIME_PATTERN.test(input.cutoffTime)) {
+    throw new Error("受付締切時刻は HH:mm 形式で入力してください");
+  }
+
+  const availableTimeSlots = (input.availableTimeSlots ?? []).filter((slot) =>
+    AVAILABLE_TIME_SLOT_VALUES.includes(slot),
+  );
+
+  const candidateCount = Math.floor(Number(input.candidateCount));
+  if (!Number.isFinite(candidateCount) || candidateCount < 1 || candidateCount > 10) {
+    throw new Error("候補日の件数は 1〜10 で入力してください");
+  }
+
+  return {
+    fulfillmentType: input.fulfillmentType,
+    temperatureZone: input.temperatureZone,
+    requiresScheduling,
+    leadTimeBusinessDays,
+    transitDays,
+    shippableWeekdays,
+    cutoffTime: input.cutoffTime,
+    availableTimeSlots,
+    candidateCount: candidateCount || DEFAULT_CANDIDATE_COUNT,
+  };
+}
+
 function normalizeFormPayload(input: MerchandiseFormPayload) {
   const heading = input.heading.trim();
   const merchandiseName = input.merchandiseName.trim();
@@ -219,6 +288,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
   const expiration = input.expiration?.trim() || undefined;
   const deliverySchedule = input.deliverySchedule?.trim() || undefined;
   const notes = input.notes?.trim() || undefined;
+  const fulfillment = normalizeFulfillment(input.fulfillment);
 
   return {
     heading,
@@ -234,6 +304,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     expiration,
     deliverySchedule,
     notes,
+    fulfillment,
   };
 }
 
@@ -402,6 +473,7 @@ export async function createMerchandiseForMerchant(
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
+    fulfillment: normalized.fulfillment,
     createdBy: actor,
     updatedBy: actor,
     history: appendMerchandiseHistory(undefined, {
@@ -498,6 +570,7 @@ export async function updateMerchandiseForMerchant(
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
+    fulfillment: normalized.fulfillment ?? existing.fulfillment,
     cardImage,
     detailImage,
     updatedBy: actor ?? existing.updatedBy,

@@ -108,7 +108,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 18);
+    template.resourceCountIs("AWS::DynamoDB::Table", 20);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -256,6 +256,59 @@ describe("InfraStack", () => {
       "AWS::DynamoDB::Table",
       Match.objectLike({
         TableName: "correcre-seminar-registration-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
+      }),
+    );
+
+    // 配送日程調整: ExchangeHistory のスパース GSI（日次バッチの横断クエリ用）
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-exchange-history-dev",
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({
+            IndexName: "ExchangeHistoryByScheduleStatus",
+            KeySchema: Match.arrayWith([
+              Match.objectLike({
+                AttributeName: "gsi4pk",
+                KeyType: "HASH",
+              }),
+              Match.objectLike({
+                AttributeName: "gsi4sk",
+                KeyType: "RANGE",
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-merchant-calendar-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "merchantId",
+            KeyType: "HASH",
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-schedule-event-dev",
         KeySchema: Match.arrayWith([
           Match.objectLike({
             AttributeName: "pk",
