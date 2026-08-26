@@ -1,6 +1,7 @@
 import "server-only";
 
 import { addCalendarDays, isValidYYYYMMDD } from "@correcre/lib/date/business-days";
+import { JP_HOLIDAY_NAMES } from "@correcre/lib/date/jp-holidays";
 import { getMerchantCalendar, putMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { MerchantCalendarItem } from "@correcre/types";
@@ -35,6 +36,7 @@ function toView(item: MerchantCalendarItem | null): MerchantCalendarView {
     regularClosedWeekdays: item?.regularClosedWeekdays ?? [],
     treatPublicHolidaysAsClosed: item?.treatPublicHolidaysAsClosed ?? true,
     updatedAt: item?.updatedAt,
+    holidays: Array.from(JP_HOLIDAY_NAMES, ([date, name]) => ({ date, name })),
   };
 }
 

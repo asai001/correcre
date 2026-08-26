@@ -3,6 +3,8 @@ export type MerchantCalendarView = {
   regularClosedWeekdays: number[];
   treatPublicHolidaysAsClosed: boolean;
   updatedAt?: string;
+  // カレンダー表示用の祝日一覧（サーバーの静的データから供給。フロントで祝日判定はしない）
+  holidays: { date: string; name: string }[];
 };
 
 export type UpdateMerchantCalendarRequest = {

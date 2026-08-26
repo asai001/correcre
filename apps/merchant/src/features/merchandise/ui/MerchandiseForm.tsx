@@ -664,7 +664,11 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
               </div>
 
               <Alert severity="info">
-                臨時休業や出張などで発送できない日は、休業日カレンダーに登録しておくと候補日の自動生成から除外されます。
+                臨時休業や出張などで発送できない日は
+                <a href="/calendar" className="mx-1 font-semibold underline">
+                  休業日カレンダー
+                </a>
+                に登録しておくと、候補日の自動生成から除外されます。
               </Alert>
             </>
           ) : null}
