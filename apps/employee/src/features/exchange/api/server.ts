@@ -161,9 +161,16 @@ function buildMerchantExchangeRequestEmailBody(params: {
   usedPoint: number;
   exchangeId: string;
   detailUrl: string;
+  requiresScheduling: boolean;
 }) {
   const exchangeAmountYen = params.usedPoint * EXCHANGE_POINT_YEN_VALUE;
   const greeting = params.merchantName ? `${params.merchantName}\nご担当者様` : "ご担当者様";
+  const schedulingNote = params.requiresScheduling
+    ? `
+
+この商品はお届け日の日程調整が必要です。
+交換詳細画面からお届け候補日を提示し、従業員に選択を依頼してください。`
+    : "";
 
   return `${greeting}
 
@@ -176,7 +183,7 @@ function buildMerchantExchangeRequestEmailBody(params: {
 申請日時：${formatApplicationDateTime(params.requestedAt)}
 交換ポイント数：${formatInteger(params.usedPoint)} pt
 交換相当額：${formatInteger(exchangeAmountYen)}円
-申請番号：${params.exchangeId}
+申請番号：${params.exchangeId}${schedulingNote}
 
 申請内容の確認はこちら：
 ${params.detailUrl}
@@ -211,6 +218,7 @@ async function notifyMerchantExchangeRequested(params: {
     usedPoint: params.exchange.usedPoint,
     exchangeId: params.exchange.exchangeId,
     detailUrl,
+    requiresScheduling: params.exchange.schedule?.scheduleStatus === "AWAITING_PROPOSAL",
   });
 
   await sendSesEmail(

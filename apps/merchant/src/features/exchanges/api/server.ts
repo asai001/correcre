@@ -10,10 +10,17 @@ import {
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
+import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
 import { listScheduleEvents } from "@correcre/lib/dynamodb/schedule-event";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
+import {
+  resolveMerchantScheduleRecipients,
+  sendEmployeeRequestRejectedEmail,
+  sendEmployeeSelectionRequestEmail,
+  sendScheduleConfirmedEmails,
+} from "@correcre/lib/notification/schedule-events";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { addCalendarDays, formatWeekdayJa, getWeekday, isMerchantWorkingDay } from "@correcre/lib/date/business-days";
@@ -71,6 +78,7 @@ type RuntimeConfig = {
   pointTransactionTableName: string;
   scheduleEventTableName: string;
   merchantCalendarTableName: string;
+  merchantTableName: string;
 };
 
 type ApplicantProfile = {
@@ -92,7 +100,51 @@ function getRuntimeConfig(): RuntimeConfig {
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     scheduleEventTableName: readRequiredServerEnv("DDB_SCHEDULE_EVENT_TABLE_NAME"),
     merchantCalendarTableName: readRequiredServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
+    merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
   };
+}
+
+// 従業員の通知先メールアドレスを引く。通知は fire-and-forget のため失敗しても null を返すだけにする。
+async function resolveEmployeeEmail(
+  config: RuntimeConfig,
+  item: ExchangeHistoryItem,
+): Promise<string | undefined> {
+  try {
+    const user = await getUserByCompanyAndUserId(
+      {
+        region: config.region,
+        tableName: config.userTableName,
+      },
+      item.companyId,
+      item.userId,
+    );
+    return user?.email?.trim() || undefined;
+  } catch (error) {
+    console.error("Failed to resolve employee email for schedule notification.", {
+      error,
+      exchangeId: item.exchangeId,
+    });
+    return undefined;
+  }
+}
+
+async function resolveMerchantRecipients(config: RuntimeConfig, merchantId: string): Promise<string[]> {
+  try {
+    const merchant = await getMerchantById(
+      {
+        region: config.region,
+        tableName: config.merchantTableName,
+      },
+      merchantId,
+    );
+    return await resolveMerchantScheduleRecipients(
+      { region: config.region, merchantUserTableName: config.merchantUserTableName },
+      merchant,
+    );
+  } catch (error) {
+    console.error("Failed to resolve merchant recipients for schedule notification.", { error, merchantId });
+    return [];
+  }
 }
 
 function buildScheduleServiceConfig(config: RuntimeConfig): ScheduleServiceConfig {
@@ -647,7 +699,33 @@ export async function proposeScheduleForMerchant(params: {
     calendar,
   });
 
+  await notifyEmployeeSelectionRequested(config, updated, false);
+
   return buildExchangeDetail(config, updated, "MERCHANT");
+}
+
+// 候補提示を employee にメールで知らせる（期限を明記）。fire-and-forget。
+async function notifyEmployeeSelectionRequested(
+  config: RuntimeConfig,
+  item: ExchangeHistoryItem,
+  isRegenerated: boolean,
+) {
+  try {
+    const recipient = await resolveEmployeeEmail(config, item);
+    if (!recipient || !item.schedule) return;
+    await sendEmployeeSelectionRequestEmail({
+      config: { region: config.region },
+      recipient,
+      exchange: item,
+      candidates: item.schedule.candidates,
+      isRegenerated,
+    });
+  } catch (error) {
+    console.error("Failed to send employee selection request notification.", {
+      error,
+      exchangeId: item.exchangeId,
+    });
+  }
 }
 
 /** employee の希望日への応答（承諾 / 対応不可 / 別候補を再提示） */
@@ -668,8 +746,43 @@ export async function respondScheduleForMerchant(params: {
   let updated: ExchangeHistoryItem;
   if (params.request.action === "ACCEPT") {
     updated = await acceptRequestedDate(serviceConfig, { item, actor, now, product, calendar });
+
+    // 日程確定を両者に通知（fire-and-forget）
+    try {
+      const [merchantRecipients, employeeRecipient] = await Promise.all([
+        resolveMerchantRecipients(config, params.merchantId),
+        resolveEmployeeEmail(config, updated),
+      ]);
+      if (updated.schedule?.selectedArrivalDate) {
+        await sendScheduleConfirmedEmails({
+          config: { region: config.region },
+          merchantRecipients,
+          employeeRecipient,
+          exchange: updated,
+          arrivalDate: updated.schedule.selectedArrivalDate,
+          timeSlot: updated.schedule.selectedTimeSlot,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send schedule confirmed notifications.", { error, exchangeId: updated.exchangeId });
+    }
   } else if (params.request.action === "REJECT") {
     updated = await rejectRequestedDate(serviceConfig, { item, reason: params.request.reason, actor, now });
+
+    try {
+      const recipient = await resolveEmployeeEmail(config, updated);
+      if (recipient) {
+        await sendEmployeeRequestRejectedEmail({
+          config: { region: config.region },
+          recipient,
+          exchange: updated,
+          requestedArrivalDate: updated.schedule?.requestedArrivalDate,
+          reason: params.request.reason,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send request rejected notification.", { error, exchangeId: updated.exchangeId });
+    }
   } else {
     updated = await reproposeCandidates(serviceConfig, {
       item,
@@ -680,6 +793,8 @@ export async function respondScheduleForMerchant(params: {
       product,
       calendar,
     });
+
+    await notifyEmployeeSelectionRequested(config, updated, true);
   }
 
   return buildExchangeDetail(config, updated, "MERCHANT");

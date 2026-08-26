@@ -4,7 +4,13 @@ import { formatWeekdayJa, isValidYYYYMMDD } from "@correcre/lib/date/business-da
 import { nowYYYYMMDD } from "@correcre/lib/date/format";
 import { listExchangeHistoryByCompanyAndUser } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
+import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import {
+  resolveMerchantScheduleRecipients,
+  sendMerchantDateRequestedEmail,
+  sendScheduleConfirmedEmails,
+} from "@correcre/lib/notification/schedule-events";
 import { isSelectable } from "@correcre/lib/schedule/engine";
 import {
   cancelScheduleWithExchange,
@@ -32,7 +38,14 @@ type RuntimeConfig = {
   userTableName: string;
   pointTransactionTableName: string;
   scheduleEventTableName: string;
+  merchantTableName: string;
+  merchantUserTableName?: string;
 };
+
+function readOptionalServerEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
 
 function getRuntimeConfig(): RuntimeConfig {
   return {
@@ -42,7 +55,35 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     scheduleEventTableName: readRequiredServerEnv("DDB_SCHEDULE_EVENT_TABLE_NAME"),
+    merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
+    merchantUserTableName: readOptionalServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
   };
+}
+
+// merchant への通知先を引く。通知は fire-and-forget のため失敗しても空配列を返すだけにする。
+async function resolveMerchantRecipients(
+  config: RuntimeConfig,
+  merchantId: string | undefined,
+): Promise<string[]> {
+  if (!merchantId) {
+    return [];
+  }
+  try {
+    const merchant = await getMerchantById(
+      {
+        region: config.region,
+        tableName: config.merchantTableName,
+      },
+      merchantId,
+    );
+    return await resolveMerchantScheduleRecipients(
+      { region: config.region, merchantUserTableName: config.merchantUserTableName },
+      merchant,
+    );
+  } catch (error) {
+    console.error("Failed to resolve merchant recipients for schedule notification.", { error, merchantId });
+    return [];
+  }
 }
 
 function buildScheduleServiceConfig(config: RuntimeConfig): ScheduleServiceConfig {
@@ -267,6 +308,23 @@ export async function selectCandidateForEmployee(
     now: new Date(),
   });
 
+  // 日程確定を両者に通知（fire-and-forget）
+  try {
+    const merchantRecipients = await resolveMerchantRecipients(config, updated.merchantId);
+    if (updated.schedule?.selectedArrivalDate) {
+      await sendScheduleConfirmedEmails({
+        config: { region: config.region },
+        merchantRecipients,
+        employeeRecipient: user.email?.trim() || undefined,
+        exchange: updated,
+        arrivalDate: updated.schedule.selectedArrivalDate,
+        timeSlot: updated.schedule.selectedTimeSlot,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send schedule confirmed notifications.", { error, exchangeId: updated.exchangeId });
+  }
+
   return (await buildScheduleView(config, updated)) ?? view;
 }
 
@@ -314,6 +372,23 @@ export async function requestDateForEmployee(
     actor: { actor: "EMPLOYEE", actorId: user.userId },
     now: new Date(),
   });
+
+  // merchant に応答を依頼（fire-and-forget）
+  try {
+    const recipients = await resolveMerchantRecipients(config, updated.merchantId);
+    if (recipients.length > 0) {
+      await sendMerchantDateRequestedEmail({
+        config: { region: config.region },
+        recipients,
+        exchange: updated,
+        requestedArrivalDate: request.requestedArrivalDate,
+        requestedTimeSlot: timeSlot,
+        requestedNote: updated.schedule?.requestedNote,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send merchant date requested notification.", { error, exchangeId: updated.exchangeId });
+  }
 
   return (await buildScheduleView(config, updated)) ?? view;
 }
