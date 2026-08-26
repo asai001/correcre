@@ -8,14 +8,18 @@ import {
   buildExchangeHistoryByMerchantGsiPk,
   buildExchangeHistoryByMerchantGsiSk,
   buildExchangeHistoryByMerchantStatusGsiPk,
+  buildExchangeHistoryByScheduleStatusGsiPk,
   buildExchangeHistoryPk,
+  buildExchangeHistoryScheduleGsiSkByExchangedAt,
   buildExchangeHistorySk,
   InsufficientPointBalanceError,
   putExchangeHistoryWithReservation,
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
+import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
 import { createPointTransaction } from "@correcre/lib/dynamodb/point-transaction";
+import { buildInitialSchedule } from "@correcre/lib/schedule/engine";
 import {
   getMerchandise,
   listMerchandiseByStatus,
@@ -37,6 +41,7 @@ import type {
   Merchant,
   Merchandise,
 } from "@correcre/types";
+import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 import type { RequestExchangeResponse } from "../model/types";
 
@@ -49,6 +54,7 @@ type RuntimeConfig = {
   exchangeHistoryTableName: string;
   pointTransactionTableName: string;
   userTableName: string;
+  merchantCalendarTableName?: string;
 };
 
 const DEFAULT_SES_FROM_EMAIL = "correcre-info@efficient-technology.com";
@@ -66,6 +72,7 @@ function getRuntimeConfig(): RuntimeConfig {
     exchangeHistoryTableName: readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    merchantCalendarTableName: readOptionalServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
   };
 }
 
@@ -438,6 +445,24 @@ export async function requestExchangeForEmployee(params: {
     gsi3pk: buildExchangeHistoryByMerchantGsiPk(merchandise.merchantId),
     gsi3sk: buildExchangeHistoryByMerchantGsiSk(exchangedAt, exchangeId),
   };
+
+  // 日程調整あり商品は候補提示待ちで作成し、merchant 画面の叩き台として候補日を自動生成して保存する。
+  const fulfillment = resolveMerchandiseFulfillment(merchandise.fulfillment);
+  if (fulfillment.requiresScheduling) {
+    const calendar = config.merchantCalendarTableName
+      ? await getMerchantCalendar(
+          {
+            region: config.region,
+            tableName: config.merchantCalendarTableName,
+          },
+          merchandise.merchantId,
+        )
+      : null;
+
+    exchange.schedule = buildInitialSchedule(new Date(now), fulfillment, calendar);
+    exchange.gsi4pk = buildExchangeHistoryByScheduleStatusGsiPk("AWAITING_PROPOSAL");
+    exchange.gsi4sk = buildExchangeHistoryScheduleGsiSkByExchangedAt(exchangedAt);
+  }
 
   await putExchangeHistoryWithReservation(
     {

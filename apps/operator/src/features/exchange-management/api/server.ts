@@ -14,6 +14,7 @@ import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant"
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
+import { cancelScheduleWithExchange, isScheduleActive } from "@correcre/lib/schedule/service";
 import type {
   DBUserAddress,
   ExchangeHistoryActorType,
@@ -36,6 +37,7 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   pointTransactionTableName: string;
+  scheduleEventTableName: string;
 };
 
 type ApplicantProfile = {
@@ -55,6 +57,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
+    scheduleEventTableName: readRequiredServerEnv("DDB_SCHEDULE_EVENT_TABLE_NAME"),
   };
 }
 
@@ -268,7 +271,13 @@ async function buildExchangeDetail(
     applicantAddress: applicant.address,
     merchandiseImageViewUrl,
     history: item.history ?? [],
-    allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
+    // 日程調整が進行中の間、operator が取れるのは却下・強制キャンセルのみ
+    // （承認して先へ進める操作は日程確定のシステム遷移に委ねる）。
+    allowedNextStatuses: isScheduleActive(item)
+      ? getAllowedNextExchangeStatuses(status, actorType).filter(
+          (nextStatus) => nextStatus === "REJECTED" || nextStatus === "CANCELED",
+        )
+      : getAllowedNextExchangeStatuses(status, actorType),
     actorType,
   };
 }
@@ -309,6 +318,35 @@ export async function transitionExchangeForOperator(params: {
 
   if (!item) {
     throw new Error("対象の交換が見つかりません");
+  }
+
+  // 日程調整が進行中の交換は、終端化と同時に schedule 側も終端化してポイント返還・
+  // 操作ログ追記まで 1 トランザクションで行う。ScheduleEvent の actor 型に OPERATOR は
+  // ないため SYSTEM として記録し、交換履歴側には OPERATOR を記録する。
+  if (isScheduleActive(item)) {
+    if (params.nextStatus !== "REJECTED" && params.nextStatus !== "CANCELED") {
+      throw new InvalidExchangeStatusTransitionError(normalizeStatus(item.status), params.nextStatus, "OPERATOR");
+    }
+
+    const cancelled = await cancelScheduleWithExchange(
+      {
+        region: config.region,
+        exchangeHistoryTableName: config.exchangeHistoryTableName,
+        scheduleEventTableName: config.scheduleEventTableName,
+        userTableName: config.userTableName,
+        pointTransactionTableName: config.pointTransactionTableName,
+      },
+      {
+        item,
+        exchangeNextStatus: params.nextStatus,
+        reason: params.comment,
+        actor: { actor: "SYSTEM", actorId: params.actorUserId, actorName: params.actorName },
+        exchangeActorType: "OPERATOR",
+        now: new Date(),
+      },
+    );
+
+    return buildExchangeDetail(config, cancelled, "OPERATOR");
   }
 
   const updated = await transitionExchangeStatus(

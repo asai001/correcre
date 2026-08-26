@@ -4,7 +4,7 @@
 //
 // タイムゾーンは Asia/Tokyo 固定。日付境界の判定はすべて JST で行う。
 // このモジュールは "server-only" を import しない純関数群として保ち、単体テスト可能にする。
-import type { DeliveryCandidate, ProductFulfillment } from "@correcre/types";
+import type { DeliveryCandidate, ExchangeSchedule, ProductFulfillment } from "@correcre/types";
 
 import {
   addCalendarDays,
@@ -121,6 +121,22 @@ export function generateCandidates(
 export function isSelectable(candidate: Pick<DeliveryCandidate, "selectableUntil">, now: Date): boolean {
   const until = Date.parse(candidate.selectableUntil);
   return Number.isFinite(until) && now.getTime() < until;
+}
+
+/**
+ * 交換申請時の初期スケジュール。候補日は merchant 画面で叩き台として表示するために自動生成して保存する。
+ */
+export function buildInitialSchedule(
+  now: Date,
+  product: ScheduleProductSettings,
+  calendar: ScheduleCalendarSettings | null | undefined,
+): ExchangeSchedule {
+  return {
+    scheduleStatus: "AWAITING_PROPOSAL",
+    candidates: generateCandidates(now, product, calendar),
+    proposalRoundCount: 0,
+    rescheduleRequestCount: 0,
+  };
 }
 
 export type ValidateRequestedDateResult =

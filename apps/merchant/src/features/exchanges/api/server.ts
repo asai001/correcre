@@ -10,10 +10,30 @@ import {
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
+import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
+import { listScheduleEvents } from "@correcre/lib/dynamodb/schedule-event";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
+import { addCalendarDays, formatWeekdayJa, getWeekday, isMerchantWorkingDay } from "@correcre/lib/date/business-days";
+import {
+  calcSelectableUntil,
+  generateCandidates,
+  isSelectable,
+  validateRequestedDate,
+  type ScheduleCalendarSettings,
+  type ScheduleProductSettings,
+} from "@correcre/lib/schedule/engine";
+import {
+  acceptRequestedDate,
+  cancelScheduleWithExchange,
+  isScheduleActive,
+  proposeCandidates,
+  rejectRequestedDate,
+  reproposeCandidates,
+  type ScheduleServiceConfig,
+} from "@correcre/lib/schedule/service";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import type {
   DBUserAddress,
@@ -21,12 +41,23 @@ import type {
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  ExchangeSchedule,
+  Merchandise,
+  MerchantCalendarItem,
+} from "@correcre/types";
+import {
+  resolveMerchandiseFulfillment,
+  SCHEDULE_PROPOSAL_ROUND_LIMIT,
+  SCHEDULE_RESCHEDULE_REQUEST_LIMIT,
 } from "@correcre/types";
 
 import type {
   ExchangeDetail,
   ExchangeListFilter,
+  ExchangeScheduleView,
   ExchangeSummary,
+  RespondScheduleRequest,
+  ScheduleCandidateView,
 } from "../model/types";
 
 type RuntimeConfig = {
@@ -38,6 +69,8 @@ type RuntimeConfig = {
   companyTableName: string;
   merchantUserTableName: string;
   pointTransactionTableName: string;
+  scheduleEventTableName: string;
+  merchantCalendarTableName: string;
 };
 
 type ApplicantProfile = {
@@ -57,6 +90,18 @@ function getRuntimeConfig(): RuntimeConfig {
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     merchantUserTableName: readRequiredServerEnv("DDB_MERCHANT_USER_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
+    scheduleEventTableName: readRequiredServerEnv("DDB_SCHEDULE_EVENT_TABLE_NAME"),
+    merchantCalendarTableName: readRequiredServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
+  };
+}
+
+function buildScheduleServiceConfig(config: RuntimeConfig): ScheduleServiceConfig {
+  return {
+    region: config.region,
+    exchangeHistoryTableName: config.exchangeHistoryTableName,
+    scheduleEventTableName: config.scheduleEventTableName,
+    userTableName: config.userTableName,
+    pointTransactionTableName: config.pointTransactionTableName,
   };
 }
 
@@ -249,6 +294,133 @@ export async function listExchangesForMerchant(
   return summaries.sort(compareExchangedAtDesc);
 }
 
+// 候補 1 件を表示用に整える。警告はブロックではなく注意喚起（merchant の判断を優先する）。
+function buildCandidateView(
+  arrivalDate: string,
+  now: Date,
+  product: ScheduleProductSettings,
+  calendar: ScheduleCalendarSettings | null,
+): ScheduleCandidateView {
+  const shipDate = addCalendarDays(arrivalDate, -product.transitDays);
+  const selectableUntil = calcSelectableUntil(shipDate, product, calendar);
+  const selectable = isSelectable({ selectableUntil }, now);
+
+  const warnings: string[] = [];
+  if (!product.shippableWeekdays.includes(getWeekday(shipDate))) {
+    warnings.push(`発送日 ${shipDate}（${formatWeekdayJa(shipDate)}）は発送可能曜日ではありません`);
+  }
+  if (!isMerchantWorkingDay(shipDate, calendar)) {
+    warnings.push(`発送日 ${shipDate} は休業日にあたります`);
+  }
+  if (!selectable) {
+    warnings.push("この候補の選択期限は既に過ぎています");
+  }
+
+  return { arrivalDate, shipDate, selectableUntil, selectable, warnings };
+}
+
+async function loadScheduleContext(
+  config: RuntimeConfig,
+  item: ExchangeHistoryItem,
+  merchandise: Merchandise | null,
+): Promise<{
+  product: ScheduleProductSettings & { availableTimeSlots: string[] };
+  calendar: MerchantCalendarItem | null;
+}> {
+  const fulfillment = resolveMerchandiseFulfillment(merchandise?.fulfillment);
+  const calendar = item.merchantId
+    ? await getMerchantCalendar(
+        {
+          region: config.region,
+          tableName: config.merchantCalendarTableName,
+        },
+        item.merchantId,
+      )
+    : null;
+
+  return { product: fulfillment, calendar };
+}
+
+async function buildScheduleView(
+  config: RuntimeConfig,
+  item: ExchangeHistoryItem,
+  merchandise: Merchandise | null,
+): Promise<ExchangeScheduleView | undefined> {
+  const schedule: ExchangeSchedule | undefined = item.schedule;
+  if (!schedule) {
+    return undefined;
+  }
+
+  const now = new Date();
+  const { product, calendar } = await loadScheduleContext(config, item, merchandise);
+
+  const events = await listScheduleEvents(
+    {
+      region: config.region,
+      tableName: config.scheduleEventTableName,
+    },
+    item.exchangeId,
+  );
+
+  const candidates = schedule.candidates.map((candidate) =>
+    buildCandidateView(candidate.arrivalDate, now, product, calendar),
+  );
+
+  // 提示・再提示フォームの叩き台。いま時点で選択可能な候補を生成し直す。
+  const needsDraft =
+    schedule.scheduleStatus === "AWAITING_PROPOSAL" || schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE";
+  const draftCandidates = needsDraft
+    ? generateCandidates(now, product, calendar).map((candidate) =>
+        buildCandidateView(candidate.arrivalDate, now, product, calendar),
+      )
+    : [];
+
+  let requestedDateJudgment: ExchangeScheduleView["requestedDateJudgment"];
+  if (schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE" && schedule.requestedArrivalDate) {
+    const result = validateRequestedDate(schedule.requestedArrivalDate, now, product, calendar);
+    requestedDateJudgment = result.ok
+      ? {
+          ok: true,
+          shipDate: result.shipDate,
+          message: `発送可能曜日から逆算して ${result.shipDate}（${formatWeekdayJa(result.shipDate)}）発送で対応可能です`,
+        }
+      : { ok: false, message: result.reason };
+  }
+
+  return {
+    scheduleStatus: schedule.scheduleStatus,
+    candidates,
+    draftCandidates,
+    merchantNote: schedule.merchantNote,
+    selectedArrivalDate: schedule.selectedArrivalDate,
+    selectedTimeSlot: schedule.selectedTimeSlot,
+    confirmedAt: schedule.confirmedAt,
+    requestedArrivalDate: schedule.requestedArrivalDate,
+    requestedTimeSlot: schedule.requestedTimeSlot,
+    requestedNote: schedule.requestedNote,
+    requestedDateJudgment,
+    merchantRejectReason: schedule.merchantRejectReason,
+    proposalRoundCount: schedule.proposalRoundCount,
+    proposalRoundLimit: SCHEDULE_PROPOSAL_ROUND_LIMIT,
+    rescheduleRequestCount: schedule.rescheduleRequestCount,
+    rescheduleRequestLimit: SCHEDULE_RESCHEDULE_REQUEST_LIMIT,
+    canRepropose: schedule.proposalRoundCount < SCHEDULE_PROPOSAL_ROUND_LIMIT,
+    availableTimeSlots: product.availableTimeSlots,
+    shippableWeekdays: product.shippableWeekdays,
+    leadTimeBusinessDays: product.leadTimeBusinessDays,
+    transitDays: product.transitDays,
+    cutoffTime: product.cutoffTime,
+    events: events.map((event) => ({
+      seq: event.seq,
+      occurredAt: event.occurredAt,
+      actor: event.actor,
+      actorName: event.actorName,
+      eventType: event.eventType,
+      payload: event.payload,
+    })),
+  };
+}
+
 async function buildExchangeDetail(
   config: RuntimeConfig,
   item: ExchangeHistoryItem,
@@ -256,10 +428,11 @@ async function buildExchangeDetail(
 ): Promise<ExchangeDetail> {
   const applicant = await resolveApplicantProfile(config, item.companyId, item.userId);
 
+  let merchandise: Merchandise | null = null;
   let merchandiseImageViewUrl: string | undefined;
 
   if (item.merchantId && item.merchandiseId) {
-    const merchandise = await getMerchandise(
+    merchandise = await getMerchandise(
       {
         region: config.region,
         tableName: config.merchandiseTableName,
@@ -294,6 +467,16 @@ async function buildExchangeDetail(
     return actorName ? { ...event, actorName } : event;
   });
 
+  const schedule = await buildScheduleView(config, item, merchandise);
+
+  // 日程調整が進行中の間は、承認して先へ進める操作は日程確定（システム遷移）に委ねる。
+  // merchant が取れるのは却下・強制キャンセルのみ。
+  const allowedNextStatuses = isScheduleActive(item)
+    ? getAllowedNextExchangeStatuses(status, actorType).filter(
+        (nextStatus) => nextStatus === "REJECTED" || nextStatus === "CANCELED",
+      )
+    : getAllowedNextExchangeStatuses(status, actorType);
+
   return {
     ...toSummary(item, applicant.name, merchantActorNames),
     merchantId: item.merchantId ?? "",
@@ -303,8 +486,9 @@ async function buildExchangeDetail(
     applicantAddress: applicant.address,
     merchandiseImageViewUrl,
     history,
-    allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
+    allowedNextStatuses,
     actorType,
+    schedule,
   };
 }
 
@@ -352,6 +536,28 @@ export async function transitionExchangeForMerchant(params: {
     throw new Error("対象の交換が見つかりません");
   }
 
+  // 日程調整が進行中の交換は、終端化と同時に schedule 側も終端化して
+  // ポイント返還・操作ログ追記まで 1 トランザクションで行う。
+  if (isScheduleActive(item)) {
+    if (params.nextStatus !== "REJECTED" && params.nextStatus !== "CANCELED") {
+      throw new InvalidExchangeStatusTransitionError(
+        normalizeStatus(item.status),
+        params.nextStatus,
+        "MERCHANT",
+      );
+    }
+
+    const cancelled = await cancelScheduleWithExchange(buildScheduleServiceConfig(config), {
+      item,
+      exchangeNextStatus: params.nextStatus,
+      reason: params.comment,
+      actor: { actor: "MERCHANT", actorId: params.actorUserId, actorName: params.actorName },
+      now: new Date(),
+    });
+
+    return buildExchangeDetail(config, cancelled, "MERCHANT");
+  }
+
   const updated = await transitionExchangeStatus(
     {
       region: config.region,
@@ -370,6 +576,131 @@ export async function transitionExchangeForMerchant(params: {
   );
 
   return buildExchangeDetail(config, updated, "MERCHANT");
+}
+
+async function requireExchangeForMerchant(
+  config: RuntimeConfig,
+  merchantId: string,
+  exchangeId: string,
+): Promise<ExchangeHistoryItem> {
+  const item = await findExchangeHistoryByMerchantAndExchangeId(
+    {
+      region: config.region,
+      tableName: config.exchangeHistoryTableName,
+    },
+    merchantId,
+    exchangeId,
+  );
+
+  if (!item) {
+    throw new Error("対象の交換が見つかりません");
+  }
+
+  return item;
+}
+
+async function loadMerchandiseForExchange(
+  config: RuntimeConfig,
+  item: ExchangeHistoryItem,
+): Promise<Merchandise | null> {
+  if (!item.merchantId || !item.merchandiseId) {
+    return null;
+  }
+  return getMerchandise(
+    {
+      region: config.region,
+      tableName: config.merchandiseTableName,
+    },
+    item.merchantId,
+    item.merchandiseId,
+  );
+}
+
+export type MerchantScheduleActor = {
+  actorUserId: string;
+  actorName?: string;
+};
+
+/**
+ * 候補日の提示（AWAITING_PROPOSAL から）。
+ * サーバー側で shipDate / selectableUntil を再計算して保存する。
+ */
+export async function proposeScheduleForMerchant(params: {
+  merchantId: string;
+  exchangeId: string;
+  arrivalDates: string[];
+  merchantNote?: string;
+  actor: MerchantScheduleActor;
+}): Promise<ExchangeDetail> {
+  const config = getRuntimeConfig();
+  const item = await requireExchangeForMerchant(config, params.merchantId, params.exchangeId);
+  const merchandise = await loadMerchandiseForExchange(config, item);
+  const { product, calendar } = await loadScheduleContext(config, item, merchandise);
+
+  const updated = await proposeCandidates(buildScheduleServiceConfig(config), {
+    item,
+    arrivalDates: params.arrivalDates,
+    merchantNote: params.merchantNote,
+    actor: { actor: "MERCHANT", actorId: params.actor.actorUserId, actorName: params.actor.actorName },
+    now: new Date(),
+    product,
+    calendar,
+  });
+
+  return buildExchangeDetail(config, updated, "MERCHANT");
+}
+
+/** employee の希望日への応答（承諾 / 対応不可 / 別候補を再提示） */
+export async function respondScheduleForMerchant(params: {
+  merchantId: string;
+  exchangeId: string;
+  request: RespondScheduleRequest;
+  actor: MerchantScheduleActor;
+}): Promise<ExchangeDetail> {
+  const config = getRuntimeConfig();
+  const item = await requireExchangeForMerchant(config, params.merchantId, params.exchangeId);
+  const merchandise = await loadMerchandiseForExchange(config, item);
+  const { product, calendar } = await loadScheduleContext(config, item, merchandise);
+  const actor = { actor: "MERCHANT" as const, actorId: params.actor.actorUserId, actorName: params.actor.actorName };
+  const now = new Date();
+  const serviceConfig = buildScheduleServiceConfig(config);
+
+  let updated: ExchangeHistoryItem;
+  if (params.request.action === "ACCEPT") {
+    updated = await acceptRequestedDate(serviceConfig, { item, actor, now, product, calendar });
+  } else if (params.request.action === "REJECT") {
+    updated = await rejectRequestedDate(serviceConfig, { item, reason: params.request.reason, actor, now });
+  } else {
+    updated = await reproposeCandidates(serviceConfig, {
+      item,
+      arrivalDates: params.request.arrivalDates,
+      merchantNote: params.request.merchantNote,
+      actor,
+      now,
+      product,
+      calendar,
+    });
+  }
+
+  return buildExchangeDetail(config, updated, "MERCHANT");
+}
+
+/**
+ * 候補追加フォームのプレビュー。追加した日付の発送日・選択期限・警告をサーバー側で計算して返す。
+ * 警告があってもブロックしない（臨時に発送できる日もあり、merchant の判断を優先する）。
+ */
+export async function previewScheduleForMerchant(params: {
+  merchantId: string;
+  exchangeId: string;
+  arrivalDates: string[];
+}): Promise<ScheduleCandidateView[]> {
+  const config = getRuntimeConfig();
+  const item = await requireExchangeForMerchant(config, params.merchantId, params.exchangeId);
+  const merchandise = await loadMerchandiseForExchange(config, item);
+  const { product, calendar } = await loadScheduleContext(config, item, merchandise);
+  const now = new Date();
+
+  return params.arrivalDates.map((arrivalDate) => buildCandidateView(arrivalDate, now, product, calendar));
 }
 
 export { InvalidExchangeStatusTransitionError };
