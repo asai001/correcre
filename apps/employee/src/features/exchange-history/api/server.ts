@@ -31,9 +31,12 @@ export async function getExchangeHistoryFromDynamo(
 
   return pickedItems.map((item) => ({
     date: item.exchangedAt.slice(0, 10),
+    exchangeId: item.exchangeId,
     merchantName: item.merchantNameSnapshot,
     merchandiseName: item.merchandiseNameSnapshot,
     usedPoint: item.usedPoint,
     status: item.status,
+    scheduleStatus: item.schedule?.scheduleStatus,
+    selectedArrivalDate: item.schedule?.selectedArrivalDate,
   }));
 }
