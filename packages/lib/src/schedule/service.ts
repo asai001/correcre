@@ -921,18 +921,21 @@ export async function cancelScheduleWithExchange(
   });
 }
 
+export type ScheduleReminderField =
+  | "proposalReminderSentAt"
+  | "selectionReminderSentAt"
+  | "responseReminderSentAt"
+  | "arrivalReminderSentAt";
+
 /**
  * 日次バッチの送信済みガード。既に送信済みならエラーにせず false を返す（冪等）。
+ * 多重送信を防ぐため送信前に立て、送信に失敗した場合は clearScheduleReminderSent で必ず戻すこと。
  */
 export async function markScheduleReminderSent(
   config: ScheduleServiceConfig,
   params: {
     item: ExchangeHistoryItem;
-    field:
-      | "proposalReminderSentAt"
-      | "selectionReminderSentAt"
-      | "responseReminderSentAt"
-      | "arrivalReminderSentAt";
+    field: ScheduleReminderField;
     sentAt: string;
   },
 ): Promise<boolean> {
@@ -968,6 +971,33 @@ export async function markScheduleReminderSent(
     }
     throw error;
   }
+}
+
+/**
+ * 送信済みマーカーを取り消す。
+ * メール送信が失敗したときに呼び、次回のバッチで再送できるようにする
+ * （特に確定日前日のリマインドは受取失敗を防ぐ要のため、送れずに握り潰さない）。
+ */
+export async function clearScheduleReminderSent(
+  config: ScheduleServiceConfig,
+  params: { item: ExchangeHistoryItem; field: ScheduleReminderField },
+): Promise<void> {
+  const client = getDynamoDocumentClient(config.region);
+  await client.send(
+    new UpdateCommand({
+      TableName: config.exchangeHistoryTableName,
+      Key: {
+        pk: params.item.pk,
+        sk: params.item.sk,
+      },
+      ConditionExpression: "attribute_exists(#schedule)",
+      UpdateExpression: "REMOVE #schedule.#field",
+      ExpressionAttributeNames: {
+        "#schedule": "schedule",
+        "#field": params.field,
+      },
+    }),
+  );
 }
 
 /** 交換履歴レコードの gsi4 キーを外す（到着日が過ぎた CONFIRMED のクリーンアップ用） */

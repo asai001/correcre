@@ -23,9 +23,11 @@ import {
 import { generateCandidates, isSelectable } from "@correcre/lib/schedule/engine";
 import {
   cancelScheduleWithExchange,
+  clearScheduleReminderSent,
   markScheduleReminderSent,
   removeScheduleGsiKeys,
   reproposeCandidates,
+  type ScheduleReminderField,
   type ScheduleServiceConfig,
 } from "@correcre/lib/schedule/service";
 import type { ExchangeHistoryItem } from "@correcre/types";
@@ -136,6 +138,33 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
     return user?.email?.trim() || undefined;
   };
 
+  // 送信済みマーカーを立ててから通知を送る。多重送信は防ぎつつ、
+  // 送信に失敗したらマーカーを戻して次回のバッチで再送できるようにする
+  // （立てっぱなしにすると、特に確定日前日のリマインドが二度と送られない）。
+  const sendOnce = async (
+    item: ExchangeHistoryItem,
+    field: ScheduleReminderField,
+    send: () => Promise<void>,
+  ): Promise<boolean> => {
+    if (!(await markScheduleReminderSent(serviceConfig, { item, field, sentAt: now.toISOString() }))) {
+      return false;
+    }
+
+    try {
+      await send();
+      return true;
+    } catch (error) {
+      await clearScheduleReminderSent(serviceConfig, { item, field }).catch((clearError) => {
+        console.error("delivery-schedule batch: failed to roll back reminder marker.", {
+          clearError,
+          exchangeId: item.exchangeId,
+          field,
+        });
+      });
+      throw error;
+    }
+  };
+
   const cancelWithNotice = async (item: ExchangeHistoryItem, reason: string) => {
     const cancelled = await cancelScheduleWithExchange(serviceConfig, {
       item,
@@ -172,16 +201,13 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
       const requestedAt = Date.parse(item.requestedAt ?? item.exchangedAt);
       if (!Number.isFinite(requestedAt) || now.getTime() - requestedAt < 24 * HOUR_MS) continue;
 
-      // 送信済みマーカーを先に条件付きで立てる（多重送信の防止）
-      if (!(await markScheduleReminderSent(serviceConfig, { item, field: "proposalReminderSentAt", sentAt: now.toISOString() }))) {
-        continue;
-      }
-
-      const recipients = await resolveMerchantRecipients(item.merchantId);
-      if (recipients.length > 0) {
-        await sendMerchantProposalReminderEmail({ config: { region: config.region }, recipients, exchange: item });
-      }
-      result.proposalReminders += 1;
+      const sent = await sendOnce(item, "proposalReminderSentAt", async () => {
+        const recipients = await resolveMerchantRecipients(item.merchantId);
+        if (recipients.length > 0) {
+          await sendMerchantProposalReminderEmail({ config: { region: config.region }, recipients, exchange: item });
+        }
+      });
+      if (sent) result.proposalReminders += 1;
     } catch (error) {
       result.errors += 1;
       console.error("delivery-schedule batch: proposal reminder failed.", { error, exchangeId: item.exchangeId });
@@ -221,13 +247,13 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
 
         if (candidates.length === 0) {
           // 自動再生成できない（発送可能日が見つからない）。merchant に手動の再提示を依頼する。
-          if (await markScheduleReminderSent(serviceConfig, { item, field: "proposalReminderSentAt", sentAt: now.toISOString() })) {
+          const sent = await sendOnce(item, "proposalReminderSentAt", async () => {
             const recipients = await resolveMerchantRecipients(item.merchantId);
             if (recipients.length > 0) {
               await sendMerchantProposalReminderEmail({ config: { region: config.region }, recipients, exchange: item });
             }
-            result.proposalReminders += 1;
-          }
+          });
+          if (sent) result.proposalReminders += 1;
           continue;
         }
 
@@ -267,20 +293,18 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
         .at(0);
       if (!nearestDeadline || Date.parse(nearestDeadline) - now.getTime() > 24 * HOUR_MS) continue;
 
-      if (!(await markScheduleReminderSent(serviceConfig, { item, field: "selectionReminderSentAt", sentAt: now.toISOString() }))) {
-        continue;
-      }
-
-      const recipient = await resolveEmployeeEmail(item);
-      if (recipient) {
-        await sendEmployeeSelectionReminderEmail({
-          config: { region: config.region },
-          recipient,
-          exchange: item,
-          nearestDeadline,
-        });
-      }
-      result.selectionReminders += 1;
+      const sent = await sendOnce(item, "selectionReminderSentAt", async () => {
+        const recipient = await resolveEmployeeEmail(item);
+        if (recipient) {
+          await sendEmployeeSelectionReminderEmail({
+            config: { region: config.region },
+            recipient,
+            exchange: item,
+            nearestDeadline,
+          });
+        }
+      });
+      if (sent) result.selectionReminders += 1;
     } catch (error) {
       result.errors += 1;
       console.error("delivery-schedule batch: selection step failed.", { error, exchangeId: item.exchangeId });
@@ -298,15 +322,13 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
         const requestedAt = Date.parse(item.updatedAt ?? item.exchangedAt);
         if (!Number.isFinite(requestedAt) || now.getTime() - requestedAt < 48 * HOUR_MS) continue;
 
-        if (!(await markScheduleReminderSent(serviceConfig, { item, field: "responseReminderSentAt", sentAt: now.toISOString() }))) {
-          continue;
-        }
-
-        const recipients = await resolveMerchantRecipients(item.merchantId);
-        if (recipients.length > 0) {
-          await sendMerchantResponseReminderEmail({ config: { region: config.region }, recipients, exchange: item });
-        }
-        result.responseReminders += 1;
+        const sent = await sendOnce(item, "responseReminderSentAt", async () => {
+          const recipients = await resolveMerchantRecipients(item.merchantId);
+          if (recipients.length > 0) {
+            await sendMerchantResponseReminderEmail({ config: { region: config.region }, recipients, exchange: item });
+          }
+        });
+        if (sent) result.responseReminders += 1;
         continue;
       }
 
@@ -336,21 +358,19 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
         continue;
       }
 
-      if (!(await markScheduleReminderSent(serviceConfig, { item, field: "arrivalReminderSentAt", sentAt: now.toISOString() }))) {
-        continue;
-      }
-
-      const recipient = await resolveEmployeeEmail(item);
-      if (recipient && schedule.selectedArrivalDate) {
-        await sendEmployeeArrivalReminderEmail({
-          config: { region: config.region },
-          recipient,
-          exchange: item,
-          arrivalDate: schedule.selectedArrivalDate,
-          timeSlot: schedule.selectedTimeSlot,
-        });
-      }
-      result.arrivalReminders += 1;
+      const sent = await sendOnce(item, "arrivalReminderSentAt", async () => {
+        const recipient = await resolveEmployeeEmail(item);
+        if (recipient && schedule.selectedArrivalDate) {
+          await sendEmployeeArrivalReminderEmail({
+            config: { region: config.region },
+            recipient,
+            exchange: item,
+            arrivalDate: schedule.selectedArrivalDate,
+            timeSlot: schedule.selectedTimeSlot,
+          });
+        }
+      });
+      if (sent) result.arrivalReminders += 1;
     } catch (error) {
       result.errors += 1;
       console.error("delivery-schedule batch: arrival reminder failed.", { error, exchangeId: item.exchangeId });
