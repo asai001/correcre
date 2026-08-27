@@ -51,6 +51,8 @@ export type RequestDateRequest = {
   requestedArrivalDate: string;
   requestedTimeSlot?: string;
   requestedNote?: string;
+  // 生鮮品のとき必須。希望日が承諾されるとそのまま確定するため、申請時点で同意を取る
+  acknowledged?: boolean;
 };
 
 // マイページのバナー表示用

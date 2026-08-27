@@ -651,6 +651,14 @@ export async function transitionExchangeStatus(
     );
   }
 
+  // 日程確定後にキャンセル・却下された場合、schedule も終端化してスパース GSI から外す。
+  // これを怠ると、キャンセル済みの交換に確定日前日の受取リマインドが送られてしまう。
+  if (input.item.schedule) {
+    expressionAttributeNames["#schedule"] = "schedule";
+    setExpressions.push("#schedule.scheduleStatus = :cancelledScheduleStatus");
+    expressionAttributeValues[":cancelledScheduleStatus"] = "CANCELLED";
+  }
+
   // 楽観ロック: 読み込み時のステータスと一致する場合のみ返金遷移を確定する。
   const statusConditionExpression = buildExchangeStatusConditionExpression(input.item.status, expressionAttributeValues);
 
@@ -665,7 +673,7 @@ export async function transitionExchangeStatus(
           sk: input.item.sk,
         },
         ConditionExpression: statusConditionExpression,
-        UpdateExpression: `SET ${setExpressions.join(", ")}`,
+        UpdateExpression: `SET ${setExpressions.join(", ")} REMOVE gsi4pk, gsi4sk`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
       },
@@ -725,6 +733,12 @@ export async function transitionExchangeStatus(
   if (input.item.merchantId) {
     updated.gsi2pk = buildExchangeHistoryByMerchantStatusGsiPk(input.item.merchantId, input.nextStatus);
   }
+
+  if (input.item.schedule) {
+    updated.schedule = { ...input.item.schedule, scheduleStatus: "CANCELLED" };
+  }
+  delete updated.gsi4pk;
+  delete updated.gsi4sk;
 
   return updated;
 }

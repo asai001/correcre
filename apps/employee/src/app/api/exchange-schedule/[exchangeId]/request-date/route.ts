@@ -24,7 +24,14 @@ export async function POST(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
 
-    if (!body || typeof body.requestedArrivalDate !== "string" || !body.requestedArrivalDate) {
+    if (
+      !body ||
+      typeof body.requestedArrivalDate !== "string" ||
+      !body.requestedArrivalDate ||
+      (body.requestedTimeSlot !== undefined && typeof body.requestedTimeSlot !== "string") ||
+      (body.requestedNote !== undefined && typeof body.requestedNote !== "string") ||
+      (body.acknowledged !== undefined && typeof body.acknowledged !== "boolean")
+    ) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 

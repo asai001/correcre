@@ -346,17 +346,13 @@ export async function listExchangesForMerchant(
   return summaries.sort(compareExchangedAtDesc);
 }
 
-// 候補 1 件を表示用に整える。警告はブロックではなく注意喚起（merchant の判断を優先する）。
-function buildCandidateView(
-  arrivalDate: string,
-  now: Date,
+// 発送日に対する注意喚起。ブロックではない（merchant の判断を優先する）。
+function buildShipDateWarnings(
+  shipDate: string,
+  selectable: boolean,
   product: ScheduleProductSettings,
   calendar: ScheduleCalendarSettings | null,
-): ScheduleCandidateView {
-  const shipDate = addCalendarDays(arrivalDate, -product.transitDays);
-  const selectableUntil = calcSelectableUntil(shipDate, product, calendar);
-  const selectable = isSelectable({ selectableUntil }, now);
-
+): string[] {
   const warnings: string[] = [];
   if (!product.shippableWeekdays.includes(getWeekday(shipDate))) {
     warnings.push(`発送日 ${shipDate}（${formatWeekdayJa(shipDate)}）は発送可能曜日ではありません`);
@@ -367,8 +363,44 @@ function buildCandidateView(
   if (!selectable) {
     warnings.push("この候補の選択期限は既に過ぎています");
   }
+  return warnings;
+}
 
-  return { arrivalDate, shipDate, selectableUntil, selectable, warnings };
+// 到着日から候補 1 件を新規計算して表示用に整える（追加プレビュー・叩き台の生成用）。
+function buildCandidateView(
+  arrivalDate: string,
+  now: Date,
+  product: ScheduleProductSettings,
+  calendar: ScheduleCalendarSettings | null,
+): ScheduleCandidateView {
+  const shipDate = addCalendarDays(arrivalDate, -product.transitDays);
+  const selectableUntil = calcSelectableUntil(shipDate, product, calendar);
+  const selectable = isSelectable({ selectableUntil }, now);
+
+  return {
+    arrivalDate,
+    shipDate,
+    selectableUntil,
+    selectable,
+    warnings: buildShipDateWarnings(shipDate, selectable, product, calendar),
+  };
+}
+
+// 保存済みの候補は再計算せず、提示時に保存した shipDate / selectableUntil をそのまま表示する。
+// 提示後に商品設定やカレンダーが変わっても、employee が見ている値・確定時に検証される値と
+// 常に一致させるため（再計算すると「merchant には期限切れに見えるのに選べる」等の矛盾が生じる）。
+function buildStoredCandidateView(
+  candidate: { arrivalDate: string; shipDate: string; selectableUntil: string },
+  now: Date,
+  product: ScheduleProductSettings,
+  calendar: ScheduleCalendarSettings | null,
+): ScheduleCandidateView {
+  const selectable = isSelectable(candidate, now);
+  return {
+    ...candidate,
+    selectable,
+    warnings: buildShipDateWarnings(candidate.shipDate, selectable, product, calendar),
+  };
 }
 
 async function loadScheduleContext(
@@ -415,12 +447,15 @@ async function buildScheduleView(
   );
 
   const candidates = schedule.candidates.map((candidate) =>
-    buildCandidateView(candidate.arrivalDate, now, product, calendar),
+    buildStoredCandidateView(candidate, now, product, calendar),
   );
 
   // 提示・再提示フォームの叩き台。いま時点で選択可能な候補を生成し直す。
+  // AWAITING_SELECTION でも、全候補が期限切れになった場合に merchant が手動で再提示できるよう含める。
   const needsDraft =
-    schedule.scheduleStatus === "AWAITING_PROPOSAL" || schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE";
+    schedule.scheduleStatus === "AWAITING_PROPOSAL" ||
+    schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE" ||
+    schedule.scheduleStatus === "AWAITING_SELECTION";
   const draftCandidates = needsDraft
     ? generateCandidates(now, product, calendar).map((candidate) =>
         buildCandidateView(candidate.arrivalDate, now, product, calendar),

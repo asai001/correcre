@@ -473,6 +473,8 @@ export async function proposeCandidates(
     candidates,
     merchantNote: input.merchantNote?.trim() || undefined,
     merchantRejectReason: undefined,
+    // 提示が済んだので、提示催促の送信済みマーカーを解除する（次に詰まったとき再送できるように）
+    proposalReminderSentAt: undefined,
   };
 
   return executeScheduleTransaction(config, {
@@ -521,8 +523,9 @@ export async function reproposeCandidates(
     merchantNote: input.merchantNote?.trim() || schedule.merchantNote,
     proposalRoundCount: schedule.proposalRoundCount + 1,
     merchantRejectReason: undefined,
-    // 新しい候補セットに対する催促を改めて送れるようにリセットする
+    // 新しい候補セットに対する催促・提示依頼を改めて送れるようにリセットする
     selectionReminderSentAt: undefined,
+    proposalReminderSentAt: undefined,
   };
 
   return executeScheduleTransaction(config, {
@@ -625,6 +628,8 @@ export type RequestDateInput = {
   requestedArrivalDate: string;
   requestedTimeSlot?: string;
   requestedNote?: string;
+  // 生鮮品の同意（希望日経由で確定した場合も同意記録が残るよう、申請時点で保存する）
+  acknowledgedText?: string;
   actor: ScheduleActor;
   now: Date;
 };
@@ -653,6 +658,10 @@ export async function requestDate(
     rescheduleRequestCount: schedule.rescheduleRequestCount + 1,
     // merchant の応答督促を改めて送れるようにリセットする
     responseReminderSentAt: undefined,
+    // 希望日が merchant に承諾されるとそのまま確定するため、同意はこの時点で記録しておく
+    ...(input.acknowledgedText
+      ? { acknowledgedAt: occurredAt, acknowledgedText: input.acknowledgedText }
+      : {}),
   };
 
   return executeScheduleTransaction(config, {

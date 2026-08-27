@@ -59,9 +59,10 @@ export function mapScheduleErrorResponse(err: unknown): NextResponse {
     return NextResponse.json({ error: FAILED_MESSAGE }, { status: 500 });
   }
 
-  if (err instanceof Error) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+  if (err instanceof Error && err.message === "対象の交換が見つかりません") {
+    return NextResponse.json({ error: "not_found", message: err.message }, { status: 404 });
   }
 
-  return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  // 分類できないエラーの生メッセージ（AWS SDK の内部情報など）はクライアントへ返さない。
+  return NextResponse.json({ error: "internal_error", message: FAILED_MESSAGE }, { status: 500 });
 }

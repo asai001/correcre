@@ -30,7 +30,13 @@ export async function POST(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "invalid_json" }, { status: 400 });
     }
 
-    if (!body || typeof body.arrivalDate !== "string" || !body.arrivalDate) {
+    if (
+      !body ||
+      typeof body.arrivalDate !== "string" ||
+      !body.arrivalDate ||
+      (body.timeSlot !== undefined && typeof body.timeSlot !== "string") ||
+      (body.acknowledged !== undefined && typeof body.acknowledged !== "boolean")
+    ) {
       return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
 

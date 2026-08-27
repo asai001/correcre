@@ -328,6 +328,14 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
       const schedule = item.schedule;
       if (!schedule || schedule.arrivalReminderSentAt) continue;
 
+      // 確定後にキャンセル・却下された交換にはリマインドを送らない
+      // （終端遷移時に gsi4 は外れるが、旧データや取りこぼしに備えて status でも確認する）。
+      if (item.status === "CANCELED" || item.status === "CANCELLED" || item.status === "REJECTED") {
+        await removeScheduleGsiKeys(serviceConfig, item);
+        result.cleanedUp += 1;
+        continue;
+      }
+
       if (!(await markScheduleReminderSent(serviceConfig, { item, field: "arrivalReminderSentAt", sentAt: now.toISOString() }))) {
         continue;
       }
@@ -353,7 +361,9 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
   for (const item of await listExchangeHistoryByScheduleStatus(exchangeConfig, "CONFIRMED")) {
     try {
       const arrivalDate = item.schedule?.selectedArrivalDate;
-      if (!arrivalDate || arrivalDate >= todayJst) continue;
+      const isTerminal =
+        item.status === "CANCELED" || item.status === "CANCELLED" || item.status === "REJECTED";
+      if (!isTerminal && (!arrivalDate || arrivalDate >= todayJst)) continue;
       await removeScheduleGsiKeys(serviceConfig, item);
       result.cleanedUp += 1;
     } catch (error) {

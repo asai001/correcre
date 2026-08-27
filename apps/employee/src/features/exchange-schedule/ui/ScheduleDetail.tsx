@@ -70,6 +70,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
   const [requestedDate, setRequestedDate] = useState("");
   const [requestedTimeSlot, setRequestedTimeSlot] = useState<string>(NO_TIME_SLOT);
   const [requestedNote, setRequestedNote] = useState("");
+  const [requestAcknowledged, setRequestAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -125,6 +126,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
           requestedArrivalDate: requestedDate,
           requestedTimeSlot: requestedTimeSlot === NO_TIME_SLOT ? undefined : requestedTimeSlot,
           requestedNote: requestedNote.trim() || undefined,
+          acknowledged: view.requiresAcknowledgement ? requestAcknowledged : undefined,
         });
         applyView(next);
         setNotice("希望日を送信しました。提携企業の回答をお待ちください（最大 48 時間）。");
@@ -321,11 +323,28 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
                     onChange={(event) => setRequestedNote(event.target.value)}
                     placeholder="例: 平日は 20 時まで不在のため週末を希望します"
                   />
+                  {view.requiresAcknowledgement ? (
+                    // 希望日は提携企業の承諾でそのまま確定するため、同意はこの時点で取る
+                    <div className="mt-3 rounded-2xl border-2 border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <div className="whitespace-pre-wrap font-medium">{view.acknowledgementText}</div>
+                      <FormControlLabel
+                        className="!mt-1"
+                        control={
+                          <Checkbox
+                            checked={requestAcknowledged}
+                            onChange={(_event, checked) => setRequestAcknowledged(checked)}
+                            sx={{ color: "#b45309", "&.Mui-checked": { color: "#b45309" } }}
+                          />
+                        }
+                        label={<span className="text-sm font-bold">確認しました</span>}
+                      />
+                    </div>
+                  ) : null}
                   <div className="mt-3 flex flex-col gap-2">
                     <Button
                       variant="contained"
                       onClick={handleRequestDate}
-                      disabled={pending}
+                      disabled={pending || (view.requiresAcknowledgement && !requestAcknowledged)}
                       className="!rounded-full"
                     >
                       この内容で希望を送る

@@ -352,6 +352,11 @@ export async function requestDateForEmployee(
     throw new ExchangeScheduleNotFoundError("この交換に日程調整はありません");
   }
 
+  // 希望日は merchant の承諾でそのまま確定するため、生鮮品の同意は申請時点で必須にする。
+  if (view.requiresAcknowledgement && request.acknowledged !== true) {
+    throw new AcknowledgementRequiredError();
+  }
+
   if (!isValidYYYYMMDD(request.requestedArrivalDate)) {
     throw new InvalidRequestedDateError("希望日の形式が正しくありません。");
   }
@@ -369,6 +374,7 @@ export async function requestDateForEmployee(
     requestedArrivalDate: request.requestedArrivalDate,
     requestedTimeSlot: timeSlot,
     requestedNote: request.requestedNote,
+    acknowledgedText: view.requiresAcknowledgement ? FRESH_ITEM_ACKNOWLEDGEMENT_TEXT : undefined,
     actor: { actor: "EMPLOYEE", actorId: user.userId },
     now: new Date(),
   });

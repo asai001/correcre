@@ -506,6 +506,28 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
               前回の希望日には「{schedule.merchantRejectReason}」として対応不可と回答済みです。
             </Alert>
           ) : null}
+          {schedule.candidates.every((candidate) => !candidate.selectable) ? (
+            schedule.canRepropose ? (
+              <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/50 p-4">
+                <h3 className="text-sm font-bold text-slate-900">
+                  すべての候補が期限切れです — 候補を再提示できます（残り{" "}
+                  {schedule.proposalRoundLimit - schedule.proposalRoundCount} 回）
+                </h3>
+                <ProposalForm
+                  detail={detail}
+                  schedule={schedule}
+                  mode="repropose"
+                  onUpdated={onUpdated}
+                  onError={setError}
+                  onNotice={setNotice}
+                />
+              </div>
+            ) : (
+              <Alert severity="warning" className="!mt-3">
+                すべての候補が期限切れで、再提示回数も上限に達しています。このままの場合、交換は自動的にキャンセルされポイントが返還されます。
+              </Alert>
+            )
+          ) : null}
         </>
       ) : null}
 
