@@ -18,6 +18,7 @@ import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { transitionExchange } from "../api/client";
 import type { ExchangeDetail as ExchangeDetailType } from "../model/types";
+import SchedulePanel from "./SchedulePanel";
 
 type Props = {
   initial: ExchangeDetailType;
@@ -334,11 +335,19 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         </dl>
       </section>
 
+      <SchedulePanel detail={detail} onUpdated={setDetail} />
+
       {detail.allowedNextStatuses.length > 0 ? (
         <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <h2 className="text-lg font-bold text-slate-900">状態を更新する</h2>
           <p className="mt-1 text-sm text-slate-500">
             選択した次の状態に応じて、自動でタイムスタンプとポイント精算が行われます。
+            {detail.schedule &&
+            (detail.schedule.scheduleStatus === "AWAITING_PROPOSAL" ||
+              detail.schedule.scheduleStatus === "AWAITING_SELECTION" ||
+              detail.schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE")
+              ? "お届け日が確定すると自動で「準備中」に進みます。ここでは却下・強制キャンセルのみ操作できます。"
+              : null}
           </p>
 
           <TextField

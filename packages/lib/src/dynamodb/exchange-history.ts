@@ -15,6 +15,7 @@ import type {
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
   PointTransaction,
+  ScheduleStatus,
 } from "@correcre/types";
 
 import { buildUserSk } from "./user";
@@ -29,6 +30,10 @@ const ALLOWED_TRANSITIONS: Record<
   REQUESTED: {
     MERCHANT: ["PREPARING", "REJECTED", "CANCELED"],
     OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
+    // SYSTEM は配送日程調整の確定（→ PREPARING）と、期限切れ・上限到達の自動キャンセルに使う。
+    SYSTEM: ["PREPARING", "CANCELED"],
+    // EMPLOYEE のキャンセルは日程調整フローの文脈でのみ feature 層がゲートする（汎用のキャンセル API は作らない）。
+    EMPLOYEE: ["CANCELED"],
   },
   PREPARING: {
     MERCHANT: ["IN_PROGRESS", "CANCELED"],
@@ -67,6 +72,7 @@ export type ExchangeHistoryTableConfig = {
 export const EXCHANGE_HISTORY_BY_COMPANY_INDEX = "ExchangeHistoryByCompanyExchangedAt";
 export const EXCHANGE_HISTORY_BY_MERCHANT_STATUS_INDEX = "ExchangeHistoryByMerchantStatusExchangedAt";
 export const EXCHANGE_HISTORY_BY_MERCHANT_INDEX = "ExchangeHistoryByMerchantExchangedAt";
+export const EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX = "ExchangeHistoryByScheduleStatus";
 
 export function buildExchangeHistoryPk(companyId: string, userId: string) {
   return `COMPANY#${companyId}#USER#${userId}` as const;
@@ -94,6 +100,83 @@ export function buildExchangeHistoryByMerchantGsiPk(merchantId: string) {
 
 export function buildExchangeHistoryByMerchantGsiSk(exchangedAt: string, exchangeId: string) {
   return `EXCHANGED_AT#${exchangedAt}#EXCHANGE#${exchangeId}` as const;
+}
+
+// 配送日程調整のスパース GSI (gsi4)。調整進行中のアイテムだけがキーを持つ。
+export function buildExchangeHistoryByScheduleStatusGsiPk(scheduleStatus: ScheduleStatus) {
+  return `SCHEDULE#${scheduleStatus}` as const;
+}
+
+export function buildExchangeHistoryScheduleGsiSkByExchangedAt(exchangedAt: string) {
+  return `EXCHANGED_AT#${exchangedAt}` as const;
+}
+
+// CONFIRMED 中は到着日で範囲クエリできるよう ARRIVAL#<YYYY-MM-DD> を使う（確定日前日リマインド用）。
+export function buildExchangeHistoryScheduleGsiSkByArrival(arrivalDate: string) {
+  return `ARRIVAL#${arrivalDate}` as const;
+}
+
+export async function listExchangeHistoryByScheduleStatus(
+  config: ExchangeHistoryTableConfig,
+  scheduleStatus: ScheduleStatus,
+): Promise<ExchangeHistoryItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const exchanges: ExchangeHistoryItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX,
+        KeyConditionExpression: "gsi4pk = :gsi4pk",
+        ExpressionAttributeValues: {
+          ":gsi4pk": buildExchangeHistoryByScheduleStatusGsiPk(scheduleStatus),
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      exchanges.push(...(Items as ExchangeHistoryItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return exchanges;
+}
+
+export async function listConfirmedExchangesByArrivalDate(
+  config: ExchangeHistoryTableConfig,
+  arrivalDate: string,
+): Promise<ExchangeHistoryItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const exchanges: ExchangeHistoryItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX,
+        KeyConditionExpression: "gsi4pk = :gsi4pk AND gsi4sk = :gsi4sk",
+        ExpressionAttributeValues: {
+          ":gsi4pk": buildExchangeHistoryByScheduleStatusGsiPk("CONFIRMED"),
+          ":gsi4sk": buildExchangeHistoryScheduleGsiSkByArrival(arrivalDate),
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      exchanges.push(...(Items as ExchangeHistoryItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return exchanges;
 }
 
 export async function listExchangeHistoryByCompanyAndUser(
@@ -568,6 +651,14 @@ export async function transitionExchangeStatus(
     );
   }
 
+  // 日程確定後にキャンセル・却下された場合、schedule も終端化してスパース GSI から外す。
+  // これを怠ると、キャンセル済みの交換に確定日前日の受取リマインドが送られてしまう。
+  if (input.item.schedule) {
+    expressionAttributeNames["#schedule"] = "schedule";
+    setExpressions.push("#schedule.scheduleStatus = :cancelledScheduleStatus");
+    expressionAttributeValues[":cancelledScheduleStatus"] = "CANCELLED";
+  }
+
   // 楽観ロック: 読み込み時のステータスと一致する場合のみ返金遷移を確定する。
   const statusConditionExpression = buildExchangeStatusConditionExpression(input.item.status, expressionAttributeValues);
 
@@ -582,7 +673,7 @@ export async function transitionExchangeStatus(
           sk: input.item.sk,
         },
         ConditionExpression: statusConditionExpression,
-        UpdateExpression: `SET ${setExpressions.join(", ")}`,
+        UpdateExpression: `SET ${setExpressions.join(", ")} REMOVE gsi4pk, gsi4sk`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
       },
@@ -642,6 +733,12 @@ export async function transitionExchangeStatus(
   if (input.item.merchantId) {
     updated.gsi2pk = buildExchangeHistoryByMerchantStatusGsiPk(input.item.merchantId, input.nextStatus);
   }
+
+  if (input.item.schedule) {
+    updated.schedule = { ...input.item.schedule, scheduleStatus: "CANCELLED" };
+  }
+  delete updated.gsi4pk;
+  delete updated.gsi4sk;
 
   return updated;
 }

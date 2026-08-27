@@ -4,6 +4,9 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import DashboardLinks from "@employee/features/dashboard-links";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import ExchangeHistory from "@employee/features/exchange-history/";
+import { ScheduleBanner } from "@employee/features/exchange-schedule";
+import { listPendingSchedulesForEmployee } from "@employee/features/exchange-schedule/api/server";
+import type { PendingScheduleSummary } from "@employee/features/exchange-schedule/model/types";
 import LoginInfo from "@employee/features/login-info";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";
@@ -26,6 +29,16 @@ export default async function DashboardPage() {
   const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
   const showPointExchangeLink = company?.showPointExchangeLink === true;
 
+  // 日程調整中の交換の通知バナー。取得に失敗してもダッシュボード自体は表示する。
+  let pendingSchedules: PendingScheduleSummary[] = [];
+  if (showPointExchangeLink) {
+    try {
+      pendingSchedules = await listPendingSchedulesForEmployee(currentUser);
+    } catch (error) {
+      console.error("Failed to load pending delivery schedules.", error);
+    }
+  }
+
   return (
     <div className="container mx-auto mb-10 px-6">
       <div className="mt-6 flex items-start justify-between gap-4">
@@ -44,6 +57,11 @@ export default async function DashboardPage() {
       <div className="mt-5">
         <Philosophy companyId={companyId} />
       </div>
+      {pendingSchedules.length > 0 ? (
+        <div className="mt-5">
+          <ScheduleBanner items={pendingSchedules} />
+        </div>
+      ) : null}
       <div className="mt-5">
         <LoginInfo companyId={companyId} userId={userId} />
       </div>

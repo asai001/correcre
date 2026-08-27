@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -71,6 +73,42 @@ export default function ExchangeHistory({
         width: "20%",
         align: "right",
         render: (row) => `${row.usedPoint.toLocaleString()} pt`,
+      },
+      {
+        id: "scheduleStatus",
+        label: "お届け日",
+        width: "18%",
+        render: (row) => {
+          if (!row.scheduleStatus || row.scheduleStatus === "NOT_REQUIRED") {
+            return "-";
+          }
+          const href = `/exchange-history/${encodeURIComponent(row.exchangeId)}` as Route;
+          if (row.scheduleStatus === "AWAITING_SELECTION") {
+            return (
+              <Link
+                href={href}
+                className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 underline"
+              >
+                選択してください
+              </Link>
+            );
+          }
+          if (row.scheduleStatus === "CONFIRMED" && row.selectedArrivalDate) {
+            return (
+              <Link href={href} className="text-xs text-slate-700 underline">
+                {row.selectedArrivalDate}
+              </Link>
+            );
+          }
+          if (row.scheduleStatus === "CANCELLED") {
+            return "-";
+          }
+          return (
+            <Link href={href} className="text-xs text-slate-500 underline">
+              調整中
+            </Link>
+          );
+        },
       },
     ],
     [],

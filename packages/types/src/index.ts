@@ -15,3 +15,5 @@ export * from "./db/pointTransaction";
 export * from "./db/systemSetting";
 export * from "./db/supportInquiry";
 export * from "./db/seminarRegistration";
+export * from "./db/merchantCalendar";
+export * from "./db/scheduleEvent";

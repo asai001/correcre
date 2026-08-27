@@ -118,6 +118,11 @@ export default function MerchandiseDetailView({ item, actionSlot, forceSingleCol
             {item.contentVolume ? <DetailRow label="内容量">{item.contentVolume}</DetailRow> : null}
             {item.expiration ? <DetailRow label="賞味期限">{item.expiration}</DetailRow> : null}
             {item.deliverySchedule ? <DetailRow label="お届け予定">{item.deliverySchedule}</DetailRow> : null}
+            {item.fulfillment.requiresScheduling ? (
+              <DetailRow label="お届け日">
+                交換申請後に、提示される候補からお届け日を選択します
+              </DetailRow>
+            ) : null}
             {item.notes ? (
               <DetailRow label="注意事項">
                 <p className="whitespace-pre-line">{item.notes}</p>
