@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
   Alert,
@@ -25,6 +25,7 @@ import type { FulfillmentType, ProductFulfillment, TemperatureZone } from "@corr
 import { AVAILABLE_TIME_SLOT_VALUES, resolveMerchandiseFulfillment } from "@correcre/types";
 import {
   createMerchandise,
+  fetchSchedulePreview,
   requestMerchandiseUploadUrl,
   updateMerchandise,
   uploadMerchandiseImage,
@@ -33,6 +34,7 @@ import type {
   CreateMerchandiseRequest,
   MerchandiseFormPayload,
   MerchandiseSummary,
+  SchedulePreviewResponse,
 } from "../model/types";
 import {
   formatMerchandiseActor,
@@ -82,6 +84,10 @@ const fulfillmentTypeOptions: { value: FulfillmentType; label: string }[] = [
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
+function isFreshZone(zone: TemperatureZone) {
+  return zone === "REFRIGERATED" || zone === "FROZEN";
+}
+
 type FulfillmentFormState = {
   fulfillmentType: FulfillmentType;
   temperatureZone: TemperatureZone;
@@ -93,6 +99,8 @@ type FulfillmentFormState = {
   shippableWeekdays: number[];
   cutoffTime: string;
   availableTimeSlots: string[];
+  // 時間帯も同様。冷蔵・冷凍では受取失敗を減らすため既定で全て選んだ状態にする。
+  availableTimeSlotsTouched: boolean;
   candidateCount: string;
 };
 
@@ -108,6 +116,7 @@ function getInitialFulfillmentState(initial: MerchandiseSummary | undefined): Fu
     shippableWeekdays: [...resolved.shippableWeekdays],
     cutoffTime: resolved.cutoffTime,
     availableTimeSlots: [...resolved.availableTimeSlots],
+    availableTimeSlotsTouched: Boolean(initial?.fulfillment),
     candidateCount: String(resolved.candidateCount),
   };
 }
@@ -204,6 +213,9 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [preview, setPreview] = useState<SchedulePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const priceYen = Number(form.priceYen);
   const autoRequiredPoint = Number.isFinite(priceYen) && priceYen > 0 ? calculateRequiredPoint(priceYen) : 0;
@@ -228,7 +240,14 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       // 冷蔵・冷凍は日程調整必須が既定。merchant が手動で切り替えるまでは自動追従する。
       requiresScheduling: prev.requiresSchedulingTouched
         ? prev.requiresScheduling
-        : value === "REFRIGERATED" || value === "FROZEN",
+        : isFreshZone(value),
+      // 時間帯も同様に追従させる。生鮮品で時間帯が選べないと受取失敗が増えるため、
+      // 既定は「すべての時間帯を選べる」状態にしておく。
+      availableTimeSlots: prev.availableTimeSlotsTouched
+        ? prev.availableTimeSlots
+        : isFreshZone(value)
+          ? [...AVAILABLE_TIME_SLOT_VALUES]
+          : [],
     }));
   };
 
@@ -248,6 +267,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   const handleTimeSlotToggle = (slot: string) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
     setFulfillment((prev) => ({
       ...prev,
+      availableTimeSlotsTouched: true,
       availableTimeSlots: checked
         ? AVAILABLE_TIME_SLOT_VALUES.filter((entry) => [...prev.availableTimeSlots, slot].includes(entry))
         : prev.availableTimeSlots.filter((entry) => entry !== slot),
@@ -360,6 +380,50 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       setSubmitting(false);
     }
   };
+
+  // 入力した設定で実際にどのお届け日が提示されるかを、保存前に確認できるようにする。
+  // 日付の計算はサーバー側だけで行い、ここでは返ってきた文字列を表示するだけにする。
+  const schedulePreviewKey = fulfillment.requiresScheduling
+    ? JSON.stringify(buildFulfillmentPayload(fulfillment))
+    : null;
+
+  useEffect(() => {
+    if (!schedulePreviewKey) {
+      setPreview(null);
+      setPreviewError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    // 入力のたびに叩かないよう、手が止まってから問い合わせる
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const result = await fetchSchedulePreview(
+          JSON.parse(schedulePreviewKey) as ProductFulfillment,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setPreview(result);
+        }
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        setPreviewError(err instanceof Error ? err.message : "お届け日の確認に失敗しました。");
+      } finally {
+        if (!controller.signal.aborted) {
+          setPreviewLoading(false);
+        }
+      }
+    }, 600);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [schedulePreviewKey]);
 
   const previewTitle = useMemo(() => form.merchandiseName || "商品名", [form.merchandiseName]);
   // 履歴は古い順に追記されるため、新しい操作が上に来るよう反転して表示する。
@@ -580,39 +644,62 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
           {fulfillment.requiresScheduling ? (
             <>
-              <div className="grid gap-4 md:grid-cols-3">
-                <TextField
-                  label="発送準備（営業日）"
-                  type="number"
-                  fullWidth
-                  value={fulfillment.leadTimeBusinessDays}
-                  onChange={handleFulfillmentField("leadTimeBusinessDays")}
-                  helperText="日程確定から発送までに必要な営業日数"
-                  slotProps={{ input: { endAdornment: <InputAdornment position="end">営業日</InputAdornment> } }}
-                />
-                <TextField
-                  label="配送日数（暦日）"
-                  type="number"
-                  fullWidth
-                  value={fulfillment.transitDays}
-                  onChange={handleFulfillmentField("transitDays")}
-                  helperText="発送から到着までの日数"
-                  slotProps={{ input: { endAdornment: <InputAdornment position="end">日</InputAdornment> } }}
-                />
-                <TextField
-                  label="当日受付の締切時刻"
-                  type="time"
-                  fullWidth
-                  value={fulfillment.cutoffTime}
-                  onChange={handleFulfillmentField("cutoffTime")}
-                  helperText="この時刻を過ぎた確定は翌営業日扱い"
-                  slotProps={{ inputLabel: { shrink: true } }}
-                />
+              {/* 設問は MUI のラベルに入れると折り返されず省略表示になるため、
+                  項目の上に本文として置き、入力欄はラベルなしにする。 */}
+              <div className="space-y-4">
+                {[
+                  {
+                    key: "leadTimeBusinessDays" as const,
+                    question: "お届け日が決まってから、発送するまで何日かかりますか？",
+                    help: "お休みの日は数えません。当日発送できるなら 0 日です",
+                    type: "number",
+                    unit: "日",
+                  },
+                  {
+                    key: "transitDays" as const,
+                    question: "発送してから、お届け先に届くまで何日かかりますか？",
+                    help: "一番時間がかかる地域に合わせてください（翌日届くなら 1 日）",
+                    type: "number",
+                    unit: "日",
+                  },
+                  {
+                    key: "cutoffTime" as const,
+                    question: "その日のうちに発送するには、何時までに決まっている必要がありますか？",
+                    help: "宅配便の集荷時間に合わせてください",
+                    type: "time",
+                    unit: undefined,
+                  },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <Typography variant="body2" className="!mb-1.5 font-semibold text-slate-800">
+                      {field.question}
+                    </Typography>
+                    <TextField
+                      type={field.type}
+                      size="small"
+                      value={fulfillment[field.key]}
+                      onChange={handleFulfillmentField(field.key)}
+                      className="!w-56"
+                      slotProps={
+                        field.unit
+                          ? { input: { endAdornment: <InputAdornment position="end">{field.unit}</InputAdornment> } }
+                          : undefined
+                      }
+                    />
+                    {/* 補足は入力欄の幅で折り返さないよう、helperText ではなく外に置く */}
+                    <Typography variant="caption" className="!mt-1 block text-slate-500">
+                      {field.help}
+                    </Typography>
+                  </div>
+                ))}
               </div>
 
               <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
                 <Typography variant="subtitle2" className="text-slate-800">
-                  発送可能曜日（製造サイクルに対応）
+                  発送できる曜日はどれですか？
+                </Typography>
+                <Typography variant="caption" className="text-slate-500">
+                  製造や梱包の都合で発送できる曜日だけを選んでください。
                 </Typography>
                 <FormGroup row className="mt-2">
                   {weekdayLabels.map((label, day) => (
@@ -633,7 +720,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
               <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
                 <Typography variant="subtitle2" className="text-slate-800">
-                  選択できる時間帯（任意）
+                  従業員が選べる時間帯（任意）
+                </Typography>
+                <Typography variant="caption" className="text-slate-500">
+                  受け取れる時間を指定できると、不在で受け取れない失敗が減ります。
                 </Typography>
                 <FormGroup row className="mt-2">
                   {AVAILABLE_TIME_SLOT_VALUES.map((slot) => (
@@ -652,15 +742,66 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                 </FormGroup>
               </FormControl>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Typography variant="body2" className="!mb-1.5 font-semibold text-slate-800">
+                  従業員に見せる候補日は何件にしますか？
+                </Typography>
                 <TextField
-                  label="提示する候補日の件数"
                   type="number"
-                  fullWidth
+                  size="small"
                   value={fulfillment.candidateCount}
                   onChange={handleFulfillmentField("candidateCount")}
-                  helperText="自動生成する候補日の件数（1〜10、既定 4）"
+                  className="!w-56"
+                  slotProps={{ input: { endAdornment: <InputAdornment position="end">件</InputAdornment> } }}
                 />
+                <Typography variant="caption" className="!mt-1 block text-slate-500">
+                  迷ったら 4 件のままで問題ありません（1〜10）
+                </Typography>
+              </div>
+
+              {/* 入力した数字が実際にどの日付になるのかを、保存前に確認できるようにする。
+                  営業日の数え方を理解していなくても、出てくる日付を見れば妥当性を判断できる。 */}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4">
+                <Typography variant="subtitle2" className="text-emerald-900">
+                  この設定だと、こうなります
+                </Typography>
+                <Typography variant="caption" className="text-emerald-800">
+                  今日この商品に交換申請があった場合に、従業員へ提示されるお届け日です。
+                </Typography>
+
+                {previewError ? (
+                  <Typography variant="body2" className="!mt-3 text-rose-700">
+                    {previewError}
+                  </Typography>
+                ) : previewLoading && !preview ? (
+                  <Typography variant="body2" className="!mt-3 text-emerald-900">
+                    確認しています...
+                  </Typography>
+                ) : preview && preview.candidates.length > 0 ? (
+                  <>
+                    <ul className="mt-3 space-y-1.5">
+                      {preview.candidates.map((candidate) => (
+                        <li key={candidate.arrivalLabel} className="text-sm text-emerald-950">
+                          <span className="font-bold">{candidate.arrivalLabel} 着</span>
+                          <span className="ml-2 text-xs text-emerald-800">
+                            （{candidate.shipLabel} 発送・{candidate.selectableUntilLabel} まで選択可能）
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Typography variant="caption" className="!mt-2 block text-emerald-800">
+                      早すぎる・遅すぎると感じたら、上の日数や曜日を調整してください。
+                    </Typography>
+                  </>
+                ) : preview?.note ? (
+                  <Typography variant="body2" className="!mt-3 text-amber-800">
+                    {preview.note}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" className="!mt-3 text-emerald-900">
+                    確認しています...
+                  </Typography>
+                )}
               </div>
 
               <Alert severity="info">

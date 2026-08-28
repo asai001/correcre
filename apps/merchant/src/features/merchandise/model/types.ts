@@ -35,6 +35,20 @@ export type MerchandiseFormPayload = {
   fulfillment?: ProductFulfillment;
 };
 
+// 配送・日程調整の設定が、実際にどの日付になるかの確認用。
+// 日付の計算と表記はすべてサーバー側で行い、画面はそのまま表示するだけにする。
+export type SchedulePreviewCandidate = {
+  arrivalLabel: string;
+  shipLabel: string;
+  selectableUntilLabel: string;
+};
+
+export type SchedulePreviewResponse = {
+  candidates: SchedulePreviewCandidate[];
+  // 候補が作れないときの理由（発送可能曜日が未選択、休業日で埋まっている など）
+  note?: string;
+};
+
 export type CreateMerchandiseRequest = MerchandiseFormPayload;
 
 export type UpdateMerchandiseRequest = MerchandiseFormPayload;

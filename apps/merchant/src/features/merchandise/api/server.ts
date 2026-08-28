@@ -16,6 +16,9 @@ import {
   updateMerchandiseStatus,
 } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
+import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
+import { formatWeekdayJa } from "@correcre/lib/date/business-days";
+import { generateCandidates } from "@correcre/lib/schedule/engine";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import {
@@ -57,6 +60,7 @@ import type {
   MerchandiseSummary,
   RequestUploadUrlResponse,
   RequestViewUrlResponse,
+  SchedulePreviewResponse,
   UpdateMerchandiseRequest,
 } from "../model/types";
 
@@ -220,7 +224,7 @@ function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFul
     .sort((a, b) => a - b);
 
   if (requiresScheduling && shippableWeekdays.length === 0) {
-    throw new Error("発送可能曜日を1つ以上選択してください");
+    throw new Error("発送できる曜日を1つ以上選んでください");
   }
 
   if (!CUTOFF_TIME_PATTERN.test(input.cutoffTime)) {
@@ -246,6 +250,76 @@ function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFul
     cutoffTime: input.cutoffTime,
     availableTimeSlots,
     candidateCount: candidateCount || DEFAULT_CANDIDATE_COUNT,
+  };
+}
+
+// "YYYY-MM-DD" を「9月4日(金)」形式にする
+function formatDateLabel(date: string): string {
+  const [, month, day] = date.split("-").map(Number);
+  return `${month}月${day}日(${formatWeekdayJa(date)})`;
+}
+
+// ISO8601（UTC）を JST の「9月2日(水) 12:00」形式にする
+function formatDeadlineLabel(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const ymd = `${get("year")}-${get("month")}-${get("day")}`;
+  return `${formatDateLabel(ymd)} ${get("hour")}:${get("minute")}`;
+}
+
+/**
+ * 入力中の配送設定で、実際に従業員へ提示される候補日を返す。
+ * 設定を保存する前に結果を確認できるようにするためのもので、
+ * 日付の計算・表記はすべてここ（サーバー側）で行う。
+ */
+export async function previewScheduleForMerchandise(
+  merchantId: string,
+  input: ProductFulfillment,
+): Promise<SchedulePreviewResponse> {
+  const config = getRuntimeConfig();
+
+  // 入力途中で曜日が空になるのは普通の状態なので、検証エラーにせず案内に留める
+  if (!input.shippableWeekdays || input.shippableWeekdays.length === 0) {
+    return { candidates: [], note: "発送できる曜日を1つ以上選ぶと、お届け日の候補が表示されます。" };
+  }
+
+  const fulfillment = normalizeFulfillment(input);
+
+  if (!fulfillment) {
+    return { candidates: [], note: "配送の設定を入力してください。" };
+  }
+
+  const calendar = await getMerchantCalendar(
+    {
+      region: config.region,
+      tableName: readRequiredServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
+    },
+    merchantId,
+  );
+
+  const candidates = generateCandidates(new Date(), fulfillment, calendar);
+
+  if (candidates.length === 0) {
+    return {
+      candidates: [],
+      note: "この設定では、当面のお届け日の候補が作れません。発送できる曜日や休業日の登録を見直してください。",
+    };
+  }
+
+  return {
+    candidates: candidates.map((candidate) => ({
+      arrivalLabel: formatDateLabel(candidate.arrivalDate),
+      shipLabel: formatDateLabel(candidate.shipDate),
+      selectableUntilLabel: formatDeadlineLabel(candidate.selectableUntil),
+    })),
   };
 }
 
