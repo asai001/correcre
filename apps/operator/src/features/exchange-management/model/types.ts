@@ -33,6 +33,9 @@ export type OperatorExchangeDetail = OperatorExchangeSummary & {
   history: ExchangeHistoryStatusEvent[];
   allowedNextStatuses: ExchangeHistoryStatus[];
   actorType: ExchangeHistoryActorType;
+  // 配送日程調整が進行中かどうか。進行中は承認（準備中への遷移）が候補から外れるため、
+  // 画面側でその理由を説明するのに使う。
+  scheduleActive: boolean;
 };
 
 export type TransitionOperatorExchangeRequest = {

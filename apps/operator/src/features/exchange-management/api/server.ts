@@ -263,6 +263,7 @@ async function buildExchangeDetail(
   }
 
   const status = normalizeStatus(item.status);
+  const scheduleActive = isScheduleActive(item);
 
   return {
     ...toSummary(item, merchantName, applicant.name, companyName),
@@ -273,12 +274,13 @@ async function buildExchangeDetail(
     history: item.history ?? [],
     // 日程調整が進行中の間、operator が取れるのは却下・強制キャンセルのみ
     // （承認して先へ進める操作は日程確定のシステム遷移に委ねる）。
-    allowedNextStatuses: isScheduleActive(item)
+    allowedNextStatuses: scheduleActive
       ? getAllowedNextExchangeStatuses(status, actorType).filter(
           (nextStatus) => nextStatus === "REJECTED" || nextStatus === "CANCELED",
         )
       : getAllowedNextExchangeStatuses(status, actorType),
     actorType,
+    scheduleActive,
   };
 }
 
