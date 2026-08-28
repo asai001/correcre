@@ -428,12 +428,13 @@ function RespondPanel({
             onChange={(event) => setRejectReason(event.target.value)}
             placeholder="例: 土曜日は製造ラインが止まるため発送できません"
           />
+          {/* gap-2 のままだと「対応不可」ボタンが理由の入力欄に張り付くため、ここだけ広げる。 */}
           <Button
             variant="outlined"
             color="error"
             onClick={() => run("REJECT")}
             disabled={pending}
-            className="!rounded-full"
+            className="!mt-4 !rounded-full"
           >
             この希望日には対応できない
           </Button>
