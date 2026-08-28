@@ -36,7 +36,8 @@ type SortKey = "popular" | "newest" | "lowestPoint";
 
 type PointRange = { min?: number; max?: number };
 
-const PAGE_SIZE = 13;
+// カード列数（md:2列 / xl:3列）の公倍数にして、最終行が欠けないようにする。
+const PAGE_SIZE = 12;
 
 const POINT_RANGES: { value: string; label: string; range: PointRange }[] = [
   { value: "any", label: "指定なし", range: {} },
