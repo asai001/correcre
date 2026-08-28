@@ -345,6 +345,9 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
           <h2 className="text-lg font-bold text-slate-900">状態を更新する</h2>
           <p className="mt-1 text-sm text-slate-500">
             運用者は提携企業の操作と同等の遷移に加え、強制キャンセルが可能です。
+            {detail.scheduleActive
+              ? "お届け日が確定すると自動で「準備中」に進みます。ここでは却下・強制キャンセルのみ操作できます。"
+              : null}
           </p>
 
           <TextField
