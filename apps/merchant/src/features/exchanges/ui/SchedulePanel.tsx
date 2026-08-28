@@ -297,7 +297,8 @@ function ProposalForm({
         onChange={(event) => setNote(event.target.value)}
       />
 
-      <div className="flex justify-end">
+      {/* space-y-3 の既定の間隔だと送信ボタンが連絡事項の入力欄に張り付くため、ここだけ広げる。 */}
+      <div className="flex justify-end !mt-6">
         <Button
           variant="contained"
           onClick={handleSubmit}
