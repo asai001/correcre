@@ -801,7 +801,10 @@ export async function resendEmployeeInvitationInDynamo(
     throw new Error("仮パスワードの有効期限が切れていないため招待メールを再送できません");
   }
 
-  const cognitoUsername = targetUser.cognitoSub?.trim();
+  // AdminCreateUser（MessageAction=RESEND）はユーザープールが email をユーザー名属性と
+  // しているため Username に email 形式を要求する。sub（UUID）を渡すと
+  // "Username should be an email." で弾かれるので、必ずメールアドレスを渡す。
+  const cognitoUsername = targetUser.email?.trim();
 
   if (!cognitoUsername) {
     throw new Error("Cognito ユーザーが見つからないため招待メールを再送できません");
