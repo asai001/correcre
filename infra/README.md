@@ -280,6 +280,15 @@ GSI:
   - `PointTransaction` 追加
   - 必要に応じて `UserMonthlyStats` 更新
 
+### ミッション報酬の「翌月反映」と月初バッチ
+
+- ミッション報酬は提出時に `currentPointBalance`（利用可能残高）へは加算せず、`pendingPointBalance` + `pendingPointYearMonth`（YYYY-MM, JST）へ積みます
+- 「翌月1日に反映」はアプリの読み書き時に `reflectPoints()`（`packages/lib/src/points-reflection.ts`）の遅延評価で適用されます
+- 本人が操作しないユーザーの保存値は古いままになるため、月初バッチ（`correcre-point-reflection-<stage>` Lambda）が毎月1日 00:05 JST（EventBridge cron、UTC では前月末日 15:05）に前月以前の pending を `currentPointBalance` へ繰り入れて永続化します
+  - Lambda 本体: `infra/lambda/reflect-pending-points/index.mjs`（条件付き更新で冪等。遅延評価と競合しても二重加算しない）
+  - 失敗時は CloudWatch アラーム `correcre-point-reflection-errors-<stage>` が ALARM になります（通知アクションは未設定。必要なら SNS を追加してください）
+- 遅延評価（`reflectPoints()`）はバッチ導入後も安全網として残します。バッチ失敗時や月初〜バッチ完了までの間の交換申請でも正しさが保たれます
+
 ## 実装メモ
 
 - 既存の `apps/mock` の構造を踏まえ、移行しやすい形でデータモデルを寄せています

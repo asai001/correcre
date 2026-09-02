@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 
 import { createSharedCognito } from "./cognito";
 import { createApplicationDynamoTables } from "./dynamodb";
+import { createPointReflectionBatch } from "./point-reflection-batch";
 import { createApplicationS3Buckets } from "./s3";
 import { createVercelOidcAccess } from "./vercel-oidc";
 
@@ -52,6 +53,10 @@ export class InfraStack extends cdk.Stack {
       dynamoTables,
       s3Buckets,
       cognitoUserPoolArns: [internalCognito.userPool.userPoolArn, merchantCognito.userPool.userPoolArn],
+    });
+    const pointReflectionBatch = createPointReflectionBatch(this, {
+      stage: props.stage,
+      userTable: dynamoTables.userTable,
     });
 
     new cdk.CfnOutput(this, "EnvironmentName", {
@@ -306,6 +311,10 @@ export class InfraStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "ScheduleEventTableName", {
       value: dynamoTables.scheduleEventTable.tableName,
+    });
+
+    new cdk.CfnOutput(this, "PointReflectionFunctionName", {
+      value: pointReflectionBatch.handler.functionName,
     });
   }
 }
