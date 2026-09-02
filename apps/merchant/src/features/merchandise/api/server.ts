@@ -559,7 +559,9 @@ export async function createMerchandiseForMerchant(
 
   const merchandiseId = getNextMerchandiseId(existing);
   const now = new Date().toISOString();
-  const status: MerchandiseStatus = "DRAFT";
+  // 登録ボタン = そのまま公開。初回登録者が「登録したのに表示されない」と迷わないよう、
+  // 明示的に「下書き保存」を選んだときだけ DRAFT で作成する。
+  const status: MerchandiseStatus = input.initialStatus === "DRAFT" ? "DRAFT" : "PUBLISHED";
 
   const cardImage = await resolveImage(config, merchantId, merchandiseId, "card", input.cardImage, undefined);
   const detailImage = await resolveImage(
@@ -594,6 +596,8 @@ export async function createMerchandiseForMerchant(
     notes: normalized.notes,
     fulfillment: normalized.fulfillment,
     reservation: normalized.reservation,
+    // 公開で作成する場合は掲載日・公開日時も登録時点で確定させる
+    ...(status === "PUBLISHED" ? { publishDate: now.slice(0, 10), publishedAt: now } : {}),
     createdBy: actor,
     updatedBy: actor,
     history: appendMerchandiseHistory(undefined, {
@@ -618,7 +622,10 @@ export async function createMerchandiseForMerchant(
     { conditionExpression: "attribute_not_exists(sk)" },
   );
 
-  await notifyOperatorMerchandiseCreated({
+  // 公開で作成した場合は「公開」通知を送る（「登録」通知と二重に送らない）。
+  const notifyOperator =
+    status === "PUBLISHED" ? notifyOperatorMerchandisePublished : notifyOperatorMerchandiseCreated;
+  await notifyOperator({
     config,
     merchantId,
     merchandise: item,

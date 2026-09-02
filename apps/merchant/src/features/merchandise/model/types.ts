@@ -52,7 +52,11 @@ export type SchedulePreviewResponse = {
   note?: string;
 };
 
-export type CreateMerchandiseRequest = MerchandiseFormPayload;
+export type CreateMerchandiseRequest = MerchandiseFormPayload & {
+  // 登録時の公開状態。省略時は PUBLISHED（登録ボタン = そのまま公開）。
+  // 「下書き保存」ボタンからは DRAFT を送る。
+  initialStatus?: "PUBLISHED" | "DRAFT";
+};
 
 export type UpdateMerchandiseRequest = MerchandiseFormPayload;
 

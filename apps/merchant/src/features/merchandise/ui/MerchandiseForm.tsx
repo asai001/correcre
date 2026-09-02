@@ -349,7 +349,8 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
     }
   };
 
-  const handleSubmit = async () => {
+  // 新規登録は既定でそのまま公開する。「下書き保存」ボタンからだけ DRAFT で保存する。
+  const handleSubmit = async (initialStatus: "PUBLISHED" | "DRAFT" = "PUBLISHED") => {
     if (submitting) return;
 
     setError(null);
@@ -389,7 +390,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       };
 
       if (mode === "create") {
-        await createMerchandise(payload);
+        await createMerchandise({ ...payload, initialStatus });
         router.push("/merchandise");
         router.refresh();
       } else if (initial) {
@@ -1010,15 +1011,41 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         >
           一覧へ戻る
         </Button>
-        <Button
-          variant="contained"
-          disabled={submitting || uploadingTarget !== null}
-          onClick={handleSubmit}
-          className="!rounded-full !px-7 !py-3"
-        >
-          {submitting ? "保存中..." : mode === "create" ? "登録する" : "変更を保存"}
-        </Button>
+        {mode === "create" ? (
+          <>
+            <Button
+              variant="outlined"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("DRAFT")}
+              className="!rounded-full !px-6 !py-3"
+            >
+              {submitting ? "保存中..." : "下書き保存"}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("PUBLISHED")}
+              className="!rounded-full !px-7 !py-3"
+            >
+              {submitting ? "保存中..." : "登録して公開する"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            disabled={submitting || uploadingTarget !== null}
+            onClick={() => handleSubmit()}
+            className="!rounded-full !px-7 !py-3"
+          >
+            {submitting ? "保存中..." : "変更を保存"}
+          </Button>
+        )}
       </div>
+      {mode === "create" ? (
+        <p className="text-right text-xs text-slate-500">
+          「登録して公開する」を押すと、すぐに申請者の商品交換ページに表示されます。まだ公開したくない場合は「下書き保存」を選んでください（一覧からいつでも公開できます）。
+        </p>
+      ) : null}
         </div>
 
         <MerchandiseFormPreview
