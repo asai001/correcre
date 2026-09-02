@@ -87,6 +87,10 @@ export type ExchangeHistoryItem = {
   priceYenSnapshot?: number;
   pointHeld?: number;
   quantity?: number;
+  // 予約が必要な商品（サロン等）の交換番号（例: COCR-0001）。全提携企業共通の連番から
+  // 申請作成時に採番する。予約時に店舗へ伝えて申請と照合するための人が読める番号で、
+  // 予約不要の商品や採番導入前の既存レコードには存在しない（表示側は exchangeId へフォールバック）。
+  reservationCode?: string;
   status?: ExchangeHistoryStatus;
   history?: ExchangeHistoryStatusEvent[];
   exchangedAt: string;

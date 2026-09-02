@@ -30,6 +30,8 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { hasCompleteExchangeRequestProfile } from "@correcre/lib/user-profile";
 import { reflectPoints } from "@correcre/lib/points-reflection";
+import { allocateReservationCode } from "@correcre/lib/reservation-code";
+import { resolveSystemSettingTableName } from "@correcre/lib/dynamodb/system-setting";
 import {
   toPublicMerchandiseSummary,
   type PublicMerchandiseDetail,
@@ -160,6 +162,7 @@ function buildMerchantExchangeRequestEmailBody(params: {
   requestedAt: string;
   usedPoint: number;
   exchangeId: string;
+  reservationCode?: string;
   detailUrl: string;
   requiresScheduling: boolean;
 }) {
@@ -183,7 +186,7 @@ function buildMerchantExchangeRequestEmailBody(params: {
 申請日時：${formatApplicationDateTime(params.requestedAt)}
 交換ポイント数：${formatInteger(params.usedPoint)} pt
 交換相当額：${formatInteger(exchangeAmountYen)}円
-申請番号：${params.exchangeId}${schedulingNote}
+申請番号：${params.exchangeId}${params.reservationCode ? `\n交換番号：${params.reservationCode}（申請者が予約時に伝える番号）` : ""}${schedulingNote}
 
 申請内容の確認はこちら：
 ${params.detailUrl}
@@ -217,6 +220,7 @@ async function notifyMerchantExchangeRequested(params: {
     requestedAt: params.exchange.requestedAt ?? params.exchange.exchangedAt,
     usedPoint: params.exchange.usedPoint,
     exchangeId: params.exchange.exchangeId,
+    reservationCode: params.exchange.reservationCode,
     detailUrl,
     requiresScheduling: params.exchange.schedule?.scheduleStatus === "AWAITING_PROPOSAL",
   });
@@ -453,6 +457,24 @@ export async function requestExchangeForEmployee(params: {
     gsi3pk: buildExchangeHistoryByMerchantGsiPk(merchandise.merchantId),
     gsi3sk: buildExchangeHistoryByMerchantGsiSk(exchangedAt, exchangeId),
   };
+
+  // 予約が必要な商品（サロン等）は、人が読める交換番号（COCR-XXXX、全提携企業共通の連番）を採番する。
+  // 採番に失敗しても申請自体は成立させる（表示側は exchangeId へフォールバックする）。
+  if (merchandise.reservation) {
+    const systemSettingTableName = resolveSystemSettingTableName();
+    if (systemSettingTableName) {
+      try {
+        exchange.reservationCode = await allocateReservationCode({
+          region: config.region,
+          tableName: systemSettingTableName,
+        });
+      } catch (error) {
+        console.error("Failed to allocate reservation code.", { error, exchangeId });
+      }
+    } else {
+      console.warn("System setting table name is unresolved. Skipping reservation code allocation.");
+    }
+  }
 
   // 日程調整あり商品は候補提示待ちで作成し、merchant 画面の叩き台として候補日を自動生成して保存する。
   const fulfillment = resolveMerchandiseFulfillment(merchandise.fulfillment);

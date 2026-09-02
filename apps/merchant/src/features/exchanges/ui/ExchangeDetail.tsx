@@ -278,6 +278,11 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge.className}`}>{badge.label}</span>
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900">{detail.merchandiseName}</div>
+              {detail.reservationCode ? (
+                <div className="mt-1 text-sm font-semibold text-slate-700">
+                  交換番号: <span className="font-mono">{detail.reservationCode}</span>
+                </div>
+              ) : null}
               <div className="mt-1 text-sm text-slate-500">交換ID: {detail.exchangeId}</div>
             </div>
           </div>
@@ -339,7 +344,8 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
 
       {detail.reservationRequired && !isCanceledStatus(detail.status) ? (
         <Alert severity="info">
-          この商品は予約が必要なサービスです。承認すると、申請者へ予約先と交換番号（{detail.exchangeId}
+          この商品は予約が必要なサービスです。承認すると、申請者へ予約先と交換番号（
+          {detail.reservationCode ?? detail.exchangeId}
           ）が自動でメール案内されます。ご予約・ご来店時に交換番号を確認し、サービス提供が済んだら「完了」へ進めてください。
         </Alert>
       ) : null}

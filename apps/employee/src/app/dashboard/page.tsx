@@ -4,9 +4,15 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import DashboardLinks from "@employee/features/dashboard-links";
 import DashboardSummary from "@employee/features/dashboard-summary";
 import ExchangeHistory from "@employee/features/exchange-history/";
-import { ScheduleBanner } from "@employee/features/exchange-schedule";
-import { listPendingSchedulesForEmployee } from "@employee/features/exchange-schedule/api/server";
-import type { PendingScheduleSummary } from "@employee/features/exchange-schedule/model/types";
+import { ReservationBanner, ScheduleBanner } from "@employee/features/exchange-schedule";
+import {
+  listPendingReservationsForEmployee,
+  listPendingSchedulesForEmployee,
+} from "@employee/features/exchange-schedule/api/server";
+import type {
+  PendingReservationSummary,
+  PendingScheduleSummary,
+} from "@employee/features/exchange-schedule/model/types";
 import LoginInfo from "@employee/features/login-info";
 import { MissionReport } from "@employee/features/mission-report";
 import MonthlyPointsHistory from "@employee/features/monthly-points-history";
@@ -29,13 +35,19 @@ export default async function DashboardPage() {
   const companyName = company?.shortName?.trim() || company?.name?.trim() || companyId;
   const showPointExchangeLink = company?.showPointExchangeLink === true;
 
-  // 日程調整中の交換の通知バナー。取得に失敗してもダッシュボード自体は表示する。
+  // 日程調整中・予約待ちの交換の通知バナー。取得に失敗してもダッシュボード自体は表示する。
   let pendingSchedules: PendingScheduleSummary[] = [];
+  let pendingReservations: PendingReservationSummary[] = [];
   if (showPointExchangeLink) {
     try {
       pendingSchedules = await listPendingSchedulesForEmployee(currentUser);
     } catch (error) {
       console.error("Failed to load pending delivery schedules.", error);
+    }
+    try {
+      pendingReservations = await listPendingReservationsForEmployee(currentUser);
+    } catch (error) {
+      console.error("Failed to load pending reservations.", error);
     }
   }
 
@@ -60,6 +72,11 @@ export default async function DashboardPage() {
       {pendingSchedules.length > 0 ? (
         <div className="mt-5">
           <ScheduleBanner items={pendingSchedules} />
+        </div>
+      ) : null}
+      {pendingReservations.length > 0 ? (
+        <div className="mt-5">
+          <ReservationBanner items={pendingReservations} />
         </div>
       ) : null}
       <div className="mt-5">

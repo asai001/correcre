@@ -625,41 +625,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           配送・日程調整
         </Typography>
         <Typography variant="body2" className="!mt-1 text-slate-500">
-          生鮮品など、お届け日の調整が必要な商品はここで設定します。冷蔵・冷凍を選ぶと日程調整が自動で有効になります。
+          生鮮品など、お届け日の調整が必要な商品はここで設定します。日程調整を有効にすると、受け渡し方法や温度帯などの詳細を設定できます。
         </Typography>
 
         <Stack spacing={2.5} className="!mt-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
-              select
-              label="受け渡し方法"
-              fullWidth
-              value={fulfillment.fulfillmentType}
-              onChange={(event) =>
-                setFulfillment((prev) => ({ ...prev, fulfillmentType: event.target.value as FulfillmentType }))
-              }
-            >
-              {fulfillmentTypeOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="温度帯"
-              fullWidth
-              value={fulfillment.temperatureZone}
-              onChange={handleTemperatureZoneChange}
-            >
-              {temperatureZoneOptions.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </div>
-
           <FormControlLabel
             control={<Switch checked={fulfillment.requiresScheduling} onChange={handleRequiresSchedulingToggle} />}
             label="お届け日の日程調整を行う（交換申請後に候補日を提示して、申請者に選んでもらいます）"
@@ -667,6 +636,38 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
           {fulfillment.requiresScheduling ? (
             <>
+              {/* 受け渡し方法・温度帯も日程調整の設定の一部なので、トグル ON のときだけ表示する */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  select
+                  label="受け渡し方法"
+                  fullWidth
+                  value={fulfillment.fulfillmentType}
+                  onChange={(event) =>
+                    setFulfillment((prev) => ({ ...prev, fulfillmentType: event.target.value as FulfillmentType }))
+                  }
+                >
+                  {fulfillmentTypeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="温度帯"
+                  fullWidth
+                  value={fulfillment.temperatureZone}
+                  onChange={handleTemperatureZoneChange}
+                >
+                  {temperatureZoneOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </div>
+
               {/* 設問は MUI のラベルに入れると折り返されず省略表示になるため、
                   項目の上に本文として置き、入力欄はラベルなしにする。 */}
               <div className="space-y-4">
@@ -994,6 +995,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           )}
         </Paper>
       ) : null}
+
+      {/* エラーはページ上部にも出すが、押下直後に視線があるボタン付近にも表示して
+          「押したのに登録されない」状態に気づけるようにする。 */}
+      {error ? <Alert severity="error">{error}</Alert> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button

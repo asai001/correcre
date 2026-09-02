@@ -27,6 +27,7 @@ import type {
   EmployeeReservationView,
   EmployeeScheduleCandidateView,
   EmployeeScheduleView,
+  PendingReservationSummary,
   PendingScheduleSummary,
   RequestDateRequest,
   SelectCandidateRequest,
@@ -276,6 +277,7 @@ export async function getReservationForEmployee(
 
   return {
     exchangeId: item.exchangeId,
+    reservationCode: item.reservationCode,
     merchandiseName: item.merchandiseNameSnapshot,
     merchantName: item.merchantNameSnapshot,
     usedPoint: item.usedPoint,
@@ -283,6 +285,71 @@ export async function getReservationForEmployee(
     reservationUrl: reservation.reservationUrl,
     instructions: reservation.instructions,
   };
+}
+
+/**
+ * マイページの「予約と来店をお願いします」バナー用。
+ * 承認済み（準備中・対応中）でまだ完了していない、予約型サービスの交換を返す。
+ * 同じ商品はまとめて 1 回だけ引いて予約要否を判定する。
+ */
+export async function listPendingReservationsForEmployee(
+  user: DBUserItem,
+): Promise<PendingReservationSummary[]> {
+  const config = getRuntimeConfig();
+  const items = await listExchangeHistoryByCompanyAndUser(
+    {
+      region: config.region,
+      tableName: config.exchangeHistoryTableName,
+    },
+    user.companyId,
+    user.userId,
+  );
+
+  const approved = items.filter(
+    (item) =>
+      (item.status === "PREPARING" || item.status === "IN_PROGRESS") &&
+      item.merchantId &&
+      item.merchandiseId &&
+      !isScheduleActive(item),
+  );
+
+  const reservationByMerchandiseKey = new Map<string, boolean>();
+  const summaries: PendingReservationSummary[] = [];
+
+  for (const item of approved) {
+    const key = `${item.merchantId}#${item.merchandiseId}`;
+    if (!reservationByMerchandiseKey.has(key)) {
+      try {
+        const merchandise = await getMerchandise(
+          {
+            region: config.region,
+            tableName: config.merchandiseTableName,
+          },
+          item.merchantId!,
+          item.merchandiseId!,
+        );
+        reservationByMerchandiseKey.set(key, Boolean(merchandise?.reservation));
+      } catch (error) {
+        console.error("Failed to resolve merchandise reservation for dashboard banner.", {
+          error,
+          merchantId: item.merchantId,
+          merchandiseId: item.merchandiseId,
+        });
+        reservationByMerchandiseKey.set(key, false);
+      }
+    }
+
+    if (reservationByMerchandiseKey.get(key)) {
+      summaries.push({
+        exchangeId: item.exchangeId,
+        merchandiseName: item.merchandiseNameSnapshot,
+        merchantName: item.merchantNameSnapshot,
+        reservationCode: item.reservationCode,
+      });
+    }
+  }
+
+  return summaries;
 }
 
 /** マイページのバナー用。日程調整が進行中の交換を返す */

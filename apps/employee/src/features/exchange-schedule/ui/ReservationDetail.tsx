@@ -21,6 +21,8 @@ type Props = {
 export default function ReservationDetail({ view, initialPointBalance }: Props) {
   const [copied, setCopied] = useState(false);
 
+  // 連番導入前の交換には reservationCode が無いため exchangeId で案内する
+  const reservationCode = view.reservationCode ?? view.exchangeId;
   const badge = getExchangeStatusBadge(view.status);
   const isApproved = view.status === "PREPARING" || view.status === "IN_PROGRESS";
   const isClosed =
@@ -28,7 +30,7 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(view.exchangeId);
+      await navigator.clipboard.writeText(reservationCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -93,8 +95,8 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="text-xs font-semibold text-slate-500">交換番号（予約時に店舗へお伝えください）</div>
                 <div className="mt-1 flex flex-wrap items-center gap-3">
-                  <span className="break-all font-mono text-base font-bold text-slate-900">
-                    {view.exchangeId}
+                  <span className="break-all font-mono text-lg font-bold tracking-wide text-slate-900">
+                    {reservationCode}
                   </span>
                   <button
                     type="button"

@@ -81,6 +81,9 @@ export type PreviewScheduleResponse = {
 
 export type ExchangeSummary = {
   exchangeId: string;
+  // 予約型サービスの交換番号（COCR-XXXX）。申請者が予約時に店舗へ伝える番号で、
+  // 予約不要の商品・連番導入前の交換には無い
+  reservationCode?: string;
   companyId: string;
   userId: string;
   userName?: string;

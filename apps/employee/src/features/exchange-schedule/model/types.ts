@@ -59,12 +59,24 @@ export type RequestDateRequest = {
 // 外部予約（ホットペッパービューティー・電話等）の案内と交換番号の提示を担う。
 export type EmployeeReservationView = {
   exchangeId: string;
+  // 予約時に店舗へ伝える交換番号（COCR-XXXX）。連番導入前の交換には無い
+  reservationCode?: string;
   merchandiseName: string;
   merchantName?: string;
   usedPoint: number;
   status: ExchangeHistoryStatus;
   reservationUrl?: string;
   instructions?: string;
+};
+
+// マイページの「予約と来店をお願いします」バナー表示用。
+// 承認済み（準備中・対応中）でまだ完了していない予約型サービスの交換。
+export type PendingReservationSummary = {
+  exchangeId: string;
+  merchandiseName: string;
+  merchantName?: string;
+  // 予約時に店舗へ伝える交換番号（COCR-XXXX）。連番導入前の交換には無い
+  reservationCode?: string;
 };
 
 // マイページのバナー表示用

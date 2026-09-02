@@ -53,7 +53,8 @@ export async function sendEmployeeExchangeApprovedReservationEmail(params: {
     `「${params.exchange.merchandiseNameSnapshot}」の交換申請が承認されました。`,
     "このサービスのご利用には、ご自身での予約が必要です。以下の案内に沿ってご予約ください。",
     "",
-    `交換番号：${params.exchange.exchangeId}`,
+    // 連番導入前の既存レコードには reservationCode が無いため exchangeId で案内する
+    `交換番号：${params.exchange.reservationCode ?? params.exchange.exchangeId}`,
   ];
 
   if (params.reservation.reservationUrl) {

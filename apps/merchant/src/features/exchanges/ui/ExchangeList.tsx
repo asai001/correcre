@@ -178,7 +178,15 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
                         </span>
                         <span className="text-xs text-slate-500">申請日時: {formatDateTime(item.requestedAt ?? item.exchangedAt)}</span>
                       </div>
-                      <div className="mt-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
+                      <div className="mt-2 text-base font-bold text-slate-900">
+                        {item.merchandiseName}
+                        {item.reservationCode ? (
+                          // 申請者が予約時に伝える交換番号。店舗が口頭の番号から申請を探せるよう一覧にも出す
+                          <span className="ml-2 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-600">
+                            {item.reservationCode}
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="mt-1 text-xs text-slate-500">
                         申請者: {item.userName ?? item.userId} ／ ポイント: {formatPoint(item.usedPoint)}
                       </div>

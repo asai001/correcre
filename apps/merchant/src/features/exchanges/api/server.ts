@@ -247,6 +247,7 @@ function toSummary(
 
   return {
     exchangeId: item.exchangeId,
+    reservationCode: item.reservationCode,
     companyId: item.companyId,
     userId: item.userId,
     userName,
