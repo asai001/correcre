@@ -261,13 +261,15 @@ export async function getIndividualAnalysisSummaryFromDynamo(
   });
 
   const sortedMissions = [...radarData].sort((a, b) => b.achievement - a.achievement || a.category.localeCompare(b.category, "ja"));
-  const goodMissions: AnalysisMissionItem[] = sortedMissions.slice(0, 2).map((mission) => ({
-    name: mission.category,
-    percentage: mission.achievement,
-  }));
+  const goodMissions: AnalysisMissionItem[] = sortedMissions
+    .filter((mission) => mission.achievement >= 80)
+    .map((mission) => ({
+      name: mission.category,
+      percentage: mission.achievement,
+    }));
   const improvementMissions: AnalysisMissionItem[] = [...sortedMissions]
     .reverse()
-    .slice(0, 2)
+    .filter((mission) => mission.achievement <= 40)
     .map((mission) => ({
       name: mission.category,
       percentage: mission.achievement,

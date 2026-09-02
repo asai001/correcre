@@ -420,15 +420,15 @@ export async function getOverallAnalysisSummaryFromDynamo(
   });
 
   const sortedMissions = [...achievementData].sort((a, b) => b.percentage - a.percentage || a.label.localeCompare(b.label, "ja"));
-  const topCount = Math.min(3, sortedMissions.length);
-  const bottomCount = Math.min(3, Math.max(0, sortedMissions.length - topCount));
-  const goodMissions: OverallAnalysisMissionItem[] = sortedMissions.slice(0, topCount).map((item) => ({
-    name: item.label,
-    percentage: item.percentage,
-  }));
+  const goodMissions: OverallAnalysisMissionItem[] = sortedMissions
+    .filter((item) => item.percentage >= 80)
+    .map((item) => ({
+      name: item.label,
+      percentage: item.percentage,
+    }));
   const improvementMissions: OverallAnalysisMissionItem[] = [...sortedMissions]
     .reverse()
-    .slice(0, bottomCount)
+    .filter((item) => item.percentage <= 40)
     .map((item) => ({
       name: item.label,
       percentage: item.percentage,

@@ -146,7 +146,7 @@ export async function sendMerchantProposalReminderEmail(params: {
       "ご担当者様",
       "",
       "お届け日の調整が必要な交換申請に、候補日がまだ提示されていません。",
-      "従業員がお届け日を選択できるよう、候補日の提示をお願いします。",
+      "申請者がお届け日を選択できるよう、候補日の提示をお願いします。",
       "",
       `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
       `申請番号：${params.exchange.exchangeId}`,
@@ -220,7 +220,7 @@ export async function sendMerchantDateRequestedEmail(params: {
     [
       "ご担当者様",
       "",
-      "従業員から、提示した候補以外のお届け希望日が届いています。",
+      "申請者から、提示した候補以外のお届け希望日が届いています。",
       "48 時間以内に、承諾・別候補の再提示・対応不可のいずれかで応答してください。",
       "",
       `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
@@ -245,8 +245,8 @@ export async function sendMerchantResponseReminderEmail(params: {
     [
       "ご担当者様",
       "",
-      "従業員からのお届け希望日に、まだ応答がありません。",
-      "このまま応答がない場合、交換は自動的にキャンセルされ、ポイントが従業員に返還されます。",
+      "申請者からのお届け希望日に、まだ応答がありません。",
+      "このまま応答がない場合、交換は自動的にキャンセルされ、ポイントが申請者に返還されます。",
       "",
       `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
       `申請番号：${params.exchange.exchangeId}`,
