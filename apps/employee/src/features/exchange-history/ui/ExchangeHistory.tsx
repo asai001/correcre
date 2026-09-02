@@ -76,13 +76,34 @@ export default function ExchangeHistory({
       },
       {
         id: "scheduleStatus",
-        label: "お届け日",
+        label: "お届け日・予約",
         width: "18%",
         render: (row) => {
-          if (!row.scheduleStatus || row.scheduleStatus === "NOT_REQUIRED") {
-            return "-";
-          }
           const href = `/exchange-history/${encodeURIComponent(row.exchangeId)}` as Route;
+          if (!row.scheduleStatus || row.scheduleStatus === "NOT_REQUIRED") {
+            // 予約が必要な商品（サロン等）は、詳細ページの予約案内へ誘導する
+            if (!row.reservationRequired) {
+              return "-";
+            }
+            if (row.status === "REJECTED" || row.status === "CANCELED" || row.status === "CANCELLED") {
+              return "-";
+            }
+            if (row.status === "PREPARING" || row.status === "IN_PROGRESS") {
+              return (
+                <Link
+                  href={href}
+                  className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800 underline"
+                >
+                  ご予約ください
+                </Link>
+              );
+            }
+            return (
+              <Link href={href} className="text-xs text-slate-700 underline">
+                予約案内
+              </Link>
+            );
+          }
           if (row.scheduleStatus === "AWAITING_SELECTION") {
             return (
               <Link

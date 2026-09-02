@@ -135,6 +135,22 @@ function buildFulfillmentPayload(state: FulfillmentFormState): ProductFulfillmen
   };
 }
 
+// 外部予約（ホットペッパービューティー等）が必要なサービスの案内設定。
+// 空き枠は本システムと同期できないため、URL とテキストの案内だけを保存する。
+type ReservationFormState = {
+  enabled: boolean;
+  reservationUrl: string;
+  instructions: string;
+};
+
+function getInitialReservationState(initial: MerchandiseSummary | undefined): ReservationFormState {
+  return {
+    enabled: Boolean(initial?.reservation),
+    reservationUrl: initial?.reservation?.reservationUrl ?? "",
+    instructions: initial?.reservation?.instructions ?? "",
+  };
+}
+
 type Props = {
   mode: "create" | "edit";
   merchantName: string;
@@ -203,6 +219,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => getInitialFormState(initial));
   const [fulfillment, setFulfillment] = useState<FulfillmentFormState>(() => getInitialFulfillmentState(initial));
+  const [reservation, setReservation] = useState<ReservationFormState>(() => getInitialReservationState(initial));
   const [cardImage, setCardImage] = useState<ImageState>(() => getInitialImageState(initial, "card"));
   const [detailImage, setDetailImage] = useState<ImageState>(() => getInitialImageState(initial, "detail"));
   const [submitting, setSubmitting] = useState(false);
@@ -363,6 +380,12 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         deliverySchedule: form.deliverySchedule || undefined,
         notes: form.notes || undefined,
         fulfillment: buildFulfillmentPayload(fulfillment),
+        reservation: reservation.enabled
+          ? {
+              reservationUrl: reservation.reservationUrl.trim() || undefined,
+              instructions: reservation.instructions.trim() || undefined,
+            }
+          : undefined,
       };
 
       if (mode === "create") {
@@ -818,6 +841,60 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
       <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <Typography variant="h6" className="font-semibold text-slate-900">
+          予約のご案内（サロン・施術など）
+        </Typography>
+        <Typography variant="body2" className="!mt-1 text-slate-500">
+          ご来店・施術に予約が必要なサービスはここで設定します。交換申請を承認すると、従業員へ予約先が自動でメール案内されます。
+        </Typography>
+
+        <Stack spacing={2.5} className="!mt-4">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={reservation.enabled}
+                onChange={(_event, checked) => setReservation((prev) => ({ ...prev, enabled: checked }))}
+              />
+            }
+            label="交換承認後に、従業員自身による予約が必要（予約サイト・電話予約など）"
+          />
+
+          {reservation.enabled ? (
+            <>
+              <TextField
+                label="予約ページURL"
+                fullWidth
+                type="url"
+                value={reservation.reservationUrl}
+                onChange={(event) =>
+                  setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
+                }
+                placeholder="https://beauty.hotpepper.jp/... （メニュー直リンクがおすすめ）"
+                helperText="ホットペッパービューティー等の予約ページのURL。対象メニューに直接飛べるURLだと従業員が迷いません。"
+              />
+              <TextField
+                label="予約方法・注意事項"
+                fullWidth
+                multiline
+                minRows={3}
+                value={reservation.instructions}
+                onChange={(event) =>
+                  setReservation((prev) => ({ ...prev, instructions: event.target.value }))
+                }
+                placeholder={"例）お電話（052-XXX-XXXX）でもご予約いただけます。\n予約時に備考欄へ交換番号をご記入ください。"}
+                helperText="電話予約のみの場合はこちらに記載してください。URLと予約方法のどちらか一方は必須です。"
+              />
+              <Alert severity="info">
+                従業員には、承認時のメールと交換履歴の詳細画面で「予約先」と「交換番号」を案内します。
+                予約時に交換番号を伝えてもらう運用のため、ご来店時に交換番号を確認し、
+                サービス提供が済んだらこの画面の交換管理から「完了」へ進めてください。
+              </Alert>
+            </>
+          ) : null}
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <Typography variant="h6" className="font-semibold text-slate-900">
           画像
         </Typography>
         <Typography variant="body2" className="!mt-1 text-slate-500">
@@ -955,6 +1032,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           expiration={form.expiration}
           deliverySchedule={form.deliverySchedule}
           notes={form.notes}
+          reservationEnabled={reservation.enabled}
         />
       </div>
     </div>

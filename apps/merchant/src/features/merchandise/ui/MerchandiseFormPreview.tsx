@@ -29,6 +29,8 @@ type Props = {
   expiration?: string;
   deliverySchedule?: string;
   notes?: string;
+  // 予約が必要なサービスとして設定中か（詳細プレビューの「ご予約」行の表示用）
+  reservationEnabled?: boolean;
 };
 
 export default function MerchandiseFormPreview(props: Props) {
@@ -62,6 +64,7 @@ export default function MerchandiseFormPreview(props: Props) {
     expiration: props.expiration || undefined,
     deliverySchedule: props.deliverySchedule || undefined,
     notes: props.notes || undefined,
+    reservation: props.reservationEnabled ? {} : undefined,
   };
 
   return (

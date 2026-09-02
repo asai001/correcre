@@ -24,6 +24,7 @@ import { resolveMerchandiseFulfillment, SCHEDULE_RESCHEDULE_REQUEST_LIMIT } from
 
 import { FRESH_ITEM_ACKNOWLEDGEMENT_TEXT } from "../model/acknowledgement";
 import type {
+  EmployeeReservationView,
   EmployeeScheduleCandidateView,
   EmployeeScheduleView,
   PendingScheduleSummary,
@@ -241,6 +242,47 @@ export async function getScheduleForEmployee(
   }
 
   return view;
+}
+
+/**
+ * 予約が必要な商品（サロン等）の交換詳細（予約案内）を返す。
+ * 日程調整のない交換のうち、商品が予約案内を持つものだけが対象。それ以外は null。
+ * 予約先 URL は最新の商品情報から引く（店舗が予約ページを変えても古い URL を案内しないため）。
+ */
+export async function getReservationForEmployee(
+  user: DBUserItem,
+  exchangeId: string,
+): Promise<EmployeeReservationView | null> {
+  const config = getRuntimeConfig();
+  const item = await findExchangeForEmployee(config, user, exchangeId);
+
+  if (!item.merchantId || !item.merchandiseId) {
+    return null;
+  }
+
+  const merchandise = await getMerchandise(
+    {
+      region: config.region,
+      tableName: config.merchandiseTableName,
+    },
+    item.merchantId,
+    item.merchandiseId,
+  );
+
+  const reservation = merchandise?.reservation;
+  if (!reservation || (!reservation.reservationUrl && !reservation.instructions)) {
+    return null;
+  }
+
+  return {
+    exchangeId: item.exchangeId,
+    merchandiseName: item.merchandiseNameSnapshot,
+    merchantName: item.merchantNameSnapshot,
+    usedPoint: item.usedPoint,
+    status: item.status ?? "REQUESTED",
+    reservationUrl: reservation.reservationUrl,
+    instructions: reservation.instructions,
+  };
 }
 
 /** マイページのバナー用。日程調整が進行中の交換を返す */

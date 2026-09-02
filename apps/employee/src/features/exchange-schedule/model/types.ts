@@ -55,6 +55,18 @@ export type RequestDateRequest = {
   acknowledged?: boolean;
 };
 
+// 予約が必要な商品（サロン等）の交換詳細ビュー。日程調整ではなく、
+// 外部予約（ホットペッパービューティー・電話等）の案内と交換番号の提示を担う。
+export type EmployeeReservationView = {
+  exchangeId: string;
+  merchandiseName: string;
+  merchantName?: string;
+  usedPoint: number;
+  status: ExchangeHistoryStatus;
+  reservationUrl?: string;
+  instructions?: string;
+};
+
 // マイページのバナー表示用
 export type PendingScheduleSummary = {
   exchangeId: string;

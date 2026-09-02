@@ -123,6 +123,11 @@ export default function MerchandiseDetailView({ item, actionSlot, forceSingleCol
                 交換申請後に、提示される候補からお届け日を選択します
               </DetailRow>
             ) : null}
+            {item.reservation ? (
+              <DetailRow label="ご予約">
+                交換申請の承認後、ご自身での予約が必要です（承認時に予約先・予約方法をメールでご案内します）
+              </DetailRow>
+            ) : null}
             {item.notes ? (
               <DetailRow label="注意事項">
                 <p className="whitespace-pre-line">{item.notes}</p>

@@ -112,6 +112,8 @@ export type ExchangeDetail = ExchangeSummary & {
   actorType: ExchangeHistoryActorType;
   // 配送日程調整（日程調整なしの交換では undefined）
   schedule?: ExchangeScheduleView;
+  // 予約が必要な商品（サロン等）か。予約・来店確認の運用案内の表示に使う
+  reservationRequired?: boolean;
 };
 
 export type TransitionExchangeRequest = {

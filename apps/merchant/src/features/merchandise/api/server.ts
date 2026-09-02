@@ -47,6 +47,7 @@ import type {
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
   MerchandiseImageRef,
+  MerchandiseReservation,
   MerchandiseStatus,
   MerchantUserItem,
   ProductFulfillment,
@@ -253,6 +254,48 @@ function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFul
   };
 }
 
+const RESERVATION_URL_MAX_LENGTH = 2048;
+const RESERVATION_INSTRUCTIONS_MAX_LENGTH = 1000;
+
+// 予約案内の設定。オブジェクト自体が無い場合は「予約不要」の商品として扱う。
+function normalizeReservation(
+  input: MerchandiseReservation | undefined,
+): MerchandiseReservation | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const reservationUrl = input.reservationUrl?.trim() || undefined;
+  const instructions = input.instructions?.trim() || undefined;
+
+  if (!reservationUrl && !instructions) {
+    throw new Error("予約ページURLまたは予約方法のどちらかを入力してください");
+  }
+
+  if (reservationUrl) {
+    if (reservationUrl.length > RESERVATION_URL_MAX_LENGTH) {
+      throw new Error("予約ページURLが長すぎます");
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(reservationUrl);
+    } catch {
+      throw new Error("予約ページURLの形式が正しくありません（https:// から入力してください）");
+    }
+
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("予約ページURLは http(s) の URL を入力してください");
+    }
+  }
+
+  if (instructions && instructions.length > RESERVATION_INSTRUCTIONS_MAX_LENGTH) {
+    throw new Error(`予約方法は ${RESERVATION_INSTRUCTIONS_MAX_LENGTH} 文字以内で入力してください`);
+  }
+
+  return { reservationUrl, instructions };
+}
+
 // "YYYY-MM-DD" を「9月4日(金)」形式にする
 function formatDateLabel(date: string): string {
   const [, month, day] = date.split("-").map(Number);
@@ -363,6 +406,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
   const deliverySchedule = input.deliverySchedule?.trim() || undefined;
   const notes = input.notes?.trim() || undefined;
   const fulfillment = normalizeFulfillment(input.fulfillment);
+  const reservation = normalizeReservation(input.reservation);
 
   return {
     heading,
@@ -379,6 +423,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     deliverySchedule,
     notes,
     fulfillment,
+    reservation,
   };
 }
 
@@ -548,6 +593,7 @@ export async function createMerchandiseForMerchant(
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
     fulfillment: normalized.fulfillment,
+    reservation: normalized.reservation,
     createdBy: actor,
     updatedBy: actor,
     history: appendMerchandiseHistory(undefined, {
@@ -645,6 +691,9 @@ export async function updateMerchandiseForMerchant(
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
     fulfillment: normalized.fulfillment ?? existing.fulfillment,
+    // フォームは常に現在の設定を送るため、undefined は「予約不要へ変更」として保存する
+    // （put 時に removeUndefinedValues で属性ごと消える）。
+    reservation: normalized.reservation,
     cardImage,
     detailImage,
     updatedBy: actor ?? existing.updatedBy,

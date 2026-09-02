@@ -42,6 +42,17 @@ export type MerchandiseHistoryEvent = {
 // 1 レコードが肥大化しないよう、保持する操作履歴の上限件数（超えた分は古いものから捨てる）。
 export const MERCHANDISE_HISTORY_MAX_ENTRIES = 50;
 
+// サロン等、外部予約システム（ホットペッパービューティー等）や電話での予約が必要な商品の案内設定。
+// 外部予約システムには公式 API がなく空き枠を本システムと同期できないため、予約は店舗側の
+// チャネルで完結させ、本システムは承認時の案内と交換番号（exchangeId）による突合だけを担う。
+// このオブジェクトが存在する商品 = 「交換承認後に従業員自身の予約が必要」。
+export type MerchandiseReservation = {
+  // 予約ページ URL（ホットペッパービューティーのメニュー直リンク等）
+  reservationUrl?: string;
+  // 予約方法・注意事項（電話予約のみの店舗、備考欄への交換番号記入依頼など）
+  instructions?: string;
+};
+
 export type FulfillmentType = "SHIPPING" | "STORE_PICKUP";
 
 export type TemperatureZone = "AMBIENT" | "REFRIGERATED" | "FROZEN";
@@ -135,6 +146,9 @@ export type Merchandise = {
 
   // 配送・日程調整の設定（既存レコードには存在しない）
   fulfillment?: ProductFulfillment;
+
+  // 外部予約の案内設定（予約が不要な商品には存在しない）
+  reservation?: MerchandiseReservation;
 
   favoriteCount?: number;
 

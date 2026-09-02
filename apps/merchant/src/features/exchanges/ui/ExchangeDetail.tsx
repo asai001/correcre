@@ -337,6 +337,13 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
 
       <SchedulePanel detail={detail} onUpdated={setDetail} />
 
+      {detail.reservationRequired && !isCanceledStatus(detail.status) ? (
+        <Alert severity="info">
+          この商品は予約が必要なサービスです。承認すると、従業員へ予約先と交換番号（{detail.exchangeId}
+          ）が自動でメール案内されます。ご予約・ご来店時に交換番号を確認し、サービス提供が済んだら「完了」へ進めてください。
+        </Alert>
+      ) : null}
+
       {detail.allowedNextStatuses.length > 0 ? (
         <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <h2 className="text-lg font-bold text-slate-900">状態を更新する</h2>

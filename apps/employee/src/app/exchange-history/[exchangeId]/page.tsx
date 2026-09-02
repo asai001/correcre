@@ -4,9 +4,10 @@ import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { reflectPoints } from "@correcre/lib/points-reflection";
 
-import { ScheduleDetail } from "@employee/features/exchange-schedule";
+import { ReservationDetail, ScheduleDetail } from "@employee/features/exchange-schedule";
 import {
   ExchangeScheduleNotFoundError,
+  getReservationForEmployee,
   getScheduleForEmployee,
 } from "@employee/features/exchange-schedule/api/server";
 import { requireCurrentEmployeeUser } from "@employee/lib/auth/current-user";
@@ -32,15 +33,22 @@ export default async function ExchangeSchedulePage({ params }: PageProps) {
     redirect("/dashboard");
   }
 
+  const pointBalance = reflectPoints(currentUser).spendablePoint;
+
   let view;
   try {
     view = await getScheduleForEmployee(currentUser, exchangeId);
   } catch (error) {
     if (error instanceof ExchangeScheduleNotFoundError) {
+      // 日程調整のない交換でも、予約が必要な商品（サロン等）は予約案内を表示する。
+      const reservation = await getReservationForEmployee(currentUser, exchangeId).catch(() => null);
+      if (reservation) {
+        return <ReservationDetail view={reservation} initialPointBalance={pointBalance} />;
+      }
       notFound();
     }
     throw error;
   }
 
-  return <ScheduleDetail initial={view} initialPointBalance={reflectPoints(currentUser).spendablePoint} />;
+  return <ScheduleDetail initial={view} initialPointBalance={pointBalance} />;
 }

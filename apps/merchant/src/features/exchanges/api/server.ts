@@ -15,6 +15,7 @@ import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
 import { listScheduleEvents } from "@correcre/lib/dynamodb/schedule-event";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
+import { notifyEmployeeExchangeApprovedIfReservationRequired } from "@correcre/lib/notification/exchange-events";
 import {
   resolveMerchantScheduleRecipients,
   sendEmployeeRequestRejectedEmail,
@@ -576,6 +577,7 @@ async function buildExchangeDetail(
     allowedNextStatuses,
     actorType,
     schedule,
+    reservationRequired: Boolean(merchandise?.reservation),
   };
 }
 
@@ -661,6 +663,17 @@ export async function transitionExchangeForMerchant(params: {
       pointTransactionTableName: config.pointTransactionTableName,
     },
   );
+
+  // 承認時のみ、予約が必要な商品なら employee へ予約先を案内する（fire-and-forget）。
+  // IN_PROGRESS → PREPARING の差し戻しでは再送しない。
+  if (normalizeStatus(item.status) === "REQUESTED" && params.nextStatus === "PREPARING") {
+    await notifyEmployeeExchangeApprovedIfReservationRequired({
+      region: config.region,
+      userTableName: config.userTableName,
+      merchandiseTableName: config.merchandiseTableName,
+      exchange: updated,
+    });
+  }
 
   return buildExchangeDetail(config, updated, "MERCHANT");
 }

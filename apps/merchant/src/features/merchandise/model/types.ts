@@ -2,6 +2,7 @@ import type {
   Merchandise,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
+  MerchandiseReservation,
   MerchandiseStatus,
   ProductFulfillment,
 } from "@correcre/types";
@@ -33,6 +34,8 @@ export type MerchandiseFormPayload = {
   deliverySchedule?: string;
   notes?: string;
   fulfillment?: ProductFulfillment;
+  // 未設定 = 予約不要。設定時は reservationUrl / instructions の少なくとも一方が必要。
+  reservation?: MerchandiseReservation;
 };
 
 // 配送・日程調整の設定が、実際にどの日付になるかの確認用。

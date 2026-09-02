@@ -13,6 +13,7 @@ import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { notifyEmployeeExchangeApprovedIfReservationRequired } from "@correcre/lib/notification/exchange-events";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { cancelScheduleWithExchange, isScheduleActive } from "@correcre/lib/schedule/service";
 import type {
@@ -364,6 +365,17 @@ export async function transitionExchangeForOperator(params: {
       pointTransactionTableName: config.pointTransactionTableName,
     },
   );
+
+  // 承認時のみ、予約が必要な商品なら employee へ予約先を案内する（fire-and-forget）。
+  // IN_PROGRESS → PREPARING の差し戻しでは再送しない。
+  if (normalizeStatus(item.status) === "REQUESTED" && params.nextStatus === "PREPARING") {
+    await notifyEmployeeExchangeApprovedIfReservationRequired({
+      region: config.region,
+      userTableName: config.userTableName,
+      merchandiseTableName: config.merchandiseTableName,
+      exchange: updated,
+    });
+  }
 
   return buildExchangeDetail(config, updated, "OPERATOR");
 }
