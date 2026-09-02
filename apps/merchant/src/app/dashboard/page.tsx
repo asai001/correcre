@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowRight, faBoxesStacked, faFileInvoice, faHeadset, faRightLeft } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
-import { DashboardCards, getMerchantDashboardData } from "@merchant/features/dashboard";
+import { DashboardCards, getMerchantDashboardData, TodoList } from "@merchant/features/dashboard";
 import {
   getMerchantHeaderInfo,
   getMerchantViewerName,
@@ -24,7 +24,7 @@ const dashboardCards = [
   {
     href: "/exchanges" as const,
     title: "交換管理",
-    description: "従業員から申請された商品・サービスの交換を確認し、状態を更新します。",
+    description: "申請者から申請された商品・サービスの交換を確認し、状態を更新します。",
     icon: faRightLeft,
     accentClassName: "from-emerald-500 to-teal-600",
   },
@@ -47,12 +47,13 @@ const dashboardCards = [
 
 export default async function DashboardPage() {
   const currentUser = await requireCurrentMerchantUser();
+  // 収支・精算は管理者ロール（MERCHANT_ADMIN）専用のため、一般ユーザーには導線を出さない。
+  // やることリストの請求メールも同じ理由で管理者にだけ出す。
+  const isAdmin = isMerchantAdminUser(currentUser);
   const [dashboard, headerInfo] = await Promise.all([
-    getMerchantDashboardData(currentUser.merchantId),
+    getMerchantDashboardData(currentUser.merchantId, { isAdmin }),
     getMerchantHeaderInfo(currentUser.merchantId),
   ]);
-  // 収支・精算は管理者ロール（MERCHANT_ADMIN）専用のため、一般ユーザーには導線を出さない。
-  const isAdmin = isMerchantAdminUser(currentUser);
   const visibleCards = isAdmin ? dashboardCards : dashboardCards.filter((card) => !card.adminOnly);
 
   return (
@@ -63,6 +64,8 @@ export default async function DashboardPage() {
         merchantDisplayName={headerInfo.displayName}
         subtitle="商品・サービスの掲載状況と直近の交換申請を集約します。"
       />
+
+      <TodoList todos={dashboard.todos} />
 
       <DashboardCards data={dashboard} />
 

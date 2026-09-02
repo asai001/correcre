@@ -662,7 +662,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
           <FormControlLabel
             control={<Switch checked={fulfillment.requiresScheduling} onChange={handleRequiresSchedulingToggle} />}
-            label="お届け日の日程調整を行う（交換申請後に候補日を提示して、従業員に選んでもらいます）"
+            label="お届け日の日程調整を行う（交換申請後に候補日を提示して、申請者に選んでもらいます）"
           />
 
           {fulfillment.requiresScheduling ? (
@@ -743,7 +743,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
               <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
                 <Typography variant="subtitle2" className="text-slate-800">
-                  従業員が選べる時間帯（任意）
+                  申請者が選べる時間帯（任意）
                 </Typography>
                 <Typography variant="caption" className="text-slate-500">
                   受け取れる時間を指定できると、不在で受け取れない失敗が減ります。
@@ -767,7 +767,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
               <div>
                 <Typography variant="body2" className="!mb-1.5 font-semibold text-slate-800">
-                  従業員に見せる候補日は何件にしますか？
+                  申請者に見せる候補日は何件にしますか？
                 </Typography>
                 <TextField
                   type="number"
@@ -789,7 +789,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                   この設定だと、こうなります
                 </Typography>
                 <Typography variant="caption" className="text-emerald-800">
-                  今日この商品に交換申請があった場合に、従業員へ提示されるお届け日です。
+                  今日この商品に交換申請があった場合に、申請者へ提示されるお届け日です。
                 </Typography>
 
                 {previewError ? (

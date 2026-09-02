@@ -57,7 +57,7 @@ function formatDateTimeJa(iso: string) {
 const SCHEDULE_STATUS_LABELS: Record<ScheduleStatus, { label: string; needsAction: boolean }> = {
   NOT_REQUIRED: { label: "日程調整なし", needsAction: false },
   AWAITING_PROPOSAL: { label: "候補日の提示待ち（要対応）", needsAction: true },
-  AWAITING_SELECTION: { label: "従業員の選択待ち", needsAction: false },
+  AWAITING_SELECTION: { label: "申請者の選択待ち", needsAction: false },
   AWAITING_MERCHANT_RESPONSE: { label: "希望日への応答待ち（要対応）", needsAction: true },
   CONFIRMED: { label: "日程確定", needsAction: false },
   CANCELLED: { label: "日程調整終了", needsAction: false },
@@ -77,7 +77,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 
 const EVENT_ACTOR_LABELS: Record<string, string> = {
   MERCHANT: "提携企業",
-  EMPLOYEE: "従業員",
+  EMPLOYEE: "申請者",
   SYSTEM: "システム",
 };
 
@@ -225,7 +225,7 @@ function ProposalForm({
                 merchantNote: note.trim() || undefined,
               });
         onUpdated(updated);
-        onNotice("候補日を提示しました。従業員に選択を依頼しています。");
+        onNotice("候補日を提示しました。申請者に選択を依頼しています。");
       } catch (err) {
         onError(err instanceof Error ? err.message : "候補日の提示に失敗しました。");
       }
@@ -289,7 +289,7 @@ function ProposalForm({
       ) : null}
 
       <TextField
-        label="従業員への連絡事項（任意）"
+        label="申請者への連絡事項（任意）"
         fullWidth
         multiline
         minRows={2}
@@ -337,7 +337,7 @@ function RespondPanel({
 
   const run = (action: "ACCEPT" | "REJECT") => {
     if (action === "REJECT" && !rejectReason.trim()) {
-      onError("対応できない理由を入力してください。従業員に表示されます。");
+      onError("対応できない理由を入力してください。申請者に表示されます。");
       return;
     }
 
@@ -350,7 +350,7 @@ function RespondPanel({
           action === "ACCEPT" ? { action: "ACCEPT" } : { action: "REJECT", reason: rejectReason },
         );
         onUpdated(updated);
-        onNotice(action === "ACCEPT" ? "希望日で確定しました。" : "対応不可として従業員に通知しました。");
+        onNotice(action === "ACCEPT" ? "希望日で確定しました。" : "対応不可として申請者に通知しました。");
       } catch (err) {
         onError(err instanceof Error ? err.message : "希望日への応答に失敗しました。");
       }
@@ -420,7 +420,7 @@ function RespondPanel({
               : "候補の再提示は上限に達しています"}
           </Button>
           <TextField
-            label="対応不可の場合の理由（従業員に表示されます）"
+            label="対応不可の場合の理由（申請者に表示されます）"
             fullWidth
             multiline
             minRows={2}
@@ -478,7 +478,7 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
       {schedule.scheduleStatus === "AWAITING_PROPOSAL" ? (
         <>
           <p className="mt-1 text-sm text-slate-500">
-            チェックした候補が従業員に提示されます。各候補の選択期限はサーバーが自動計算します。
+            チェックした候補が申請者に提示されます。各候補の選択期限はサーバーが自動計算します。
             休業日は<a href="/calendar" className="mx-1 font-semibold text-blue-600 underline">休業日カレンダー</a>
             に登録しておくと候補の自動生成から除外されます。
           </p>
@@ -496,7 +496,7 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
       {schedule.scheduleStatus === "AWAITING_SELECTION" ? (
         <>
           <p className="mt-1 text-sm text-slate-500">
-            従業員がお届け日を選択するのを待っています。全候補が期限切れになった場合は、自動的に候補を再生成して再提示します。
+            申請者がお届け日を選択するのを待っています。全候補が期限切れになった場合は、自動的に候補を再生成して再提示します。
           </p>
           <div className="mt-4 space-y-2">
             {schedule.candidates.map((candidate) => (
@@ -536,7 +536,7 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
       {schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE" ? (
         <>
           <p className="mt-1 text-sm text-slate-500">
-            従業員から「候補の中に受け取れる日がない」として希望日が届いています。48 時間以内に応答してください。
+            申請者から「候補の中に受け取れる日がない」として希望日が届いています。48 時間以内に応答してください。
           </p>
           <RespondPanel
             detail={detail}
@@ -563,7 +563,7 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
 
       {schedule.scheduleStatus === "CANCELLED" ? (
         <p className="mt-3 text-sm text-slate-500">
-          日程調整は終了しました。使用ポイントは従業員に返還されています。
+          日程調整は終了しました。使用ポイントは申請者に返還されています。
         </p>
       ) : null}
 

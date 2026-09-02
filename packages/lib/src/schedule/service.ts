@@ -770,6 +770,7 @@ async function confirmSchedule(
     ...params.schedule,
     scheduleStatus: "CONFIRMED",
     selectedArrivalDate: params.arrivalDate,
+    selectedShipDate: params.shipDate,
     selectedTimeSlot: params.timeSlot,
     confirmedAt: occurredAt,
     ...acknowledgement,
