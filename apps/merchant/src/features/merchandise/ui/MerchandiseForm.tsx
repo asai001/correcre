@@ -237,6 +237,9 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   const priceYen = Number(form.priceYen);
   const autoRequiredPoint = Number.isFinite(priceYen) && priceYen > 0 ? calculateRequiredPoint(priceYen) : 0;
 
+  // 下書きの編集は「下書きを保存」と「保存して公開する」の 2 ボタンに分ける
+  const isDraftEdit = mode === "edit" && initial?.status === "DRAFT";
+
   const handleField = (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -349,8 +352,11 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
     }
   };
 
-  // 新規登録は既定でそのまま公開する。「下書き保存」ボタンからだけ DRAFT で保存する。
-  const handleSubmit = async (initialStatus: "PUBLISHED" | "DRAFT" = "PUBLISHED") => {
+  // 送信モード。PUBLISH = 公開を伴う保存（必須チェックあり）、DRAFT = 下書きとして新規保存、
+  // SAVE = 公開状態を変えずに保存（下書きの編集は必須チェックなし）。
+  type SubmitMode = "PUBLISH" | "DRAFT" | "SAVE";
+
+  const handleSubmit = async (submitMode: SubmitMode) => {
     if (submitting) return;
 
     setError(null);
@@ -390,11 +396,17 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       };
 
       if (mode === "create") {
-        await createMerchandise({ ...payload, initialStatus });
+        await createMerchandise({
+          ...payload,
+          initialStatus: submitMode === "DRAFT" ? "DRAFT" : "PUBLISHED",
+        });
         router.push("/merchandise");
         router.refresh();
       } else if (initial) {
-        await updateMerchandise(initial.merchandiseId, payload);
+        await updateMerchandise(initial.merchandiseId, {
+          ...payload,
+          publish: submitMode === "PUBLISH" ? true : undefined,
+        });
         router.push("/merchandise");
         router.refresh();
       }
@@ -1024,17 +1036,36 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
             <Button
               variant="contained"
               disabled={submitting || uploadingTarget !== null}
-              onClick={() => handleSubmit("PUBLISHED")}
+              onClick={() => handleSubmit("PUBLISH")}
               className="!rounded-full !px-7 !py-3"
             >
               {submitting ? "保存中..." : "登録して公開する"}
+            </Button>
+          </>
+        ) : isDraftEdit ? (
+          <>
+            <Button
+              variant="outlined"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("SAVE")}
+              className="!rounded-full !px-6 !py-3"
+            >
+              {submitting ? "保存中..." : "下書きを保存"}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("PUBLISH")}
+              className="!rounded-full !px-7 !py-3"
+            >
+              {submitting ? "保存中..." : "保存して公開する"}
             </Button>
           </>
         ) : (
           <Button
             variant="contained"
             disabled={submitting || uploadingTarget !== null}
-            onClick={() => handleSubmit()}
+            onClick={() => handleSubmit("SAVE")}
             className="!rounded-full !px-7 !py-3"
           >
             {submitting ? "保存中..." : "変更を保存"}
@@ -1044,6 +1075,11 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       {mode === "create" ? (
         <p className="text-right text-xs text-slate-500">
           「登録して公開する」を押すと、すぐに申請者の商品交換ページに表示されます。まだ公開したくない場合は「下書き保存」を選んでください（入力が途中でも保存でき、一覧からいつでも公開できます。公開時に必須項目のチェックが行われます）。
+        </p>
+      ) : null}
+      {isDraftEdit ? (
+        <p className="text-right text-xs text-slate-500">
+          この商品は下書きです。「下書きを保存」は入力が途中でも保存できます。「保存して公開する」を押すと必須項目のチェックのうえ、申請者の商品交換ページに公開されます。
         </p>
       ) : null}
         </div>

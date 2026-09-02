@@ -58,7 +58,11 @@ export type CreateMerchandiseRequest = MerchandiseFormPayload & {
   initialStatus?: "PUBLISHED" | "DRAFT";
 };
 
-export type UpdateMerchandiseRequest = MerchandiseFormPayload;
+export type UpdateMerchandiseRequest = MerchandiseFormPayload & {
+  // true のとき、保存と同時に公開する（下書きの編集画面の「保存して公開する」ボタン）。
+  // 公開を伴うため必須チェックは通常どおり行われる。
+  publish?: boolean;
+};
 
 export type UpdateMerchandiseStatusRequest = {
   status: MerchandiseStatus;

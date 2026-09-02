@@ -696,9 +696,15 @@ export async function updateMerchandiseForMerchant(
     throw new Error("Merchandise not found");
   }
 
-  // 下書きの編集は入力途中でも保存できるようにする（公開・非公開の商品は従来どおり必須チェック）。
-  const normalized = normalizeFormPayload(input, { draft: existing.status === "DRAFT" });
+  // publish=true は「保存して公開する」（下書きの編集画面）。公開を伴うため必須チェックを行う。
+  const publishing = input.publish === true && existing.status !== "PUBLISHED";
+  // 下書きのまま保存する編集は入力途中でも保存できるようにする
+  // （公開する場合と、公開・非公開の商品の編集は従来どおり必須チェック）。
+  const normalized = normalizeFormPayload(input, {
+    draft: existing.status === "DRAFT" && !publishing,
+  });
   const now = new Date().toISOString();
+  const nextStatus: MerchandiseStatus = publishing ? "PUBLISHED" : existing.status;
 
   const cardImage = await resolveImage(
     config,
@@ -716,6 +722,21 @@ export async function updateMerchandiseForMerchant(
     input.detailImage,
     existing.detailImage,
   );
+
+  let history = appendMerchandiseHistory(existing.history, {
+    action: "UPDATED",
+    occurredAt: now,
+    status: existing.status,
+    actor,
+  });
+  if (publishing) {
+    history = appendMerchandiseHistory(history, {
+      action: "STATUS_CHANGED",
+      occurredAt: now,
+      status: nextStatus,
+      actor,
+    });
+  }
 
   const item: Merchandise = {
     ...existing,
@@ -739,13 +760,17 @@ export async function updateMerchandiseForMerchant(
     reservation: normalized.reservation,
     cardImage,
     detailImage,
+    status: nextStatus,
+    gsi1pk: buildMerchandiseByStatusGsiPk(nextStatus),
+    // 公開する場合は掲載日・公開日時も確定させる（過去に公開済みならその値を維持）
+    ...(publishing
+      ? {
+          publishDate: existing.publishDate ?? now.slice(0, 10),
+          publishedAt: existing.publishedAt ?? now,
+        }
+      : {}),
     updatedBy: actor ?? existing.updatedBy,
-    history: appendMerchandiseHistory(existing.history, {
-      action: "UPDATED",
-      occurredAt: now,
-      status: existing.status,
-      actor,
-    }),
+    history,
     updatedAt: now,
   };
 
@@ -756,6 +781,21 @@ export async function updateMerchandiseForMerchant(
     },
     item,
   );
+
+  if (publishing) {
+    await notifyOperatorMerchandisePublished({
+      config,
+      merchantId,
+      merchandise: item,
+      occurredAt: now,
+    }).catch((notifyError) => {
+      console.error("Failed to send merchandise-published notification.", {
+        error: notifyError,
+        merchantId,
+        merchandiseId,
+      });
+    });
+  }
 
   return buildMerchandiseSummary(config, item);
 }
