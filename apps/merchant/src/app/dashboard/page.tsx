@@ -24,7 +24,7 @@ const dashboardCards = [
   {
     href: "/exchanges" as const,
     title: "交換管理",
-    description: "従業員から申請された商品・サービスの交換を確認し、状態を更新します。",
+    description: "申請者から申請された商品・サービスの交換を確認し、状態を更新します。",
     icon: faRightLeft,
     accentClassName: "from-emerald-500 to-teal-600",
   },

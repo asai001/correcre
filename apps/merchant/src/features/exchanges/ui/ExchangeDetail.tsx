@@ -39,8 +39,8 @@ const TRANSITION_BUTTONS: Record<
   PREPARING: { label: "承認して準備に進める", icon: faPaperPlane, color: "primary" },
   IN_PROGRESS: { label: "対応を開始する", icon: faClock, color: "primary" },
   COMPLETED: { label: "完了にする", icon: faCheck, color: "success", confirm: "完了するとポイントが消費確定となります。よろしいですか？" },
-  REJECTED: { label: "却下する", icon: faXmark, color: "error", confirm: "却下するとポイントが従業員に返却されます。よろしいですか？" },
-  CANCELED: { label: "強制キャンセルする", icon: faXmark, color: "warning", confirm: "強制キャンセルするとポイントが従業員に返却されます。よろしいですか？" },
+  REJECTED: { label: "却下する", icon: faXmark, color: "error", confirm: "却下するとポイントが申請者に返却されます。よろしいですか？" },
+  CANCELED: { label: "強制キャンセルする", icon: faXmark, color: "warning", confirm: "強制キャンセルするとポイントが申請者に返却されます。よろしいですか？" },
   REQUESTED: undefined,
   CANCELLED: undefined,
 };
@@ -189,7 +189,7 @@ function formatApplicantAddress(address?: ApplicantAddress) {
 }
 
 const ACTOR_LABEL: Record<string, string> = {
-  EMPLOYEE: "従業員",
+  EMPLOYEE: "申請者",
   MERCHANT: "提携企業",
   OPERATOR: "運用者",
   SYSTEM: "システム",
@@ -353,7 +353,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
           <TextField
             className="!mt-4"
             label="コメント（任意）"
-            placeholder="従業員には表示されません。社内向けのメモとして履歴に残します。"
+            placeholder="申請者には表示されません。社内向けのメモとして履歴に残します。"
             fullWidth
             multiline
             minRows={2}

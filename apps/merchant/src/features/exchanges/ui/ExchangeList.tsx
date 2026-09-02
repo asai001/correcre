@@ -47,7 +47,7 @@ function formatPoint(value: number) {
 }
 
 const ACTOR_LABEL: Record<string, string> = {
-  EMPLOYEE: "従業員",
+  EMPLOYEE: "申請者",
   MERCHANT: "提携企業",
   OPERATOR: "運用者",
   SYSTEM: "システム",
@@ -101,7 +101,7 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
         title="交換管理"
         adminName={merchantName}
         merchantDisplayName={merchantDisplayName}
-        subtitle="従業員からの交換申請の確認と状態更新"
+        subtitle="申請者からの交換申請の確認と状態更新"
         backHref="/dashboard"
       />
 
@@ -131,7 +131,7 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p className="text-sm text-slate-500">
-          交換状態を更新すると従業員の履歴画面に反映されます。却下・キャンセル時はポイントが従業員に返却されます。
+          交換状態を更新すると申請者の履歴画面に反映されます。却下・キャンセル時はポイントが申請者に返却されます。
         </p>
         <TextField
           select
