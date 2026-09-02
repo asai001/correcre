@@ -844,7 +844,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           予約のご案内（サロン・施術など）
         </Typography>
         <Typography variant="body2" className="!mt-1 text-slate-500">
-          ご来店・施術に予約が必要なサービスはここで設定します。交換申請を承認すると、従業員へ予約先が自動でメール案内されます。
+          ご来店・施術に予約が必要なサービスはここで設定します。交換申請を承認すると、申請者へ予約先が自動でメール案内されます。
         </Typography>
 
         <Stack spacing={2.5} className="!mt-4">
@@ -855,7 +855,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                 onChange={(_event, checked) => setReservation((prev) => ({ ...prev, enabled: checked }))}
               />
             }
-            label="交換承認後に、従業員自身による予約が必要（予約サイト・電話予約など）"
+            label="交換承認後に、申請者自身による予約が必要（予約サイト・電話予約など）"
           />
 
           {reservation.enabled ? (
@@ -869,7 +869,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                   setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
                 }
                 placeholder="https://beauty.hotpepper.jp/... （メニュー直リンクがおすすめ）"
-                helperText="ホットペッパービューティー等の予約ページのURL。対象メニューに直接飛べるURLだと従業員が迷いません。"
+                helperText="ホットペッパービューティー等の予約ページのURL。対象メニューに直接飛べるURLだと申請者が迷いません。"
               />
               <TextField
                 label="予約方法・注意事項"
@@ -884,7 +884,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                 helperText="電話予約のみの場合はこちらに記載してください。URLと予約方法のどちらか一方は必須です。"
               />
               <Alert severity="info">
-                従業員には、承認時のメールと交換履歴の詳細画面で「予約先」と「交換番号」を案内します。
+                申請者には、承認時のメールと交換履歴の詳細画面で「予約先」と「交換番号」を案内します。
                 予約時に交換番号を伝えてもらう運用のため、ご来店時に交換番号を確認し、
                 サービス提供が済んだらこの画面の交換管理から「完了」へ進めてください。
               </Alert>
