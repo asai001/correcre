@@ -387,7 +387,7 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
           kind: "DRAFT_MERCHANDISE",
           severity: "INFO",
           title: "下書きの商品を公開する",
-          description: "下書きのままの商品は、従業員の画面には表示されません。",
+          description: "下書きのままの商品は、申請者の画面には表示されません。",
           actionLabel: "商品・サービス管理を開く",
           actionHref: "/merchandise",
         },
