@@ -193,7 +193,12 @@ const ALLOWED_FULFILLMENT_TYPES: FulfillmentType[] = ["SHIPPING", "STORE_PICKUP"
 const ALLOWED_TEMPERATURE_ZONES: TemperatureZone[] = ["AMBIENT", "REFRIGERATED", "FROZEN"];
 const CUTOFF_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFulfillment | undefined {
+// draft=true のときは「必須」系のチェック（発送可能曜日）だけをスキップする。
+// 形式・範囲のチェックは、入力欄に既定値があり通常は通るため下書きでも行う。
+function normalizeFulfillment(
+  input: ProductFulfillment | undefined,
+  draft = false,
+): ProductFulfillment | undefined {
   if (!input) {
     return undefined;
   }
@@ -224,7 +229,7 @@ function normalizeFulfillment(input: ProductFulfillment | undefined): ProductFul
     .filter((day) => day >= 0 && day <= 6)
     .sort((a, b) => a - b);
 
-  if (requiresScheduling && shippableWeekdays.length === 0) {
+  if (!draft && requiresScheduling && shippableWeekdays.length === 0) {
     throw new Error("発送できる曜日を1つ以上選んでください");
   }
 
@@ -258,8 +263,11 @@ const RESERVATION_URL_MAX_LENGTH = 2048;
 const RESERVATION_INSTRUCTIONS_MAX_LENGTH = 1000;
 
 // 予約案内の設定。オブジェクト自体が無い場合は「予約不要」の商品として扱う。
+// draft=true のときは URL・予約方法とも未入力を許し、その場合は「予約不要」として保存する
+// （中身が空の予約設定を残すと、承認メールや案内画面の予約判定が不整合になるため）。
 function normalizeReservation(
   input: MerchandiseReservation | undefined,
+  draft = false,
 ): MerchandiseReservation | undefined {
   if (!input) {
     return undefined;
@@ -269,6 +277,9 @@ function normalizeReservation(
   const instructions = input.instructions?.trim() || undefined;
 
   if (!reservationUrl && !instructions) {
+    if (draft) {
+      return undefined;
+    }
     throw new Error("予約ページURLまたは予約方法のどちらかを入力してください");
   }
 
@@ -366,28 +377,33 @@ export async function previewScheduleForMerchandise(
   };
 }
 
-function normalizeFormPayload(input: MerchandiseFormPayload) {
-  const heading = input.heading.trim();
-  const merchandiseName = input.merchandiseName.trim();
-  const serviceDescription = input.serviceDescription.trim();
-  const serviceArea = input.serviceArea.trim();
+// draft=true（下書き保存・下書きの編集）のときは必須チェックをスキップし、入力途中でも保存できるようにする。
+// 未入力のまま公開されないよう、公開遷移時に collectMerchandisePublishBlockers で完全性を検査する。
+function normalizeFormPayload(input: MerchandiseFormPayload, options?: { draft?: boolean }) {
+  const draft = options?.draft === true;
+  const heading = input.heading?.trim() ?? "";
+  const merchandiseName = input.merchandiseName?.trim() ?? "";
+  const serviceDescription = input.serviceDescription?.trim() ?? "";
+  const serviceArea = input.serviceArea?.trim() ?? "";
 
-  if (!heading || !merchandiseName || !serviceDescription || !serviceArea) {
+  if (!draft && (!heading || !merchandiseName || !serviceDescription || !serviceArea)) {
     throw new Error("商品の必須項目を入力してください");
   }
 
-  if (!Number.isFinite(input.priceYen) || input.priceYen <= 0) {
+  // 価格未入力の下書きは 0 円（必要ポイント 0）として保存する（公開時にブロックされる）。
+  const rawPriceYen = Number(input.priceYen);
+  if (!draft && (!Number.isFinite(rawPriceYen) || rawPriceYen <= 0)) {
     throw new Error("価格は正の数で入力してください");
   }
 
-  const priceYen = Math.floor(input.priceYen);
-  const requiredPoint = Math.ceil(priceYen / 5);
+  const priceYen = Number.isFinite(rawPriceYen) && rawPriceYen > 0 ? Math.floor(rawPriceYen) : 0;
+  const requiredPoint = priceYen > 0 ? Math.ceil(priceYen / 5) : 0;
 
   const deliveryMethods = (input.deliveryMethods ?? []).filter((method): method is MerchandiseDeliveryMethod =>
     ALLOWED_DELIVERY_METHODS.includes(method),
   );
 
-  if (deliveryMethods.length === 0) {
+  if (!draft && deliveryMethods.length === 0) {
     throw new Error("提供方法を1つ以上選択してください");
   }
 
@@ -397,7 +413,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
 
   const genreOther = input.genre === "その他" ? input.genreOther?.trim() : undefined;
 
-  if (input.genre === "その他" && !genreOther) {
+  if (!draft && input.genre === "その他" && !genreOther) {
     throw new Error("ジャンル（その他）を入力してください");
   }
 
@@ -405,8 +421,8 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
   const expiration = input.expiration?.trim() || undefined;
   const deliverySchedule = input.deliverySchedule?.trim() || undefined;
   const notes = input.notes?.trim() || undefined;
-  const fulfillment = normalizeFulfillment(input.fulfillment);
-  const reservation = normalizeReservation(input.reservation);
+  const fulfillment = normalizeFulfillment(input.fulfillment, draft);
+  const reservation = normalizeReservation(input.reservation, draft);
 
   return {
     heading,
@@ -425,6 +441,24 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     fulfillment,
     reservation,
   };
+}
+
+// 公開するために埋まっている必要がある項目の不足一覧（表示用ラベル）。
+// 下書きは必須チェックなしで保存できるため、公開遷移時にここで完全性を検査する。
+function collectMerchandisePublishBlockers(item: Merchandise): string[] {
+  const blockers: string[] = [];
+
+  if (!item.merchandiseName?.trim()) blockers.push("商品・サービス名");
+  if (!item.serviceDescription?.trim()) blockers.push("商品・サービス内容");
+  if (!Number.isFinite(item.priceYen) || item.priceYen <= 0) blockers.push("価格");
+  if (!item.deliveryMethods?.length) blockers.push("提供方法");
+  if (!item.serviceArea?.trim()) blockers.push("対応エリア");
+  if (item.genre === "その他" && !item.genreOther?.trim()) blockers.push("ジャンル（その他）");
+  if (item.fulfillment?.requiresScheduling && item.fulfillment.shippableWeekdays.length === 0) {
+    blockers.push("発送できる曜日");
+  }
+
+  return blockers;
 }
 
 async function buildMerchandiseSummary(
@@ -548,7 +582,11 @@ export async function createMerchandiseForMerchant(
   actor?: MerchandiseAuditActor,
 ): Promise<MerchandiseSummary> {
   const config = getRuntimeConfig();
-  const normalized = normalizeFormPayload(input);
+  // 登録ボタン = そのまま公開。初回登録者が「登録したのに表示されない」と迷わないよう、
+  // 明示的に「下書き保存」を選んだときだけ DRAFT で作成する。
+  // 下書きは入力途中でも保存できるよう、必須チェックをスキップする。
+  const status: MerchandiseStatus = input.initialStatus === "DRAFT" ? "DRAFT" : "PUBLISHED";
+  const normalized = normalizeFormPayload(input, { draft: status === "DRAFT" });
   const existing = await listMerchandiseByMerchant(
     {
       region: config.region,
@@ -559,9 +597,6 @@ export async function createMerchandiseForMerchant(
 
   const merchandiseId = getNextMerchandiseId(existing);
   const now = new Date().toISOString();
-  // 登録ボタン = そのまま公開。初回登録者が「登録したのに表示されない」と迷わないよう、
-  // 明示的に「下書き保存」を選んだときだけ DRAFT で作成する。
-  const status: MerchandiseStatus = input.initialStatus === "DRAFT" ? "DRAFT" : "PUBLISHED";
 
   const cardImage = await resolveImage(config, merchantId, merchandiseId, "card", input.cardImage, undefined);
   const detailImage = await resolveImage(
@@ -661,7 +696,8 @@ export async function updateMerchandiseForMerchant(
     throw new Error("Merchandise not found");
   }
 
-  const normalized = normalizeFormPayload(input);
+  // 下書きの編集は入力途中でも保存できるようにする（公開・非公開の商品は従来どおり必須チェック）。
+  const normalized = normalizeFormPayload(input, { draft: existing.status === "DRAFT" });
   const now = new Date().toISOString();
 
   const cardImage = await resolveImage(
@@ -742,6 +778,16 @@ export async function setMerchandiseStatusForMerchant(
 
   if (!existing) {
     throw new Error("Merchandise not found");
+  }
+
+  // 入力途中で下書き保存された商品を、そのまま公開してしまわないようにする。
+  if (status === "PUBLISHED") {
+    const blockers = collectMerchandisePublishBlockers(existing);
+    if (blockers.length > 0) {
+      throw new Error(
+        `未入力の項目があるため公開できません（${blockers.join("、")}）。編集画面で入力してから公開してください`,
+      );
+    }
   }
 
   const shouldNotifyPublished = status === "PUBLISHED" && existing.status !== "PUBLISHED";

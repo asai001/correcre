@@ -1043,7 +1043,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       </div>
       {mode === "create" ? (
         <p className="text-right text-xs text-slate-500">
-          「登録して公開する」を押すと、すぐに申請者の商品交換ページに表示されます。まだ公開したくない場合は「下書き保存」を選んでください（一覧からいつでも公開できます）。
+          「登録して公開する」を押すと、すぐに申請者の商品交換ページに表示されます。まだ公開したくない場合は「下書き保存」を選んでください（入力が途中でも保存でき、一覧からいつでも公開できます。公開時に必須項目のチェックが行われます）。
         </p>
       ) : null}
         </div>
