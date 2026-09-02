@@ -61,6 +61,8 @@ export function reflectMission(mission: Mission, currentYearMonth: string = nowY
       score: pending.score,
       enabled: pending.enabled,
       fields: pending.fields,
+      // 予約側が未設定なら現行の設定も引き継がず「企業既定に従う」に戻す（保存時に属性ごと消える）。
+      analysisThresholds: pending.analysisThresholds,
       updatedAt: startOfYearMonthIso(pending.effectiveYearMonth),
     };
     return { mission: promoted, changed: true };

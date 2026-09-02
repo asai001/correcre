@@ -1,4 +1,10 @@
-import type { Mission, MissionField, MissionHistory, ScheduledMissionChange } from "@correcre/types";
+import type {
+  AnalysisThresholds,
+  Mission,
+  MissionField,
+  MissionHistory,
+  ScheduledMissionChange,
+} from "@correcre/types";
 
 export const MISSION_SLOT_COUNT = 5;
 
@@ -20,6 +26,8 @@ export type OperatorMissionSummary = {
   score: number;
   enabled: boolean;
   fields: MissionField[];
+  // 項目分析の閾値のミッション個別設定。null = 企業既定値に従う。
+  analysisThresholds: AnalysisThresholds | null;
   updatedAt: string | null;
   configured: boolean;
   // 「翌月月初から反映」予約（未反映のスケジュール変更）。無ければ null。
@@ -35,6 +43,8 @@ export type UpdateMissionInput = {
   score: number;
   enabled: boolean;
   fields: MissionField[];
+  // 項目分析の閾値。null = 企業既定値に従う。
+  analysisThresholds: AnalysisThresholds | null;
 };
 
 // ミッション履歴のレスポンス
@@ -46,6 +56,7 @@ export type OperatorMissionHistoryItem = {
   monthlyCount: number;
   score: number;
   fields: MissionField[];
+  analysisThresholds: AnalysisThresholds | null;
   validFrom: string;
   validTo: string | null;
   changedByUserId: string;
@@ -64,6 +75,7 @@ export function createEmptyMissionSummary(slotIndex: number): OperatorMissionSum
     score: 1,
     enabled: true,
     fields: [],
+    analysisThresholds: null,
     updatedAt: null,
     configured: false,
     pendingChange: null,
@@ -82,6 +94,7 @@ export function toMissionSummary(mission: Mission): OperatorMissionSummary {
     score: mission.score,
     enabled: mission.enabled,
     fields: mission.fields,
+    analysisThresholds: mission.analysisThresholds ?? null,
     updatedAt: mission.updatedAt,
     configured: true,
     pendingChange: mission.pendingChange ?? null,
@@ -97,6 +110,7 @@ export function toHistoryItem(history: MissionHistory): OperatorMissionHistoryIt
     monthlyCount: history.monthlyCount,
     score: history.score,
     fields: history.fields,
+    analysisThresholds: history.analysisThresholds ?? null,
     validFrom: history.validFrom,
     validTo: history.validTo,
     changedByUserId: history.changedByUserId,

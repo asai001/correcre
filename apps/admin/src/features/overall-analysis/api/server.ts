@@ -1,3 +1,4 @@
+import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listExchangeHistoryByCompany } from "@correcre/lib/dynamodb/exchange-history";
@@ -386,7 +387,9 @@ export async function getOverallAnalysisSummaryFromDynamo(
     reportCountByUserMission.set(key, (reportCountByUserMission.get(key) ?? 0) + 1);
   }
 
-  const achievementData: OverallAnalysisAchievementItem[] = missions.map((mission) => {
+  // 項目分析の閾値はミッション単位 → 企業既定 → システム既定（80% / 40%）の順に解決する。
+  // ミッションごとに閾値が異なりうるため、達成率と一緒に持ち回る。
+  const missionAchievements = missions.map((mission) => {
     let totalAchievementRate = 0;
     let targetUserCount = 0;
 
@@ -416,19 +419,27 @@ export async function getOverallAnalysisSummaryFromDynamo(
     return {
       label: mission.title,
       percentage,
+      thresholds: resolveAnalysisThresholds(mission.analysisThresholds, company?.analysisThresholds),
     };
   });
 
-  const sortedMissions = [...achievementData].sort((a, b) => b.percentage - a.percentage || a.label.localeCompare(b.label, "ja"));
+  const achievementData: OverallAnalysisAchievementItem[] = missionAchievements.map(({ label, percentage }) => ({
+    label,
+    percentage,
+  }));
+
+  const sortedMissions = [...missionAchievements].sort(
+    (a, b) => b.percentage - a.percentage || a.label.localeCompare(b.label, "ja"),
+  );
   const goodMissions: OverallAnalysisMissionItem[] = sortedMissions
-    .filter((item) => item.percentage >= 80)
+    .filter((item) => item.percentage >= item.thresholds.goodRate)
     .map((item) => ({
       name: item.label,
       percentage: item.percentage,
     }));
   const improvementMissions: OverallAnalysisMissionItem[] = [...sortedMissions]
     .reverse()
-    .filter((item) => item.percentage <= 40)
+    .filter((item) => item.percentage <= item.thresholds.improvementRate)
     .map((item) => ({
       name: item.label,
       percentage: item.percentage,

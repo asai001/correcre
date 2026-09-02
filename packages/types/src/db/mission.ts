@@ -1,3 +1,5 @@
+import type { AnalysisThresholds } from "../analysis";
+
 // ミッション報告フォームのフィールド型
 export type MissionFieldType =
   | "text"
@@ -48,6 +50,7 @@ export type ScheduledMissionChange = {
   score: number;
   enabled: boolean;
   fields: MissionField[];
+  analysisThresholds?: AnalysisThresholds;
   scheduledByUserId: string;
   scheduledAt: string; // ISO 8601
 };
@@ -66,6 +69,8 @@ export type Mission = {
   score: number;
   enabled: boolean;
   fields: MissionField[];
+  // 項目分析の閾値のミッション個別設定。未設定なら企業既定値 → システム既定値の順にフォールバックする。
+  analysisThresholds?: AnalysisThresholds;
   createdAt: string;
   updatedAt: string;
   // 「翌月月初から反映」予約。未反映のスケジュール変更が1件だけ載る（無ければ undefined）。
@@ -85,6 +90,7 @@ export type MissionHistory = {
   monthlyCount: number;
   score: number;
   fields: MissionField[];
+  analysisThresholds?: AnalysisThresholds;
   validFrom: string; // ISO 8601
   validTo: string | null; // null = 現行版
   changedByUserId: string;

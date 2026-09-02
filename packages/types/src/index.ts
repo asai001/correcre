@@ -1,3 +1,4 @@
+export * from "./analysis";
 export * from "./db/user";
 export * from "./db/company";
 export * from "./db/department";

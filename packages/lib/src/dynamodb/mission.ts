@@ -122,6 +122,7 @@ export async function promoteScheduledMissionIfDue(
     monthlyCount: promoted.monthlyCount,
     score: promoted.score,
     fields: promoted.fields,
+    analysisThresholds: promoted.analysisThresholds,
     validFrom: effectiveFrom,
     validTo: null,
     changedByUserId: current.pendingChange.scheduledByUserId,

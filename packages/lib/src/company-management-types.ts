@@ -1,4 +1,4 @@
-import type { Company } from "@correcre/types";
+import type { AnalysisThresholds, Company } from "@correcre/types";
 
 export type CompanyStatus = Company["status"];
 export type CompanyPlan = Company["plan"];
@@ -24,6 +24,8 @@ export type CompanySummary = {
   pointUnitLabel: string;
   showPointExchangeLink: boolean;
   philosophyItems: CompanyPhilosophyItem[];
+  // 項目分析の閾値の企業既定値。未設定（システム既定値に従う）の場合は null。
+  analysisThresholds: AnalysisThresholds | null;
   updatedAt: string;
 };
 
@@ -44,6 +46,8 @@ export type UpdateCompanyInput = Partial<Omit<CreateCompanyInput, "showPointExch
   companyId: string;
   showPointExchangeLink?: boolean;
   pointAdjustment?: number;
+  // 項目分析の閾値の企業既定値。undefined = 変更しない / null = 未設定に戻す（システム既定値に従う）。
+  analysisThresholds?: AnalysisThresholds | null;
 };
 
 export type OperatorCompanyStatus = CompanyStatus;

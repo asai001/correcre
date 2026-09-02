@@ -143,6 +143,13 @@ export default function MissionHistoryDialog({
                   </span>
                 </div>
 
+                <div className="mt-3 text-xs text-slate-500">
+                  項目分析の閾値:{" "}
+                  {item.analysisThresholds
+                    ? `高 ${item.analysisThresholds.goodRate}% 以上 / 改善 ${item.analysisThresholds.improvementRate}% 以下（個別設定）`
+                    : "企業の既定値に従う"}
+                </div>
+
                 <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
                   <div>有効開始: {formatDateTime(item.validFrom)}</div>
                   <div>

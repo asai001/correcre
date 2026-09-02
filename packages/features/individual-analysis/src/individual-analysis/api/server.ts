@@ -1,3 +1,5 @@
+import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
+import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listEnabledLatestMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { listMissionReportsByCompanyAndUser } from "@correcre/lib/dynamodb/mission-report";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
@@ -15,6 +17,7 @@ import type {
 
 type RuntimeConfig = {
   region: string;
+  companyTableName: string;
   missionTableName: string;
   missionReportTableName: string;
   userTableName: string;
@@ -28,6 +31,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function getRuntimeConfig(): RuntimeConfig {
   return {
     region: readRequiredServerEnv("AWS_REGION"),
+    companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     missionTableName: readRequiredServerEnv("DDB_MISSION_TABLE_NAME"),
     missionReportTableName: readRequiredServerEnv("DDB_MISSION_REPORT_TABLE_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
@@ -138,7 +142,14 @@ export async function getIndividualAnalysisSummaryFromDynamo(
 ): Promise<IndividualAnalysisSummary> {
   const config = getRuntimeConfig();
 
-  const [user, missions, allReports, allMonthlyStats] = await Promise.all([
+  const [company, user, missions, allReports, allMonthlyStats] = await Promise.all([
+    getCompanyById(
+      {
+        region: config.region,
+        tableName: config.companyTableName,
+      },
+      companyId,
+    ),
     getUserByCompanyAndUserId(
       {
         region: config.region,
@@ -235,7 +246,9 @@ export async function getIndividualAnalysisSummaryFromDynamo(
   let totalTargetCount = 0;
   let totalActualCount = 0;
 
-  const radarData: AnalysisRadarItem[] = missions.map((mission) => {
+  // 項目分析の閾値はミッション単位 → 企業既定 → システム既定（80% / 40%）の順に解決する。
+  // ミッションごとに閾値が異なりうるため、達成率と一緒に持ち回る。
+  const missionAchievements = missions.map((mission) => {
     let targetCount = 0;
 
     for (const yearMonth of months) {
@@ -257,19 +270,27 @@ export async function getIndividualAnalysisSummaryFromDynamo(
     return {
       category: mission.title,
       achievement: toRate(actualCount, targetCount),
+      thresholds: resolveAnalysisThresholds(mission.analysisThresholds, company?.analysisThresholds),
     };
   });
 
-  const sortedMissions = [...radarData].sort((a, b) => b.achievement - a.achievement || a.category.localeCompare(b.category, "ja"));
+  const radarData: AnalysisRadarItem[] = missionAchievements.map(({ category, achievement }) => ({
+    category,
+    achievement,
+  }));
+
+  const sortedMissions = [...missionAchievements].sort(
+    (a, b) => b.achievement - a.achievement || a.category.localeCompare(b.category, "ja"),
+  );
   const goodMissions: AnalysisMissionItem[] = sortedMissions
-    .filter((mission) => mission.achievement >= 80)
+    .filter((mission) => mission.achievement >= mission.thresholds.goodRate)
     .map((mission) => ({
       name: mission.category,
       percentage: mission.achievement,
     }));
   const improvementMissions: AnalysisMissionItem[] = [...sortedMissions]
     .reverse()
-    .filter((mission) => mission.achievement <= 40)
+    .filter((mission) => mission.achievement <= mission.thresholds.improvementRate)
     .map((mission) => ({
       name: mission.category,
       percentage: mission.achievement,
