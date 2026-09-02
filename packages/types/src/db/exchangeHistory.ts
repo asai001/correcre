@@ -48,6 +48,9 @@ export type ExchangeSchedule = {
   candidates: DeliveryCandidate[];
   merchantNote?: string;
   selectedArrivalDate?: string;
+  // 確定したお届け日に対応する発送日 (YYYY-MM-DD)。確定時に保存する。
+  // これを持たない既存レコードは商品の transitDays から逆算して補う（読み取り時解決）。
+  selectedShipDate?: string;
   selectedTimeSlot?: string;
   confirmedAt?: string;
   requestedArrivalDate?: string;
