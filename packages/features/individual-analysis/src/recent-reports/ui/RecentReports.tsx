@@ -4,7 +4,7 @@ import { faTable } from "@fortawesome/free-solid-svg-icons";
 
 import { SkeletonTableCard } from "../../components/LoadingSkeleton";
 import { useRecentReports } from "../hooks/useRecentReports";
-import RecentReportsView, { type RecentReportsPagination } from "./RecentReportsView";
+import RecentReportsView, { type RecentReportsExportOptions, type RecentReportsPagination } from "./RecentReportsView";
 
 type Props = {
   className?: string;
@@ -16,6 +16,8 @@ type Props = {
   startDate?: string;
   endDate?: string;
   showEmployeeName?: boolean;
+  /** 指定したときだけ「データエクスポート」ボタンを表示する */
+  exportOptions?: RecentReportsExportOptions;
 };
 
 export default function RecentReports({
@@ -28,6 +30,7 @@ export default function RecentReports({
   startDate,
   endDate,
   showEmployeeName = true,
+  exportOptions,
 }: Props) {
   const { reports, loading, error } = useRecentReports(companyId, { limit, fetchAll, userId, startDate, endDate });
 
@@ -47,6 +50,7 @@ export default function RecentReports({
       reports={reports}
       pagination={pagination}
       showEmployeeName={showEmployeeName}
+      exportOptions={exportOptions}
     />
   );
 }

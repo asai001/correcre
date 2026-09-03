@@ -14,10 +14,16 @@ import {
 } from "@mui/material";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
+import DataExportButton from "../../components/DataExportButton";
+import type { CsvCell } from "../../lib/csv";
 import Table, { ColumnDef } from "../../components/Table";
 import type { RecentReport, RecentReportImageRef } from "../model/types";
 
 const IMAGE_PLACEHOLDER_PATTERN = /<image:([^>]+)>/g;
+
+function formatReportDateTime(date: string) {
+  return toYYYYMMDDHHmm(new Date(date)).replace("T", " ");
+}
 
 type SelectedImage = {
   fieldKey: string;
@@ -100,9 +106,56 @@ function renderInputContent(
   });
 }
 
+/** 画像プレースホルダを、そのままでは意味が読み取れないので添付ファイル名に置き換える */
+function toPlainInputContent(inputContent: string, images: RecentReportImageRef[] | undefined) {
+  if (!inputContent) {
+    return "";
+  }
+
+  const imagesByKey = new Map((images ?? []).map((image) => [image.fieldKey, image]));
+
+  return inputContent.replace(IMAGE_PLACEHOLDER_PATTERN, (_match, fieldKey: string) => {
+    const image = imagesByKey.get(fieldKey);
+    return image ? `[アップロード写真: ${image.originalFileName}]` : "[画像なし]";
+  });
+}
+
+/**
+ * 報告内容をエクスポート用の行データに変換する。
+ * 社員名列は、表に出ているとき（showEmployeeName）か、
+ * 表には出ていないが対象社員が 1 人に絞られているとき（employeeName）に付与する。
+ */
+export function buildRecentReportsExportRows(
+  reports: RecentReport[],
+  showEmployeeName: boolean,
+  employeeName?: string,
+): CsvCell[][] {
+  const includeEmployeeName = showEmployeeName || Boolean(employeeName);
+
+  return [
+    ["日付", ...(includeEmployeeName ? ["社員名"] : []), "項目名", "進捗", "入力内容"],
+    ...reports.map((report) => [
+      formatReportDateTime(report.date),
+      ...(includeEmployeeName ? [showEmployeeName ? report.name : (employeeName ?? "")] : []),
+      report.itemName,
+      report.progress,
+      toPlainInputContent(report.inputContent, report.images),
+    ]),
+  ];
+}
+
 export type RecentReportsPagination = {
   rowsPerPageOptions?: number[];
   initialRowsPerPage?: number;
+};
+
+export type RecentReportsExportOptions = {
+  /** 拡張子を除いたファイル名 */
+  fileBaseName: string;
+  /** Excel のシート名 */
+  sheetName?: string;
+  /** 表に社員名列がない（対象社員が 1 人）ときに、エクスポートへ補う社員名 */
+  employeeName?: string;
 };
 
 type RecentReportsViewProps = {
@@ -112,6 +165,8 @@ type RecentReportsViewProps = {
   reports: RecentReport[];
   pagination?: RecentReportsPagination;
   showEmployeeName?: boolean;
+  /** 指定したときだけ「データエクスポート」ボタンを表示する */
+  exportOptions?: RecentReportsExportOptions;
 };
 
 function getColumns(
@@ -123,7 +178,7 @@ function getColumns(
       id: "date",
       label: "日付",
       width: showEmployeeName ? "15%" : "18%",
-      render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
+      render: (row) => formatReportDateTime(row.date),
     },
   ];
 
@@ -164,6 +219,7 @@ export default function RecentReportsView({
   reports,
   pagination,
   showEmployeeName = true,
+  exportOptions,
 }: RecentReportsViewProps) {
   const [selectedImage, setSelectedImage] = React.useState<SelectedImage | null>(null);
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
@@ -214,6 +270,10 @@ export default function RecentReportsView({
   }, [selectedImage]);
 
   const columns = React.useMemo(() => getColumns(showEmployeeName, handleClickImage), [showEmployeeName, handleClickImage]);
+  const buildExportRows = React.useCallback(
+    () => buildRecentReportsExportRows(reports, showEmployeeName, exportOptions?.employeeName),
+    [reports, showEmployeeName, exportOptions?.employeeName],
+  );
   const hasPagination = Boolean(pagination);
   const rowsPerPageOptions = React.useMemo(
     () => (pagination?.rowsPerPageOptions?.length ? pagination.rowsPerPageOptions : [5, 10, 25, 50]),
@@ -275,9 +335,19 @@ export default function RecentReportsView({
 
   return (
     <div className={`mb-8 rounded-2xl bg-white p-6 shadow-lg ${className ?? ""}`}>
-      <div className="mb-4 flex items-center">
-        <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
-        <div className="text-lg font-bold lg:text-2xl">{"報告内容"}</div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center">
+          <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
+          <div className="text-lg font-bold lg:text-2xl">{"報告内容"}</div>
+        </div>
+        {exportOptions && (
+          <DataExportButton
+            fileBaseName={exportOptions.fileBaseName}
+            sheetName={exportOptions.sheetName ?? "報告内容"}
+            disabled={reports.length === 0}
+            buildRows={buildExportRows}
+          />
+        )}
       </div>
 
       <Table columns={columns} rows={displayedReports} footer={footer} />

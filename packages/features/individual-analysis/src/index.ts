@@ -1,6 +1,9 @@
 export type { CsvCell } from "./lib/csv";
 export { downloadCsv } from "./lib/csv";
 
+export type { XlsxCell, XlsxOptions } from "./lib/xlsx";
+export { buildXlsx, downloadExcel, XLSX_MIME_TYPE } from "./lib/xlsx";
+
 export type { AnalysisDateRange, AnalysisMonthOption } from "./lib/analysis-date-range";
 export {
   getAnalysisMonthEndDate,
@@ -30,9 +33,12 @@ export { default as MonthlyAchievementRadar } from "./individual-analysis/ui/Mon
 export type { ColumnDef, TableProps } from "./components/Table";
 export { default as Table } from "./components/Table";
 
+export type { DataExportButtonProps, DataExportFormat } from "./components/DataExportButton";
+export { default as DataExportButton, sanitizeFileName } from "./components/DataExportButton";
+
 export type { RecentReport } from "./recent-reports/model/types";
 export { fetchRecentReports } from "./recent-reports/api/client";
 export { useRecentReports } from "./recent-reports/hooks/useRecentReports";
 export { default as RecentReports } from "./recent-reports/ui/RecentReports";
-export type { RecentReportsPagination } from "./recent-reports/ui/RecentReportsView";
-export { default as RecentReportsView } from "./recent-reports/ui/RecentReportsView";
+export type { RecentReportsExportOptions, RecentReportsPagination } from "./recent-reports/ui/RecentReportsView";
+export { buildRecentReportsExportRows, default as RecentReportsView } from "./recent-reports/ui/RecentReportsView";

@@ -13,7 +13,8 @@ export default async function DashboardPage() {
   const currentUser = await requireCurrentAdminUser();
   const companyId = currentUser.companyId;
   const userId = currentUser.userId;
-  const targetYearMonth = new Date().toISOString().slice(0, 7);
+  const today = new Date().toISOString().slice(0, 10);
+  const targetYearMonth = today.slice(0, 7);
   const company = await getCompanyById(
     {
       region: readRequiredServerEnv("AWS_REGION"),
@@ -57,7 +58,10 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-5">
-        <RecentReports companyId={companyId} />
+        <RecentReports
+          companyId={companyId}
+          exportOptions={{ fileBaseName: `dashboard-recent-reports-${today}`, sheetName: "報告内容" }}
+        />
       </div>
     </>
   );
