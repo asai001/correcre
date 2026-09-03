@@ -62,11 +62,12 @@ export default function IndividualAnalysis({ companyId, companyRegisteredYearMon
   const selectedEmployee = employees.find((employee) => employee.userId === selectedUserId);
   const reportExportOptions = useMemo(
     () => ({
-      fileBaseName: `individual-analysis-reports-${selectedEmployee?.name || selectedUserId || "employee"}-${selectedStartDate}_${selectedEndDate}`,
+      fileBaseName: `individual-analysis-reports-${selectedEmployee?.name || selectedUserId || "employee"}`,
       sheetName: "報告内容",
       employeeName: selectedEmployee?.name || selectedUserId,
+      startYearMonth: companyRegisteredYearMonth,
     }),
-    [selectedEmployee?.name, selectedUserId, selectedStartDate, selectedEndDate],
+    [selectedEmployee?.name, selectedUserId, companyRegisteredYearMonth],
   );
   const { summary, loading, error } = useIndividualAnalysisSummary(companyId, selectedUserId, selectedStartDate, selectedEndDate);
   const currentSummary = summary ?? emptySummary;

@@ -14,4 +14,8 @@ module.exports = {
       },
     ],
   },
+  moduleNameMapper: {
+    "^@correcre/lib$": "<rootDir>/../../lib/src/index.ts",
+    "^@correcre/types$": "<rootDir>/../../types/src/index.ts",
+  },
 };

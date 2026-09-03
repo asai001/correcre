@@ -1,1 +1,1 @@
-export { RecentReports as default } from "@correcre/individual-analysis";
+export { RecentReports as default, type RecentReportsExportOptions } from "@correcre/individual-analysis";
