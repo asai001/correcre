@@ -18,7 +18,30 @@ npm run dev:employee
 npm run dev:operator
 npm run build
 npm run lint
+npm test
 ```
+
+## Testing
+
+`npm test` はルートから各 workspace の `test` スクリプトを順に実行します。
+
+| 対象 | ランナー | 内容 |
+| --- | --- | --- |
+| `packages/lib` | Vitest | 4 アプリが共有する純粋ロジック（ポイント計算・翌月反映・請求・ミッション予約反映・交換ステータス遷移・日付整形）のユニットテスト |
+| `infra` | Jest + `aws-cdk-lib/assertions` | CDK 合成テンプレートの回帰テスト（テーブル設計、Cognito、IAM、S3 CORS） |
+
+個別に回す場合:
+
+```bash
+npm test --workspace @correcre/lib   # vitest run
+npm test --workspace infra           # jest
+cd packages/lib && npx vitest        # watch モード
+```
+
+`packages/lib` のテストは `src/**/*.test.ts` に置きます。`server-only` は `packages/lib/vitest.config.ts` で空モジュールに差し替えているため、
+Next.js 専用の import を含むモジュールでも Node 上でそのまま読み込めます。DynamoDB / S3 / SES へ実際にアクセスする関数はユニットテストの対象外です。
+
+CI（`.github/workflows/ci.yml`）は push / pull request ごとに `npm run lint` と `npm test` を実行します。
 
 ## Initial Operator Bootstrap
 

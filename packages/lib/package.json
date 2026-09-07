@@ -21,7 +21,11 @@
     "@vercel/oidc-aws-credentials-provider": "^3.0.7",
     "server-only": "^0.0.1"
   },
+  "scripts": {
+    "test": "vitest run"
+  },
   "devDependencies": {
-    "@types/node": "^20"
+    "@types/node": "^20",
+    "vitest": "^3.2.7"
   }
 }
