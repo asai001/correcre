@@ -22,48 +22,22 @@ import type {
 import { buildUserSk } from "./user";
 import { createPointTransaction, createPointTransactionPutTransactItem } from "./point-transaction";
 
+import {
+  canTransitionExchangeStatus,
+  getAllowedNextExchangeStatuses,
+  InvalidExchangeStatusTransitionError,
+} from "../exchange/status-transitions";
+
 import { getDynamoDocumentClient } from "./client";
 
-const ALLOWED_TRANSITIONS: Record<
-  ExchangeHistoryStatus,
-  Partial<Record<ExchangeHistoryActorType, ExchangeHistoryStatus[]>>
-> = {
-  REQUESTED: {
-    MERCHANT: ["PREPARING", "REJECTED", "CANCELED"],
-    OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
-    // SYSTEM は配送日程調整の確定（→ PREPARING）と、期限切れ・上限到達の自動キャンセルに使う。
-    SYSTEM: ["PREPARING", "CANCELED"],
-    // EMPLOYEE のキャンセルは日程調整フローの文脈でのみ feature 層がゲートする（汎用のキャンセル API は作らない）。
-    EMPLOYEE: ["CANCELED"],
-  },
-  PREPARING: {
-    MERCHANT: ["IN_PROGRESS", "CANCELED"],
-    OPERATOR: ["IN_PROGRESS", "CANCELED"],
-  },
-  IN_PROGRESS: {
-    MERCHANT: ["COMPLETED", "PREPARING"],
-    OPERATOR: ["COMPLETED", "PREPARING"],
-  },
-  COMPLETED: {},
-  REJECTED: {},
-  CANCELED: {},
-  CANCELLED: {},
+// 遷移規則は DB アクセスから切り離した純ロジック（../exchange/status-transitions）に置いている。
+// 既存の import パスを保つため、ここから再輸出する。
+export {
+  canTransitionExchangeStatus,
+  getAllowedNextExchangeStatuses,
+  InvalidExchangeStatusTransitionError,
 };
 
-export function getAllowedNextExchangeStatuses(
-  from: ExchangeHistoryStatus,
-  actor: ExchangeHistoryActorType,
-): ExchangeHistoryStatus[] {
-  return ALLOWED_TRANSITIONS[from]?.[actor] ?? [];
-}
-
-export function canTransitionExchangeStatus(
-  from: ExchangeHistoryStatus,
-  to: ExchangeHistoryStatus,
-  actor: ExchangeHistoryActorType,
-): boolean {
-  return getAllowedNextExchangeStatuses(from, actor).includes(to);
-}
 
 export type ExchangeHistoryTableConfig = {
   region: string;
@@ -370,16 +344,6 @@ export class InsufficientPointBalanceError extends Error {
   }
 }
 
-export class InvalidExchangeStatusTransitionError extends Error {
-  constructor(
-    public readonly from: ExchangeHistoryStatus,
-    public readonly to: ExchangeHistoryStatus,
-    public readonly actor: ExchangeHistoryActorType,
-  ) {
-    super(`Status transition ${from} -> ${to} is not allowed for actor ${actor}`);
-    this.name = "InvalidExchangeStatusTransitionError";
-  }
-}
 
 export async function putExchangeHistoryWithReservation(
   config: ExchangeHistoryTableConfig,
@@ -670,7 +634,10 @@ export async function transitionExchangeStatus(
     });
   }
 
-  const refundAmount = input.item.pointHeld ?? 0;
+  // 通常のキャンセル・却下は保留中のポイントを戻すだけでよい。
+  // 完了の取り消しだけは pointHeld が 0 に落ちた後（＝消費確定済み）なので、
+  // 使用ポイントそのものを戻さないと 0 ポイントの返還になってしまう。
+  const refundAmount = fromStatus === "COMPLETED" ? (input.item.usedPoint ?? 0) : (input.item.pointHeld ?? 0);
   const occurredAt = input.occurredAt ?? new Date().toISOString();
   const event: ExchangeHistoryStatusEvent = {
     status: input.nextStatus,

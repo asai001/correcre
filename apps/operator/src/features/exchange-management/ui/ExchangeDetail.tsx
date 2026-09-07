@@ -62,6 +62,18 @@ function resolveTransitionButton(
     };
   }
 
+  // 完了の取り消し（不着・誤配送の救済）。消費確定したポイントを戻し、売上からも外れる
+  // ので、通常のキャンセルとは影響範囲が違う。取り違えないよう文言を分ける。
+  if (fromStatus === "COMPLETED" && nextStatus === "CANCELED") {
+    return {
+      label: "完了を取り消す",
+      icon: faRotateLeft,
+      color: "error",
+      confirm:
+        "完了を取り消し、使用ポイントを申請者に返還します。この交換は収支・精算の集計からも外れます。よろしいですか？",
+    };
+  }
+
   return TRANSITION_BUTTONS[nextStatus];
 }
 
