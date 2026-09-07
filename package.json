@@ -18,7 +18,10 @@
     "dev:merchant": "npm run dev --workspace @correcre/merchant -- -p 3003",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "test:integration": "npm run test:integration --workspace @correcre/lib",
+    "ddb:local": "docker compose -f docker-compose.test.yml up -d",
+    "ddb:local:stop": "docker compose -f docker-compose.test.yml down"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

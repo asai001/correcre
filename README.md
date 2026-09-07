@@ -38,10 +38,27 @@ npm test --workspace infra           # jest
 cd packages/lib && npx vitest        # watch モード
 ```
 
-`packages/lib` のテストは `src/**/*.test.ts` に置きます。`server-only` は `packages/lib/vitest.config.ts` で空モジュールに差し替えているため、
+`packages/lib` のユニットテストは `src/**/*.test.ts` に置きます。`server-only` は `packages/lib/vitest.config.ts` で空モジュールに差し替えているため、
 Next.js 専用の import を含むモジュールでも Node 上でそのまま読み込めます。DynamoDB / S3 / SES へ実際にアクセスする関数はユニットテストの対象外です。
 
-CI（`.github/workflows/ci.yml`）は push / pull request ごとに `npm run lint` と `npm test` を実行します。
+### 統合テスト（DynamoDB Local）
+
+4 つのアプリは同じ DynamoDB テーブルを `packages/lib` 経由で読み書きしているため、
+「従業員が交換を申請 → 提携企業/運用者がステータスを進める → 管理者が履歴を見る」のようなアプリ横断のフローは、
+lib の関数を実際の DynamoDB API に対して役割ごとに呼ぶ統合テストで検証します（`packages/lib/test/integration/`）。
+
+- テーブルは `infra/lib` の CDK スタックを合成した結果から毎回作り直します。infra 側のキー設計・GSI 名と lib 側の実装がズレていればここで落ちます
+- 接続先は環境変数 `DDB_ENDPOINT`（既定: `http://127.0.0.1:8000`）。設定されている間、`packages/lib` の DynamoDB クライアントは AWS 認証情報を解決せずダミーの静的キーを使います
+
+```bash
+npm run ddb:local            # docker compose で DynamoDB Local を起動（ポート 8000）
+npm run test:integration     # packages/lib の統合テストを実行
+npm run ddb:local:stop
+```
+
+Docker を使わない場合は、別途起動した DynamoDB Local のエンドポイントを `DDB_ENDPOINT` に指定してください。
+
+CI（`.github/workflows/ci.yml`）は push / pull request ごとに `npm run lint`、`npm test`、`npm run test:integration`（DynamoDB Local をサービスコンテナとして起動）を実行します。
 
 ## Initial Operator Bootstrap
 

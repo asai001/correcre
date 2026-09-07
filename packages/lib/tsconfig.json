@@ -10,6 +10,6 @@
     ],
     "allowJs": true
   },
-  "include": ["src", ".next/types/**/*.ts"],
+  "include": ["src", "test", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

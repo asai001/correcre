@@ -35,3 +35,24 @@ jobs:
       # ルートの `npm test` は各 workspace の test スクリプトを順に実行する。
       # 現時点の対象: packages/lib (vitest) と infra (jest / CDK テンプレート検証)。
       - run: npm test
+
+  integration:
+    name: Integration (DynamoDB Local)
+    runs-on: ubuntu-latest
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local:2.6.1
+        ports:
+          - 8000:8000
+    env:
+      DDB_ENDPOINT: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # packages/lib の統合テスト。CDK 定義から DynamoDB Local にテーブルを作り、
+      # 4 アプリを横断する交換・ポイント反映のフローを lib の関数で検証する。
+      - run: npm run test:integration

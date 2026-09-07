@@ -1,0 +1,10 @@
+# 統合テスト (npm run test:integration) 用の DynamoDB Local。
+#   npm run ddb:local       # 起動
+#   npm run ddb:local:stop  # 停止
+# データはメモリ上にのみ保持され、停止すると消える。テーブルはテスト側が CDK 定義から作り直す。
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.6.1
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"
