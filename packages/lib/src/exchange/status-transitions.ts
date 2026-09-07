@@ -21,6 +21,9 @@ const ALLOWED_TRANSITIONS: Record<
   IN_PROGRESS: {
     MERCHANT: ["COMPLETED", "PREPARING"],
     OPERATOR: ["COMPLETED", "PREPARING"],
+    // 受け取った本人の申告が、配達を確認する一番確かな手段。
+    // 誰の交換かの検証は feature 層（findExchangeForEmployee）で行う。
+    EMPLOYEE: ["COMPLETED"],
   },
   // 完了は原則として終端。ただし「届いていないのに完了になった」ケースを救済できないと、
   // 申請者はポイントを失ったまま泣き寝入りになる。運用者だけが取り消せる逃げ道を残す

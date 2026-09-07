@@ -38,6 +38,8 @@ export type EmployeeScheduleView = {
   requiresAcknowledgement: boolean;
   acknowledgementText: string;
   temperatureZone: TemperatureZone;
+  // 「受け取りました」を押せるか（発送済みで、まだ完了していない）
+  canConfirmReceipt: boolean;
   // 発送情報。提携企業が送り状番号を登録したときだけ入る（登録は任意なので無いことも多い）
   shippedAt?: string;
   trackingNumber?: string;

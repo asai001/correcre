@@ -2,7 +2,11 @@ import "server-only";
 
 import { formatWeekdayJa, isValidYYYYMMDD } from "@correcre/lib/date/business-days";
 import { nowYYYYMMDD } from "@correcre/lib/date/format";
-import { listExchangeHistoryByCompanyAndUser } from "@correcre/lib/dynamodb/exchange-history";
+import {
+  InvalidExchangeStatusTransitionError,
+  listExchangeHistoryByCompanyAndUser,
+  transitionExchangeStatus,
+} from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -228,6 +232,7 @@ async function buildScheduleView(
     requiresAcknowledgement,
     acknowledgementText: FRESH_ITEM_ACKNOWLEDGEMENT_TEXT,
     temperatureZone: fulfillment.temperatureZone,
+    canConfirmReceipt: item.status === "IN_PROGRESS",
     shippedAt: item.shipment?.shippedAt,
     trackingNumber: item.shipment?.trackingNumber,
     carrierLabel: resolveCarrierLabel(item.shipment),
@@ -517,6 +522,43 @@ export async function requestDateForEmployee(
  * 日程調整中の交換を employee 自身がキャンセルする。
  * 商品はまだ発送されていないため、ポイントは必ず返還される。
  */
+/**
+ * 申請者本人による受取確認。発送済み（IN_PROGRESS）を完了に進め、ポイントの消費を確定する。
+ *
+ * 「届いたかどうか」を最も確実に知っているのは受け取った本人なので、これを完了の主経路にする。
+ * 日次バッチの自動完了はあくまで、誰も動かなかったときの保険。
+ */
+export async function confirmReceiptForEmployee(
+  user: DBUserItem,
+  exchangeId: string,
+): Promise<EmployeeScheduleView> {
+  const config = getRuntimeConfig();
+  const item = await findExchangeForEmployee(config, user, exchangeId);
+
+  if (item.status !== "IN_PROGRESS") {
+    throw new InvalidExchangeStatusTransitionError(item.status ?? "REQUESTED", "COMPLETED", "EMPLOYEE");
+  }
+
+  const updated = await transitionExchangeStatus(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    {
+      item,
+      nextStatus: "COMPLETED",
+      actorType: "EMPLOYEE",
+      actorId: user.userId,
+      comment: "申請者が受け取りを確認しました",
+      userTableName: config.userTableName,
+      pointTransactionTableName: config.pointTransactionTableName,
+    },
+  );
+
+  const view = await buildScheduleView(config, updated);
+  if (!view) {
+    throw new ExchangeScheduleNotFoundError("この交換に日程調整はありません");
+  }
+  return view;
+}
+
 export async function cancelScheduleForEmployee(
   user: DBUserItem,
   exchangeId: string,

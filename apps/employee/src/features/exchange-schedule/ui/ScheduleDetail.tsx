@@ -7,7 +7,13 @@ import { SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS } from "@correcre/types";
 
 import EmployeePageHeader from "@employee/components/EmployeePageHeader";
 
-import { CandidateExpiredError, cancelSchedule, requestDate, selectCandidate } from "../api/client";
+import {
+  cancelSchedule,
+  CandidateExpiredError,
+  confirmReceipt,
+  requestDate,
+  selectCandidate,
+} from "../api/client";
 import type { EmployeeScheduleCandidateView, EmployeeScheduleView } from "../model/types";
 
 type Props = {
@@ -136,6 +142,26 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "希望日の送信に失敗しました。");
+      }
+    });
+  };
+
+  const handleConfirmReceipt = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("受け取りを確認して完了にします。使用したポイントが確定します。よろしいですか？")
+    ) {
+      return;
+    }
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      try {
+        const next = await confirmReceipt(view.exchangeId);
+        applyView(next);
+        setNotice("受け取りを確認しました。ご利用ありがとうございました。");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "受け取りの確認に失敗しました。");
       }
     });
   };
@@ -417,6 +443,25 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
                   配送会社のサイトで、この番号を入力すると配送状況を確認できます。
                 </p>
               )}
+            </div>
+          ) : null}
+
+          {/* 届いたかどうかを一番確実に知っているのは受け取った本人。ここを完了の主経路にする。 */}
+          {view.canConfirmReceipt ? (
+            <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
+              <div className="text-sm font-bold text-slate-900">商品は届きましたか？</div>
+              <p className="mt-1 text-xs text-slate-600">
+                受け取りを確認すると、この交換は完了になります。届いていない場合は押さずにお待ちください。
+              </p>
+              <Button
+                variant="contained"
+                fullWidth
+                disabled={pending}
+                onClick={handleConfirmReceipt}
+                className="!mt-3 !rounded-full !py-2.5"
+              >
+                受け取りました
+              </Button>
             </div>
           ) : null}
 

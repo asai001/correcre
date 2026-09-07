@@ -30,6 +30,19 @@ export async function fetchSchedule(exchangeId: string): Promise<EmployeeSchedul
   return (await res.json()) as EmployeeScheduleView;
 }
 
+export async function confirmReceipt(exchangeId: string): Promise<EmployeeScheduleView> {
+  const res = await fetch(`/api/exchange-schedule/${encodeURIComponent(exchangeId)}/receipt`, {
+    method: "POST",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "受け取りの確認に失敗しました。"));
+  }
+
+  return (await res.json()) as EmployeeScheduleView;
+}
+
 export async function selectCandidate(
   exchangeId: string,
   body: SelectCandidateRequest,

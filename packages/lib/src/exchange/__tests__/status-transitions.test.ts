@@ -23,6 +23,15 @@ describe("getAllowedNextExchangeStatuses", () => {
     }
   });
 
+  test("申請者は発送済みの交換を受取確認で完了にできる", () => {
+    expect(canTransitionExchangeStatus("IN_PROGRESS", "COMPLETED", "EMPLOYEE")).toBe(true);
+    // 受取確認以外の操作までは開放しない
+    expect(canTransitionExchangeStatus("IN_PROGRESS", "PREPARING", "EMPLOYEE")).toBe(false);
+    expect(canTransitionExchangeStatus("IN_PROGRESS", "CANCELED", "EMPLOYEE")).toBe(false);
+    // 発送前に勝手に完了にはできない
+    expect(canTransitionExchangeStatus("PREPARING", "COMPLETED", "EMPLOYEE")).toBe(false);
+  });
+
   test("発送済みへ進められるのは提携企業と運用者だけ", () => {
     expect(canTransitionExchangeStatus("PREPARING", "IN_PROGRESS", "MERCHANT")).toBe(true);
     expect(canTransitionExchangeStatus("PREPARING", "IN_PROGRESS", "OPERATOR")).toBe(true);
