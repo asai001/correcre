@@ -129,7 +129,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
           acknowledged: view.requiresAcknowledgement ? requestAcknowledged : undefined,
         });
         applyView(next);
-        setNotice("希望日を送信しました。提携企業の回答をお待ちください（最大 48 時間）。");
+        setNotice("希望日を送信しました。提携企業の回答をお待ちください（最大 3 営業日）。");
       } catch (err) {
         setError(err instanceof Error ? err.message : "希望日の送信に失敗しました。");
       }
@@ -282,7 +282,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
                     希望のお届け日を伝える（残り {view.remainingRequestCount} 回）
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    提携企業が対応できるか確認して回答します。回答まで最大 48 時間お待ちください。
+                    提携企業が対応できるか確認して回答します。回答まで最大 3 営業日お待ちください。
                   </p>
                   <TextField
                     type="date"
@@ -371,7 +371,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
                 {view.requestedTimeSlot ? ` ${view.requestedTimeSlot}` : ""}
               </div>
               <div className="mt-1 text-xs text-slate-500">
-                回答があり次第メールでお知らせします（最大 48 時間）。
+                回答があり次第メールでお知らせします（最大 3 営業日）。
               </div>
             </div>
           ) : null}
