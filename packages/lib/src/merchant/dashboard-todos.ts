@@ -15,6 +15,7 @@ import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 import { addCalendarDays, formatWeekdayJa } from "../date/business-days";
 import { toYYYYMMDD } from "../date/format";
+import { isTrackingNumberMissing } from "../shipment/tracking";
 
 export type MerchantTodoSeverity = "URGENT" | "NORMAL" | "INFO";
 
@@ -22,7 +23,9 @@ export type MerchantTodoKind =
   | "SCHEDULE_PROPOSAL"
   | "SCHEDULE_RESPONSE"
   | "SHIPPING_DUE"
+  | "DELIVERY_DUE"
   | "EXCHANGE_APPROVAL"
+  | "TRACKING_NUMBER_MISSING"
   | "CALENDAR_SETUP"
   | "DRAFT_MERCHANDISE"
   | "INVOICE_EMAIL";
@@ -81,16 +84,20 @@ const EXCHANGE_BACKED_KINDS: ReadonlySet<MerchantTodoKind> = new Set<MerchantTod
   "SCHEDULE_PROPOSAL",
   "SCHEDULE_RESPONSE",
   "SHIPPING_DUE",
+  "DELIVERY_DUE",
   "EXCHANGE_APPROVAL",
+  "TRACKING_NUMBER_MISSING",
 ]);
 
 const KIND_ORDER: MerchantTodoKind[] = [
   "SCHEDULE_PROPOSAL",
   "SCHEDULE_RESPONSE",
   "SHIPPING_DUE",
+  "DELIVERY_DUE",
   "EXCHANGE_APPROVAL",
   "CALENDAR_SETUP",
   "INVOICE_EMAIL",
+  "TRACKING_NUMBER_MISSING",
   "DRAFT_MERCHANDISE",
 ];
 
@@ -254,7 +261,7 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
           severity: hasOverdueOrToday ? "URGENT" : "NORMAL",
           title: "商品を発送する",
           description:
-            "お届け日をお約束済みです。発送したら交換管理で「対応中」に進めてください。",
+            "お届け日をお約束済みです。発送したら交換管理で「発送済みにする」を押してください。",
           actionLabel: "交換管理を開く",
           actionHref: "/exchanges",
         },
@@ -278,6 +285,44 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
             emphasis: shipDate <= todayJst,
           };
         }),
+      ),
+    );
+  }
+
+  // --- 3-2. お届け日を過ぎた発送済み ---------------------------------------------
+  // 発送後は提携企業の手を離れるため、放っておくと「発送済み」のまま完了にされず、
+  // 申請者のポイントが保留されっぱなしになる。届いているはずの頃に完了を促す。
+  // （将来ここを日次バッチの自動完了に置き換えたら、このやることは不要になる）
+  const deliveryDue = exchanges
+    .flatMap((item) => {
+      if (normalizeStatus(item.status) !== "IN_PROGRESS") return [];
+      const arrivalDate = item.schedule?.selectedArrivalDate;
+      // お届け日が分からない交換（日程調整なし）は、いつ届いたか推定できないので出さない。
+      if (!arrivalDate || arrivalDate >= todayJst) return [];
+      return [{ item, arrivalDate }];
+    })
+    .sort((a, b) => (a.arrivalDate < b.arrivalDate ? -1 : 1));
+
+  if (deliveryDue.length > 0) {
+    todos.push(
+      buildTodo(
+        {
+          kind: "DELIVERY_DUE",
+          severity: "NORMAL",
+          title: "完了にする",
+          description:
+            "お届け日を過ぎています。届いていることを確認して完了にすると、ポイントの精算が確定します。",
+          actionLabel: "交換管理を開く",
+          actionHref: "/exchanges",
+        },
+        deliveryDue.map(({ item, arrivalDate }) => ({
+          key: item.exchangeId,
+          href: exchangeHref(item),
+          title: displayName(item),
+          detail: `お届け ${formatMonthDayJa(arrivalDate)}${
+            item.shipment?.trackingNumber ? " ・ 追跡番号あり" : ""
+          }`,
+        })),
       ),
     );
   }
@@ -373,6 +418,36 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
         actionHref: "/settlement",
       });
     }
+  }
+
+  // --- 6-2. 送り状番号が未登録の発送済み -----------------------------------------
+  // 登録はあくまで任意なので「急ぎ」にはしない。申請者の自己解決を増やすための後追い。
+  const trackingMissing = exchanges
+    .filter((item) => normalizeStatus(item.status) === "IN_PROGRESS" && isTrackingNumberMissing(item.shipment))
+    .sort((a, b) => (waitingSince(a) < waitingSince(b) ? -1 : 1));
+
+  if (trackingMissing.length > 0) {
+    todos.push(
+      buildTodo(
+        {
+          kind: "TRACKING_NUMBER_MISSING",
+          severity: "INFO",
+          title: "送り状番号を登録する",
+          description:
+            "登録しておくと、申請者が自分で配送状況を確認できます。「まだ届きませんか」の問い合わせが減ります。",
+          actionLabel: "交換管理を開く",
+          actionHref: "/exchanges",
+        },
+        trackingMissing.map((item) => ({
+          key: item.exchangeId,
+          href: exchangeHref(item),
+          title: displayName(item),
+          detail: item.schedule?.selectedArrivalDate
+            ? `お届け ${formatMonthDayJa(item.schedule.selectedArrivalDate)}`
+            : "発送済み",
+        })),
+      ),
+    );
   }
 
   // --- 7. 下書きのままの商品 -----------------------------------------------------

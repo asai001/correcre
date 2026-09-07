@@ -388,8 +388,35 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
                 {view.selectedTimeSlot ? ` ${view.selectedTimeSlot}` : ""}
               </div>
               <div className="mt-1 text-xs text-emerald-700">
-                前日にリマインドメールをお送りします。確実にお受け取りください。
+                {view.shippedAt
+                  ? "発送済みです。前日にリマインドメールをお送りします。確実にお受け取りください。"
+                  : "前日にリマインドメールをお送りします。確実にお受け取りください。"}
               </div>
+            </div>
+          ) : null}
+
+          {/* 送り状番号の登録は提携企業の任意。登録があるときだけ配送状況への導線を出す。 */}
+          {view.trackingNumber ? (
+            <div className="mt-3 rounded-2xl border border-slate-200 px-4 py-3">
+              <div className="text-sm font-bold text-slate-900">配送状況</div>
+              <div className="mt-1 text-sm text-slate-700">
+                {view.carrierLabel ? <span className="font-semibold">{view.carrierLabel}</span> : null}
+                <span className="ml-2 break-all font-mono text-slate-900">{view.trackingNumber}</span>
+              </div>
+              {view.trackingUrl ? (
+                <a
+                  href={view.trackingUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-2 inline-block text-sm font-semibold text-blue-600 underline"
+                >
+                  配送状況を確認する
+                </a>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">
+                  配送会社のサイトで、この番号を入力すると配送状況を確認できます。
+                </p>
+              )}
             </div>
           ) : null}
 

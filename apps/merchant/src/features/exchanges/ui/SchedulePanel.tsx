@@ -556,9 +556,14 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
             お届け日: {schedule.selectedArrivalDate ? formatDateJa(schedule.selectedArrivalDate) : "-"}
             {schedule.selectedTimeSlot ? ` ${schedule.selectedTimeSlot}` : ""}
           </div>
+          {schedule.selectedShipDate ? (
+            <div className="mt-1 text-sm font-bold text-emerald-800">
+              発送予定日: {formatDateJa(schedule.selectedShipDate)}
+            </div>
+          ) : null}
           <div className="mt-1 text-xs text-emerald-700">
             {schedule.confirmedAt ? `${formatDateTimeJa(schedule.confirmedAt)} に確定` : ""}
-            ・この日に到着するよう発送してください
+            ・お届け日に到着するよう、この日までに発送してください
           </div>
         </div>
       ) : null}

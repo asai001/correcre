@@ -48,6 +48,29 @@ export const SCHEDULE_RESCHEDULE_REQUEST_LIMIT = 2;
 // 申請者には「最大 3 営業日」と案内し、同じ日数だけ督促後も無応答なら自動キャンセルする。
 export const SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS = 3;
 
+// 発送情報（物販の発送時に merchant が登録する）。
+// 追跡番号は任意。入力を必須（＝発送済みに進めるための条件）にすると、面倒がって
+// 入力しない merchant の交換が「実物は配送中なのに画面は準備中」で止まり、督促まで飛ぶ。
+// 実態とデータが食い違うほうが害が大きいので、番号なしでも発送済みに進められる設計にする。
+export type ShipmentCarrier = "YAMATO" | "SAGAWA" | "JAPAN_POST" | "OTHER";
+
+export const SHIPMENT_CARRIERS: readonly ShipmentCarrier[] = [
+  "YAMATO",
+  "SAGAWA",
+  "JAPAN_POST",
+  "OTHER",
+];
+
+export type ExchangeShipment = {
+  carrier?: ShipmentCarrier;
+  // carrier が OTHER のときの配送会社名（自由入力）
+  carrierName?: string;
+  // 送り状番号。ハイフン・空白を除いた数字列で保存する
+  trackingNumber?: string;
+  // 発送済み（IN_PROGRESS）に進めた時刻
+  shippedAt?: string;
+};
+
 export type ExchangeSchedule = {
   scheduleStatus: ScheduleStatus;
   candidates: DeliveryCandidate[];
@@ -96,6 +119,8 @@ export type ExchangeHistoryItem = {
   // 申請作成時に採番する。予約時に店舗へ伝えて申請と照合するための人が読める番号で、
   // 予約不要の商品や採番導入前の既存レコードには存在しない（表示側は exchangeId へフォールバック）。
   reservationCode?: string;
+  // 発送情報。発送済みに進めた交換にだけ存在する（追跡番号は入っていないこともある）
+  shipment?: ExchangeShipment;
   status?: ExchangeHistoryStatus;
   history?: ExchangeHistoryStatusEvent[];
   exchangedAt: string;

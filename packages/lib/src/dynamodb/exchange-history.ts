@@ -14,6 +14,7 @@ import type {
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  ExchangeShipment,
   PointTransaction,
   ScheduleStatus,
 } from "@correcre/types";
@@ -486,6 +487,9 @@ export async function updateExchangeHistoryStatus(
     actorName?: string;
     occurredAt?: string;
     comment?: string;
+    // 発送済みへ進める際の発送情報。ステータス遷移と同じ更新で書き、
+    // 「発送済みなのに発送情報が入っていない」中途半端な状態を作らない。
+    shipment?: ExchangeShipment;
   },
 ): Promise<ExchangeHistoryItem> {
   const client = getDynamoDocumentClient(config.region);
@@ -533,6 +537,12 @@ export async function updateExchangeHistoryStatus(
     expressionAttributeValues[":zero"] = 0;
   }
 
+  const shipment = params.shipment ? { ...params.shipment, shippedAt: occurredAt } : undefined;
+  if (shipment) {
+    setExpressions.push("shipment = :shipment");
+    expressionAttributeValues[":shipment"] = shipment;
+  }
+
   // 楽観ロック: 読み込み時のステータスと DB の現在値が一致する場合のみ更新する。
   // これにより、他アプリのキャンセル/返金など並行して確定した遷移を前進遷移が黙って上書き
   // （交換の「復活」）するのを防ぐ。ステータス属性が無い旧レコードは REQUESTED 相当として扱う。
@@ -572,6 +582,51 @@ export async function updateExchangeHistoryStatus(
     updated.pointHeld = 0;
   }
 
+  if (shipment) {
+    updated.shipment = shipment;
+  }
+
+  return updated;
+}
+
+/**
+ * 発送情報だけを差し替える（発送済みにした後から送り状番号を足す・直すための更新）。
+ * ステータスは触らないが、発送済み以外のレコードに書いても意味がないので呼び出し側で絞る。
+ * shippedAt は最初に発送済みへ進めた時刻を保つ（番号の追記で発送日時が動かないように）。
+ */
+export async function updateExchangeShipment(
+  config: ExchangeHistoryTableConfig,
+  params: {
+    item: ExchangeHistoryItem;
+    shipment: ExchangeShipment | undefined;
+    updatedAt?: string;
+  },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const updatedAt = params.updatedAt ?? new Date().toISOString();
+  const shippedAt = params.item.shipment?.shippedAt;
+  const shipment = params.shipment ? { ...params.shipment, ...(shippedAt ? { shippedAt } : {}) } : undefined;
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: shipment
+        ? "SET shipment = :shipment, updatedAt = :updatedAt"
+        : "SET updatedAt = :updatedAt REMOVE shipment",
+      ExpressionAttributeValues: shipment
+        ? { ":shipment": shipment, ":updatedAt": updatedAt }
+        : { ":updatedAt": updatedAt },
+    }),
+  );
+
+  const updated: ExchangeHistoryItem = { ...params.item, updatedAt };
+  if (shipment) {
+    updated.shipment = shipment;
+  } else {
+    delete updated.shipment;
+  }
+
   return updated;
 }
 
@@ -584,6 +639,8 @@ export type TransitionExchangeStatusInput = {
   actorName?: string;
   comment?: string;
   occurredAt?: string;
+  // 発送済みへ進める際の発送情報（任意）
+  shipment?: ExchangeShipment;
   userTableName: string;
   pointTransactionTableName?: string;
 };
@@ -609,6 +666,7 @@ export async function transitionExchangeStatus(
       actorName: input.actorName,
       comment: input.comment,
       occurredAt: input.occurredAt,
+      shipment: input.shipment,
     });
   }
 

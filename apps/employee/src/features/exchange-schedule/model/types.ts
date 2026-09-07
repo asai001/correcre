@@ -38,6 +38,11 @@ export type EmployeeScheduleView = {
   requiresAcknowledgement: boolean;
   acknowledgementText: string;
   temperatureZone: TemperatureZone;
+  // 発送情報。提携企業が送り状番号を登録したときだけ入る（登録は任意なので無いことも多い）
+  shippedAt?: string;
+  trackingNumber?: string;
+  carrierLabel?: string;
+  trackingUrl?: string;
 };
 
 export type SelectCandidateRequest = {

@@ -237,12 +237,13 @@ describe("buildMerchantTodos", () => {
     expect(todos[0].entries[0].detail).toBe("本日発送 ・ お届け 9月1日(火)");
   });
 
-  it("発送済み（対応中）や遠い発送日は出さない", () => {
+  it("発送済み（対応中）や遠い発送日は「商品を発送する」を出さない", () => {
     const shipped = build({
       exchanges: [
         exchange({
           exchangeId: "e1",
           status: "IN_PROGRESS",
+          shipment: { carrier: "YAMATO", trackingNumber: "123456789012" },
           schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-09-01", selectedShipDate: "2026-08-28" }),
         }),
       ],
@@ -259,6 +260,69 @@ describe("buildMerchantTodos", () => {
       ],
     });
     expect(later).toEqual([]);
+  });
+
+  it("お届け日を過ぎた発送済みは完了を促す", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "IN_PROGRESS",
+          shipment: { carrier: "YAMATO", trackingNumber: "123456789012" },
+          schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-08-27", selectedShipDate: "2026-08-26" }),
+        }),
+      ],
+    });
+
+    expect(kinds(todos)).toContain("DELIVERY_DUE");
+    const deliveryDue = todos.find((todo) => todo.kind === "DELIVERY_DUE");
+    expect(deliveryDue?.entries[0].detail).toBe("お届け 8月27日(木) ・ 追跡番号あり");
+  });
+
+  it("お届け日当日はまだ完了を促さない", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "IN_PROGRESS",
+          shipment: { carrier: "YAMATO", trackingNumber: "123456789012" },
+          schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-08-28", selectedShipDate: "2026-08-27" }),
+        }),
+      ],
+    });
+
+    expect(kinds(todos)).not.toContain("DELIVERY_DUE");
+  });
+
+  it("送り状番号が未登録の発送済みは INFO で登録を促す", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "IN_PROGRESS",
+          schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-09-01", selectedShipDate: "2026-08-28" }),
+        }),
+      ],
+    });
+
+    const missing = todos.find((todo) => todo.kind === "TRACKING_NUMBER_MISSING");
+    expect(missing?.severity).toBe("INFO");
+    expect(missing?.entries[0].detail).toBe("お届け 9月1日(火)");
+  });
+
+  it("送り状番号が登録済みなら登録を促さない", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "IN_PROGRESS",
+          shipment: { carrier: "SAGAWA", trackingNumber: "123456789012" },
+          schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-09-01", selectedShipDate: "2026-08-28" }),
+        }),
+      ],
+    });
+
+    expect(kinds(todos)).not.toContain("TRACKING_NUMBER_MISSING");
   });
 
   it("日程調整ありの商品があってカレンダーが空なら登録を促す", () => {

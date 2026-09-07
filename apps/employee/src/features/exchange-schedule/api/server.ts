@@ -12,6 +12,7 @@ import {
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
 import { isSelectable } from "@correcre/lib/schedule/engine";
+import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
 import {
   cancelScheduleWithExchange,
   isScheduleActive,
@@ -227,6 +228,10 @@ async function buildScheduleView(
     requiresAcknowledgement,
     acknowledgementText: FRESH_ITEM_ACKNOWLEDGEMENT_TEXT,
     temperatureZone: fulfillment.temperatureZone,
+    shippedAt: item.shipment?.shippedAt,
+    trackingNumber: item.shipment?.trackingNumber,
+    carrierLabel: resolveCarrierLabel(item.shipment),
+    trackingUrl: buildTrackingUrl(item.shipment),
   };
 }
 

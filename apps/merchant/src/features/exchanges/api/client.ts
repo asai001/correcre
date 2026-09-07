@@ -6,6 +6,7 @@ import type {
   ProposeScheduleRequest,
   RespondScheduleRequest,
   TransitionExchangeRequest,
+  UpdateShipmentRequest,
 } from "../model/types";
 
 async function parseError(res: Response, fallback: string): Promise<string> {
@@ -47,6 +48,24 @@ export async function transitionExchange(
 
   if (!res.ok) {
     throw new Error(await parseError(res, "状態の更新に失敗しました。"));
+  }
+
+  return (await res.json()) as ExchangeDetail;
+}
+
+export async function updateShipment(
+  exchangeId: string,
+  body: UpdateShipmentRequest,
+): Promise<ExchangeDetail> {
+  const res = await fetch(`/api/exchanges/${encodeURIComponent(exchangeId)}/shipment`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "発送情報の更新に失敗しました。"));
   }
 
   return (await res.json()) as ExchangeDetail;

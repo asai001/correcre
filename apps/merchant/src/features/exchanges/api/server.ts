@@ -7,6 +7,7 @@ import {
   listExchangeHistoryByMerchant,
   listExchangeHistoryByMerchantAndStatus,
   transitionExchangeStatus,
+  updateExchangeShipment,
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
@@ -42,6 +43,11 @@ import {
   reproposeCandidates,
   type ScheduleServiceConfig,
 } from "@correcre/lib/schedule/service";
+import {
+  buildTrackingUrl,
+  normalizeShipmentInput,
+  resolveCarrierLabel,
+} from "@correcre/lib/shipment/tracking";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import type {
   DBUserAddress,
@@ -66,6 +72,7 @@ import type {
   ExchangeSummary,
   RespondScheduleRequest,
   ScheduleCandidateView,
+  ShipmentInputRequest,
 } from "../model/types";
 
 type RuntimeConfig = {
@@ -483,6 +490,12 @@ async function buildScheduleView(
     merchantNote: schedule.merchantNote,
     selectedArrivalDate: schedule.selectedArrivalDate,
     selectedTimeSlot: schedule.selectedTimeSlot,
+    // 確定時に保存した発送日。持たない過去のレコードは商品の配送日数から逆算する。
+    selectedShipDate:
+      schedule.selectedShipDate ??
+      (schedule.selectedArrivalDate
+        ? addCalendarDays(schedule.selectedArrivalDate, -product.transitDays)
+        : undefined),
     confirmedAt: schedule.confirmedAt,
     requestedArrivalDate: schedule.requestedArrivalDate,
     requestedTimeSlot: schedule.requestedTimeSlot,
@@ -579,6 +592,10 @@ async function buildExchangeDetail(
     actorType,
     schedule,
     reservationRequired: Boolean(merchandise?.reservation),
+    fulfillmentType: resolveMerchandiseFulfillment(merchandise?.fulfillment).fulfillmentType,
+    shipment: item.shipment,
+    trackingUrl: buildTrackingUrl(item.shipment),
+    carrierLabel: resolveCarrierLabel(item.shipment),
   };
 }
 
@@ -610,6 +627,8 @@ export async function transitionExchangeForMerchant(params: {
   actorName?: string;
   nextStatus: ExchangeHistoryStatus;
   comment?: string;
+  // 発送済み（IN_PROGRESS）へ進めるときの発送情報。未入力でも遷移は通す。
+  shipment?: ShipmentInputRequest;
 }): Promise<ExchangeDetail> {
   const config = getRuntimeConfig();
 
@@ -660,6 +679,9 @@ export async function transitionExchangeForMerchant(params: {
       actorId: params.actorUserId,
       actorName: params.actorName,
       comment: params.comment,
+      // 発送情報は発送済みへ進めるときだけ書く（差し戻しや完了で消えないように）。
+      shipment:
+        params.nextStatus === "IN_PROGRESS" ? normalizeShipmentInput(params.shipment) : undefined,
       userTableName: config.userTableName,
       pointTransactionTableName: config.pointTransactionTableName,
     },
@@ -675,6 +697,30 @@ export async function transitionExchangeForMerchant(params: {
       exchange: updated,
     });
   }
+
+  return buildExchangeDetail(config, updated, "MERCHANT");
+}
+
+/**
+ * 発送済みにした後から発送情報（配送会社・送り状番号）を登録・修正する。
+ * 発送前や終端化済みの交換には書けないようにして、意味のない発送情報が残るのを防ぐ。
+ */
+export async function updateShipmentForMerchant(params: {
+  merchantId: string;
+  exchangeId: string;
+  shipment: ShipmentInputRequest;
+}): Promise<ExchangeDetail> {
+  const config = getRuntimeConfig();
+  const item = await requireExchangeForMerchant(config, params.merchantId, params.exchangeId);
+
+  if (normalizeStatus(item.status) !== "IN_PROGRESS") {
+    throw new Error("発送済みの交換にのみ発送情報を登録できます");
+  }
+
+  const updated = await updateExchangeShipment(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    { item, shipment: normalizeShipmentInput(params.shipment) },
+  );
 
   return buildExchangeDetail(config, updated, "MERCHANT");
 }

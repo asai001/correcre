@@ -9,6 +9,7 @@ import {
   faClock,
   faPaperPlane,
   faRotateLeft,
+  faTruck,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -19,6 +20,11 @@ import type { ExchangeHistoryStatus } from "@correcre/types";
 import { transitionExchange } from "../api/client";
 import type { ExchangeDetail as ExchangeDetailType } from "../model/types";
 import SchedulePanel from "./SchedulePanel";
+import ShipmentPanel, {
+  EMPTY_SHIPMENT_DRAFT,
+  toShipmentRequest,
+  type ShipmentDraft,
+} from "./ShipmentPanel";
 
 type Props = {
   initial: ExchangeDetailType;
@@ -47,11 +53,14 @@ const TRANSITION_BUTTONS: Record<
 
 type TransitionButtonConfig = NonNullable<(typeof TRANSITION_BUTTONS)[ExchangeHistoryStatus]>;
 
-// 遷移ボタンは遷移先ステータスを基準に決まるが、「対応中 → 準備中」は前のステップへ
-// 差し戻す操作なので、専用のラベル・アイコンに切り替える。
+// 遷移ボタンは遷移先ステータスを基準に決まるが、次の 2 つは文脈で意味が変わるので上書きする。
+// - 「対応中 → 準備中」は前のステップへ差し戻す操作
+// - 発送型商品の「準備中 → 対応中」は実質「発送した」の記録。ここで「対応を開始する」と
+//   出ていると、発送後に何を押せばよいのか分からなくなる。
 function resolveTransitionButton(
   fromStatus: ExchangeHistoryStatus,
   nextStatus: ExchangeHistoryStatus,
+  isShipping: boolean,
 ): TransitionButtonConfig | undefined {
   if (fromStatus === "IN_PROGRESS" && nextStatus === "PREPARING") {
     return {
@@ -60,6 +69,10 @@ function resolveTransitionButton(
       color: "warning",
       confirm: "対応中から準備中へ差し戻します。よろしいですか？",
     };
+  }
+
+  if (isShipping && fromStatus === "PREPARING" && nextStatus === "IN_PROGRESS") {
+    return { label: "発送済みにする", icon: faTruck, color: "primary" };
   }
 
   return TRANSITION_BUTTONS[nextStatus];
@@ -213,13 +226,15 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<ExchangeHistoryStatus | null>(null);
+  const [shipmentDraft, setShipmentDraft] = useState<ShipmentDraft>(EMPTY_SHIPMENT_DRAFT);
   const [, startTransition] = useTransition();
 
   const badge = getExchangeStatusBadge(detail.status);
   const lastEvent = detail.history.at(-1);
+  const isShipping = detail.fulfillmentType === "SHIPPING";
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
-    const button = resolveTransitionButton(detail.status, nextStatus);
+    const button = resolveTransitionButton(detail.status, nextStatus, isShipping);
     if (button?.confirm && typeof window !== "undefined" && !window.confirm(button.confirm)) {
       return;
     }
@@ -233,10 +248,17 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         const updated = await transitionExchange(detail.exchangeId, {
           nextStatus,
           comment: comment.trim() || undefined,
+          // 発送情報は発送済みへ進めるときだけ添える。未入力なら undefined のまま送る。
+          shipment: nextStatus === "IN_PROGRESS" ? toShipmentRequest(shipmentDraft) : undefined,
         });
         setDetail(updated);
         setComment("");
-        setNotice(`状態を「${getExchangeStatusLabel(nextStatus)}」に更新しました。`);
+        setShipmentDraft(EMPTY_SHIPMENT_DRAFT);
+        setNotice(
+          isShipping && nextStatus === "IN_PROGRESS"
+            ? "発送済みにしました。お届け日を過ぎたら「完了にする」へ進めてください。"
+            : `状態を「${getExchangeStatusLabel(nextStatus)}」に更新しました。`,
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "状態の更新に失敗しました。");
       } finally {
@@ -342,6 +364,14 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
 
       <SchedulePanel detail={detail} onUpdated={setDetail} />
 
+      <ShipmentPanel
+        detail={detail}
+        draft={shipmentDraft}
+        onDraftChange={setShipmentDraft}
+        onUpdated={setDetail}
+        disabled={pendingStatus !== null}
+      />
+
       {detail.reservationRequired && !isCanceledStatus(detail.status) ? (
         <Alert severity="info">
           この商品は予約が必要なサービスです。承認すると、申請者へ予約先と交換番号（
@@ -376,7 +406,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
 
           <div className="mt-5 flex flex-wrap gap-3">
             {detail.allowedNextStatuses.map((nextStatus) => {
-              const button = resolveTransitionButton(detail.status, nextStatus);
+              const button = resolveTransitionButton(detail.status, nextStatus, isShipping);
               if (!button) return null;
               return (
                 <Button

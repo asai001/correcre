@@ -4,6 +4,8 @@ import type {
   ExchangeHistoryActorType,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  ExchangeShipment,
+  FulfillmentType,
   ScheduleEventActor,
   ScheduleEventType,
   ScheduleStatus,
@@ -41,6 +43,8 @@ export type ExchangeScheduleView = {
   merchantNote?: string;
   selectedArrivalDate?: string;
   selectedTimeSlot?: string;
+  // 確定した候補の発送日。merchant が「いつ発送すればよいか」を逆算せずに済むよう画面に出す
+  selectedShipDate?: string;
   confirmedAt?: string;
   requestedArrivalDate?: string;
   requestedTimeSlot?: string;
@@ -117,11 +121,32 @@ export type ExchangeDetail = ExchangeSummary & {
   schedule?: ExchangeScheduleView;
   // 予約が必要な商品（サロン等）か。予約・来店確認の運用案内の表示に使う
   reservationRequired?: boolean;
+  // 発送型か来店受取か。発送型のときだけ発送情報の入力欄・ボタン文言を出す
+  fulfillmentType?: FulfillmentType;
+  // 登録済みの発送情報（発送済みに進めた交換のみ）
+  shipment?: ExchangeShipment;
+  // 追跡ページの URL。配送会社と番号がそろっていて URL を特定できるときだけ入る
+  trackingUrl?: string;
+  // 配送会社の表示名（その他は merchant の入力値）
+  carrierLabel?: string;
+};
+
+// 発送情報の入力値。すべて任意で、未入力なら発送情報なしで発送済みに進める。
+export type ShipmentInputRequest = {
+  carrier?: string;
+  carrierName?: string;
+  trackingNumber?: string;
 };
 
 export type TransitionExchangeRequest = {
   nextStatus: ExchangeHistoryStatus;
   comment?: string;
+  // 発送済み（IN_PROGRESS）へ進めるときだけ意味を持つ
+  shipment?: ShipmentInputRequest;
+};
+
+export type UpdateShipmentRequest = {
+  shipment: ShipmentInputRequest;
 };
 
 export type ExchangeListFilter = "ALL" | ExchangeHistoryStatus;
