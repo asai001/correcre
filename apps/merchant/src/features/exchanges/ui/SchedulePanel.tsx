@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarCheck, faPaperPlane, faPlus, faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import type { ScheduleStatus } from "@correcre/types";
+import { SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS } from "@correcre/types";
 
 import { previewScheduleCandidates, proposeSchedule, respondSchedule } from "../api/client";
 import type {
@@ -536,7 +537,8 @@ export default function SchedulePanel({ detail, onUpdated }: Props) {
       {schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE" ? (
         <>
           <p className="mt-1 text-sm text-slate-500">
-            申請者から「候補の中に受け取れる日がない」として希望日が届いています。48 時間以内に応答してください。
+            申請者から「候補の中に受け取れる日がない」として希望日が届いています。
+            {SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS} 営業日以内に応答してください。
           </p>
           <RespondPanel
             detail={detail}

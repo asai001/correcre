@@ -101,3 +101,30 @@ export function subtractBusinessDays(
 
   return current;
 }
+
+/**
+ * date から count 営業日だけ進めた日付を返す（date 自身は数えない）。
+ * count = 0 のときは date をそのまま返す。
+ */
+export function addBusinessDays(
+  date: string,
+  count: number,
+  calendar: WorkingDayCalendar | null | undefined,
+): string {
+  let current = date;
+  let remaining = count;
+  let guard = 0;
+
+  while (remaining > 0) {
+    if (guard >= BUSINESS_DAY_SCAN_LIMIT) {
+      throw new Error("営業日の計算が収束しません。休業日の設定を確認してください。");
+    }
+    guard += 1;
+    current = addCalendarDays(current, 1);
+    if (isMerchantWorkingDay(current, calendar)) {
+      remaining -= 1;
+    }
+  }
+
+  return current;
+}

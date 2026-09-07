@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { DeliveryCandidate, ExchangeHistoryItem, Merchant } from "@correcre/types";
+import { SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS } from "@correcre/types";
 
 import { formatWeekdayJa } from "../date/business-days";
 import { listMerchantUsersByMerchant } from "../dynamodb/merchant-user";
@@ -221,7 +222,7 @@ export async function sendMerchantDateRequestedEmail(params: {
       "ご担当者様",
       "",
       "申請者から、提示した候補以外のお届け希望日が届いています。",
-      "48 時間以内に、承諾・別候補の再提示・対応不可のいずれかで応答してください。",
+      `${SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS} 営業日以内に、承諾・別候補の再提示・対応不可のいずれかで応答してください。`,
       "",
       `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
       `希望日：${formatDateJa(params.requestedArrivalDate)}${params.requestedTimeSlot ? ` ${params.requestedTimeSlot}` : ""}`,

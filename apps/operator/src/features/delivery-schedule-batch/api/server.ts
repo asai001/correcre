@@ -1,7 +1,7 @@
 import "server-only";
 
-import { addCalendarDays } from "@correcre/lib/date/business-days";
-import { nowYYYYMMDD } from "@correcre/lib/date/format";
+import { addBusinessDays, addCalendarDays } from "@correcre/lib/date/business-days";
+import { nowYYYYMMDD, toYYYYMMDD } from "@correcre/lib/date/format";
 import {
   listConfirmedExchangesByArrivalDate,
   listExchangeHistoryByScheduleStatus,
@@ -30,16 +30,22 @@ import {
   type ScheduleReminderField,
   type ScheduleServiceConfig,
 } from "@correcre/lib/schedule/service";
-import type { ExchangeHistoryItem } from "@correcre/types";
-import { resolveMerchandiseFulfillment, SCHEDULE_PROPOSAL_ROUND_LIMIT } from "@correcre/types";
+import type { ExchangeHistoryItem, MerchantCalendarItem } from "@correcre/types";
+import {
+  resolveMerchandiseFulfillment,
+  SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS,
+  SCHEDULE_PROPOSAL_ROUND_LIMIT,
+} from "@correcre/types";
 
 // 配送日程調整の日次バッチ。
 // - 申請 24h 無反応の merchant への候補提示の再通知
 // - 選択期限 24h 前の employee への催促
 // - 全候補期限切れの AWAITING_SELECTION の候補再生成（上限到達時はキャンセル + ポイント返還）
-// - 応答期限（48h）超過の AWAITING_MERCHANT_RESPONSE への督促、さらに 48h で自動キャンセル
+// - 応答期限（3 営業日）超過の AWAITING_MERCHANT_RESPONSE への督促、さらに 3 営業日で自動キャンセル
 // - 確定日前日の employee への受取リマインド（受取失敗を防ぐ要）
-// 日次実行のため、時間ベースの判定（24h / 48h）は日単位の近似になる。
+// 日次実行のため、時間ベースの判定（24h）は日単位の近似になる。
+// 応答期限は merchant の休業日を跨ぐと暦日では実質ゼロ営業日になり得るため、
+// merchant カレンダーを見て営業日で数える（申請者への案内「最大 3 営業日」と揃える）。
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -127,6 +133,40 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
     );
     merchantRecipientCache.set(merchantId, recipients);
     return recipients;
+  };
+
+  const merchantCalendarCache = new Map<string, MerchantCalendarItem | null>();
+
+  const resolveMerchantCalendar = async (
+    merchantId: string | undefined,
+  ): Promise<MerchantCalendarItem | null> => {
+    if (!merchantId) return null;
+    const cached = merchantCalendarCache.get(merchantId);
+    if (cached !== undefined) return cached;
+    const calendar = await getMerchantCalendar(
+      { region: config.region, tableName: config.merchantCalendarTableName },
+      merchantId,
+    );
+    merchantCalendarCache.set(merchantId, calendar);
+    return calendar;
+  };
+
+  // 応答期限は暦日ではなく merchant の営業日で数える。
+  // since（JST の暦日）自身は数えず、そこから N 営業日進んだ日を過ぎたら期限超過とみなす。
+  const businessDayDeadlinePassed = async (
+    since: string | undefined,
+    merchantId: string | undefined,
+    fallbackSince: string,
+  ): Promise<boolean> => {
+    const parsed = Date.parse(since ?? fallbackSince);
+    if (!Number.isFinite(parsed)) return false;
+    const calendar = await resolveMerchantCalendar(merchantId);
+    const deadline = addBusinessDays(
+      toYYYYMMDD(new Date(parsed)),
+      SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS,
+      calendar,
+    );
+    return toYYYYMMDD(now) > deadline;
   };
 
   const resolveEmployeeEmail = async (item: ExchangeHistoryItem): Promise<string | undefined> => {
@@ -311,7 +351,7 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
     }
   }
 
-  // 3. AWAITING_MERCHANT_RESPONSE: 48h 超過で督促、さらに 48h でキャンセル + 返還
+  // 3. AWAITING_MERCHANT_RESPONSE: 3 営業日超過で督促、さらに 3 営業日でキャンセル + 返還
   for (const item of await listExchangeHistoryByScheduleStatus(exchangeConfig, "AWAITING_MERCHANT_RESPONSE")) {
     try {
       const schedule = item.schedule;
@@ -319,8 +359,7 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
 
       if (!schedule.responseReminderSentAt) {
         // 希望日の申請時刻は updatedAt で近似する（希望申請時に更新され、督促マーカーでは更新されない）
-        const requestedAt = Date.parse(item.updatedAt ?? item.exchangedAt);
-        if (!Number.isFinite(requestedAt) || now.getTime() - requestedAt < 48 * HOUR_MS) continue;
+        if (!(await businessDayDeadlinePassed(item.updatedAt, item.merchantId, item.exchangedAt))) continue;
 
         const sent = await sendOnce(item, "responseReminderSentAt", async () => {
           const recipients = await resolveMerchantRecipients(item.merchantId);
@@ -332,8 +371,7 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
         continue;
       }
 
-      const remindedAt = Date.parse(schedule.responseReminderSentAt);
-      if (Number.isFinite(remindedAt) && now.getTime() - remindedAt >= 48 * HOUR_MS) {
+      if (await businessDayDeadlinePassed(schedule.responseReminderSentAt, item.merchantId, item.exchangedAt)) {
         await cancelWithNotice(item, "お届け希望日への応答がなかったため自動キャンセルされました");
       }
     } catch (error) {

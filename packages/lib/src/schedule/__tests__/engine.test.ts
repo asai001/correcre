@@ -8,7 +8,7 @@ import {
   type ScheduleCalendarSettings,
   type ScheduleProductSettings,
 } from "../engine";
-import { subtractBusinessDays } from "../../date/business-days";
+import { addBusinessDays, subtractBusinessDays } from "../../date/business-days";
 
 // JST の日時から Date を作る（テストの可読性のため）
 function jst(dateTime: string): Date {
@@ -87,6 +87,28 @@ describe("subtractBusinessDays（土日を挟む営業日カウント）", () =>
     expect(() => subtractBusinessDays("2026-06-02", 1, allClosed)).toThrow(
       "営業日の計算が収束しません",
     );
+  });
+});
+
+describe("addBusinessDays（応答期限などの営業日カウント）", () => {
+  test("金曜から 3 営業日進むと土日を跨いで翌週水曜になる", () => {
+    // 2026-06-05(金) → 6/8(月) が 1 営業日、6/9(火) が 2 営業日、6/10(水) が 3 営業日
+    expect(addBusinessDays("2026-06-05", 3, calendar)).toBe("2026-06-10");
+  });
+
+  test("closedDates と祝日は営業日カウントから除外される", () => {
+    const withClosed = { ...calendar, closedDates: ["2026-06-09"] };
+    // 2026-06-05(金) → 6/8(月) が 1 営業日、6/9(火) は臨時休業、6/10(水) が 2 営業日、6/11(木) が 3 営業日
+    expect(addBusinessDays("2026-06-05", 3, withClosed)).toBe("2026-06-11");
+  });
+
+  test("count = 0 は同じ日付を返す", () => {
+    expect(addBusinessDays("2026-06-05", 0, calendar)).toBe("2026-06-05");
+  });
+
+  test("全曜日が定休日でも無限ループせずエラーになる", () => {
+    const allClosed = { closedDates: [], regularClosedWeekdays: [0, 1, 2, 3, 4, 5, 6] };
+    expect(() => addBusinessDays("2026-06-05", 1, allClosed)).toThrow("営業日の計算が収束しません");
   });
 });
 

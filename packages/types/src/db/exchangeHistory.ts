@@ -43,6 +43,11 @@ export type DeliveryCandidate = {
 export const SCHEDULE_PROPOSAL_ROUND_LIMIT = 2;
 export const SCHEDULE_RESCHEDULE_REQUEST_LIMIT = 2;
 
+// 希望日申請（AWAITING_MERCHANT_RESPONSE）に対する merchant の応答期限。営業日で数える
+// （merchant の休業日を挟むと暦日の 48 時間では実質ゼロ営業日になり得るため）。
+// 申請者には「最大 3 営業日」と案内し、同じ日数だけ督促後も無応答なら自動キャンセルする。
+export const SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS = 3;
+
 export type ExchangeSchedule = {
   scheduleStatus: ScheduleStatus;
   candidates: DeliveryCandidate[];
@@ -68,7 +73,7 @@ export type ExchangeSchedule = {
   // 日次バッチの送信済みガード
   proposalReminderSentAt?: string; // 申請 24h 無反応の merchant 再通知
   selectionReminderSentAt?: string; // 選択期限 24h 前の employee 催促
-  responseReminderSentAt?: string; // AWAITING_MERCHANT_RESPONSE 48h 超過の督促
+  responseReminderSentAt?: string; // AWAITING_MERCHANT_RESPONSE 応答期限（3 営業日）超過の督促
   arrivalReminderSentAt?: string; // 確定日前日の受取リマインド
 };
 
