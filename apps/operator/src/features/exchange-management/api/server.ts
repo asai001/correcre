@@ -16,6 +16,7 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { notifyEmployeeExchangeApprovedIfReservationRequired } from "@correcre/lib/notification/exchange-events";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { cancelScheduleWithExchange, isScheduleActive } from "@correcre/lib/schedule/service";
+import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
 import type {
   DBUserAddress,
   ExchangeHistoryActorType,
@@ -282,6 +283,10 @@ async function buildExchangeDetail(
       : getAllowedNextExchangeStatuses(status, actorType),
     actorType,
     scheduleActive,
+    shipment: item.shipment,
+    trackingUrl: buildTrackingUrl(item.shipment),
+    carrierLabel: resolveCarrierLabel(item.shipment),
+    selectedArrivalDate: item.schedule?.selectedArrivalDate,
   };
 }
 

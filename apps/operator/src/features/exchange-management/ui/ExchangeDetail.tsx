@@ -9,6 +9,8 @@ import {
   faClock,
   faPaperPlane,
   faRotateLeft,
+  faTruck,
+  faUpRightFromSquare,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -339,6 +341,59 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
           ) : null}
         </dl>
       </section>
+
+      {/* 「まだ届かない」という問い合わせに答えるための発送情報。
+          送り状番号の登録は提携企業の任意なので、発送済みでも空のことがある。
+          その場合は「未登録」と明示して、運用者が提携企業に確認しに行けるようにする。 */}
+      {detail.shipment ? (
+        <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faTruck} className="text-slate-400" />
+            <h2 className="text-lg font-bold text-slate-900">発送情報</h2>
+          </div>
+
+          <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">発送日時</dt>
+              <dd className="mt-1 text-slate-900">{formatDateTime(detail.shipment.shippedAt)}</dd>
+            </div>
+            {detail.selectedArrivalDate ? (
+              <div>
+                <dt className="text-xs font-semibold text-slate-500">お届け予定日</dt>
+                <dd className="mt-1 text-slate-900">{detail.selectedArrivalDate}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">配送会社</dt>
+              <dd className="mt-1 text-slate-900">{detail.carrierLabel ?? "未登録"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">送り状番号</dt>
+              <dd className="mt-1 font-mono text-slate-900">
+                {detail.shipment.trackingNumber ?? "未登録"}
+              </dd>
+            </div>
+          </dl>
+
+          {detail.trackingUrl ? (
+            <a
+              href={detail.trackingUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 underline"
+            >
+              配送状況を確認する
+              <FontAwesomeIcon icon={faUpRightFromSquare} className="text-xs" />
+            </a>
+          ) : (
+            <p className="mt-4 text-xs text-slate-500">
+              {detail.shipment.trackingNumber
+                ? "この配送会社は追跡ページを自動で開けません。配送会社のサイトで番号を照会してください。"
+                : "送り状番号が登録されていません。配送状況は提携企業に確認してください。"}
+            </p>
+          )}
+        </section>
+      ) : null}
 
       {detail.allowedNextStatuses.length > 0 ? (
         <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
