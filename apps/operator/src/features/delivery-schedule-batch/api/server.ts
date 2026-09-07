@@ -5,6 +5,7 @@ import { nowYYYYMMDD, toYYYYMMDD } from "@correcre/lib/date/format";
 import {
   listConfirmedExchangesByArrivalDate,
   listExchangeHistoryByScheduleStatus,
+  transitionExchangeStatus,
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
@@ -14,6 +15,8 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
   resolveMerchantScheduleRecipients,
   sendEmployeeArrivalReminderEmail,
+  sendEmployeeAutoCompletedEmail,
+  sendEmployeeAutoCompleteNoticeEmail,
   sendEmployeeScheduleCancelledEmail,
   sendEmployeeSelectionRequestEmail,
   sendEmployeeSelectionReminderEmail,
@@ -32,6 +35,8 @@ import {
 } from "@correcre/lib/schedule/service";
 import type { ExchangeHistoryItem, MerchantCalendarItem } from "@correcre/types";
 import {
+  AUTO_COMPLETE_GRACE_DAYS,
+  AUTO_COMPLETE_NOTICE_DAYS,
   resolveMerchandiseFulfillment,
   SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS,
   SCHEDULE_PROPOSAL_ROUND_LIMIT,
@@ -43,6 +48,7 @@ import {
 // - 全候補期限切れの AWAITING_SELECTION の候補再生成（上限到達時はキャンセル + ポイント返還）
 // - 応答期限（3 営業日）超過の AWAITING_MERCHANT_RESPONSE への督促、さらに 3 営業日で自動キャンセル
 // - 確定日前日の employee への受取リマインド（受取失敗を防ぐ要）
+// - 発送済みのまま放置された交換の自動完了（予告 → 猶予 → 完了）
 // 日次実行のため、時間ベースの判定（24h）は日単位の近似になる。
 // 応答期限は merchant の休業日を跨ぐと暦日では実質ゼロ営業日になり得るため、
 // merchant カレンダーを見て営業日で数える（申請者への案内「最大 3 営業日」と揃える）。
@@ -97,6 +103,8 @@ export type DeliveryScheduleBatchResult = {
   cancelled: number;
   responseReminders: number;
   arrivalReminders: number;
+  autoCompleteNotices: number;
+  autoCompleted: number;
   cleanedUp: number;
   errors: number;
 };
@@ -113,6 +121,8 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
     cancelled: 0,
     responseReminders: 0,
     arrivalReminders: 0,
+    autoCompleteNotices: 0,
+    autoCompleted: 0,
     cleanedUp: 0,
     errors: 0,
   };
@@ -415,12 +425,95 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
     }
   }
 
-  // 5. 到着日を過ぎた CONFIRMED のスパース GSI キーを外す（インデックスの肥大化防止）
+  // 4-2. 発送済みのまま放置された交換の自動完了。
+  //
+  // これは「配達された」判定ではなく「異議がなければ確定とみなす」処理である。
+  // 誤って完了させると申請者はポイントを失うため、次の 3 つで守りを固めている。
+  //   - 猶予を長く取る（お届け日 + AUTO_COMPLETE_GRACE_DAYS）
+  //   - 完了の数日前に予告メールを送り、受取確認と未着報告への導線を示す
+  //   - 未着報告（deliveryIssue）が立っていれば完了させない
+  // それでも取り違えは起き得るので、運用者による完了取り消し（COMPLETED → CANCELED）を
+  // 最後の救済として残してある。
+  for (const item of await listExchangeHistoryByScheduleStatus(exchangeConfig, "CONFIRMED")) {
+    try {
+      const schedule = item.schedule;
+      const arrivalDate = schedule?.selectedArrivalDate;
+      if (!schedule || !arrivalDate) continue;
+      // 発送済みのものだけが対象。準備中のまま止まっているものは「商品を発送する」で促す。
+      if (item.status !== "IN_PROGRESS") continue;
+      // 未着の連絡が来ている間は自動完了しない。運用者が実態を確認して判断する。
+      if (item.deliveryIssue) continue;
+
+      const autoCompleteDate = addCalendarDays(arrivalDate, AUTO_COMPLETE_GRACE_DAYS);
+
+      if (todayJst >= autoCompleteDate) {
+        const completed = await transitionExchangeStatus(exchangeConfig, {
+          item,
+          nextStatus: "COMPLETED",
+          actorType: "SYSTEM",
+          comment: `お届け予定日から ${AUTO_COMPLETE_GRACE_DAYS} 日が過ぎたため自動完了しました`,
+          occurredAt: now.toISOString(),
+          userTableName: config.userTableName,
+          pointTransactionTableName: config.pointTransactionTableName,
+        });
+        result.autoCompleted += 1;
+
+        try {
+          const recipient = await resolveEmployeeEmail(completed);
+          if (recipient) {
+            await sendEmployeeAutoCompletedEmail({
+              config: { region: config.region },
+              recipient,
+              exchange: completed,
+            });
+          }
+        } catch (error) {
+          console.error("Failed to send auto-completed notification.", { error, exchangeId: item.exchangeId });
+        }
+        continue;
+      }
+
+      // 予告。自動完了までまだ猶予があるうちに、受取確認か未着報告を促す。
+      if (schedule.autoCompleteNoticeSentAt) continue;
+      if (todayJst < addCalendarDays(arrivalDate, AUTO_COMPLETE_NOTICE_DAYS)) continue;
+
+      const sent = await sendOnce(item, "autoCompleteNoticeSentAt", async () => {
+        const recipient = await resolveEmployeeEmail(item);
+        if (recipient) {
+          await sendEmployeeAutoCompleteNoticeEmail({
+            config: { region: config.region },
+            recipient,
+            exchange: item,
+            autoCompleteDate,
+          });
+        }
+      });
+      if (sent) result.autoCompleteNotices += 1;
+    } catch (error) {
+      result.errors += 1;
+      console.error("delivery-schedule batch: auto complete step failed.", { error, exchangeId: item.exchangeId });
+    }
+  }
+
+  // 5. 用済みになった CONFIRMED のスパース GSI キーを外す（インデックスの肥大化防止）
+  //
+  // このバッチは gsi4 経由でしか対象を引けないため、キーを外した時点でその交換はバッチの
+  // 視界から消える。到着日の翌日に外してしまうと 4-2 の自動完了が永久に走らなくなるので、
+  // 自動完了を待っている交換はその期限までインデックスに残す。
   for (const item of await listExchangeHistoryByScheduleStatus(exchangeConfig, "CONFIRMED")) {
     try {
       const arrivalDate = item.schedule?.selectedArrivalDate;
       const isTerminal =
         item.status === "CANCELED" || item.status === "CANCELLED" || item.status === "REJECTED";
+
+      // 発送済みのまま自動完了の期限を迎えていないものは、4-2 がまだ必要としている。
+      const awaitingAutoComplete =
+        !isTerminal &&
+        item.status === "IN_PROGRESS" &&
+        Boolean(arrivalDate) &&
+        todayJst < addCalendarDays(arrivalDate!, AUTO_COMPLETE_GRACE_DAYS);
+      if (awaitingAutoComplete) continue;
+
       if (!isTerminal && (!arrivalDate || arrivalDate >= todayJst)) continue;
       await removeScheduleGsiKeys(serviceConfig, item);
       result.cleanedUp += 1;

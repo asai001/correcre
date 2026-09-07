@@ -38,8 +38,10 @@ export type EmployeeScheduleView = {
   requiresAcknowledgement: boolean;
   acknowledgementText: string;
   temperatureZone: TemperatureZone;
-  // 「受け取りました」を押せるか（発送済みで、まだ完了していない）
+  // 「受け取りました」「届いていない」を押せるか（発送済みで、まだ完了していない）
   canConfirmReceipt: boolean;
+  // 未着報告済みなら、その報告日時。立っている間は自動完了が止まる
+  deliveryIssueReportedAt?: string;
   // 発送情報。提携企業が送り状番号を登録したときだけ入る（登録は任意なので無いことも多い）
   shippedAt?: string;
   trackingNumber?: string;
@@ -52,6 +54,10 @@ export type SelectCandidateRequest = {
   timeSlot?: string;
   // 生鮮品のとき必須。true で同意文言と時刻を保存する
   acknowledged?: boolean;
+};
+
+export type ReportDeliveryIssueRequest = {
+  note?: string;
 };
 
 export type RequestDateRequest = {

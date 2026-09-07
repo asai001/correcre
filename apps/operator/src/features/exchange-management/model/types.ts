@@ -3,6 +3,7 @@ import type {
   ExchangeHistoryActorType,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  ExchangeDeliveryIssue,
   ExchangeShipment,
 } from "@correcre/types";
 
@@ -44,6 +45,8 @@ export type OperatorExchangeDetail = OperatorExchangeSummary & {
   carrierLabel?: string;
   // 確定済みのお届け日 (YYYY-MM-DD)。発送情報と併せて配送の遅れを判断する
   selectedArrivalDate?: string;
+  // 申請者からの未着報告。立っている間は自動完了が止まっている
+  deliveryIssue?: ExchangeDeliveryIssue;
 };
 
 export type TransitionOperatorExchangeRequest = {

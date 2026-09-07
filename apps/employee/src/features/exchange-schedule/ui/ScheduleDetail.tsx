@@ -11,6 +11,7 @@ import {
   cancelSchedule,
   CandidateExpiredError,
   confirmReceipt,
+  reportDeliveryIssue,
   requestDate,
   selectCandidate,
 } from "../api/client";
@@ -79,6 +80,8 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
   const [requestedTimeSlot, setRequestedTimeSlot] = useState<string>(NO_TIME_SLOT);
   const [requestedNote, setRequestedNote] = useState("");
   const [requestAcknowledged, setRequestAcknowledged] = useState(false);
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [issueNote, setIssueNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -88,6 +91,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
     setSelectedDate(null);
     setAcknowledged(false);
     setShowRequestForm(false);
+    setShowIssueForm(false);
   };
 
   const selectedCandidate = view.candidates.find(
@@ -162,6 +166,23 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
         setNotice("受け取りを確認しました。ご利用ありがとうございました。");
       } catch (err) {
         setError(err instanceof Error ? err.message : "受け取りの確認に失敗しました。");
+      }
+    });
+  };
+
+  const handleReportIssue = () => {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      try {
+        const next = await reportDeliveryIssue(view.exchangeId, {
+          note: issueNote.trim() || undefined,
+        });
+        applyView(next);
+        setIssueNote("");
+        setNotice("ご連絡ありがとうございます。提携企業に確認を依頼しました。自動での完了は止まります。");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "ご連絡の送信に失敗しました。");
       }
     });
   };
@@ -462,6 +483,53 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
               >
                 受け取りました
               </Button>
+
+              {view.deliveryIssueReportedAt ? (
+                <p className="mt-3 text-xs font-semibold text-rose-700">
+                  「届いていない」とご連絡いただいています。提携企業が確認中です。
+                </p>
+              ) : showIssueForm ? (
+                <div className="mt-3 border-t border-blue-200 pt-3">
+                  <TextField
+                    label="状況（任意）"
+                    placeholder="例: お届け予定日を3日過ぎても届きません"
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    size="small"
+                    value={issueNote}
+                    onChange={(event) => setIssueNote(event.target.value)}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      disabled={pending}
+                      onClick={handleReportIssue}
+                      className="!rounded-full"
+                    >
+                      この内容で連絡する
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      disabled={pending}
+                      onClick={() => setShowIssueForm(false)}
+                      className="!rounded-full"
+                    >
+                      やめる
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowIssueForm(true)}
+                  className="mt-3 block w-full text-center text-sm text-slate-600 underline"
+                >
+                  届いていない
+                </button>
+              )}
             </div>
           ) : null}
 

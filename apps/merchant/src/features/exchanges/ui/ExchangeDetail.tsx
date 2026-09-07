@@ -362,6 +362,19 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         </dl>
       </section>
 
+      {detail.deliveryIssue ? (
+        <Alert severity="warning">
+          <div className="font-bold">申請者から「商品が届いていない」と連絡がありました</div>
+          <div className="mt-1 text-sm">
+            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
+            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
+          </div>
+          <div className="mt-1 text-xs">
+            配送状況をご確認のうえ、対応をお願いします。解決するまで自動での完了は行われません。
+          </div>
+        </Alert>
+      ) : null}
+
       <SchedulePanel detail={detail} onUpdated={setDetail} />
 
       <ShipmentPanel

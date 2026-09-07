@@ -596,6 +596,7 @@ async function buildExchangeDetail(
     shipment: item.shipment,
     trackingUrl: buildTrackingUrl(item.shipment),
     carrierLabel: resolveCarrierLabel(item.shipment),
+    deliveryIssue: item.deliveryIssue,
   };
 }
 

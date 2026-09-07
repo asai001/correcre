@@ -23,6 +23,7 @@ export type MerchantTodoKind =
   | "SCHEDULE_PROPOSAL"
   | "SCHEDULE_RESPONSE"
   | "SHIPPING_DUE"
+  | "DELIVERY_ISSUE"
   | "DELIVERY_DUE"
   | "EXCHANGE_APPROVAL"
   | "TRACKING_NUMBER_MISSING"
@@ -84,12 +85,14 @@ const EXCHANGE_BACKED_KINDS: ReadonlySet<MerchantTodoKind> = new Set<MerchantTod
   "SCHEDULE_PROPOSAL",
   "SCHEDULE_RESPONSE",
   "SHIPPING_DUE",
+  "DELIVERY_ISSUE",
   "DELIVERY_DUE",
   "EXCHANGE_APPROVAL",
   "TRACKING_NUMBER_MISSING",
 ]);
 
 const KIND_ORDER: MerchantTodoKind[] = [
+  "DELIVERY_ISSUE",
   "SCHEDULE_PROPOSAL",
   "SCHEDULE_RESPONSE",
   "SHIPPING_DUE",
@@ -104,6 +107,10 @@ const KIND_ORDER: MerchantTodoKind[] = [
 function normalizeStatus(status: ExchangeHistoryStatus | undefined): ExchangeHistoryStatus {
   if (!status) return "COMPLETED";
   return status === "CANCELLED" ? "CANCELED" : status;
+}
+
+function isTerminalStatus(status: ExchangeHistoryStatus): boolean {
+  return status === "COMPLETED" || status === "CANCELED" || status === "REJECTED";
 }
 
 function elapsedDays(since: string | undefined, now: Date): number {
@@ -289,6 +296,40 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
     );
   }
 
+  // --- 3-1. 未着の連絡が来ているもの ---------------------------------------------
+  // 申請者が「届いていない」と申告した状態。ポイントは保留のまま止まっており、
+  // 自動完了も止まっているので、提携企業が配送状況を確認しないと前に進まない。
+  const deliveryIssues = exchanges
+    .filter((item) => Boolean(item.deliveryIssue) && !isTerminalStatus(normalizeStatus(item.status)))
+    .sort((a, b) =>
+      (a.deliveryIssue?.reportedAt ?? "") < (b.deliveryIssue?.reportedAt ?? "") ? -1 : 1,
+    );
+
+  if (deliveryIssues.length > 0) {
+    todos.push(
+      buildTodo(
+        {
+          kind: "DELIVERY_ISSUE",
+          severity: "URGENT",
+          title: "「届いていない」の連絡に対応する",
+          description:
+            "申請者から商品が届いていないと連絡がありました。配送状況を確認し、再送・返金などの対応をお願いします。",
+          actionLabel: "交換管理を開く",
+          actionHref: "/exchanges",
+        },
+        deliveryIssues.map((item) => ({
+          key: item.exchangeId,
+          href: exchangeHref(item),
+          title: displayName(item),
+          detail: item.schedule?.selectedArrivalDate
+            ? `お届け ${formatMonthDayJa(item.schedule.selectedArrivalDate)} ・ 未着の連絡あり`
+            : "未着の連絡あり",
+          emphasis: true,
+        })),
+      ),
+    );
+  }
+
   // --- 3-2. お届け日を過ぎた発送済み ---------------------------------------------
   // 発送後は提携企業の手を離れるため、放っておくと「発送済み」のまま完了にされず、
   // 申請者のポイントが保留されっぱなしになる。届いているはずの頃に完了を促す。
@@ -296,6 +337,8 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
   const deliveryDue = exchanges
     .flatMap((item) => {
       if (normalizeStatus(item.status) !== "IN_PROGRESS") return [];
+      // 未着の連絡が来ているものは 3-1 で扱う（同じ案件が二重に出ないように）。
+      if (item.deliveryIssue) return [];
       const arrivalDate = item.schedule?.selectedArrivalDate;
       // お届け日が分からない交換（日程調整なし）は、いつ届いたか推定できないので出さない。
       if (!arrivalDate || arrivalDate >= todayJst) return [];

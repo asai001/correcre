@@ -554,6 +554,63 @@ export async function updateExchangeHistoryStatus(
 }
 
 /**
+ * 申請者からの未着報告を記録する。ステータスは動かさない（勝手にキャンセルはしない）。
+ * この印が立っている間は日次バッチの自動完了を止め、運用者が実態を確認して判断する。
+ * 既に報告済みの場合は最初の報告時刻を保つ（何度押しても最初の申告日が残るように）。
+ */
+export async function reportExchangeDeliveryIssue(
+  config: ExchangeHistoryTableConfig,
+  params: {
+    item: ExchangeHistoryItem;
+    note?: string;
+    reportedAt?: string;
+  },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const reportedAt = params.item.deliveryIssue?.reportedAt ?? params.reportedAt ?? new Date().toISOString();
+  const note = params.note?.trim();
+  const deliveryIssue = { reportedAt, ...(note ? { note } : {}) };
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: "SET deliveryIssue = :issue, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":issue": deliveryIssue,
+        ":updatedAt": params.reportedAt ?? new Date().toISOString(),
+      },
+    }),
+  );
+
+  return { ...params.item, deliveryIssue, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * 未着報告を取り下げる（運用者が対応を終えたとき）。取り下げると自動完了の対象に戻る。
+ */
+export async function clearExchangeDeliveryIssue(
+  config: ExchangeHistoryTableConfig,
+  params: { item: ExchangeHistoryItem },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const updatedAt = new Date().toISOString();
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: "SET updatedAt = :updatedAt REMOVE deliveryIssue",
+      ExpressionAttributeValues: { ":updatedAt": updatedAt },
+    }),
+  );
+
+  const updated: ExchangeHistoryItem = { ...params.item, updatedAt };
+  delete updated.deliveryIssue;
+  return updated;
+}
+
+/**
  * 発送情報だけを差し替える（発送済みにした後から送り状番号を足す・直すための更新）。
  * ステータスは触らないが、発送済み以外のレコードに書いても意味がないので呼び出し側で絞る。
  * shippedAt は最初に発送済みへ進めた時刻を保つ（番号の追記で発送日時が動かないように）。

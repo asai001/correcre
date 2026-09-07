@@ -354,6 +354,20 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
         </dl>
       </section>
 
+      {/* 未着報告は自動完了を止めている状態なので、運用者が最初に気づくべき情報として上に出す。 */}
+      {detail.deliveryIssue ? (
+        <Alert severity="warning">
+          <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
+          <div className="mt-1 text-sm">
+            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
+            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
+          </div>
+          <div className="mt-1 text-xs">
+            この交換は自動完了の対象から外れています。配送状況を確認し、完了または強制キャンセルで解決してください。
+          </div>
+        </Alert>
+      ) : null}
+
       {/* 「まだ届かない」という問い合わせに答えるための発送情報。
           送り状番号の登録は提携企業の任意なので、発送済みでも空のことがある。
           その場合は「未登録」と明示して、運用者が提携企業に確認しに行けるようにする。 */}

@@ -5,6 +5,7 @@ import { nowYYYYMMDD } from "@correcre/lib/date/format";
 import {
   InvalidExchangeStatusTransitionError,
   listExchangeHistoryByCompanyAndUser,
+  reportExchangeDeliveryIssue,
   transitionExchangeStatus,
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
@@ -13,6 +14,7 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import {
   resolveMerchantScheduleRecipients,
   sendMerchantDateRequestedEmail,
+  sendMerchantDeliveryIssueEmail,
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
 import { isSelectable } from "@correcre/lib/schedule/engine";
@@ -233,6 +235,7 @@ async function buildScheduleView(
     acknowledgementText: FRESH_ITEM_ACKNOWLEDGEMENT_TEXT,
     temperatureZone: fulfillment.temperatureZone,
     canConfirmReceipt: item.status === "IN_PROGRESS",
+    deliveryIssueReportedAt: item.deliveryIssue?.reportedAt,
     shippedAt: item.shipment?.shippedAt,
     trackingNumber: item.shipment?.trackingNumber,
     carrierLabel: resolveCarrierLabel(item.shipment),
@@ -551,6 +554,51 @@ export async function confirmReceiptForEmployee(
       pointTransactionTableName: config.pointTransactionTableName,
     },
   );
+
+  const view = await buildScheduleView(config, updated);
+  if (!view) {
+    throw new ExchangeScheduleNotFoundError("この交換に日程調整はありません");
+  }
+  return view;
+}
+
+/**
+ * 申請者からの「届いていない」報告。ステータスは動かさず、印を立てて自動完了を止める。
+ *
+ * ここで自動キャンセル（＝ポイント返還）まで走らせないのは、配送の遅れなのか本当の不着なのかを
+ * システムでは判別できないため。実態の確認は提携企業と運用者に委ね、その間ポイントは保留のまま残す。
+ */
+export async function reportDeliveryIssueForEmployee(
+  user: DBUserItem,
+  exchangeId: string,
+  note?: string,
+): Promise<EmployeeScheduleView> {
+  const config = getRuntimeConfig();
+  const item = await findExchangeForEmployee(config, user, exchangeId);
+
+  if (item.status !== "IN_PROGRESS") {
+    throw new ExchangeScheduleNotFoundError("発送済みの交換にのみ連絡できます");
+  }
+
+  const updated = await reportExchangeDeliveryIssue(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    { item, note },
+  );
+
+  // 通知は fire-and-forget。届かなくても報告そのものは残す。
+  try {
+    const recipients = await resolveMerchantRecipients(config, item.merchantId);
+    if (recipients.length > 0) {
+      await sendMerchantDeliveryIssueEmail({
+        config: { region: config.region },
+        recipients,
+        exchange: updated,
+        note: note?.trim() || undefined,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to notify merchant of delivery issue.", { error, exchangeId });
+  }
 
   const view = await buildScheduleView(config, updated);
   if (!view) {

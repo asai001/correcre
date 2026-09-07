@@ -294,6 +294,41 @@ describe("buildMerchantTodos", () => {
     expect(kinds(todos)).not.toContain("DELIVERY_DUE");
   });
 
+  it("未着の連絡が来ていたら急ぎで対応を促し、完了の催促とは二重に出さない", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "IN_PROGRESS",
+          shipment: { carrier: "YAMATO", trackingNumber: "123456789012" },
+          deliveryIssue: { reportedAt: "2026-08-28T09:00:00.000Z", note: "3日過ぎても届きません" },
+          schedule: schedule("CONFIRMED", { selectedArrivalDate: "2026-08-25", selectedShipDate: "2026-08-24" }),
+        }),
+      ],
+    });
+
+    const issue = todos.find((todo) => todo.kind === "DELIVERY_ISSUE");
+    expect(issue?.severity).toBe("URGENT");
+    expect(issue?.entries[0].detail).toBe("お届け 8月25日(火) ・ 未着の連絡あり");
+    // 同じ案件が「完了にする」と二重に出ない
+    expect(kinds(todos)).not.toContain("DELIVERY_DUE");
+  });
+
+  it("終端まで進んだ交換の未着報告は蒸し返さない", () => {
+    const todos = build({
+      exchanges: [
+        exchange({
+          exchangeId: "e1",
+          status: "CANCELED",
+          deliveryIssue: { reportedAt: "2026-08-28T09:00:00.000Z" },
+          schedule: schedule("CANCELLED", { selectedArrivalDate: "2026-08-25" }),
+        }),
+      ],
+    });
+
+    expect(kinds(todos)).not.toContain("DELIVERY_ISSUE");
+  });
+
   it("送り状番号が未登録の発送済みは INFO で登録を促す", () => {
     const todos = build({
       exchanges: [

@@ -256,6 +256,82 @@ export async function sendMerchantResponseReminderEmail(params: {
   );
 }
 
+/**
+ * 自動完了の予告（日次バッチ）。
+ * 自動完了は「配達された」判定ではなく「異議がなければ確定とみなす」処理なので、
+ * 申請者が異議を出す機会を必ず先に作る。文面では受取確認と未着報告の両方に誘導する。
+ */
+export async function sendEmployeeAutoCompleteNoticeEmail(params: {
+  config: ScheduleNotificationConfig;
+  recipient: string;
+  exchange: ExchangeHistoryItem;
+  autoCompleteDate: string;
+}) {
+  await sendMail(
+    params.config.region,
+    params.recipient,
+    "【コレクレ】お受け取りのご確認をお願いします",
+    [
+      `「${params.exchange.merchandiseNameSnapshot}」はお届け予定日を過ぎています。`,
+      "",
+      `${formatDateJa(params.autoCompleteDate)}になっても操作がない場合、お受け取りいただけたものとして`,
+      "自動的に完了となり、使用ポイントが確定します。",
+      "",
+      "・お受け取り済みの場合：交換の画面で「受け取りました」を押してください。",
+      "・まだ届いていない場合：交換の画面から「届いていない」とご連絡ください。自動完了を止めて確認いたします。",
+      ...employeeLinkLines(params.exchange.exchangeId),
+    ],
+  );
+}
+
+/** 自動完了したことの申請者への通知（日次バッチ） */
+export async function sendEmployeeAutoCompletedEmail(params: {
+  config: ScheduleNotificationConfig;
+  recipient: string;
+  exchange: ExchangeHistoryItem;
+}) {
+  await sendMail(
+    params.config.region,
+    params.recipient,
+    "【コレクレ】交換が完了しました",
+    [
+      `「${params.exchange.merchandiseNameSnapshot}」の交換が完了しました。`,
+      "お届け予定日から一定期間が過ぎたため、お受け取り済みとして完了処理を行いました。",
+      "",
+      "お心当たりがない場合や、商品が届いていない場合は、お手数ですがお問い合わせください。",
+      ...employeeLinkLines(params.exchange.exchangeId),
+    ],
+  );
+}
+
+/** 申請者からの未着報告を提携企業へ通知する */
+export async function sendMerchantDeliveryIssueEmail(params: {
+  config: ScheduleNotificationConfig;
+  recipients: string[];
+  exchange: ExchangeHistoryItem;
+  note?: string;
+}) {
+  await sendMail(
+    params.config.region,
+    params.recipients,
+    "【コレクレ】商品が届いていないとの連絡がありました",
+    [
+      "ご担当者様",
+      "",
+      "申請者から「商品が届いていない」との連絡がありました。",
+      "配送状況をご確認のうえ、必要な対応をお願いします。",
+      "",
+      `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
+      ...(params.exchange.schedule?.selectedArrivalDate
+        ? [`お届け予定日：${formatDateJa(params.exchange.schedule.selectedArrivalDate)}`]
+        : []),
+      ...(params.note ? [`申請者からの連絡：${params.note}`] : []),
+      `申請番号：${params.exchange.exchangeId}`,
+      ...merchantLinkLines(params.exchange.exchangeId),
+    ],
+  );
+}
+
 /** 日程確定時の両者への通知 */
 export async function sendScheduleConfirmedEmails(params: {
   config: ScheduleNotificationConfig;

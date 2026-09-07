@@ -287,6 +287,7 @@ async function buildExchangeDetail(
     trackingUrl: buildTrackingUrl(item.shipment),
     carrierLabel: resolveCarrierLabel(item.shipment),
     selectedArrivalDate: item.schedule?.selectedArrivalDate,
+    deliveryIssue: item.deliveryIssue,
   };
 }
 

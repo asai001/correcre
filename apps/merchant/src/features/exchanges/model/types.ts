@@ -3,6 +3,7 @@ import type {
   DeliveryCandidate,
   ExchangeHistoryActorType,
   ExchangeHistoryStatus,
+  ExchangeDeliveryIssue,
   ExchangeHistoryStatusEvent,
   ExchangeShipment,
   FulfillmentType,
@@ -129,6 +130,8 @@ export type ExchangeDetail = ExchangeSummary & {
   trackingUrl?: string;
   // 配送会社の表示名（その他は merchant の入力値）
   carrierLabel?: string;
+  // 申請者からの未着報告。配送状況の確認をお願いするために出す
+  deliveryIssue?: ExchangeDeliveryIssue;
 };
 
 // 発送情報の入力値。すべて任意で、未入力なら発送情報なしで発送済みに進める。

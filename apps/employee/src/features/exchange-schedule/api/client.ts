@@ -1,5 +1,6 @@
 import type {
   EmployeeScheduleView,
+  ReportDeliveryIssueRequest,
   RequestDateRequest,
   SelectCandidateRequest,
 } from "../model/types";
@@ -38,6 +39,24 @@ export async function confirmReceipt(exchangeId: string): Promise<EmployeeSchedu
 
   if (!res.ok) {
     throw new Error(await parseError(res, "受け取りの確認に失敗しました。"));
+  }
+
+  return (await res.json()) as EmployeeScheduleView;
+}
+
+export async function reportDeliveryIssue(
+  exchangeId: string,
+  body: ReportDeliveryIssueRequest,
+): Promise<EmployeeScheduleView> {
+  const res = await fetch(`/api/exchange-schedule/${encodeURIComponent(exchangeId)}/delivery-issue`, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "ご連絡の送信に失敗しました。"));
   }
 
   return (await res.json()) as EmployeeScheduleView;
