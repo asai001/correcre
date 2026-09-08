@@ -133,6 +133,19 @@ function employeeLinkLines(exchangeId: string): string[] {
   return url ? ["", "お届け日の確認・選択はこちら:", url] : [];
 }
 
+/**
+ * 申請者向けの問い合わせ先。
+ * 申請者のアプリには問い合わせ機能がないため、自動完了のように「後から異議を出したくなる」
+ * 通知には必ずこの連絡先を添える。宛先は SES の送信元と同じで、返信すれば運用者に届く。
+ */
+function employeeContactLines(): string[] {
+  return [
+    "",
+    "商品が届いていない、身に覚えがないなど、お困りのことがありましたら",
+    `このメールへの返信、または ${getSesFromEmail()} までご連絡ください。`,
+  ];
+}
+
 /** 申請 24h 無反応の merchant への候補提示の再通知（日次バッチ） */
 export async function sendMerchantProposalReminderEmail(params: {
   config: ScheduleNotificationConfig;
@@ -280,6 +293,7 @@ export async function sendEmployeeAutoCompleteNoticeEmail(params: {
       "・お受け取り済みの場合：交換の画面で「受け取りました」を押してください。",
       "・まだ届いていない場合：交換の画面から「届いていない」とご連絡ください。自動完了を止めて確認いたします。",
       ...employeeLinkLines(params.exchange.exchangeId),
+      ...employeeContactLines(),
     ],
   );
 }
@@ -298,8 +312,10 @@ export async function sendEmployeeAutoCompletedEmail(params: {
       `「${params.exchange.merchandiseNameSnapshot}」の交換が完了しました。`,
       "お届け予定日から一定期間が過ぎたため、お受け取り済みとして完了処理を行いました。",
       "",
-      "お心当たりがない場合や、商品が届いていない場合は、お手数ですがお問い合わせください。",
+      "お心当たりがない場合や、商品が届いていない場合は、お手数ですが下記までご連絡ください。",
+      "使用ポイントの返還を含めて対応いたします。",
       ...employeeLinkLines(params.exchange.exchangeId),
+      ...employeeContactLines(),
     ],
   );
 }

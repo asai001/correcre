@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  clearExchangeDeliveryIssue,
   findExchangeHistoryByMerchantAndExchangeId,
   getAllowedNextExchangeStatuses,
   InvalidExchangeStatusTransitionError,
@@ -17,6 +18,7 @@ import { notifyEmployeeExchangeApprovedIfReservationRequired } from "@correcre/l
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { cancelScheduleWithExchange, isScheduleActive } from "@correcre/lib/schedule/service";
 import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
+import { nowYYYYMMDD } from "@correcre/lib/date/format";
 import type {
   DBUserAddress,
   ExchangeHistoryActorType,
@@ -306,6 +308,41 @@ export async function getExchangeDetailForOperator(
   if (!item) return null;
 
   return buildExchangeDetail(config, item, "OPERATOR");
+}
+
+/**
+ * 申請者からの未着報告を解除し、自動完了の対象に戻す。
+ *
+ * 「完了にする」との違いは、運用者が受け取りを断定しないこと。申請者が「届いていない」と
+ * 言っている交換を運用者が完了にするのは重い判断になるため、断定せずに通常の流れへ戻す
+ * 選択肢を用意する。解除日を起点に猶予を数え直すので、申請者には改めて予告が届く。
+ */
+export async function clearDeliveryIssueForOperator(params: {
+  merchantId: string;
+  exchangeId: string;
+}): Promise<OperatorExchangeDetail> {
+  const config = getRuntimeConfig();
+
+  const item = await findExchangeHistoryByMerchantAndExchangeId(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    params.merchantId,
+    params.exchangeId,
+  );
+
+  if (!item) {
+    throw new Error("対象の交換が見つかりません");
+  }
+
+  if (!item.deliveryIssue) {
+    throw new Error("この交換に未着の連絡はありません");
+  }
+
+  const updated = await clearExchangeDeliveryIssue(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    { item, autoCompleteFrom: nowYYYYMMDD() },
+  );
+
+  return buildExchangeDetail(config, updated, "OPERATOR");
 }
 
 export async function transitionExchangeForOperator(params: {

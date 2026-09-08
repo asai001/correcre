@@ -113,6 +113,10 @@ export type ExchangeSchedule = {
   responseReminderSentAt?: string; // AWAITING_MERCHANT_RESPONSE 応答期限（3 営業日）超過の督促
   arrivalReminderSentAt?: string; // 確定日前日の受取リマインド
   autoCompleteNoticeSentAt?: string; // 自動完了の予告（employee へ）
+  // 自動完了カウントの起点 (YYYY-MM-DD)。未設定ならお届け日を使う。
+  // 未着報告を解除したときに解除日を入れ、猶予を最初から数え直すためのフィールド。
+  // お届け日を起点のまま使い回すと、解除した瞬間に猶予切れで即完了してしまう。
+  autoCompleteFrom?: string;
 };
 
 export type ExchangeHistoryItem = {

@@ -49,3 +49,19 @@ export async function transitionExchange(
 
   return (await res.json()) as OperatorExchangeDetail;
 }
+
+export async function clearDeliveryIssue(
+  merchantId: string,
+  exchangeId: string,
+): Promise<OperatorExchangeDetail> {
+  const res = await fetch(
+    `/api/exchanges/${encodeURIComponent(merchantId)}/${encodeURIComponent(exchangeId)}/delivery-issue`,
+    { method: "DELETE", cache: "no-store" },
+  );
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "未着連絡の解除に失敗しました。"));
+  }
+
+  return (await res.json()) as OperatorExchangeDetail;
+}

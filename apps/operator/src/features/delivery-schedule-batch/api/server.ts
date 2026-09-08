@@ -23,6 +23,11 @@ import {
   sendMerchantProposalReminderEmail,
   sendMerchantResponseReminderEmail,
 } from "@correcre/lib/notification/schedule-events";
+import {
+  isAutoCompleteDue,
+  isAutoCompleteNoticeDue,
+  resolveAutoCompleteSchedule,
+} from "@correcre/lib/schedule/auto-complete";
 import { generateCandidates, isSelectable } from "@correcre/lib/schedule/engine";
 import {
   cancelScheduleWithExchange,
@@ -36,7 +41,6 @@ import {
 import type { ExchangeHistoryItem, MerchantCalendarItem } from "@correcre/types";
 import {
   AUTO_COMPLETE_GRACE_DAYS,
-  AUTO_COMPLETE_NOTICE_DAYS,
   resolveMerchandiseFulfillment,
   SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS,
   SCHEDULE_PROPOSAL_ROUND_LIMIT,
@@ -444,14 +448,21 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
       // 未着の連絡が来ている間は自動完了しない。運用者が実態を確認して判断する。
       if (item.deliveryIssue) continue;
 
-      const autoCompleteDate = addCalendarDays(arrivalDate, AUTO_COMPLETE_GRACE_DAYS);
+      // 起点は原則お届け日だが、未着報告を解除した交換は解除日から数え直す
+      // （お届け日のまま使うと、解除した瞬間に猶予切れで即完了してしまう）。
+      const autoComplete = resolveAutoCompleteSchedule({
+        arrivalDate,
+        autoCompleteFrom: schedule.autoCompleteFrom,
+      });
 
-      if (todayJst >= autoCompleteDate) {
+      if (isAutoCompleteDue(todayJst, autoComplete)) {
         const completed = await transitionExchangeStatus(exchangeConfig, {
           item,
           nextStatus: "COMPLETED",
           actorType: "SYSTEM",
-          comment: `お届け予定日から ${AUTO_COMPLETE_GRACE_DAYS} 日が過ぎたため自動完了しました`,
+          comment: schedule.autoCompleteFrom
+            ? `未着連絡の解除から ${AUTO_COMPLETE_GRACE_DAYS} 日が過ぎたため自動完了しました`
+            : `お届け予定日から ${AUTO_COMPLETE_GRACE_DAYS} 日が過ぎたため自動完了しました`,
           occurredAt: now.toISOString(),
           userTableName: config.userTableName,
           pointTransactionTableName: config.pointTransactionTableName,
@@ -475,7 +486,7 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
 
       // 予告。自動完了までまだ猶予があるうちに、受取確認か未着報告を促す。
       if (schedule.autoCompleteNoticeSentAt) continue;
-      if (todayJst < addCalendarDays(arrivalDate, AUTO_COMPLETE_NOTICE_DAYS)) continue;
+      if (!isAutoCompleteNoticeDue(todayJst, autoComplete)) continue;
 
       const sent = await sendOnce(item, "autoCompleteNoticeSentAt", async () => {
         const recipient = await resolveEmployeeEmail(item);
@@ -484,7 +495,7 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
             config: { region: config.region },
             recipient,
             exchange: item,
-            autoCompleteDate,
+            autoCompleteDate: autoComplete.completeDate,
           });
         }
       });
@@ -507,11 +518,19 @@ export async function runDeliveryScheduleBatch(now: Date = new Date()): Promise<
         item.status === "CANCELED" || item.status === "CANCELLED" || item.status === "REJECTED";
 
       // 発送済みのまま自動完了の期限を迎えていないものは、4-2 がまだ必要としている。
+      // 未着報告の解除で起点が動くため、4-2 と同じ起点で判断しないとインデックスから
+      // 先に落ちて自動完了が走らなくなる。
       const awaitingAutoComplete =
         !isTerminal &&
         item.status === "IN_PROGRESS" &&
         Boolean(arrivalDate) &&
-        todayJst < addCalendarDays(arrivalDate!, AUTO_COMPLETE_GRACE_DAYS);
+        !isAutoCompleteDue(
+          todayJst,
+          resolveAutoCompleteSchedule({
+            arrivalDate: arrivalDate!,
+            autoCompleteFrom: item.schedule?.autoCompleteFrom,
+          }),
+        );
       if (awaitingAutoComplete) continue;
 
       if (!isTerminal && (!arrivalDate || arrivalDate >= todayJst)) continue;

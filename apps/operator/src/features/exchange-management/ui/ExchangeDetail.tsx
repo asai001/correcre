@@ -18,7 +18,7 @@ import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { getExchangeStatusBadge, getExchangeStatusLabel } from "@correcre/merchandise-public";
 import type { ExchangeHistoryStatus } from "@correcre/types";
 
-import { transitionExchange } from "../api/client";
+import { clearDeliveryIssue, transitionExchange } from "../api/client";
 import type { OperatorExchangeDetail } from "../model/types";
 
 type Props = {
@@ -227,9 +227,38 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<ExchangeHistoryStatus | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [, startTransition] = useTransition();
 
   const badge = getExchangeStatusBadge(detail.status);
+
+  const handleClearDeliveryIssue = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "未着の連絡を解除し、通常の流れに戻します。" +
+          "本日から起算して、申請者へ改めて予告メールが送られ、応答がなければ自動完了します。よろしいですか？",
+      )
+    ) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setClearing(true);
+
+    startTransition(async () => {
+      try {
+        const updated = await clearDeliveryIssue(detail.merchantId, detail.exchangeId);
+        setDetail(updated);
+        setNotice("未着の連絡を解除しました。本日から自動完了の猶予を数え直します。");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "未着連絡の解除に失敗しました。");
+      } finally {
+        setClearing(false);
+      }
+    });
+  };
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
     const button = resolveTransitionButton(detail.status, nextStatus);
@@ -354,8 +383,9 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
         </dl>
       </section>
 
-      {/* 未着報告は自動完了を止めている状態なので、運用者が最初に気づくべき情報として上に出す。 */}
-      {detail.deliveryIssue ? (
+      {/* 未着報告は自動完了を止めている状態なので、運用者が最初に気づくべき情報として上に出す。
+          終端まで進んだ交換では自動完了はもう関係ないため、古い警告を残さない。 */}
+      {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
         <Alert severity="warning">
           <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
           <div className="mt-1 text-sm">
@@ -363,8 +393,23 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
             {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
           </div>
           <div className="mt-1 text-xs">
-            この交換は自動完了の対象から外れています。配送状況を確認し、完了または強制キャンセルで解決してください。
+            この交換は自動完了の対象から外れています。配送状況を確認し、次のいずれかで解決してください。
           </div>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            <li>受け取りが確認できた → 「完了にする」</li>
+            <li>届かないことが確定した → 「強制キャンセルする」（ポイントを返還）</li>
+            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」</li>
+          </ul>
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="small"
+            className="!mt-3 !rounded-full"
+            onClick={handleClearDeliveryIssue}
+            disabled={clearing || pendingStatus !== null}
+          >
+            未着の連絡を解除する
+          </Button>
         </Alert>
       ) : null}
 

@@ -587,26 +587,50 @@ export async function reportExchangeDeliveryIssue(
 }
 
 /**
- * 未着報告を取り下げる（運用者が対応を終えたとき）。取り下げると自動完了の対象に戻る。
+ * 未着報告を取り下げる（運用者が実態を確認して、通常の流れに戻すとき）。
+ *
+ * 単にフラグを消すだけでは足りない。自動完了はお届け日を起点に数えており、解除する頃には
+ * その猶予はとっくに過ぎているので、そのままだと翌朝のバッチで予告もなく即完了してしまう。
+ * 申請者から見れば「届いていないと連絡したのに、いつのまにか完了してポイントが消えた」になる。
+ * そこで解除日を新しい起点として置き、予告の送信済みマーカーも外して猶予を最初から数え直す。
  */
 export async function clearExchangeDeliveryIssue(
   config: ExchangeHistoryTableConfig,
-  params: { item: ExchangeHistoryItem },
+  params: {
+    item: ExchangeHistoryItem;
+    // 自動完了カウントの新しい起点 (YYYY-MM-DD)。通常は解除日（JST）。
+    autoCompleteFrom: string;
+    clearedAt?: string;
+  },
 ): Promise<ExchangeHistoryItem> {
   const client = getDynamoDocumentClient(config.region);
-  const updatedAt = new Date().toISOString();
+  const updatedAt = params.clearedAt ?? new Date().toISOString();
+  const hasSchedule = Boolean(params.item.schedule);
 
+  // schedule を持たない交換（日程調整なし）には起点も予告マーカーも存在しない。
+  // 存在しない属性へのネスト更新は失敗するので、フラグの削除だけに留める。
   await client.send(
     new UpdateCommand({
       TableName: config.tableName,
       Key: { pk: params.item.pk, sk: params.item.sk },
-      UpdateExpression: "SET updatedAt = :updatedAt REMOVE deliveryIssue",
-      ExpressionAttributeValues: { ":updatedAt": updatedAt },
+      UpdateExpression: hasSchedule
+        ? "SET updatedAt = :updatedAt, #schedule.autoCompleteFrom = :from REMOVE deliveryIssue, #schedule.autoCompleteNoticeSentAt"
+        : "SET updatedAt = :updatedAt REMOVE deliveryIssue",
+      ...(hasSchedule ? { ExpressionAttributeNames: { "#schedule": "schedule" } } : {}),
+      ExpressionAttributeValues: hasSchedule
+        ? { ":updatedAt": updatedAt, ":from": params.autoCompleteFrom }
+        : { ":updatedAt": updatedAt },
     }),
   );
 
   const updated: ExchangeHistoryItem = { ...params.item, updatedAt };
   delete updated.deliveryIssue;
+  if (updated.schedule) {
+    const schedule = { ...updated.schedule, autoCompleteFrom: params.autoCompleteFrom };
+    delete schedule.autoCompleteNoticeSentAt;
+    updated.schedule = schedule;
+  }
+
   return updated;
 }
 
