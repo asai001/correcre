@@ -362,7 +362,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         </dl>
       </section>
 
-      {/* 終端まで進んだ交換では自動完了はもう関係ないため、古い警告を残さない。 */}
+      {/* 終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
       {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
         <Alert severity="warning">
           <div className="font-bold">申請者から「商品が届いていない」と連絡がありました</div>
@@ -371,7 +371,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
             {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
           </div>
           <div className="mt-1 text-xs">
-            配送状況をご確認のうえ、対応をお願いします。解決するまで自動での完了は行われません。
+            配送状況をご確認のうえ、対応をお願いします。
           </div>
         </Alert>
       ) : null}

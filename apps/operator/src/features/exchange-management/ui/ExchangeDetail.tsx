@@ -236,8 +236,7 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        "未着の連絡を解除し、通常の流れに戻します。" +
-          "本日から起算して、申請者へ改めて予告メールが送られ、応答がなければ自動完了します。よろしいですか？",
+        "未着の連絡を解除し、警告と催促を下ろします。交換のステータスは変わりません。よろしいですか？",
       )
     ) {
       return;
@@ -251,7 +250,7 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
       try {
         const updated = await clearDeliveryIssue(detail.merchantId, detail.exchangeId);
         setDetail(updated);
-        setNotice("未着の連絡を解除しました。本日から自動完了の猶予を数え直します。");
+        setNotice("未着の連絡を解除しました。ステータスは変わっていません。");
       } catch (err) {
         setError(err instanceof Error ? err.message : "未着連絡の解除に失敗しました。");
       } finally {
@@ -383,8 +382,8 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
         </dl>
       </section>
 
-      {/* 未着報告は自動完了を止めている状態なので、運用者が最初に気づくべき情報として上に出す。
-          終端まで進んだ交換では自動完了はもう関係ないため、古い警告を残さない。 */}
+      {/* 申請者が待たされている状態なので、運用者が最初に気づくべき情報として上に出す。
+          終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
       {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
         <Alert severity="warning">
           <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
@@ -393,12 +392,12 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
             {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
           </div>
           <div className="mt-1 text-xs">
-            この交換は自動完了の対象から外れています。配送状況を確認し、次のいずれかで解決してください。
+            配送状況を確認し、次のいずれかで解決してください。
           </div>
           <ul className="mt-1 list-disc pl-5 text-xs">
             <li>受け取りが確認できた → 「完了にする」</li>
             <li>届かないことが確定した → 「強制キャンセルする」（ポイントを返還）</li>
-            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」</li>
+            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」（ステータスは変えない）</li>
           </ul>
           <Button
             variant="outlined"

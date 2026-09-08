@@ -45,7 +45,7 @@ export type OperatorExchangeDetail = OperatorExchangeSummary & {
   carrierLabel?: string;
   // 確定済みのお届け日 (YYYY-MM-DD)。発送情報と併せて配送の遅れを判断する
   selectedArrivalDate?: string;
-  // 申請者からの未着報告。立っている間は自動完了が止まっている
+  // 申請者からの未着報告。対応が済むまで警告として出し続ける
   deliveryIssue?: ExchangeDeliveryIssue;
 };
 

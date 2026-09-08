@@ -298,7 +298,7 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
 
   // --- 3-1. 未着の連絡が来ているもの ---------------------------------------------
   // 申請者が「届いていない」と申告した状態。ポイントは保留のまま止まっており、
-  // 自動完了も止まっているので、提携企業が配送状況を確認しないと前に進まない。
+  // 提携企業が配送状況を確認しないと前に進まない。
   const deliveryIssues = exchanges
     .filter((item) => Boolean(item.deliveryIssue) && !isTerminalStatus(normalizeStatus(item.status)))
     .sort((a, b) =>
@@ -333,7 +333,7 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
   // --- 3-2. お届け日を過ぎた発送済み ---------------------------------------------
   // 発送後は提携企業の手を離れるため、放っておくと「発送済み」のまま完了にされず、
   // 申請者のポイントが保留されっぱなしになる。届いているはずの頃に完了を促す。
-  // （将来ここを日次バッチの自動完了に置き換えたら、このやることは不要になる）
+  // 完了は必ず人が押す仕様なので、この催促が唯一のきっかけになる。
   const deliveryDue = exchanges
     .flatMap((item) => {
       if (normalizeStatus(item.status) !== "IN_PROGRESS") return [];

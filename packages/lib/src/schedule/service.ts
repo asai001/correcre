@@ -926,8 +926,7 @@ export type ScheduleReminderField =
   | "proposalReminderSentAt"
   | "selectionReminderSentAt"
   | "responseReminderSentAt"
-  | "arrivalReminderSentAt"
-  | "autoCompleteNoticeSentAt";
+  | "arrivalReminderSentAt";
 
 /**
  * 日次バッチの送信済みガード。既に送信済みならエラーにせず false を返す（冪等）。

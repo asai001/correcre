@@ -180,7 +180,7 @@ export default function ScheduleDetail({ initial, initialPointBalance }: Props) 
         });
         applyView(next);
         setIssueNote("");
-        setNotice("ご連絡ありがとうございます。提携企業に確認を依頼しました。自動での完了は止まります。");
+        setNotice("ご連絡ありがとうございます。提携企業に確認を依頼しました。");
       } catch (err) {
         setError(err instanceof Error ? err.message : "ご連絡の送信に失敗しました。");
       }

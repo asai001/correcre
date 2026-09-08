@@ -48,13 +48,6 @@ export const SCHEDULE_RESCHEDULE_REQUEST_LIMIT = 2;
 // 申請者には「最大 3 営業日」と案内し、同じ日数だけ督促後も無応答なら自動キャンセルする。
 export const SCHEDULE_MERCHANT_RESPONSE_BUSINESS_DAYS = 3;
 
-// 発送済みのまま誰も動かなかったときに、日次バッチが完了へ進めるまでの猶予（お届け日からの暦日）。
-// これは「配達された」判定ではなく「異議がなければ確定とみなす」処理なので、猶予は長めに取る。
-// 自動完了の数日前に申請者へ予告し、未着報告があれば止める。
-export const AUTO_COMPLETE_GRACE_DAYS = 14;
-// 予告メールを送るタイミング（お届け日からの暦日）。自動完了までの残りが分かるように先に送る。
-export const AUTO_COMPLETE_NOTICE_DAYS = 7;
-
 // 発送情報（物販の発送時に merchant が登録する）。
 // 追跡番号は任意。入力を必須（＝発送済みに進めるための条件）にすると、面倒がって
 // 入力しない merchant の交換が「実物は配送中なのに画面は準備中」で止まり、督促まで飛ぶ。
@@ -78,7 +71,8 @@ export type ExchangeShipment = {
   shippedAt?: string;
 };
 
-// 申請者からの「届いていない」報告。自動完了のブレーキであり、運用者への申し送りでもある。
+// 申請者からの「届いていない」報告。提携企業と運用者への申し送り。
+// 完了はあくまで人の操作なので、この印はステータスを動かさず、対応が要ることだけを伝える。
 export type ExchangeDeliveryIssue = {
   reportedAt: string;
   // 申請者が書いた状況（任意）
@@ -112,11 +106,6 @@ export type ExchangeSchedule = {
   selectionReminderSentAt?: string; // 選択期限 24h 前の employee 催促
   responseReminderSentAt?: string; // AWAITING_MERCHANT_RESPONSE 応答期限（3 営業日）超過の督促
   arrivalReminderSentAt?: string; // 確定日前日の受取リマインド
-  autoCompleteNoticeSentAt?: string; // 自動完了の予告（employee へ）
-  // 自動完了カウントの起点 (YYYY-MM-DD)。未設定ならお届け日を使う。
-  // 未着報告を解除したときに解除日を入れ、猶予を最初から数え直すためのフィールド。
-  // お届け日を起点のまま使い回すと、解除した瞬間に猶予切れで即完了してしまう。
-  autoCompleteFrom?: string;
 };
 
 export type ExchangeHistoryItem = {
@@ -140,7 +129,7 @@ export type ExchangeHistoryItem = {
   reservationCode?: string;
   // 発送情報。発送済みに進めた交換にだけ存在する（追跡番号は入っていないこともある）
   shipment?: ExchangeShipment;
-  // 申請者からの未着報告。立っている間は自動完了を止め、運用者が対応する
+  // 申請者からの未着報告。提携企業・運用者の画面とやることリストに出して対応を促す
   deliveryIssue?: ExchangeDeliveryIssue;
   status?: ExchangeHistoryStatus;
   history?: ExchangeHistoryStatusEvent[];

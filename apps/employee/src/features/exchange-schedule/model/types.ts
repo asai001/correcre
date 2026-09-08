@@ -40,7 +40,7 @@ export type EmployeeScheduleView = {
   temperatureZone: TemperatureZone;
   // 「受け取りました」「届いていない」を押せるか（発送済みで、まだ完了していない）
   canConfirmReceipt: boolean;
-  // 未着報告済みなら、その報告日時。立っている間は自動完了が止まる
+  // 未着報告済みなら、その報告日時。提携企業が確認中であることの表示に使う
   deliveryIssueReportedAt?: string;
   // 発送情報。提携企業が送り状番号を登録したときだけ入る（登録は任意なので無いことも多い）
   shippedAt?: string;

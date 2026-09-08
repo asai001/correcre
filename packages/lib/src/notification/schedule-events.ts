@@ -135,8 +135,9 @@ function employeeLinkLines(exchangeId: string): string[] {
 
 /**
  * 申請者向けの問い合わせ先。
- * 申請者のアプリには問い合わせ機能がないため、自動完了のように「後から異議を出したくなる」
- * 通知には必ずこの連絡先を添える。宛先は SES の送信元と同じで、返信すれば運用者に届く。
+ * 申請者のアプリには問い合わせ機能がないため、システム側の都合で交換が終わる通知
+ * （期限切れの自動キャンセルなど）には必ずこの連絡先を添える。
+ * 宛先は SES の送信元と同じで、返信すれば運用者に届く。
  */
 function employeeContactLines(): string[] {
   return [
@@ -265,57 +266,6 @@ export async function sendMerchantResponseReminderEmail(params: {
       `商品・サービス名：${params.exchange.merchandiseNameSnapshot}`,
       `申請番号：${params.exchange.exchangeId}`,
       ...merchantLinkLines(params.exchange.exchangeId),
-    ],
-  );
-}
-
-/**
- * 自動完了の予告（日次バッチ）。
- * 自動完了は「配達された」判定ではなく「異議がなければ確定とみなす」処理なので、
- * 申請者が異議を出す機会を必ず先に作る。文面では受取確認と未着報告の両方に誘導する。
- */
-export async function sendEmployeeAutoCompleteNoticeEmail(params: {
-  config: ScheduleNotificationConfig;
-  recipient: string;
-  exchange: ExchangeHistoryItem;
-  autoCompleteDate: string;
-}) {
-  await sendMail(
-    params.config.region,
-    params.recipient,
-    "【コレクレ】お受け取りのご確認をお願いします",
-    [
-      `「${params.exchange.merchandiseNameSnapshot}」はお届け予定日を過ぎています。`,
-      "",
-      `${formatDateJa(params.autoCompleteDate)}になっても操作がない場合、お受け取りいただけたものとして`,
-      "自動的に完了となり、使用ポイントが確定します。",
-      "",
-      "・お受け取り済みの場合：交換の画面で「受け取りました」を押してください。",
-      "・まだ届いていない場合：交換の画面から「届いていない」とご連絡ください。自動完了を止めて確認いたします。",
-      ...employeeLinkLines(params.exchange.exchangeId),
-      ...employeeContactLines(),
-    ],
-  );
-}
-
-/** 自動完了したことの申請者への通知（日次バッチ） */
-export async function sendEmployeeAutoCompletedEmail(params: {
-  config: ScheduleNotificationConfig;
-  recipient: string;
-  exchange: ExchangeHistoryItem;
-}) {
-  await sendMail(
-    params.config.region,
-    params.recipient,
-    "【コレクレ】交換が完了しました",
-    [
-      `「${params.exchange.merchandiseNameSnapshot}」の交換が完了しました。`,
-      "お届け予定日から一定期間が過ぎたため、お受け取り済みとして完了処理を行いました。",
-      "",
-      "お心当たりがない場合や、商品が届いていない場合は、お手数ですが下記までご連絡ください。",
-      "使用ポイントの返還を含めて対応いたします。",
-      ...employeeLinkLines(params.exchange.exchangeId),
-      ...employeeContactLines(),
     ],
   );
 }
@@ -462,6 +412,7 @@ export async function sendEmployeeScheduleCancelledEmail(params: {
       "",
       `使用した ${params.refundPoint.toLocaleString("ja-JP")}pt は全額返還済みです。`,
       "改めて商品・サービスの交換をご利用いただけます。",
+      ...employeeContactLines(),
     ],
   );
 }
