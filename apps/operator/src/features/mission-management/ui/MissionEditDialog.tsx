@@ -14,7 +14,8 @@ import {
 } from "@mui/material";
 
 import { nextMonthYYYYMM, nowYYYYMM } from "@correcre/lib";
-import type { MissionField } from "@correcre/types";
+import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
+import type { AnalysisThresholds, MissionField } from "@correcre/types";
 import { updateMission } from "../api/client";
 import { MISSION_TOTAL_POINTS_CAP } from "../model/types";
 import type { MissionApplyMode, OperatorMissionSummary, UpdateMissionInput } from "../model/types";
@@ -27,6 +28,8 @@ type MissionEditDialogProps = {
   mission: OperatorMissionSummary;
   // 編集中のスロットを除いた、有効なミッションの「月間実施回数 × 点数」の合計。
   otherMissionsTotalPoints: number;
+  // 企業の項目分析の既定閾値（未設定なら null）。ミッション個別設定の初期値・プレースホルダに使う。
+  companyThresholds: AnalysisThresholds | null;
   onClose: () => void;
   onUpdated: (mission: OperatorMissionSummary) => void;
 };
@@ -39,9 +42,16 @@ type FormState = {
   score: string;
   enabled: boolean;
   fields: MissionField[];
+  // true = 企業の既定閾値に従う（ミッション個別設定を持たない）。
+  useCompanyDefaultThresholds: boolean;
+  goodRate: string;
+  improvementRate: string;
 };
 
-function initFormState(mission: OperatorMissionSummary): FormState {
+function initFormState(mission: OperatorMissionSummary, companyThresholds: AnalysisThresholds | null): FormState {
+  // 個別設定が無い場合は、実際に適用される値（企業既定 → システム既定）を初期表示にする。
+  const effectiveThresholds = resolveAnalysisThresholds(mission.analysisThresholds, companyThresholds);
+
   return {
     title: mission.title,
     description: mission.description,
@@ -50,6 +60,9 @@ function initFormState(mission: OperatorMissionSummary): FormState {
     score: String(mission.score),
     enabled: mission.enabled,
     fields: mission.fields.map((f) => ({ ...f })),
+    useCompanyDefaultThresholds: mission.analysisThresholds === null,
+    goodRate: String(effectiveThresholds.goodRate),
+    improvementRate: String(effectiveThresholds.improvementRate),
   };
 }
 
@@ -69,11 +82,14 @@ export default function MissionEditDialog({
   companyId,
   mission,
   otherMissionsTotalPoints,
+  companyThresholds,
   onClose,
   onUpdated,
 }: MissionEditDialogProps) {
   const isNewMission = !mission.configured;
-  const [form, setForm] = useState<FormState>(() => initFormState(mission));
+  const [form, setForm] = useState<FormState>(() => initFormState(mission, companyThresholds));
+  // 「企業の既定値に従う」を選んだときに実際に適用される閾値（企業既定 → システム既定）。
+  const effectiveCompanyThresholds = resolveAnalysisThresholds(null, companyThresholds);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 確認ダイアログで反映モードを保持（null = 未確認）。
@@ -82,10 +98,10 @@ export default function MissionEditDialog({
   const scheduledYearMonth = nextMonthYYYYMM(nowYYYYMM());
 
   useEffect(() => {
-    setForm(initFormState(mission));
+    setForm(initFormState(mission, companyThresholds));
     setError(null);
     setPendingMode(null);
-  }, [mission]);
+  }, [mission, companyThresholds]);
 
   const buildInput = (): UpdateMissionInput => ({
     title: form.title,
@@ -95,6 +111,9 @@ export default function MissionEditDialog({
     score: Number(form.score),
     enabled: form.enabled,
     fields: form.fields,
+    analysisThresholds: form.useCompanyDefaultThresholds
+      ? null
+      : { goodRate: Number(form.goodRate), improvementRate: Number(form.improvementRate) },
   });
 
   const handleSave = (mode: MissionApplyMode) => {
@@ -251,6 +270,74 @@ export default function MissionEditDialog({
               }
               label="有効"
             />
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <h4 className="text-sm font-bold text-slate-800">項目分析の閾値</h4>
+              <p className="mt-1 text-xs text-slate-500">
+                分析・レポートの項目分析で、このミッションを「達成率が高い項目」「改善余地がある項目」に
+                振り分ける基準です。どちらにも当てはまらない達成率の場合、このミッションは
+                どちらの一覧にも表示されません。
+              </p>
+
+              <FormControlLabel
+                sx={{ mt: 1 }}
+                control={
+                  <Checkbox
+                    checked={form.useCompanyDefaultThresholds}
+                    onChange={(e) =>
+                      setForm((c) => ({ ...c, useCompanyDefaultThresholds: e.target.checked }))
+                    }
+                  />
+                }
+                label={
+                  <span className="text-sm text-slate-700">
+                    企業の既定値に従う（達成率が高い: {effectiveCompanyThresholds.goodRate}% 以上 / 改善余地:{" "}
+                    {effectiveCompanyThresholds.improvementRate}% 以下）
+                  </span>
+                }
+              />
+
+              {form.useCompanyDefaultThresholds ? null : (
+                <div className="mt-2 grid gap-x-4 gap-y-6 md:grid-cols-2">
+                  <div className="pt-2">
+                    <TextField
+                      label="達成率が高い項目（% 以上）"
+                      type="number"
+                      value={form.goodRate}
+                      onChange={(e) => {
+                        const nextValue = toIntegerFormValue(e.target.value);
+                        if (nextValue !== null) {
+                          setForm((c) => ({ ...c, goodRate: nextValue }));
+                        }
+                      }}
+                      fullWidth
+                      slotProps={{
+                        htmlInput: { min: 0, max: 100, step: 1, inputMode: "numeric", pattern: "[0-9]*" },
+                      }}
+                      sx={floatingLabelTextFieldSx}
+                    />
+                  </div>
+                  <div className="pt-2">
+                    <TextField
+                      label="改善余地がある項目（% 以下）"
+                      type="number"
+                      value={form.improvementRate}
+                      onChange={(e) => {
+                        const nextValue = toIntegerFormValue(e.target.value);
+                        if (nextValue !== null) {
+                          setForm((c) => ({ ...c, improvementRate: nextValue }));
+                        }
+                      }}
+                      fullWidth
+                      slotProps={{
+                        htmlInput: { min: 0, max: 100, step: 1, inputMode: "numeric", pattern: "[0-9]*" },
+                      }}
+                      sx={floatingLabelTextFieldSx}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
             <FieldBuilder
               fields={form.fields}

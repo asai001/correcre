@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  clearExchangeDeliveryIssue,
   findExchangeHistoryByMerchantAndExchangeId,
   getAllowedNextExchangeStatuses,
   InvalidExchangeStatusTransitionError,
@@ -13,7 +14,10 @@ import { getMerchandise } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { notifyEmployeeExchangeApprovedIfReservationRequired } from "@correcre/lib/notification/exchange-events";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
+import { cancelScheduleWithExchange, isScheduleActive } from "@correcre/lib/schedule/service";
+import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
 import type {
   DBUserAddress,
   ExchangeHistoryActorType,
@@ -36,6 +40,7 @@ type RuntimeConfig = {
   userTableName: string;
   companyTableName: string;
   pointTransactionTableName: string;
+  scheduleEventTableName: string;
 };
 
 type ApplicantProfile = {
@@ -55,6 +60,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
+    scheduleEventTableName: readRequiredServerEnv("DDB_SCHEDULE_EVENT_TABLE_NAME"),
   };
 }
 
@@ -260,6 +266,7 @@ async function buildExchangeDetail(
   }
 
   const status = normalizeStatus(item.status);
+  const scheduleActive = isScheduleActive(item);
 
   return {
     ...toSummary(item, merchantName, applicant.name, companyName),
@@ -268,8 +275,20 @@ async function buildExchangeDetail(
     applicantAddress: applicant.address,
     merchandiseImageViewUrl,
     history: item.history ?? [],
-    allowedNextStatuses: getAllowedNextExchangeStatuses(status, actorType),
+    // 日程調整が進行中の間、operator が取れるのは却下・強制キャンセルのみ
+    // （承認して先へ進める操作は日程確定のシステム遷移に委ねる）。
+    allowedNextStatuses: scheduleActive
+      ? getAllowedNextExchangeStatuses(status, actorType).filter(
+          (nextStatus) => nextStatus === "REJECTED" || nextStatus === "CANCELED",
+        )
+      : getAllowedNextExchangeStatuses(status, actorType),
     actorType,
+    scheduleActive,
+    shipment: item.shipment,
+    trackingUrl: buildTrackingUrl(item.shipment),
+    carrierLabel: resolveCarrierLabel(item.shipment),
+    selectedArrivalDate: item.schedule?.selectedArrivalDate,
+    deliveryIssue: item.deliveryIssue,
   };
 }
 
@@ -288,6 +307,41 @@ export async function getExchangeDetailForOperator(
   if (!item) return null;
 
   return buildExchangeDetail(config, item, "OPERATOR");
+}
+
+/**
+ * 申請者からの未着報告を解除する（配送状況を確認して対応が済んだとき）。
+ *
+ * 「完了にする」との違いは、運用者が受け取りを断定しないこと。申請者が「届いていない」と
+ * 言っている交換を運用者が完了にするのは重い判断になるため、警告と催促だけを下ろして
+ * 通常の一覧に戻す選択肢を用意する。完了の判断は本人か提携企業に委ねる。
+ */
+export async function clearDeliveryIssueForOperator(params: {
+  merchantId: string;
+  exchangeId: string;
+}): Promise<OperatorExchangeDetail> {
+  const config = getRuntimeConfig();
+
+  const item = await findExchangeHistoryByMerchantAndExchangeId(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    params.merchantId,
+    params.exchangeId,
+  );
+
+  if (!item) {
+    throw new Error("対象の交換が見つかりません");
+  }
+
+  if (!item.deliveryIssue) {
+    throw new Error("この交換に未着の連絡はありません");
+  }
+
+  const updated = await clearExchangeDeliveryIssue(
+    { region: config.region, tableName: config.exchangeHistoryTableName },
+    { item },
+  );
+
+  return buildExchangeDetail(config, updated, "OPERATOR");
 }
 
 export async function transitionExchangeForOperator(params: {
@@ -311,6 +365,35 @@ export async function transitionExchangeForOperator(params: {
     throw new Error("対象の交換が見つかりません");
   }
 
+  // 日程調整が進行中の交換は、終端化と同時に schedule 側も終端化してポイント返還・
+  // 操作ログ追記まで 1 トランザクションで行う。ScheduleEvent の actor 型に OPERATOR は
+  // ないため SYSTEM として記録し、交換履歴側には OPERATOR を記録する。
+  if (isScheduleActive(item)) {
+    if (params.nextStatus !== "REJECTED" && params.nextStatus !== "CANCELED") {
+      throw new InvalidExchangeStatusTransitionError(normalizeStatus(item.status), params.nextStatus, "OPERATOR");
+    }
+
+    const cancelled = await cancelScheduleWithExchange(
+      {
+        region: config.region,
+        exchangeHistoryTableName: config.exchangeHistoryTableName,
+        scheduleEventTableName: config.scheduleEventTableName,
+        userTableName: config.userTableName,
+        pointTransactionTableName: config.pointTransactionTableName,
+      },
+      {
+        item,
+        exchangeNextStatus: params.nextStatus,
+        reason: params.comment,
+        actor: { actor: "SYSTEM", actorId: params.actorUserId, actorName: params.actorName },
+        exchangeActorType: "OPERATOR",
+        now: new Date(),
+      },
+    );
+
+    return buildExchangeDetail(config, cancelled, "OPERATOR");
+  }
+
   const updated = await transitionExchangeStatus(
     { region: config.region, tableName: config.exchangeHistoryTableName },
     {
@@ -324,6 +407,17 @@ export async function transitionExchangeForOperator(params: {
       pointTransactionTableName: config.pointTransactionTableName,
     },
   );
+
+  // 承認時のみ、予約が必要な商品なら employee へ予約先を案内する（fire-and-forget）。
+  // IN_PROGRESS → PREPARING の差し戻しでは再送しない。
+  if (normalizeStatus(item.status) === "REQUESTED" && params.nextStatus === "PREPARING") {
+    await notifyEmployeeExchangeApprovedIfReservationRequired({
+      region: config.region,
+      userTableName: config.userTableName,
+      merchandiseTableName: config.merchandiseTableName,
+      exchange: updated,
+    });
+  }
 
   return buildExchangeDetail(config, updated, "OPERATOR");
 }

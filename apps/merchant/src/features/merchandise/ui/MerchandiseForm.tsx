@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
   Alert,
@@ -15,13 +15,17 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
+import type { FulfillmentType, ProductFulfillment, TemperatureZone } from "@correcre/types";
+import { AVAILABLE_TIME_SLOT_VALUES, resolveMerchandiseFulfillment } from "@correcre/types";
 import {
   createMerchandise,
+  fetchSchedulePreview,
   requestMerchandiseUploadUrl,
   updateMerchandise,
   uploadMerchandiseImage,
@@ -30,6 +34,7 @@ import type {
   CreateMerchandiseRequest,
   MerchandiseFormPayload,
   MerchandiseSummary,
+  SchedulePreviewResponse,
 } from "../model/types";
 import {
   formatMerchandiseActor,
@@ -65,6 +70,86 @@ type FormState = {
   deliverySchedule: string;
   notes: string;
 };
+
+const temperatureZoneOptions: { value: TemperatureZone; label: string }[] = [
+  { value: "AMBIENT", label: "常温" },
+  { value: "REFRIGERATED", label: "冷蔵" },
+  { value: "FROZEN", label: "冷凍" },
+];
+
+const fulfillmentTypeOptions: { value: FulfillmentType; label: string }[] = [
+  { value: "SHIPPING", label: "配送" },
+  { value: "STORE_PICKUP", label: "店頭受け取り" },
+];
+
+const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
+
+function isFreshZone(zone: TemperatureZone) {
+  return zone === "REFRIGERATED" || zone === "FROZEN";
+}
+
+type FulfillmentFormState = {
+  fulfillmentType: FulfillmentType;
+  temperatureZone: TemperatureZone;
+  requiresScheduling: boolean;
+  // merchant が手動でスイッチを触ったか。触るまでは温度帯に応じた既定値へ自動追従する。
+  requiresSchedulingTouched: boolean;
+  leadTimeBusinessDays: string;
+  transitDays: string;
+  shippableWeekdays: number[];
+  cutoffTime: string;
+  availableTimeSlots: string[];
+  // 時間帯も同様。冷蔵・冷凍では受取失敗を減らすため既定で全て選んだ状態にする。
+  availableTimeSlotsTouched: boolean;
+  candidateCount: string;
+};
+
+function getInitialFulfillmentState(initial: MerchandiseSummary | undefined): FulfillmentFormState {
+  const resolved = resolveMerchandiseFulfillment(initial?.fulfillment);
+  return {
+    fulfillmentType: resolved.fulfillmentType,
+    temperatureZone: resolved.temperatureZone,
+    requiresScheduling: resolved.requiresScheduling,
+    requiresSchedulingTouched: Boolean(initial?.fulfillment),
+    leadTimeBusinessDays: String(resolved.leadTimeBusinessDays),
+    transitDays: String(resolved.transitDays),
+    shippableWeekdays: [...resolved.shippableWeekdays],
+    cutoffTime: resolved.cutoffTime,
+    availableTimeSlots: [...resolved.availableTimeSlots],
+    availableTimeSlotsTouched: Boolean(initial?.fulfillment),
+    candidateCount: String(resolved.candidateCount),
+  };
+}
+
+function buildFulfillmentPayload(state: FulfillmentFormState): ProductFulfillment {
+  return {
+    fulfillmentType: state.fulfillmentType,
+    temperatureZone: state.temperatureZone,
+    requiresScheduling: state.requiresScheduling,
+    leadTimeBusinessDays: Number(state.leadTimeBusinessDays),
+    transitDays: Number(state.transitDays),
+    shippableWeekdays: [...state.shippableWeekdays].sort((a, b) => a - b),
+    cutoffTime: state.cutoffTime,
+    availableTimeSlots: state.availableTimeSlots,
+    candidateCount: Number(state.candidateCount),
+  };
+}
+
+// 外部予約（ホットペッパービューティー等）が必要なサービスの案内設定。
+// 空き枠は本システムと同期できないため、URL とテキストの案内だけを保存する。
+type ReservationFormState = {
+  enabled: boolean;
+  reservationUrl: string;
+  instructions: string;
+};
+
+function getInitialReservationState(initial: MerchandiseSummary | undefined): ReservationFormState {
+  return {
+    enabled: Boolean(initial?.reservation),
+    reservationUrl: initial?.reservation?.reservationUrl ?? "",
+    instructions: initial?.reservation?.instructions ?? "",
+  };
+}
 
 type Props = {
   mode: "create" | "edit";
@@ -133,6 +218,8 @@ function getInitialImageState(initial: MerchandiseSummary | undefined, target: I
 export default function MerchandiseForm({ mode, merchantName, merchantDisplayName, merchantCompanyName, initial }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => getInitialFormState(initial));
+  const [fulfillment, setFulfillment] = useState<FulfillmentFormState>(() => getInitialFulfillmentState(initial));
+  const [reservation, setReservation] = useState<ReservationFormState>(() => getInitialReservationState(initial));
   const [cardImage, setCardImage] = useState<ImageState>(() => getInitialImageState(initial, "card"));
   const [detailImage, setDetailImage] = useState<ImageState>(() => getInitialImageState(initial, "detail"));
   const [submitting, setSubmitting] = useState(false);
@@ -143,13 +230,68 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [preview, setPreview] = useState<SchedulePreviewResponse | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const priceYen = Number(form.priceYen);
   const autoRequiredPoint = Number.isFinite(priceYen) && priceYen > 0 ? calculateRequiredPoint(priceYen) : 0;
 
+  // 下書きの編集は「下書きを保存」と「保存して公開する」の 2 ボタンに分ける
+  const isDraftEdit = mode === "edit" && initial?.status === "DRAFT";
+
   const handleField = (field: keyof FormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFulfillmentField =
+    (field: "leadTimeBusinessDays" | "transitDays" | "cutoffTime" | "candidateCount") =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const value = event.target.value;
+      setFulfillment((prev) => ({ ...prev, [field]: value }));
+    };
+
+  const handleTemperatureZoneChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value as TemperatureZone;
+    setFulfillment((prev) => ({
+      ...prev,
+      temperatureZone: value,
+      // 冷蔵・冷凍は日程調整必須が既定。merchant が手動で切り替えるまでは自動追従する。
+      requiresScheduling: prev.requiresSchedulingTouched
+        ? prev.requiresScheduling
+        : isFreshZone(value),
+      // 時間帯も同様に追従させる。生鮮品で時間帯が選べないと受取失敗が増えるため、
+      // 既定は「すべての時間帯を選べる」状態にしておく。
+      availableTimeSlots: prev.availableTimeSlotsTouched
+        ? prev.availableTimeSlots
+        : isFreshZone(value)
+          ? [...AVAILABLE_TIME_SLOT_VALUES]
+          : [],
+    }));
+  };
+
+  const handleRequiresSchedulingToggle = (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({ ...prev, requiresScheduling: checked, requiresSchedulingTouched: true }));
+  };
+
+  const handleWeekdayToggle = (day: number) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({
+      ...prev,
+      shippableWeekdays: checked
+        ? Array.from(new Set([...prev.shippableWeekdays, day]))
+        : prev.shippableWeekdays.filter((entry) => entry !== day),
+    }));
+  };
+
+  const handleTimeSlotToggle = (slot: string) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    setFulfillment((prev) => ({
+      ...prev,
+      availableTimeSlotsTouched: true,
+      availableTimeSlots: checked
+        ? AVAILABLE_TIME_SLOT_VALUES.filter((entry) => [...prev.availableTimeSlots, slot].includes(entry))
+        : prev.availableTimeSlots.filter((entry) => entry !== slot),
+    }));
   };
 
   const handleDeliveryToggle = (method: string) => (_event: ChangeEvent<HTMLInputElement>, checked: boolean) => {
@@ -210,7 +352,11 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
     }
   };
 
-  const handleSubmit = async () => {
+  // 送信モード。PUBLISH = 公開を伴う保存（必須チェックあり）、DRAFT = 下書きとして新規保存、
+  // SAVE = 公開状態を変えずに保存（下書きの編集は必須チェックなし）。
+  type SubmitMode = "PUBLISH" | "DRAFT" | "SAVE";
+
+  const handleSubmit = async (submitMode: SubmitMode) => {
     if (submitting) return;
 
     setError(null);
@@ -240,14 +386,27 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         expiration: form.expiration || undefined,
         deliverySchedule: form.deliverySchedule || undefined,
         notes: form.notes || undefined,
+        fulfillment: buildFulfillmentPayload(fulfillment),
+        reservation: reservation.enabled
+          ? {
+              reservationUrl: reservation.reservationUrl.trim() || undefined,
+              instructions: reservation.instructions.trim() || undefined,
+            }
+          : undefined,
       };
 
       if (mode === "create") {
-        await createMerchandise(payload);
+        await createMerchandise({
+          ...payload,
+          initialStatus: submitMode === "DRAFT" ? "DRAFT" : "PUBLISHED",
+        });
         router.push("/merchandise");
         router.refresh();
       } else if (initial) {
-        await updateMerchandise(initial.merchandiseId, payload);
+        await updateMerchandise(initial.merchandiseId, {
+          ...payload,
+          publish: submitMode === "PUBLISH" ? true : undefined,
+        });
         router.push("/merchandise");
         router.refresh();
       }
@@ -257,6 +416,50 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
       setSubmitting(false);
     }
   };
+
+  // 入力した設定で実際にどのお届け日が提示されるかを、保存前に確認できるようにする。
+  // 日付の計算はサーバー側だけで行い、ここでは返ってきた文字列を表示するだけにする。
+  const schedulePreviewKey = fulfillment.requiresScheduling
+    ? JSON.stringify(buildFulfillmentPayload(fulfillment))
+    : null;
+
+  useEffect(() => {
+    if (!schedulePreviewKey) {
+      setPreview(null);
+      setPreviewError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    // 入力のたびに叩かないよう、手が止まってから問い合わせる
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        const result = await fetchSchedulePreview(
+          JSON.parse(schedulePreviewKey) as ProductFulfillment,
+          controller.signal,
+        );
+        if (!controller.signal.aborted) {
+          setPreview(result);
+        }
+      } catch (err) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        setPreviewError(err instanceof Error ? err.message : "お届け日の確認に失敗しました。");
+      } finally {
+        if (!controller.signal.aborted) {
+          setPreviewLoading(false);
+        }
+      }
+    }, 600);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [schedulePreviewKey]);
 
   const previewTitle = useMemo(() => form.merchandiseName || "商品名", [form.merchandiseName]);
   // 履歴は古い順に追記されるため、新しい操作が上に来るよう反転して表示する。
@@ -432,6 +635,280 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
 
       <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <Typography variant="h6" className="font-semibold text-slate-900">
+          配送・日程調整
+        </Typography>
+        <Typography variant="body2" className="!mt-1 text-slate-500">
+          生鮮品など、お届け日の調整が必要な商品はここで設定します。日程調整を有効にすると、受け渡し方法や温度帯などの詳細を設定できます。
+        </Typography>
+
+        <Stack spacing={2.5} className="!mt-4">
+          <FormControlLabel
+            control={<Switch checked={fulfillment.requiresScheduling} onChange={handleRequiresSchedulingToggle} />}
+            label="お届け日の日程調整を行う（交換申請後に候補日を提示して、申請者に選んでもらいます）"
+          />
+
+          {fulfillment.requiresScheduling ? (
+            <>
+              {/* 受け渡し方法・温度帯も日程調整の設定の一部なので、トグル ON のときだけ表示する */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextField
+                  select
+                  label="受け渡し方法"
+                  fullWidth
+                  value={fulfillment.fulfillmentType}
+                  onChange={(event) =>
+                    setFulfillment((prev) => ({ ...prev, fulfillmentType: event.target.value as FulfillmentType }))
+                  }
+                >
+                  {fulfillmentTypeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="温度帯"
+                  fullWidth
+                  value={fulfillment.temperatureZone}
+                  onChange={handleTemperatureZoneChange}
+                >
+                  {temperatureZoneOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </div>
+
+              {/* 設問は MUI のラベルに入れると折り返されず省略表示になるため、
+                  項目の上に本文として置き、入力欄はラベルなしにする。 */}
+              <div className="space-y-4">
+                {[
+                  {
+                    key: "leadTimeBusinessDays" as const,
+                    question: "お届け日が決まってから、発送するまで何日かかりますか？",
+                    help: "お休みの日は数えません。当日発送できるなら 0 日です",
+                    type: "number",
+                    unit: "日",
+                  },
+                  {
+                    key: "transitDays" as const,
+                    question: "発送してから、お届け先に届くまで何日かかりますか？",
+                    help: "一番時間がかかる地域に合わせてください（翌日届くなら 1 日）",
+                    type: "number",
+                    unit: "日",
+                  },
+                  {
+                    key: "cutoffTime" as const,
+                    question: "その日のうちに発送するには、何時までに決まっている必要がありますか？",
+                    help: "宅配便の集荷時間に合わせてください",
+                    type: "time",
+                    unit: undefined,
+                  },
+                ].map((field) => (
+                  <div key={field.key}>
+                    <Typography variant="body2" className="!mb-1.5 font-semibold text-slate-800">
+                      {field.question}
+                    </Typography>
+                    <TextField
+                      type={field.type}
+                      size="small"
+                      value={fulfillment[field.key]}
+                      onChange={handleFulfillmentField(field.key)}
+                      className="!w-56"
+                      slotProps={
+                        field.unit
+                          ? { input: { endAdornment: <InputAdornment position="end">{field.unit}</InputAdornment> } }
+                          : undefined
+                      }
+                    />
+                    {/* 補足は入力欄の幅で折り返さないよう、helperText ではなく外に置く */}
+                    <Typography variant="caption" className="!mt-1 block text-slate-500">
+                      {field.help}
+                    </Typography>
+                  </div>
+                ))}
+              </div>
+
+              <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
+                <Typography variant="subtitle2" className="text-slate-800">
+                  発送できる曜日はどれですか？
+                </Typography>
+                <Typography variant="caption" className="text-slate-500">
+                  製造や梱包の都合で発送できる曜日だけを選んでください。
+                </Typography>
+                <FormGroup row className="mt-2">
+                  {weekdayLabels.map((label, day) => (
+                    <FormControlLabel
+                      key={day}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={fulfillment.shippableWeekdays.includes(day)}
+                          onChange={handleWeekdayToggle(day)}
+                        />
+                      }
+                      label={label}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+
+              <FormControl className="rounded-2xl border border-slate-200 px-4 py-4">
+                <Typography variant="subtitle2" className="text-slate-800">
+                  申請者が選べる時間帯（任意）
+                </Typography>
+                <Typography variant="caption" className="text-slate-500">
+                  受け取れる時間を指定できると、不在で受け取れない失敗が減ります。
+                </Typography>
+                <FormGroup row className="mt-2">
+                  {AVAILABLE_TIME_SLOT_VALUES.map((slot) => (
+                    <FormControlLabel
+                      key={slot}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={fulfillment.availableTimeSlots.includes(slot)}
+                          onChange={handleTimeSlotToggle(slot)}
+                        />
+                      }
+                      label={slot}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+
+              <div>
+                <Typography variant="body2" className="!mb-1.5 font-semibold text-slate-800">
+                  申請者に見せる候補日は何件にしますか？
+                </Typography>
+                <TextField
+                  type="number"
+                  size="small"
+                  value={fulfillment.candidateCount}
+                  onChange={handleFulfillmentField("candidateCount")}
+                  className="!w-56"
+                  slotProps={{ input: { endAdornment: <InputAdornment position="end">件</InputAdornment> } }}
+                />
+                <Typography variant="caption" className="!mt-1 block text-slate-500">
+                  迷ったら 4 件のままで問題ありません（1〜10）
+                </Typography>
+              </div>
+
+              {/* 入力した数字が実際にどの日付になるのかを、保存前に確認できるようにする。
+                  営業日の数え方を理解していなくても、出てくる日付を見れば妥当性を判断できる。 */}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-4">
+                <Typography variant="subtitle2" className="text-emerald-900">
+                  この設定だと、こうなります
+                </Typography>
+                <Typography variant="caption" className="text-emerald-800">
+                  今日この商品に交換申請があった場合に、申請者へ提示されるお届け日です。
+                </Typography>
+
+                {previewError ? (
+                  <Typography variant="body2" className="!mt-3 text-rose-700">
+                    {previewError}
+                  </Typography>
+                ) : previewLoading && !preview ? (
+                  <Typography variant="body2" className="!mt-3 text-emerald-900">
+                    確認しています...
+                  </Typography>
+                ) : preview && preview.candidates.length > 0 ? (
+                  <>
+                    <ul className="mt-3 space-y-1.5">
+                      {preview.candidates.map((candidate) => (
+                        <li key={candidate.arrivalLabel} className="text-sm text-emerald-950">
+                          <span className="font-bold">{candidate.arrivalLabel} 着</span>
+                          <span className="ml-2 text-xs text-emerald-800">
+                            （{candidate.shipLabel} 発送・{candidate.selectableUntilLabel} まで選択可能）
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <Typography variant="caption" className="!mt-2 block text-emerald-800">
+                      早すぎる・遅すぎると感じたら、上の日数や曜日を調整してください。
+                    </Typography>
+                  </>
+                ) : preview?.note ? (
+                  <Typography variant="body2" className="!mt-3 text-amber-800">
+                    {preview.note}
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" className="!mt-3 text-emerald-900">
+                    確認しています...
+                  </Typography>
+                )}
+              </div>
+
+              <Alert severity="info">
+                臨時休業や出張などで発送できない日は
+                <a href="/calendar" className="mx-1 font-semibold underline">
+                  休業日カレンダー
+                </a>
+                に登録しておくと、候補日の自動生成から除外されます。
+              </Alert>
+            </>
+          ) : null}
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <Typography variant="h6" className="font-semibold text-slate-900">
+          予約のご案内（サロン・施術など）
+        </Typography>
+        <Typography variant="body2" className="!mt-1 text-slate-500">
+          ご来店・施術に予約が必要なサービスはここで設定します。交換申請を承認すると、申請者へ予約先が自動でメール案内されます。
+        </Typography>
+
+        <Stack spacing={2.5} className="!mt-4">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={reservation.enabled}
+                onChange={(_event, checked) => setReservation((prev) => ({ ...prev, enabled: checked }))}
+              />
+            }
+            label="交換承認後に、申請者自身による予約が必要（予約サイト・電話予約など）"
+          />
+
+          {reservation.enabled ? (
+            <>
+              <TextField
+                label="予約ページURL"
+                fullWidth
+                type="url"
+                value={reservation.reservationUrl}
+                onChange={(event) =>
+                  setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
+                }
+                placeholder="https://beauty.hotpepper.jp/... （メニュー直リンクがおすすめ）"
+                helperText="ホットペッパービューティー等の予約ページのURL。対象メニューに直接飛べるURLだと申請者が迷いません。"
+              />
+              <TextField
+                label="予約方法・注意事項"
+                fullWidth
+                multiline
+                minRows={3}
+                value={reservation.instructions}
+                onChange={(event) =>
+                  setReservation((prev) => ({ ...prev, instructions: event.target.value }))
+                }
+                placeholder={"例）お電話（052-XXX-XXXX）でもご予約いただけます。\n予約時に備考欄へ交換番号をご記入ください。"}
+                helperText="電話予約のみの場合はこちらに記載してください。URLと予約方法のどちらか一方は必須です。"
+              />
+              <Alert severity="info">
+                申請者には、承認時のメールと交換履歴の詳細画面で「予約先」と「交換番号」を案内します。
+                予約時に交換番号を伝えてもらう運用のため、ご来店時に交換番号を確認し、
+                サービス提供が済んだらこの画面の交換管理から「完了」へ進めてください。
+              </Alert>
+            </>
+          ) : null}
+        </Stack>
+      </Paper>
+
+      <Paper elevation={0} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <Typography variant="h6" className="font-semibold text-slate-900">
           画像
         </Typography>
         <Typography variant="body2" className="!mt-1 text-slate-500">
@@ -532,6 +1009,10 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         </Paper>
       ) : null}
 
+      {/* エラーはページ上部にも出すが、押下直後に視線があるボタン付近にも表示して
+          「押したのに登録されない」状態に気づけるようにする。 */}
+      {error ? <Alert severity="error">{error}</Alert> : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         <Button
           variant="outlined"
@@ -542,15 +1023,65 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         >
           一覧へ戻る
         </Button>
-        <Button
-          variant="contained"
-          disabled={submitting || uploadingTarget !== null}
-          onClick={handleSubmit}
-          className="!rounded-full !px-7 !py-3"
-        >
-          {submitting ? "保存中..." : mode === "create" ? "登録する" : "変更を保存"}
-        </Button>
+        {mode === "create" ? (
+          <>
+            <Button
+              variant="outlined"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("DRAFT")}
+              className="!rounded-full !px-6 !py-3"
+            >
+              {submitting ? "保存中..." : "下書き保存"}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("PUBLISH")}
+              className="!rounded-full !px-7 !py-3"
+            >
+              {submitting ? "保存中..." : "登録して公開する"}
+            </Button>
+          </>
+        ) : isDraftEdit ? (
+          <>
+            <Button
+              variant="outlined"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("SAVE")}
+              className="!rounded-full !px-6 !py-3"
+            >
+              {submitting ? "保存中..." : "下書きを保存"}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={submitting || uploadingTarget !== null}
+              onClick={() => handleSubmit("PUBLISH")}
+              className="!rounded-full !px-7 !py-3"
+            >
+              {submitting ? "保存中..." : "保存して公開する"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            variant="contained"
+            disabled={submitting || uploadingTarget !== null}
+            onClick={() => handleSubmit("SAVE")}
+            className="!rounded-full !px-7 !py-3"
+          >
+            {submitting ? "保存中..." : "変更を保存"}
+          </Button>
+        )}
       </div>
+      {mode === "create" ? (
+        <p className="text-right text-xs text-slate-500">
+          「登録して公開する」を押すと、すぐに申請者の商品交換ページに表示されます。まだ公開したくない場合は「下書き保存」を選んでください（入力が途中でも保存でき、一覧からいつでも公開できます。公開時に必須項目のチェックが行われます）。
+        </p>
+      ) : null}
+      {isDraftEdit ? (
+        <p className="text-right text-xs text-slate-500">
+          この商品は下書きです。「下書きを保存」は入力が途中でも保存できます。「保存して公開する」を押すと必須項目のチェックのうえ、申請者の商品交換ページに公開されます。
+        </p>
+      ) : null}
         </div>
 
         <MerchandiseFormPreview
@@ -569,6 +1100,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           expiration={form.expiration}
           deliverySchedule={form.deliverySchedule}
           notes={form.notes}
+          reservationEnabled={reservation.enabled}
         />
       </div>
     </div>

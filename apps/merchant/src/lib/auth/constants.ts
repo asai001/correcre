@@ -10,6 +10,7 @@ export const MERCHANT_PROTECTED_PATH_PREFIXES = [
   "/dashboard",
   "/merchandise",
   "/exchanges",
+  "/calendar",
   "/settlement",
   "/support",
   "/company-info",

@@ -1,6 +1,11 @@
 export type { CsvCell } from "./lib/csv";
 export { downloadCsv } from "./lib/csv";
 
+export { sanitizeFileName } from "./lib/file-name";
+
+export type { XlsxCell, XlsxOptions } from "./lib/xlsx";
+export { buildXlsx, downloadExcel, XLSX_MIME_TYPE } from "./lib/xlsx";
+
 export type { AnalysisDateRange, AnalysisMonthOption } from "./lib/analysis-date-range";
 export {
   getAnalysisMonthEndDate,
@@ -30,9 +35,19 @@ export { default as MonthlyAchievementRadar } from "./individual-analysis/ui/Mon
 export type { ColumnDef, TableProps } from "./components/Table";
 export { default as Table } from "./components/Table";
 
+export type { DataExportButtonProps } from "./components/DataExportButton";
+export { default as DataExportButton } from "./components/DataExportButton";
+
+export type { DataExportDateRange, DataExportDialogProps, DataExportFormat } from "./components/DataExportDialog";
+export { default as DataExportDialog } from "./components/DataExportDialog";
+
 export type { RecentReport } from "./recent-reports/model/types";
+export { buildRecentReportsExportRows } from "./recent-reports/model/export-rows";
 export { fetchRecentReports } from "./recent-reports/api/client";
 export { useRecentReports } from "./recent-reports/hooks/useRecentReports";
+export type { RecentReportsExportOptions } from "./recent-reports/ui/RecentReports";
 export { default as RecentReports } from "./recent-reports/ui/RecentReports";
+export type { RecentReportsExportButtonProps } from "./recent-reports/ui/RecentReportsExportButton";
+export { default as RecentReportsExportButton } from "./recent-reports/ui/RecentReportsExportButton";
 export type { RecentReportsPagination } from "./recent-reports/ui/RecentReportsView";
 export { default as RecentReportsView } from "./recent-reports/ui/RecentReportsView";

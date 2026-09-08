@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { nowYYYYMMDD } from "@correcre/lib";
+import { nowYYYYMMDD, reflectPoints } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -165,6 +165,9 @@ function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
   const { lastName, firstName, lastNameKana, firstNameKana } = getNameFields(user);
   const name = joinNameParts(lastName, firstName);
   const nameKana = joinNameKanaParts(lastNameKana, firstNameKana);
+  // DB の生値は「翌月反映」前の値のまま残っていることがある（反映は読み書き時の遅延評価のため）。
+  // 従業員アプリと同じく reflectPoints を通し、利用可能残高と翌月反映待ちを分けて返す。
+  const reflected = reflectPoints(user);
 
   return {
     userId: user.userId,
@@ -182,7 +185,8 @@ function toEmployee(user: DBUserItem): EmployeeManagementEmployee | null {
     email: user.email,
     phoneNumber: normalizeOptionalText(user.phoneNumber),
     address: user.address,
-    pointBalance: user.currentPointBalance ?? 0,
+    pointBalance: reflected.spendablePoint,
+    pendingPointBalance: reflected.pendingPoint,
     completionRate: user.currentMonthCompletionRate ?? 0,
     joinedAt: user.joinedAt,
     lastLoginAt: user.lastLoginAt,
@@ -542,7 +546,10 @@ export async function getEmployeeManagementSummaryFromDynamo(
     .sort((left, right) => (left.status === "DELETED" ? 1 : 0) - (right.status === "DELETED" ? 1 : 0));
   const nonDeletedEmployees = employees.filter((employee) => employee.status !== "DELETED");
   const activeEmployees = nonDeletedEmployees.filter((employee) => employee.status === "ACTIVE");
-  const totalEmployeePoints = activeEmployees.reduce((sum, employee) => sum + employee.pointBalance, 0);
+  const totalEmployeePoints = activeEmployees.reduce(
+    (sum, employee) => sum + employee.pointBalance + employee.pendingPointBalance,
+    0,
+  );
   const totalCompletionRate = activeEmployees.reduce((sum, employee) => sum + employee.completionRate, 0);
   const departmentOptions: EmployeeDepartmentOption[] = departments
     .filter((department) => department.status !== "INACTIVE")
@@ -815,7 +822,11 @@ export async function updateEmployeeInDynamo(
   const emailChanged = previousEmail.trim().toLowerCase() !== normalizedInput.email;
   const cognitoUsername = targetUser.cognitoSub?.trim();
 
-  const nextUserPointBalance = (targetUser.currentPointBalance ?? 0) + input.pointAdjustment;
+  // 「翌月反映」を適用した後の利用可能残高を基準に調整する。前月以前の pending が
+  // 残っている場合は、この更新のタイミングで利用可能残高への繰り入れも永続化する。
+  const reflected = reflectPoints(targetUser);
+  const nextUserPointBalance = reflected.spendablePoint + input.pointAdjustment;
+  const nextPendingPointBalance = reflected.pendingPoint;
   const nextCompanyPointBalance = company.companyPointBalance - input.pointAdjustment;
 
   if (nextUserPointBalance < 0) {
@@ -838,7 +849,8 @@ export async function updateEmployeeInDynamo(
           occurredAt: now,
           type: "OPERATOR_ADJUSTMENT",
           deltaPoint: input.pointAdjustment,
-          balanceAfter: nextUserPointBalance,
+          // ミッション報酬と同じく、保有総額（利用可能 + 翌月反映待ち）を記録する。
+          balanceAfter: nextUserPointBalance + nextPendingPointBalance,
           sourceType: "OPERATOR_USER_REGISTRATION",
           sourceId: targetUser.userId,
           actorType: "OPERATOR",
@@ -857,6 +869,7 @@ export async function updateEmployeeInDynamo(
     "#roles = :roles",
     "joinedAt = :joinedAt",
     "currentPointBalance = :nextUserPointBalance",
+    "pendingPointBalance = :nextPendingPointBalance",
     "updatedAt = :updatedAt",
     "gsi2pk = :gsi2pk",
     "gsi3pk = :gsi3pk",
@@ -869,6 +882,7 @@ export async function updateEmployeeInDynamo(
   };
   const userExpressionAttributeValues: Record<string, unknown> = {
     ":currentPointBalance": targetUser.currentPointBalance ?? 0,
+    ":nextPendingPointBalance": nextPendingPointBalance,
     ":lastName": normalizedInput.lastName,
     ":firstName": normalizedInput.firstName,
     ":lastNameKana": normalizedInput.lastNameKana,
@@ -900,6 +914,32 @@ export async function updateEmployeeInDynamo(
     userRemoveExpressions.push("address");
   }
 
+  // 繰り入れ済みなら pendingPointYearMonth は不要になるため REMOVE する。
+  if (reflected.pendingPointYearMonth === undefined) {
+    userRemoveExpressions.push("pendingPointYearMonth");
+  } else {
+    userSetExpressions.push("pendingPointYearMonth = :nextPendingPointYearMonth");
+    userExpressionAttributeValues[":nextPendingPointYearMonth"] = reflected.pendingPointYearMonth;
+  }
+
+  // 楽観ロック: pending も絶対値で SET するため、読み込み時点から利用可能残高・pending の
+  // いずれかが他経路（報告提出・交換・繰り入れバッチなど）で更新されていたら失敗させる。
+  const userConditionExpressions = ["currentPointBalance = :currentPointBalance"];
+
+  if (targetUser.pendingPointBalance === undefined) {
+    userConditionExpressions.push("attribute_not_exists(pendingPointBalance)");
+  } else {
+    userConditionExpressions.push("pendingPointBalance = :expectedPendingPointBalance");
+    userExpressionAttributeValues[":expectedPendingPointBalance"] = targetUser.pendingPointBalance;
+  }
+
+  if (targetUser.pendingPointYearMonth === undefined) {
+    userConditionExpressions.push("attribute_not_exists(pendingPointYearMonth)");
+  } else {
+    userConditionExpressions.push("pendingPointYearMonth = :expectedPendingPointYearMonth");
+    userExpressionAttributeValues[":expectedPendingPointYearMonth"] = targetUser.pendingPointYearMonth;
+  }
+
   if (emailChanged && cognitoUsername) {
     try {
       await updateCognitoUserEmail(
@@ -928,7 +968,7 @@ export async function updateEmployeeInDynamo(
                 companyId,
                 sk: buildUserSk(targetUser.userId),
               },
-              ConditionExpression: "currentPointBalance = :currentPointBalance",
+              ConditionExpression: userConditionExpressions.join(" AND "),
               UpdateExpression: `${userSetExpressions.length ? `SET ${userSetExpressions.join(", ")}` : ""}${userRemoveExpressions.length ? ` REMOVE ${userRemoveExpressions.join(", ")}` : ""}`,
               ExpressionAttributeNames: userExpressionAttributeNames,
               ExpressionAttributeValues: userExpressionAttributeValues,
@@ -999,6 +1039,8 @@ export async function updateEmployeeInDynamo(
     roles: finalRoles,
     joinedAt: normalizedInput.joinedAt,
     currentPointBalance: nextUserPointBalance,
+    pendingPointBalance: nextPendingPointBalance,
+    pendingPointYearMonth: reflected.pendingPointYearMonth,
     updatedAt: now,
     gsi2pk: buildUserByEmailGsiPk(normalizedInput.email),
     gsi3pk: buildUserByDepartmentGsiPk(companyId, department.departmentId),

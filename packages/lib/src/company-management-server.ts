@@ -10,6 +10,7 @@ import {
   toBillingSnapshotMonth,
   upsertCompanyMonthlyBillingSnapshot,
 } from "./dynamodb/company";
+import { validateAnalysisThresholds } from "./analysis-thresholds";
 import { readRequiredServerEnv } from "./env/server";
 
 import type { Company, CompanyPhilosophy } from "@correcre/types";
@@ -190,6 +191,7 @@ export function toCompanySummary(company: Company): CompanySummary {
     pointUnitLabel: company.pointUnitLabel?.trim() || "pt",
     showPointExchangeLink: company.showPointExchangeLink === true,
     philosophyItems: toCompanyPhilosophyItems(company),
+    analysisThresholds: company.analysisThresholds ?? null,
     updatedAt: company.updatedAt,
   };
 }
@@ -341,6 +343,18 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     throw new Error("調整後のポイントが 0 未満になるため更新できません");
   }
 
+  // undefined = 変更しない / null = 未設定に戻す（システム既定値に従う）。
+  let effectiveAnalysisThresholds = company.analysisThresholds;
+  if (input.analysisThresholds === null) {
+    effectiveAnalysisThresholds = undefined;
+  } else if (input.analysisThresholds !== undefined) {
+    const thresholdError = validateAnalysisThresholds(input.analysisThresholds);
+    if (thresholdError) {
+      throw new Error(thresholdError);
+    }
+    effectiveAnalysisThresholds = input.analysisThresholds;
+  }
+
   const updatedAt = new Date().toISOString();
   const effectivePhilosophy =
     input.philosophyItems === undefined
@@ -368,6 +382,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
         ? input.showPointExchangeLink
         : company.showPointExchangeLink === true,
     philosophy: effectivePhilosophy,
+    analysisThresholds: effectiveAnalysisThresholds,
     updatedAt,
   };
 

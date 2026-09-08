@@ -13,11 +13,9 @@ import {
   Typography,
 } from "@mui/material";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-import { toYYYYMMDDHHmm } from "@correcre/lib";
 import Table, { ColumnDef } from "../../components/Table";
+import { formatReportDateTime, IMAGE_PLACEHOLDER_PATTERN } from "../model/export-rows";
 import type { RecentReport, RecentReportImageRef } from "../model/types";
-
-const IMAGE_PLACEHOLDER_PATTERN = /<image:([^>]+)>/g;
 
 type SelectedImage = {
   fieldKey: string;
@@ -112,6 +110,8 @@ type RecentReportsViewProps = {
   reports: RecentReport[];
   pagination?: RecentReportsPagination;
   showEmployeeName?: boolean;
+  /** 見出し右に置くエクスポートボタン。渡されたときだけ表示する */
+  exportButton?: React.ReactNode;
 };
 
 function getColumns(
@@ -123,7 +123,7 @@ function getColumns(
       id: "date",
       label: "日付",
       width: showEmployeeName ? "15%" : "18%",
-      render: (row) => toYYYYMMDDHHmm(new Date(row.date)).replace("T", " "),
+      render: (row) => formatReportDateTime(row.date),
     },
   ];
 
@@ -164,6 +164,7 @@ export default function RecentReportsView({
   reports,
   pagination,
   showEmployeeName = true,
+  exportButton,
 }: RecentReportsViewProps) {
   const [selectedImage, setSelectedImage] = React.useState<SelectedImage | null>(null);
   const [imageUrl, setImageUrl] = React.useState<string | null>(null);
@@ -275,9 +276,12 @@ export default function RecentReportsView({
 
   return (
     <div className={`mb-8 rounded-2xl bg-white p-6 shadow-lg ${className ?? ""}`}>
-      <div className="mb-4 flex items-center">
-        <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
-        <div className="text-lg font-bold lg:text-2xl">{"報告内容"}</div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center">
+          <FontAwesomeIcon icon={icon} className="mr-3 text-xl lg:text-2xl" style={{ color: iconColor }} />
+          <div className="text-lg font-bold lg:text-2xl">{"報告内容"}</div>
+        </div>
+        {exportButton}
       </div>
 
       <Table columns={columns} rows={displayedReports} footer={footer} />

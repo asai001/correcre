@@ -8,14 +8,18 @@ import {
   buildExchangeHistoryByMerchantGsiPk,
   buildExchangeHistoryByMerchantGsiSk,
   buildExchangeHistoryByMerchantStatusGsiPk,
+  buildExchangeHistoryByScheduleStatusGsiPk,
   buildExchangeHistoryPk,
+  buildExchangeHistoryScheduleGsiSkByExchangedAt,
   buildExchangeHistorySk,
   InsufficientPointBalanceError,
   putExchangeHistoryWithReservation,
 } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
+import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { listMerchantUsersByMerchant } from "@correcre/lib/dynamodb/merchant-user";
 import { createPointTransaction } from "@correcre/lib/dynamodb/point-transaction";
+import { buildInitialSchedule } from "@correcre/lib/schedule/engine";
 import {
   getMerchandise,
   listMerchandiseByStatus,
@@ -26,6 +30,8 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { hasCompleteExchangeRequestProfile } from "@correcre/lib/user-profile";
 import { reflectPoints } from "@correcre/lib/points-reflection";
+import { allocateReservationCode } from "@correcre/lib/reservation-code";
+import { resolveSystemSettingTableName } from "@correcre/lib/dynamodb/system-setting";
 import {
   toPublicMerchandiseSummary,
   type PublicMerchandiseDetail,
@@ -37,6 +43,7 @@ import type {
   Merchant,
   Merchandise,
 } from "@correcre/types";
+import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 import type { RequestExchangeResponse } from "../model/types";
 
@@ -49,6 +56,7 @@ type RuntimeConfig = {
   exchangeHistoryTableName: string;
   pointTransactionTableName: string;
   userTableName: string;
+  merchantCalendarTableName?: string;
 };
 
 const DEFAULT_SES_FROM_EMAIL = "correcre-info@efficient-technology.com";
@@ -66,6 +74,7 @@ function getRuntimeConfig(): RuntimeConfig {
     exchangeHistoryTableName: readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME"),
     pointTransactionTableName: readRequiredServerEnv("DDB_POINT_TRANSACTION_TABLE_NAME"),
     userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
+    merchantCalendarTableName: readOptionalServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
   };
 }
 
@@ -153,10 +162,18 @@ function buildMerchantExchangeRequestEmailBody(params: {
   requestedAt: string;
   usedPoint: number;
   exchangeId: string;
+  reservationCode?: string;
   detailUrl: string;
+  requiresScheduling: boolean;
 }) {
   const exchangeAmountYen = params.usedPoint * EXCHANGE_POINT_YEN_VALUE;
   const greeting = params.merchantName ? `${params.merchantName}\nご担当者様` : "ご担当者様";
+  const schedulingNote = params.requiresScheduling
+    ? `
+
+この商品はお届け日の日程調整が必要です。
+交換詳細画面からお届け候補日を提示し、従業員に選択を依頼してください。`
+    : "";
 
   return `${greeting}
 
@@ -169,7 +186,7 @@ function buildMerchantExchangeRequestEmailBody(params: {
 申請日時：${formatApplicationDateTime(params.requestedAt)}
 交換ポイント数：${formatInteger(params.usedPoint)} pt
 交換相当額：${formatInteger(exchangeAmountYen)}円
-申請番号：${params.exchangeId}
+申請番号：${params.exchangeId}${params.reservationCode ? `\n交換番号：${params.reservationCode}（申請者が予約時に伝える番号）` : ""}${schedulingNote}
 
 申請内容の確認はこちら：
 ${params.detailUrl}
@@ -203,7 +220,9 @@ async function notifyMerchantExchangeRequested(params: {
     requestedAt: params.exchange.requestedAt ?? params.exchange.exchangedAt,
     usedPoint: params.exchange.usedPoint,
     exchangeId: params.exchange.exchangeId,
+    reservationCode: params.exchange.reservationCode,
     detailUrl,
+    requiresScheduling: params.exchange.schedule?.scheduleStatus === "AWAITING_PROPOSAL",
   });
 
   await sendSesEmail(
@@ -438,6 +457,42 @@ export async function requestExchangeForEmployee(params: {
     gsi3pk: buildExchangeHistoryByMerchantGsiPk(merchandise.merchantId),
     gsi3sk: buildExchangeHistoryByMerchantGsiSk(exchangedAt, exchangeId),
   };
+
+  // 予約が必要な商品（サロン等）は、人が読める交換番号（COCR-XXXX、全提携企業共通の連番）を採番する。
+  // 採番に失敗しても申請自体は成立させる（表示側は exchangeId へフォールバックする）。
+  if (merchandise.reservation) {
+    const systemSettingTableName = resolveSystemSettingTableName();
+    if (systemSettingTableName) {
+      try {
+        exchange.reservationCode = await allocateReservationCode({
+          region: config.region,
+          tableName: systemSettingTableName,
+        });
+      } catch (error) {
+        console.error("Failed to allocate reservation code.", { error, exchangeId });
+      }
+    } else {
+      console.warn("System setting table name is unresolved. Skipping reservation code allocation.");
+    }
+  }
+
+  // 日程調整あり商品は候補提示待ちで作成し、merchant 画面の叩き台として候補日を自動生成して保存する。
+  const fulfillment = resolveMerchandiseFulfillment(merchandise.fulfillment);
+  if (fulfillment.requiresScheduling) {
+    const calendar = config.merchantCalendarTableName
+      ? await getMerchantCalendar(
+          {
+            region: config.region,
+            tableName: config.merchantCalendarTableName,
+          },
+          merchandise.merchantId,
+        )
+      : null;
+
+    exchange.schedule = buildInitialSchedule(new Date(now), fulfillment, calendar);
+    exchange.gsi4pk = buildExchangeHistoryByScheduleStatusGsiPk("AWAITING_PROPOSAL");
+    exchange.gsi4sk = buildExchangeHistoryScheduleGsiSkByExchangedAt(exchangedAt);
+  }
 
   await putExchangeHistoryWithReservation(
     {

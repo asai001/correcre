@@ -60,7 +60,9 @@ export default function MerchandiseList({ initialItems, merchantName, merchantDi
   const handleDelete = (item: MerchandiseSummary) => {
     if (
       typeof window !== "undefined" &&
-      !window.confirm(`「${item.merchandiseName}」を削除します。よろしいですか？\nこの操作は取り消せません。`)
+      !window.confirm(
+        `「${item.merchandiseName.trim() || "（無題の下書き）"}」を削除します。よろしいですか？\nこの操作は取り消せません。`,
+      )
     ) {
       return;
     }
@@ -140,7 +142,10 @@ export default function MerchandiseList({ initialItems, merchantName, merchantDi
                   <span className="text-sm font-semibold text-slate-700">{formatPoint(item.requiredPoint)}</span>
                 </div>
                 <div>
-                  <div className="line-clamp-2 text-base font-bold text-slate-900">{item.merchandiseName}</div>
+                  {/* 名称未入力のまま下書き保存された商品でも一覧で識別できるようにする */}
+                  <div className="line-clamp-2 text-base font-bold text-slate-900">
+                    {item.merchandiseName.trim() || <span className="text-slate-400">（無題の下書き）</span>}
+                  </div>
                 </div>
                 {/* 誰がいつ登録・更新したかを一覧上で追えるようにする。 */}
                 <dl className="space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">

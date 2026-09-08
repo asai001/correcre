@@ -154,6 +154,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "丁目・番地",
       "建物名・部屋番号",
       "ポイント",
+      "翌月反映予定ポイント",
       "達成率",
       "入社日",
       "最終ログイン",
@@ -173,6 +174,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       employee.address?.street ?? "-",
       employee.address?.building ?? "-",
       employee.pointBalance,
+      employee.pendingPointBalance,
       `${employee.completionRate}%`,
       formatDate(employee.joinedAt),
       formatDateTime(employee.lastLoginAt),
@@ -264,6 +266,12 @@ function getEmployeeColumns(
             {formatNumber(row.pointBalance)}
             {pointUnitLabel}
           </div>
+          {row.pendingPointBalance > 0 ? (
+            <div className="mt-1 text-xs text-slate-500">
+              翌月反映 +{formatNumber(row.pendingPointBalance)}
+              {pointUnitLabel}
+            </div>
+          ) : null}
           <div className="mt-1 text-xs text-slate-500">達成率 {row.completionRate}%</div>
         </div>
       ),
@@ -653,7 +661,7 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         <StatCard
           label="ユーザーポイント"
           value={`${formatNumber(summary.totalEmployeePoints)}${pointUnitLabel}`}
-          description="ユーザーが保有しているポイントの合計"
+          description="ユーザーが保有しているポイントの合計（翌月反映予定分を含む）"
           accentClassName="bg-blue-500"
         />
         <StatCard

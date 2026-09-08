@@ -9,6 +9,7 @@ import {
   faClock,
   faPaperPlane,
   faRotateLeft,
+  faTruck,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -18,6 +19,12 @@ import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { transitionExchange } from "../api/client";
 import type { ExchangeDetail as ExchangeDetailType } from "../model/types";
+import SchedulePanel from "./SchedulePanel";
+import ShipmentPanel, {
+  EMPTY_SHIPMENT_DRAFT,
+  toShipmentRequest,
+  type ShipmentDraft,
+} from "./ShipmentPanel";
 
 type Props = {
   initial: ExchangeDetailType;
@@ -38,19 +45,22 @@ const TRANSITION_BUTTONS: Record<
   PREPARING: { label: "承認して準備に進める", icon: faPaperPlane, color: "primary" },
   IN_PROGRESS: { label: "対応を開始する", icon: faClock, color: "primary" },
   COMPLETED: { label: "完了にする", icon: faCheck, color: "success", confirm: "完了するとポイントが消費確定となります。よろしいですか？" },
-  REJECTED: { label: "却下する", icon: faXmark, color: "error", confirm: "却下するとポイントが従業員に返却されます。よろしいですか？" },
-  CANCELED: { label: "強制キャンセルする", icon: faXmark, color: "warning", confirm: "強制キャンセルするとポイントが従業員に返却されます。よろしいですか？" },
+  REJECTED: { label: "却下する", icon: faXmark, color: "error", confirm: "却下するとポイントが申請者に返却されます。よろしいですか？" },
+  CANCELED: { label: "強制キャンセルする", icon: faXmark, color: "warning", confirm: "強制キャンセルするとポイントが申請者に返却されます。よろしいですか？" },
   REQUESTED: undefined,
   CANCELLED: undefined,
 };
 
 type TransitionButtonConfig = NonNullable<(typeof TRANSITION_BUTTONS)[ExchangeHistoryStatus]>;
 
-// 遷移ボタンは遷移先ステータスを基準に決まるが、「対応中 → 準備中」は前のステップへ
-// 差し戻す操作なので、専用のラベル・アイコンに切り替える。
+// 遷移ボタンは遷移先ステータスを基準に決まるが、次の 2 つは文脈で意味が変わるので上書きする。
+// - 「対応中 → 準備中」は前のステップへ差し戻す操作
+// - 発送型商品の「準備中 → 対応中」は実質「発送した」の記録。ここで「対応を開始する」と
+//   出ていると、発送後に何を押せばよいのか分からなくなる。
 function resolveTransitionButton(
   fromStatus: ExchangeHistoryStatus,
   nextStatus: ExchangeHistoryStatus,
+  isShipping: boolean,
 ): TransitionButtonConfig | undefined {
   if (fromStatus === "IN_PROGRESS" && nextStatus === "PREPARING") {
     return {
@@ -59,6 +69,10 @@ function resolveTransitionButton(
       color: "warning",
       confirm: "対応中から準備中へ差し戻します。よろしいですか？",
     };
+  }
+
+  if (isShipping && fromStatus === "PREPARING" && nextStatus === "IN_PROGRESS") {
+    return { label: "発送済みにする", icon: faTruck, color: "primary" };
   }
 
   return TRANSITION_BUTTONS[nextStatus];
@@ -188,7 +202,7 @@ function formatApplicantAddress(address?: ApplicantAddress) {
 }
 
 const ACTOR_LABEL: Record<string, string> = {
-  EMPLOYEE: "従業員",
+  EMPLOYEE: "申請者",
   MERCHANT: "提携企業",
   OPERATOR: "運用者",
   SYSTEM: "システム",
@@ -212,13 +226,15 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<ExchangeHistoryStatus | null>(null);
+  const [shipmentDraft, setShipmentDraft] = useState<ShipmentDraft>(EMPTY_SHIPMENT_DRAFT);
   const [, startTransition] = useTransition();
 
   const badge = getExchangeStatusBadge(detail.status);
   const lastEvent = detail.history.at(-1);
+  const isShipping = detail.fulfillmentType === "SHIPPING";
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
-    const button = resolveTransitionButton(detail.status, nextStatus);
+    const button = resolveTransitionButton(detail.status, nextStatus, isShipping);
     if (button?.confirm && typeof window !== "undefined" && !window.confirm(button.confirm)) {
       return;
     }
@@ -232,10 +248,17 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         const updated = await transitionExchange(detail.exchangeId, {
           nextStatus,
           comment: comment.trim() || undefined,
+          // 発送情報は発送済みへ進めるときだけ添える。未入力なら undefined のまま送る。
+          shipment: nextStatus === "IN_PROGRESS" ? toShipmentRequest(shipmentDraft) : undefined,
         });
         setDetail(updated);
         setComment("");
-        setNotice(`状態を「${getExchangeStatusLabel(nextStatus)}」に更新しました。`);
+        setShipmentDraft(EMPTY_SHIPMENT_DRAFT);
+        setNotice(
+          isShipping && nextStatus === "IN_PROGRESS"
+            ? "発送済みにしました。お届け日を過ぎたら「完了にする」へ進めてください。"
+            : `状態を「${getExchangeStatusLabel(nextStatus)}」に更新しました。`,
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : "状態の更新に失敗しました。");
       } finally {
@@ -277,6 +300,11 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge.className}`}>{badge.label}</span>
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-900">{detail.merchandiseName}</div>
+              {detail.reservationCode ? (
+                <div className="mt-1 text-sm font-semibold text-slate-700">
+                  交換番号: <span className="font-mono">{detail.reservationCode}</span>
+                </div>
+              ) : null}
               <div className="mt-1 text-sm text-slate-500">交換ID: {detail.exchangeId}</div>
             </div>
           </div>
@@ -334,17 +362,55 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
         </dl>
       </section>
 
+      {/* 終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
+      {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
+        <Alert severity="warning">
+          <div className="font-bold">申請者から「商品が届いていない」と連絡がありました</div>
+          <div className="mt-1 text-sm">
+            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
+            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
+          </div>
+          <div className="mt-1 text-xs">
+            配送状況をご確認のうえ、対応をお願いします。
+          </div>
+        </Alert>
+      ) : null}
+
+      <SchedulePanel detail={detail} onUpdated={setDetail} />
+
+      <ShipmentPanel
+        detail={detail}
+        draft={shipmentDraft}
+        onDraftChange={setShipmentDraft}
+        onUpdated={setDetail}
+        disabled={pendingStatus !== null}
+      />
+
+      {detail.reservationRequired && !isCanceledStatus(detail.status) ? (
+        <Alert severity="info">
+          この商品は予約が必要なサービスです。承認すると、申請者へ予約先と交換番号（
+          {detail.reservationCode ?? detail.exchangeId}
+          ）が自動でメール案内されます。ご予約・ご来店時に交換番号を確認し、サービス提供が済んだら「完了」へ進めてください。
+        </Alert>
+      ) : null}
+
       {detail.allowedNextStatuses.length > 0 ? (
         <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <h2 className="text-lg font-bold text-slate-900">状態を更新する</h2>
           <p className="mt-1 text-sm text-slate-500">
             選択した次の状態に応じて、自動でタイムスタンプとポイント精算が行われます。
+            {detail.schedule &&
+            (detail.schedule.scheduleStatus === "AWAITING_PROPOSAL" ||
+              detail.schedule.scheduleStatus === "AWAITING_SELECTION" ||
+              detail.schedule.scheduleStatus === "AWAITING_MERCHANT_RESPONSE")
+              ? "お届け日が確定すると自動で「準備中」に進みます。ここでは却下・強制キャンセルのみ操作できます。"
+              : null}
           </p>
 
           <TextField
             className="!mt-4"
             label="コメント（任意）"
-            placeholder="従業員には表示されません。社内向けのメモとして履歴に残します。"
+            placeholder="申請者には表示されません。社内向けのメモとして履歴に残します。"
             fullWidth
             multiline
             minRows={2}
@@ -354,7 +420,7 @@ export default function ExchangeDetail({ initial, merchantName, merchantDisplayN
 
           <div className="mt-5 flex flex-wrap gap-3">
             {detail.allowedNextStatuses.map((nextStatus) => {
-              const button = resolveTransitionButton(detail.status, nextStatus);
+              const button = resolveTransitionButton(detail.status, nextStatus, isShipping);
               if (!button) return null;
               return (
                 <Button

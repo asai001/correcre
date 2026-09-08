@@ -16,6 +16,9 @@ import {
   updateMerchandiseStatus,
 } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
+import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
+import { formatWeekdayJa } from "@correcre/lib/date/business-days";
+import { generateCandidates } from "@correcre/lib/schedule/engine";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import {
@@ -37,15 +40,20 @@ import {
   type MerchandiseImageTarget,
 } from "@correcre/lib/s3/merchandise-image";
 import type {
+  FulfillmentType,
   Merchant,
   Merchandise,
   MerchandiseAuditActor,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
   MerchandiseImageRef,
+  MerchandiseReservation,
   MerchandiseStatus,
   MerchantUserItem,
+  ProductFulfillment,
+  TemperatureZone,
 } from "@correcre/types";
+import { AVAILABLE_TIME_SLOT_VALUES, DEFAULT_CANDIDATE_COUNT } from "@correcre/types";
 
 import type {
   CreateMerchandiseRequest,
@@ -53,6 +61,7 @@ import type {
   MerchandiseSummary,
   RequestUploadUrlResponse,
   RequestViewUrlResponse,
+  SchedulePreviewResponse,
   UpdateMerchandiseRequest,
 } from "../model/types";
 
@@ -180,28 +189,221 @@ function getNextMerchandiseId(items: Merchandise[]) {
   return `md-${String(nextNumber).padStart(3, "0")}`;
 }
 
-function normalizeFormPayload(input: MerchandiseFormPayload) {
-  const heading = input.heading.trim();
-  const merchandiseName = input.merchandiseName.trim();
-  const serviceDescription = input.serviceDescription.trim();
-  const serviceArea = input.serviceArea.trim();
+const ALLOWED_FULFILLMENT_TYPES: FulfillmentType[] = ["SHIPPING", "STORE_PICKUP"];
+const ALLOWED_TEMPERATURE_ZONES: TemperatureZone[] = ["AMBIENT", "REFRIGERATED", "FROZEN"];
+const CUTOFF_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-  if (!heading || !merchandiseName || !serviceDescription || !serviceArea) {
+// draft=true のときは「必須」系のチェック（発送可能曜日）だけをスキップする。
+// 形式・範囲のチェックは、入力欄に既定値があり通常は通るため下書きでも行う。
+function normalizeFulfillment(
+  input: ProductFulfillment | undefined,
+  draft = false,
+): ProductFulfillment | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  if (!ALLOWED_FULFILLMENT_TYPES.includes(input.fulfillmentType)) {
+    throw new Error("受け渡し方法が不正です");
+  }
+
+  if (!ALLOWED_TEMPERATURE_ZONES.includes(input.temperatureZone)) {
+    throw new Error("温度帯が不正です");
+  }
+
+  const requiresScheduling = input.requiresScheduling === true;
+
+  const leadTimeBusinessDays = Math.floor(Number(input.leadTimeBusinessDays));
+  if (!Number.isFinite(leadTimeBusinessDays) || leadTimeBusinessDays < 0 || leadTimeBusinessDays > 30) {
+    throw new Error("発送準備の営業日数は 0〜30 で入力してください");
+  }
+
+  const transitDays = Math.floor(Number(input.transitDays));
+  if (!Number.isFinite(transitDays) || transitDays < 0 || transitDays > 14) {
+    throw new Error("配送日数は 0〜14 で入力してください");
+  }
+
+  const shippableWeekdays = Array.from(
+    new Set((input.shippableWeekdays ?? []).map((day) => Math.floor(Number(day)))),
+  )
+    .filter((day) => day >= 0 && day <= 6)
+    .sort((a, b) => a - b);
+
+  if (!draft && requiresScheduling && shippableWeekdays.length === 0) {
+    throw new Error("発送できる曜日を1つ以上選んでください");
+  }
+
+  if (!CUTOFF_TIME_PATTERN.test(input.cutoffTime)) {
+    throw new Error("受付締切時刻は HH:mm 形式で入力してください");
+  }
+
+  const availableTimeSlots = (input.availableTimeSlots ?? []).filter((slot) =>
+    AVAILABLE_TIME_SLOT_VALUES.includes(slot),
+  );
+
+  const candidateCount = Math.floor(Number(input.candidateCount));
+  if (!Number.isFinite(candidateCount) || candidateCount < 1 || candidateCount > 10) {
+    throw new Error("候補日の件数は 1〜10 で入力してください");
+  }
+
+  return {
+    fulfillmentType: input.fulfillmentType,
+    temperatureZone: input.temperatureZone,
+    requiresScheduling,
+    leadTimeBusinessDays,
+    transitDays,
+    shippableWeekdays,
+    cutoffTime: input.cutoffTime,
+    availableTimeSlots,
+    candidateCount: candidateCount || DEFAULT_CANDIDATE_COUNT,
+  };
+}
+
+const RESERVATION_URL_MAX_LENGTH = 2048;
+const RESERVATION_INSTRUCTIONS_MAX_LENGTH = 1000;
+
+// 予約案内の設定。オブジェクト自体が無い場合は「予約不要」の商品として扱う。
+// draft=true のときは URL・予約方法とも未入力を許し、その場合は「予約不要」として保存する
+// （中身が空の予約設定を残すと、承認メールや案内画面の予約判定が不整合になるため）。
+function normalizeReservation(
+  input: MerchandiseReservation | undefined,
+  draft = false,
+): MerchandiseReservation | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const reservationUrl = input.reservationUrl?.trim() || undefined;
+  const instructions = input.instructions?.trim() || undefined;
+
+  if (!reservationUrl && !instructions) {
+    if (draft) {
+      return undefined;
+    }
+    throw new Error("予約ページURLまたは予約方法のどちらかを入力してください");
+  }
+
+  if (reservationUrl) {
+    if (reservationUrl.length > RESERVATION_URL_MAX_LENGTH) {
+      throw new Error("予約ページURLが長すぎます");
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(reservationUrl);
+    } catch {
+      throw new Error("予約ページURLの形式が正しくありません（https:// から入力してください）");
+    }
+
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("予約ページURLは http(s) の URL を入力してください");
+    }
+  }
+
+  if (instructions && instructions.length > RESERVATION_INSTRUCTIONS_MAX_LENGTH) {
+    throw new Error(`予約方法は ${RESERVATION_INSTRUCTIONS_MAX_LENGTH} 文字以内で入力してください`);
+  }
+
+  return { reservationUrl, instructions };
+}
+
+// "YYYY-MM-DD" を「9月4日(金)」形式にする
+function formatDateLabel(date: string): string {
+  const [, month, day] = date.split("-").map(Number);
+  return `${month}月${day}日(${formatWeekdayJa(date)})`;
+}
+
+// ISO8601（UTC）を JST の「9月2日(水) 12:00」形式にする
+function formatDeadlineLabel(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const ymd = `${get("year")}-${get("month")}-${get("day")}`;
+  return `${formatDateLabel(ymd)} ${get("hour")}:${get("minute")}`;
+}
+
+/**
+ * 入力中の配送設定で、実際に従業員へ提示される候補日を返す。
+ * 設定を保存する前に結果を確認できるようにするためのもので、
+ * 日付の計算・表記はすべてここ（サーバー側）で行う。
+ */
+export async function previewScheduleForMerchandise(
+  merchantId: string,
+  input: ProductFulfillment,
+): Promise<SchedulePreviewResponse> {
+  const config = getRuntimeConfig();
+
+  // 入力途中で曜日が空になるのは普通の状態なので、検証エラーにせず案内に留める
+  if (!input.shippableWeekdays || input.shippableWeekdays.length === 0) {
+    return { candidates: [], note: "発送できる曜日を1つ以上選ぶと、お届け日の候補が表示されます。" };
+  }
+
+  const fulfillment = normalizeFulfillment(input);
+
+  if (!fulfillment) {
+    return { candidates: [], note: "配送の設定を入力してください。" };
+  }
+
+  const calendar = await getMerchantCalendar(
+    {
+      region: config.region,
+      tableName: readRequiredServerEnv("DDB_MERCHANT_CALENDAR_TABLE_NAME"),
+    },
+    merchantId,
+  );
+
+  const candidates = generateCandidates(new Date(), fulfillment, calendar);
+
+  if (candidates.length === 0) {
+    return {
+      candidates: [],
+      note: "この設定では、当面のお届け日の候補が作れません。発送できる曜日や休業日の登録を見直してください。",
+    };
+  }
+
+  return {
+    candidates: candidates.map((candidate) => ({
+      arrivalLabel: formatDateLabel(candidate.arrivalDate),
+      shipLabel: formatDateLabel(candidate.shipDate),
+      selectableUntilLabel: formatDeadlineLabel(candidate.selectableUntil),
+    })),
+  };
+}
+
+// draft=true（下書き保存・下書きの編集）のときは必須チェックをスキップし、入力途中でも保存できるようにする。
+// 未入力のまま公開されないよう、公開遷移時に collectMerchandisePublishBlockers で完全性を検査する。
+function normalizeFormPayload(input: MerchandiseFormPayload, options?: { draft?: boolean }) {
+  const draft = options?.draft === true;
+  const heading = input.heading?.trim() ?? "";
+  const merchandiseName = input.merchandiseName?.trim() ?? "";
+  const serviceDescription = input.serviceDescription?.trim() ?? "";
+  const serviceArea = input.serviceArea?.trim() ?? "";
+
+  if (!draft && (!heading || !merchandiseName || !serviceDescription || !serviceArea)) {
     throw new Error("商品の必須項目を入力してください");
   }
 
-  if (!Number.isFinite(input.priceYen) || input.priceYen <= 0) {
+  // 価格未入力の下書きは 0 円（必要ポイント 0）として保存する（公開時にブロックされる）。
+  const rawPriceYen = Number(input.priceYen);
+  if (!draft && (!Number.isFinite(rawPriceYen) || rawPriceYen <= 0)) {
     throw new Error("価格は正の数で入力してください");
   }
 
-  const priceYen = Math.floor(input.priceYen);
-  const requiredPoint = Math.ceil(priceYen / 5);
+  const priceYen = Number.isFinite(rawPriceYen) && rawPriceYen > 0 ? Math.floor(rawPriceYen) : 0;
+  const requiredPoint = priceYen > 0 ? Math.ceil(priceYen / 5) : 0;
 
   const deliveryMethods = (input.deliveryMethods ?? []).filter((method): method is MerchandiseDeliveryMethod =>
     ALLOWED_DELIVERY_METHODS.includes(method),
   );
 
-  if (deliveryMethods.length === 0) {
+  if (!draft && deliveryMethods.length === 0) {
     throw new Error("提供方法を1つ以上選択してください");
   }
 
@@ -211,7 +413,7 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
 
   const genreOther = input.genre === "その他" ? input.genreOther?.trim() : undefined;
 
-  if (input.genre === "その他" && !genreOther) {
+  if (!draft && input.genre === "その他" && !genreOther) {
     throw new Error("ジャンル（その他）を入力してください");
   }
 
@@ -219,6 +421,8 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
   const expiration = input.expiration?.trim() || undefined;
   const deliverySchedule = input.deliverySchedule?.trim() || undefined;
   const notes = input.notes?.trim() || undefined;
+  const fulfillment = normalizeFulfillment(input.fulfillment, draft);
+  const reservation = normalizeReservation(input.reservation, draft);
 
   return {
     heading,
@@ -234,7 +438,27 @@ function normalizeFormPayload(input: MerchandiseFormPayload) {
     expiration,
     deliverySchedule,
     notes,
+    fulfillment,
+    reservation,
   };
+}
+
+// 公開するために埋まっている必要がある項目の不足一覧（表示用ラベル）。
+// 下書きは必須チェックなしで保存できるため、公開遷移時にここで完全性を検査する。
+function collectMerchandisePublishBlockers(item: Merchandise): string[] {
+  const blockers: string[] = [];
+
+  if (!item.merchandiseName?.trim()) blockers.push("商品・サービス名");
+  if (!item.serviceDescription?.trim()) blockers.push("商品・サービス内容");
+  if (!Number.isFinite(item.priceYen) || item.priceYen <= 0) blockers.push("価格");
+  if (!item.deliveryMethods?.length) blockers.push("提供方法");
+  if (!item.serviceArea?.trim()) blockers.push("対応エリア");
+  if (item.genre === "その他" && !item.genreOther?.trim()) blockers.push("ジャンル（その他）");
+  if (item.fulfillment?.requiresScheduling && item.fulfillment.shippableWeekdays.length === 0) {
+    blockers.push("発送できる曜日");
+  }
+
+  return blockers;
 }
 
 async function buildMerchandiseSummary(
@@ -358,7 +582,11 @@ export async function createMerchandiseForMerchant(
   actor?: MerchandiseAuditActor,
 ): Promise<MerchandiseSummary> {
   const config = getRuntimeConfig();
-  const normalized = normalizeFormPayload(input);
+  // 登録ボタン = そのまま公開。初回登録者が「登録したのに表示されない」と迷わないよう、
+  // 明示的に「下書き保存」を選んだときだけ DRAFT で作成する。
+  // 下書きは入力途中でも保存できるよう、必須チェックをスキップする。
+  const status: MerchandiseStatus = input.initialStatus === "DRAFT" ? "DRAFT" : "PUBLISHED";
+  const normalized = normalizeFormPayload(input, { draft: status === "DRAFT" });
   const existing = await listMerchandiseByMerchant(
     {
       region: config.region,
@@ -369,7 +597,6 @@ export async function createMerchandiseForMerchant(
 
   const merchandiseId = getNextMerchandiseId(existing);
   const now = new Date().toISOString();
-  const status: MerchandiseStatus = "DRAFT";
 
   const cardImage = await resolveImage(config, merchantId, merchandiseId, "card", input.cardImage, undefined);
   const detailImage = await resolveImage(
@@ -402,6 +629,10 @@ export async function createMerchandiseForMerchant(
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
+    fulfillment: normalized.fulfillment,
+    reservation: normalized.reservation,
+    // 公開で作成する場合は掲載日・公開日時も登録時点で確定させる
+    ...(status === "PUBLISHED" ? { publishDate: now.slice(0, 10), publishedAt: now } : {}),
     createdBy: actor,
     updatedBy: actor,
     history: appendMerchandiseHistory(undefined, {
@@ -426,7 +657,10 @@ export async function createMerchandiseForMerchant(
     { conditionExpression: "attribute_not_exists(sk)" },
   );
 
-  await notifyOperatorMerchandiseCreated({
+  // 公開で作成した場合は「公開」通知を送る（「登録」通知と二重に送らない）。
+  const notifyOperator =
+    status === "PUBLISHED" ? notifyOperatorMerchandisePublished : notifyOperatorMerchandiseCreated;
+  await notifyOperator({
     config,
     merchantId,
     merchandise: item,
@@ -462,8 +696,15 @@ export async function updateMerchandiseForMerchant(
     throw new Error("Merchandise not found");
   }
 
-  const normalized = normalizeFormPayload(input);
+  // publish=true は「保存して公開する」（下書きの編集画面）。公開を伴うため必須チェックを行う。
+  const publishing = input.publish === true && existing.status !== "PUBLISHED";
+  // 下書きのまま保存する編集は入力途中でも保存できるようにする
+  // （公開する場合と、公開・非公開の商品の編集は従来どおり必須チェック）。
+  const normalized = normalizeFormPayload(input, {
+    draft: existing.status === "DRAFT" && !publishing,
+  });
   const now = new Date().toISOString();
+  const nextStatus: MerchandiseStatus = publishing ? "PUBLISHED" : existing.status;
 
   const cardImage = await resolveImage(
     config,
@@ -482,6 +723,21 @@ export async function updateMerchandiseForMerchant(
     existing.detailImage,
   );
 
+  let history = appendMerchandiseHistory(existing.history, {
+    action: "UPDATED",
+    occurredAt: now,
+    status: existing.status,
+    actor,
+  });
+  if (publishing) {
+    history = appendMerchandiseHistory(history, {
+      action: "STATUS_CHANGED",
+      occurredAt: now,
+      status: nextStatus,
+      actor,
+    });
+  }
+
   const item: Merchandise = {
     ...existing,
     heading: normalized.heading,
@@ -498,15 +754,23 @@ export async function updateMerchandiseForMerchant(
     expiration: normalized.expiration,
     deliverySchedule: normalized.deliverySchedule,
     notes: normalized.notes,
+    fulfillment: normalized.fulfillment ?? existing.fulfillment,
+    // フォームは常に現在の設定を送るため、undefined は「予約不要へ変更」として保存する
+    // （put 時に removeUndefinedValues で属性ごと消える）。
+    reservation: normalized.reservation,
     cardImage,
     detailImage,
+    status: nextStatus,
+    gsi1pk: buildMerchandiseByStatusGsiPk(nextStatus),
+    // 公開する場合は掲載日・公開日時も確定させる（過去に公開済みならその値を維持）
+    ...(publishing
+      ? {
+          publishDate: existing.publishDate ?? now.slice(0, 10),
+          publishedAt: existing.publishedAt ?? now,
+        }
+      : {}),
     updatedBy: actor ?? existing.updatedBy,
-    history: appendMerchandiseHistory(existing.history, {
-      action: "UPDATED",
-      occurredAt: now,
-      status: existing.status,
-      actor,
-    }),
+    history,
     updatedAt: now,
   };
 
@@ -517,6 +781,21 @@ export async function updateMerchandiseForMerchant(
     },
     item,
   );
+
+  if (publishing) {
+    await notifyOperatorMerchandisePublished({
+      config,
+      merchantId,
+      merchandise: item,
+      occurredAt: now,
+    }).catch((notifyError) => {
+      console.error("Failed to send merchandise-published notification.", {
+        error: notifyError,
+        merchantId,
+        merchandiseId,
+      });
+    });
+  }
 
   return buildMerchandiseSummary(config, item);
 }
@@ -539,6 +818,16 @@ export async function setMerchandiseStatusForMerchant(
 
   if (!existing) {
     throw new Error("Merchandise not found");
+  }
+
+  // 入力途中で下書き保存された商品を、そのまま公開してしまわないようにする。
+  if (status === "PUBLISHED") {
+    const blockers = collectMerchandisePublishBlockers(existing);
+    if (blockers.length > 0) {
+      throw new Error(
+        `未入力の項目があるため公開できません（${blockers.join("、")}）。編集画面で入力してから公開してください`,
+      );
+    }
   }
 
   const shouldNotifyPublished = status === "PUBLISHED" && existing.status !== "PUBLISHED";

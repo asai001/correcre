@@ -57,7 +57,14 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-5">
-        <RecentReports companyId={companyId} />
+        <RecentReports
+          companyId={companyId}
+          exportOptions={{
+            fileBaseName: "dashboard-recent-reports",
+            sheetName: "報告内容",
+            startYearMonth: company?.createdAt.slice(0, 7),
+          }}
+        />
       </div>
     </>
   );

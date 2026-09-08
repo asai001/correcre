@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
 import { InvalidExchangeStatusTransitionError } from "@correcre/lib/dynamodb/exchange-history";
+import { InvalidShipmentInputError } from "@correcre/lib/shipment/tracking";
 import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { transitionExchangeForMerchant } from "@merchant/features/exchanges/api/server";
@@ -67,6 +68,7 @@ export async function POST(req: Request, { params }: RouteParams) {
       actorName: getMerchantViewerName(user!),
       nextStatus: body.nextStatus,
       comment: body.comment,
+      shipment: body.shipment,
     });
 
     return NextResponse.json(detail);
@@ -75,6 +77,11 @@ export async function POST(req: Request, { params }: RouteParams) {
 
     if (err instanceof InvalidExchangeStatusTransitionError) {
       return NextResponse.json({ error: "invalid_transition" }, { status: 400 });
+    }
+
+    // 発送情報の入力エラーは文言をそのまま画面に出す（何を直せばよいか分かるように）。
+    if (err instanceof InvalidShipmentInputError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
 
     if (isAwsCredentialError(err)) {

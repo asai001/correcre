@@ -1,3 +1,5 @@
+import type { AnalysisThresholds } from "../analysis";
+
 type CompanyItemStatus = "ACTIVE" | "INACTIVE" | "TRIAL";
 type CompanyPlan = "TRIAL" | "STANDARD" | "ENTERPRISE";
 
@@ -80,6 +82,9 @@ export type Company = {
   allowedEmailDomains?: string[];
   showPointExchangeLink?: boolean;
   philosophy?: CompanyPhilosophy;
+  // 項目分析の閾値の企業既定値。未設定ならシステム既定値（80% / 40%）を使う。
+  // ミッション側に設定があればそちらが優先される。
+  analysisThresholds?: AnalysisThresholds;
 
   createdAt: string;
   updatedAt: string;

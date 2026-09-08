@@ -4,6 +4,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faClockRotateLeft, faPenToSquare, faCalendarCheck } from "@fortawesome/free-solid-svg-icons";
 import { Button } from "@mui/material";
 
+import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
+import type { AnalysisThresholds } from "@correcre/types";
 import type { OperatorMissionSummary } from "../model/types";
 
 type MissionCardProps = {
@@ -12,11 +14,21 @@ type MissionCardProps = {
   onHistory: () => void;
   onCancelSchedule: () => void;
   cancelingSchedule?: boolean;
+  // 企業の項目分析の既定閾値（未設定なら null）。個別設定が無いミッションの実効値表示に使う。
+  companyThresholds: AnalysisThresholds | null;
 };
 
-export default function MissionCard({ mission, onEdit, onHistory, onCancelSchedule, cancelingSchedule }: MissionCardProps) {
+export default function MissionCard({
+  mission,
+  onEdit,
+  onHistory,
+  onCancelSchedule,
+  cancelingSchedule,
+  companyThresholds,
+}: MissionCardProps) {
   const actionLabel = mission.configured ? "編集" : "新規設定";
   const pending = mission.pendingChange;
+  const effectiveThresholds = resolveAnalysisThresholds(mission.analysisThresholds, companyThresholds);
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-200/50">
@@ -51,6 +63,13 @@ export default function MissionCard({ mission, onEdit, onHistory, onCancelSchedu
             </span>
             <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">
               {mission.fields.length} フィールド
+            </span>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500">
+            項目分析の閾値: 高 {effectiveThresholds.goodRate}% 以上 / 改善 {effectiveThresholds.improvementRate}% 以下
+            <span className="ml-1 text-slate-400">
+              {mission.analysisThresholds ? "（このミッションの個別設定）" : "（企業の既定値）"}
             </span>
           </div>
 

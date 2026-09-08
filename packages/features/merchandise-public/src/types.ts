@@ -3,8 +3,11 @@ import type {
   Merchandise,
   MerchandiseDeliveryMethod,
   MerchandiseGenre,
+  MerchandiseReservation,
   MerchandiseTag,
+  ProductFulfillment,
 } from "@correcre/types";
+import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 export type PublicMerchandiseSummary = {
   merchandiseId: string;
@@ -30,6 +33,10 @@ export type PublicMerchandiseSummary = {
   notes?: string;
   favoriteCount?: number;
   createdAt?: string;
+  // 配送・日程調整の設定（未設定の既存商品は既定値で埋めて返す）
+  fulfillment: ProductFulfillment;
+  // 外部予約の案内設定（予約が不要な商品は undefined）
+  reservation?: MerchandiseReservation;
 };
 
 export type PublicMerchandiseDetail = PublicMerchandiseSummary;
@@ -63,6 +70,8 @@ export function toPublicMerchandiseSummary(
     notes: merchandise.notes,
     favoriteCount: merchandise.favoriteCount,
     createdAt: merchandise.createdAt,
+    fulfillment: resolveMerchandiseFulfillment(merchandise.fulfillment),
+    reservation: merchandise.reservation,
   };
 }
 

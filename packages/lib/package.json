@@ -11,6 +11,9 @@
   "main": "./src/index.ts",
   "module": "./src/index.ts",
   "sideEffects": false,
+  "scripts": {
+    "test": "jest"
+  },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1019.0",
     "@aws-sdk/client-s3": "^3.1019.0",
@@ -22,6 +25,9 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20"
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5"
   }
 }

@@ -108,7 +108,7 @@ describe("InfraStack", () => {
     const template = Template.fromStack(createStack("dev"));
     const devUserTable = getSingleTableResource(template, "correcre-user-dev");
 
-    template.resourceCountIs("AWS::DynamoDB::Table", 18);
+    template.resourceCountIs("AWS::DynamoDB::Table", 20);
 
     template.hasResourceProperties(
       "AWS::DynamoDB::Table",
@@ -268,6 +268,129 @@ describe("InfraStack", () => {
         ]),
       }),
     );
+
+    // 配送日程調整: ExchangeHistory のスパース GSI（日次バッチの横断クエリ用）
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-exchange-history-dev",
+        GlobalSecondaryIndexes: Match.arrayWith([
+          Match.objectLike({
+            IndexName: "ExchangeHistoryByScheduleStatus",
+            KeySchema: Match.arrayWith([
+              Match.objectLike({
+                AttributeName: "gsi4pk",
+                KeyType: "HASH",
+              }),
+              Match.objectLike({
+                AttributeName: "gsi4sk",
+                KeyType: "RANGE",
+              }),
+            ]),
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-merchant-calendar-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "merchantId",
+            KeyType: "HASH",
+          }),
+        ]),
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::DynamoDB::Table",
+      Match.objectLike({
+        TableName: "correcre-schedule-event-dev",
+        KeySchema: Match.arrayWith([
+          Match.objectLike({
+            AttributeName: "pk",
+            KeyType: "HASH",
+          }),
+          Match.objectLike({
+            AttributeName: "sk",
+            KeyType: "RANGE",
+          }),
+        ]),
+      }),
+    );
+  });
+
+  test("schedules the monthly point reflection batch at 00:05 JST on the 1st", () => {
+    const template = Template.fromStack(createStack("stg"));
+
+    template.hasResourceProperties(
+      "AWS::Lambda::Function",
+      Match.objectLike({
+        FunctionName: "correcre-point-reflection-stg",
+        Handler: "index.handler",
+        Environment: {
+          Variables: Match.objectLike({
+            // テーブル名は Ref トークンとして解決されるため、値の存在のみ検証する。
+            USER_TABLE_NAME: Match.anyValue(),
+          }),
+        },
+      }),
+    );
+
+    // JST の毎月1日 00:05 = UTC の前月末日 15:05（cron の "L" は月末日）。
+    template.hasResourceProperties(
+      "AWS::Events::Rule",
+      Match.objectLike({
+        Name: "correcre-point-reflection-stg",
+        ScheduleExpression: "cron(5 15 L * ? *)",
+        State: "ENABLED",
+      }),
+    );
+
+    template.hasResourceProperties(
+      "AWS::CloudWatch::Alarm",
+      Match.objectLike({
+        AlarmName: "correcre-point-reflection-errors-stg",
+        MetricName: "Errors",
+        Namespace: "AWS/Lambda",
+        Threshold: 1,
+        ComparisonOperator: "GreaterThanOrEqualToThreshold",
+        TreatMissingData: "notBreaching",
+      }),
+    );
+  });
+
+  test("grants the point reflection batch access to the user table", () => {
+    const template = Template.fromStack(createStack("stg"));
+    const inlinePolicies = template.findResources("AWS::IAM::Policy");
+
+    type PolicyResource = {
+      Properties: {
+        PolicyDocument: {
+          Statement: Array<{ Action?: unknown; Effect?: string }>;
+        };
+      };
+    };
+
+    // Vercel OIDC ロールも DynamoDB 権限を持つため、Lambda のロールに紐付くポリシーに限定して検証する。
+    const batchPolicy = Object.entries(inlinePolicies).find(([logicalId]) =>
+      logicalId.startsWith("PointReflectionFunctionServiceRoleDefaultPolicy"),
+    )?.[1] as PolicyResource | undefined;
+
+    expect(batchPolicy).toBeDefined();
+
+    const dynamoStatement = (batchPolicy?.Properties.PolicyDocument.Statement ?? []).find((stmt) => {
+      const action = stmt.Action;
+      if (!Array.isArray(action)) {
+        return false;
+      }
+      return action.includes("dynamodb:Scan") && action.includes("dynamodb:UpdateItem") && stmt.Effect === "Allow";
+    });
+
+    expect(dynamoStatement).toBeDefined();
   });
 
   test("uses retain and point-in-time recovery only in production", () => {

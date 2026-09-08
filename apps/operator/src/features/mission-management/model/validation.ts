@@ -1,3 +1,4 @@
+import { validateAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import type { MissionField } from "@correcre/types";
 
 import type { UpdateMissionInput } from "./types";
@@ -27,6 +28,14 @@ export function validateMissionInput(input: UpdateMissionInput): string | null {
 
   if (!Number.isInteger(input.score) || input.score < 1) {
     return "点数は 1 以上の整数で入力してください。";
+  }
+
+  // null は「企業既定値に従う」を意味するので検証不要。
+  if (input.analysisThresholds) {
+    const thresholdError = validateAnalysisThresholds(input.analysisThresholds);
+    if (thresholdError) {
+      return thresholdError;
+    }
   }
 
   return validateMissionFields(input.fields);

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { nextMonthYYYYMM, nowYYYYMM, reflectMission } from "@correcre/lib";
+import { validateAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import {
   buildMissionSk,
@@ -116,6 +117,14 @@ function validateUpdateInput(input: UpdateMissionInput): void {
     throw new Error("点数は 1 以上の整数で入力してください。");
   }
 
+  // null / undefined は「企業既定値に従う」を意味するので検証不要。
+  if (input.analysisThresholds) {
+    const thresholdError = validateAnalysisThresholds(input.analysisThresholds);
+    if (thresholdError) {
+      throw new Error(thresholdError);
+    }
+  }
+
   validateMissionFields(input.fields);
 }
 
@@ -216,6 +225,8 @@ export async function updateMissionInDynamo(
       score: input.score,
       enabled: input.enabled,
       fields: input.fields,
+      // null（企業既定に従う）のときは属性ごと持たせない。
+      analysisThresholds: input.analysisThresholds ?? undefined,
       scheduledByUserId: changedByUserId,
       scheduledAt: now,
     };
@@ -250,6 +261,9 @@ export async function updateMissionInDynamo(
     score: input.score,
     enabled: input.enabled,
     fields: input.fields,
+    // null（企業既定に従う）のときは属性ごと持たせない。
+    // Put による全項目置き換えなので、以前設定されていた値もここで消える。
+    analysisThresholds: input.analysisThresholds ?? undefined,
     createdAt: currentMission?.createdAt ?? now,
     updatedAt: now,
   };
@@ -267,6 +281,7 @@ export async function updateMissionInDynamo(
     monthlyCount: input.monthlyCount,
     score: input.score,
     fields: input.fields,
+    analysisThresholds: input.analysisThresholds ?? undefined,
     validFrom: now,
     validTo: null,
     changedByUserId,

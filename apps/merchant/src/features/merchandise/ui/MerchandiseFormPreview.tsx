@@ -11,6 +11,7 @@ import {
   type PublicMerchandiseSummary,
 } from "@correcre/merchandise-public";
 import type { MerchandiseDeliveryMethod, MerchandiseGenre } from "@correcre/types";
+import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 type Props = {
   merchandiseName: string;
@@ -28,6 +29,8 @@ type Props = {
   expiration?: string;
   deliverySchedule?: string;
   notes?: string;
+  // 予約が必要なサービスとして設定中か（詳細プレビューの「ご予約」行の表示用）
+  reservationEnabled?: boolean;
 };
 
 export default function MerchandiseFormPreview(props: Props) {
@@ -49,6 +52,7 @@ export default function MerchandiseFormPreview(props: Props) {
     genre: props.genre as MerchandiseGenre,
     genreOther: props.genreOther || undefined,
     cardImageViewUrl: props.cardImagePreviewUrl,
+    fulfillment: resolveMerchandiseFulfillment(undefined),
   };
 
   // 詳細ページプレビューは従業員アプリの商品交換詳細ページと同じ MerchandiseDetailView を使い、
@@ -60,6 +64,7 @@ export default function MerchandiseFormPreview(props: Props) {
     expiration: props.expiration || undefined,
     deliverySchedule: props.deliverySchedule || undefined,
     notes: props.notes || undefined,
+    reservation: props.reservationEnabled ? {} : undefined,
   };
 
   return (

@@ -9,6 +9,8 @@ import {
   faClock,
   faPaperPlane,
   faRotateLeft,
+  faTruck,
+  faUpRightFromSquare,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -16,7 +18,7 @@ import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { getExchangeStatusBadge, getExchangeStatusLabel } from "@correcre/merchandise-public";
 import type { ExchangeHistoryStatus } from "@correcre/types";
 
-import { transitionExchange } from "../api/client";
+import { clearDeliveryIssue, transitionExchange } from "../api/client";
 import type { OperatorExchangeDetail } from "../model/types";
 
 type Props = {
@@ -57,6 +59,18 @@ function resolveTransitionButton(
       icon: faRotateLeft,
       color: "warning",
       confirm: "対応中から準備中へ差し戻します。よろしいですか？",
+    };
+  }
+
+  // 完了の取り消し（不着・誤配送の救済）。消費確定したポイントを戻し、売上からも外れる
+  // ので、通常のキャンセルとは影響範囲が違う。取り違えないよう文言を分ける。
+  if (fromStatus === "COMPLETED" && nextStatus === "CANCELED") {
+    return {
+      label: "完了を取り消す",
+      icon: faRotateLeft,
+      color: "error",
+      confirm:
+        "完了を取り消し、使用ポイントを申請者に返還します。この交換は収支・精算の集計からも外れます。よろしいですか？",
     };
   }
 
@@ -213,9 +227,37 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<ExchangeHistoryStatus | null>(null);
+  const [clearing, setClearing] = useState(false);
   const [, startTransition] = useTransition();
 
   const badge = getExchangeStatusBadge(detail.status);
+
+  const handleClearDeliveryIssue = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "未着の連絡を解除し、警告と催促を下ろします。交換のステータスは変わりません。よろしいですか？",
+      )
+    ) {
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setClearing(true);
+
+    startTransition(async () => {
+      try {
+        const updated = await clearDeliveryIssue(detail.merchantId, detail.exchangeId);
+        setDetail(updated);
+        setNotice("未着の連絡を解除しました。ステータスは変わっていません。");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "未着連絡の解除に失敗しました。");
+      } finally {
+        setClearing(false);
+      }
+    });
+  };
 
   const handleTransition = (nextStatus: ExchangeHistoryStatus) => {
     const button = resolveTransitionButton(detail.status, nextStatus);
@@ -340,11 +382,97 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
         </dl>
       </section>
 
+      {/* 申請者が待たされている状態なので、運用者が最初に気づくべき情報として上に出す。
+          終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
+      {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
+        <Alert severity="warning">
+          <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
+          <div className="mt-1 text-sm">
+            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
+            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
+          </div>
+          <div className="mt-1 text-xs">
+            配送状況を確認し、次のいずれかで解決してください。
+          </div>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            <li>受け取りが確認できた → 「完了にする」</li>
+            <li>届かないことが確定した → 「強制キャンセルする」（ポイントを返還）</li>
+            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」（ステータスは変えない）</li>
+          </ul>
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="small"
+            className="!mt-3 !rounded-full"
+            onClick={handleClearDeliveryIssue}
+            disabled={clearing || pendingStatus !== null}
+          >
+            未着の連絡を解除する
+          </Button>
+        </Alert>
+      ) : null}
+
+      {/* 「まだ届かない」という問い合わせに答えるための発送情報。
+          送り状番号の登録は提携企業の任意なので、発送済みでも空のことがある。
+          その場合は「未登録」と明示して、運用者が提携企業に確認しに行けるようにする。 */}
+      {detail.shipment ? (
+        <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
+          <div className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faTruck} className="text-slate-400" />
+            <h2 className="text-lg font-bold text-slate-900">発送情報</h2>
+          </div>
+
+          <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">発送日時</dt>
+              <dd className="mt-1 text-slate-900">{formatDateTime(detail.shipment.shippedAt)}</dd>
+            </div>
+            {detail.selectedArrivalDate ? (
+              <div>
+                <dt className="text-xs font-semibold text-slate-500">お届け予定日</dt>
+                <dd className="mt-1 text-slate-900">{detail.selectedArrivalDate}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">配送会社</dt>
+              <dd className="mt-1 text-slate-900">{detail.carrierLabel ?? "未登録"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold text-slate-500">送り状番号</dt>
+              <dd className="mt-1 font-mono text-slate-900">
+                {detail.shipment.trackingNumber ?? "未登録"}
+              </dd>
+            </div>
+          </dl>
+
+          {detail.trackingUrl ? (
+            <a
+              href={detail.trackingUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 underline"
+            >
+              配送状況を確認する
+              <FontAwesomeIcon icon={faUpRightFromSquare} className="text-xs" />
+            </a>
+          ) : (
+            <p className="mt-4 text-xs text-slate-500">
+              {detail.shipment.trackingNumber
+                ? "この配送会社は追跡ページを自動で開けません。配送会社のサイトで番号を照会してください。"
+                : "送り状番号が登録されていません。配送状況は提携企業に確認してください。"}
+            </p>
+          )}
+        </section>
+      ) : null}
+
       {detail.allowedNextStatuses.length > 0 ? (
         <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <h2 className="text-lg font-bold text-slate-900">状態を更新する</h2>
           <p className="mt-1 text-sm text-slate-500">
             運用者は提携企業の操作と同等の遷移に加え、強制キャンセルが可能です。
+            {detail.scheduleActive
+              ? "お届け日が確定すると自動で「準備中」に進みます。ここでは却下・強制キャンセルのみ操作できます。"
+              : null}
           </p>
 
           <TextField

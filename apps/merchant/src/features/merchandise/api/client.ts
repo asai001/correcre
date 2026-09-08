@@ -1,7 +1,10 @@
+import type { ProductFulfillment } from "@correcre/types";
+
 import type {
   CreateMerchandiseRequest,
   MerchandiseSummary,
   RequestUploadUrlResponse,
+  SchedulePreviewResponse,
   UpdateMerchandiseRequest,
   UpdateMerchandiseStatusRequest,
 } from "../model/types";
@@ -144,4 +147,25 @@ export async function uploadMerchandiseImage(uploadUrl: string, file: File): Pro
         : "画像のアップロードに失敗しました。時間をおいて再度お試しください。",
     );
   }
+}
+
+// 入力中の配送設定で、実際にどのお届け日が提示されるかを確認する。
+// 日付の計算はサーバー側でのみ行い、画面は返ってきた文字列を表示するだけにする。
+export async function fetchSchedulePreview(
+  fulfillment: ProductFulfillment,
+  signal?: AbortSignal,
+): Promise<SchedulePreviewResponse> {
+  const res = await fetch("/api/merchandise/schedule-preview", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fulfillment }),
+    signal,
+  });
+
+  if (!res.ok) {
+    throw new Error(await parseError(res, "お届け日の確認に失敗しました。"));
+  }
+
+  return (await res.json()) as SchedulePreviewResponse;
 }

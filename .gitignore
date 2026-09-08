@@ -53,7 +53,7 @@
 #      CDK      #
 #################
 infra/*.js
-infra/!jest.config.js
+!infra/jest.config.js
 infra/*.d.ts
 infra/dist
 

@@ -14,50 +14,30 @@ import type {
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
   ExchangeHistoryStatusEvent,
+  ExchangeShipment,
   PointTransaction,
+  ScheduleStatus,
 } from "@correcre/types";
 
 import { buildUserSk } from "./user";
 import { createPointTransaction, createPointTransactionPutTransactItem } from "./point-transaction";
 
+import {
+  canTransitionExchangeStatus,
+  getAllowedNextExchangeStatuses,
+  InvalidExchangeStatusTransitionError,
+} from "../exchange/status-transitions";
+
 import { getDynamoDocumentClient } from "./client";
 
-const ALLOWED_TRANSITIONS: Record<
-  ExchangeHistoryStatus,
-  Partial<Record<ExchangeHistoryActorType, ExchangeHistoryStatus[]>>
-> = {
-  REQUESTED: {
-    MERCHANT: ["PREPARING", "REJECTED", "CANCELED"],
-    OPERATOR: ["PREPARING", "REJECTED", "CANCELED"],
-  },
-  PREPARING: {
-    MERCHANT: ["IN_PROGRESS", "CANCELED"],
-    OPERATOR: ["IN_PROGRESS", "CANCELED"],
-  },
-  IN_PROGRESS: {
-    MERCHANT: ["COMPLETED", "PREPARING"],
-    OPERATOR: ["COMPLETED", "PREPARING"],
-  },
-  COMPLETED: {},
-  REJECTED: {},
-  CANCELED: {},
-  CANCELLED: {},
+// 遷移規則は DB アクセスから切り離した純ロジック（../exchange/status-transitions）に置いている。
+// 既存の import パスを保つため、ここから再輸出する。
+export {
+  canTransitionExchangeStatus,
+  getAllowedNextExchangeStatuses,
+  InvalidExchangeStatusTransitionError,
 };
 
-export function getAllowedNextExchangeStatuses(
-  from: ExchangeHistoryStatus,
-  actor: ExchangeHistoryActorType,
-): ExchangeHistoryStatus[] {
-  return ALLOWED_TRANSITIONS[from]?.[actor] ?? [];
-}
-
-export function canTransitionExchangeStatus(
-  from: ExchangeHistoryStatus,
-  to: ExchangeHistoryStatus,
-  actor: ExchangeHistoryActorType,
-): boolean {
-  return getAllowedNextExchangeStatuses(from, actor).includes(to);
-}
 
 export type ExchangeHistoryTableConfig = {
   region: string;
@@ -67,6 +47,7 @@ export type ExchangeHistoryTableConfig = {
 export const EXCHANGE_HISTORY_BY_COMPANY_INDEX = "ExchangeHistoryByCompanyExchangedAt";
 export const EXCHANGE_HISTORY_BY_MERCHANT_STATUS_INDEX = "ExchangeHistoryByMerchantStatusExchangedAt";
 export const EXCHANGE_HISTORY_BY_MERCHANT_INDEX = "ExchangeHistoryByMerchantExchangedAt";
+export const EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX = "ExchangeHistoryByScheduleStatus";
 
 export function buildExchangeHistoryPk(companyId: string, userId: string) {
   return `COMPANY#${companyId}#USER#${userId}` as const;
@@ -94,6 +75,83 @@ export function buildExchangeHistoryByMerchantGsiPk(merchantId: string) {
 
 export function buildExchangeHistoryByMerchantGsiSk(exchangedAt: string, exchangeId: string) {
   return `EXCHANGED_AT#${exchangedAt}#EXCHANGE#${exchangeId}` as const;
+}
+
+// 配送日程調整のスパース GSI (gsi4)。調整進行中のアイテムだけがキーを持つ。
+export function buildExchangeHistoryByScheduleStatusGsiPk(scheduleStatus: ScheduleStatus) {
+  return `SCHEDULE#${scheduleStatus}` as const;
+}
+
+export function buildExchangeHistoryScheduleGsiSkByExchangedAt(exchangedAt: string) {
+  return `EXCHANGED_AT#${exchangedAt}` as const;
+}
+
+// CONFIRMED 中は到着日で範囲クエリできるよう ARRIVAL#<YYYY-MM-DD> を使う（確定日前日リマインド用）。
+export function buildExchangeHistoryScheduleGsiSkByArrival(arrivalDate: string) {
+  return `ARRIVAL#${arrivalDate}` as const;
+}
+
+export async function listExchangeHistoryByScheduleStatus(
+  config: ExchangeHistoryTableConfig,
+  scheduleStatus: ScheduleStatus,
+): Promise<ExchangeHistoryItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const exchanges: ExchangeHistoryItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX,
+        KeyConditionExpression: "gsi4pk = :gsi4pk",
+        ExpressionAttributeValues: {
+          ":gsi4pk": buildExchangeHistoryByScheduleStatusGsiPk(scheduleStatus),
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      exchanges.push(...(Items as ExchangeHistoryItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return exchanges;
+}
+
+export async function listConfirmedExchangesByArrivalDate(
+  config: ExchangeHistoryTableConfig,
+  arrivalDate: string,
+): Promise<ExchangeHistoryItem[]> {
+  const client = getDynamoDocumentClient(config.region);
+  const exchanges: ExchangeHistoryItem[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+
+  do {
+    const { Items, LastEvaluatedKey } = await client.send(
+      new QueryCommand({
+        TableName: config.tableName,
+        IndexName: EXCHANGE_HISTORY_BY_SCHEDULE_STATUS_INDEX,
+        KeyConditionExpression: "gsi4pk = :gsi4pk AND gsi4sk = :gsi4sk",
+        ExpressionAttributeValues: {
+          ":gsi4pk": buildExchangeHistoryByScheduleStatusGsiPk("CONFIRMED"),
+          ":gsi4sk": buildExchangeHistoryScheduleGsiSkByArrival(arrivalDate),
+        },
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    if (Items?.length) {
+      exchanges.push(...(Items as ExchangeHistoryItem[]));
+    }
+
+    exclusiveStartKey = LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return exchanges;
 }
 
 export async function listExchangeHistoryByCompanyAndUser(
@@ -286,16 +344,6 @@ export class InsufficientPointBalanceError extends Error {
   }
 }
 
-export class InvalidExchangeStatusTransitionError extends Error {
-  constructor(
-    public readonly from: ExchangeHistoryStatus,
-    public readonly to: ExchangeHistoryStatus,
-    public readonly actor: ExchangeHistoryActorType,
-  ) {
-    super(`Status transition ${from} -> ${to} is not allowed for actor ${actor}`);
-    this.name = "InvalidExchangeStatusTransitionError";
-  }
-}
 
 export async function putExchangeHistoryWithReservation(
   config: ExchangeHistoryTableConfig,
@@ -403,6 +451,9 @@ export async function updateExchangeHistoryStatus(
     actorName?: string;
     occurredAt?: string;
     comment?: string;
+    // 発送済みへ進める際の発送情報。ステータス遷移と同じ更新で書き、
+    // 「発送済みなのに発送情報が入っていない」中途半端な状態を作らない。
+    shipment?: ExchangeShipment;
   },
 ): Promise<ExchangeHistoryItem> {
   const client = getDynamoDocumentClient(config.region);
@@ -450,6 +501,12 @@ export async function updateExchangeHistoryStatus(
     expressionAttributeValues[":zero"] = 0;
   }
 
+  const shipment = params.shipment ? { ...params.shipment, shippedAt: occurredAt } : undefined;
+  if (shipment) {
+    setExpressions.push("shipment = :shipment");
+    expressionAttributeValues[":shipment"] = shipment;
+  }
+
   // 楽観ロック: 読み込み時のステータスと DB の現在値が一致する場合のみ更新する。
   // これにより、他アプリのキャンセル/返金など並行して確定した遷移を前進遷移が黙って上書き
   // （交換の「復活」）するのを防ぐ。ステータス属性が無い旧レコードは REQUESTED 相当として扱う。
@@ -489,6 +546,109 @@ export async function updateExchangeHistoryStatus(
     updated.pointHeld = 0;
   }
 
+  if (shipment) {
+    updated.shipment = shipment;
+  }
+
+  return updated;
+}
+
+/**
+ * 申請者からの未着報告を記録する。ステータスは動かさない（勝手にキャンセルはしない）。
+ * この印は提携企業・運用者の画面とやることリストに出て、対応が要ることを伝える。
+ * 既に報告済みの場合は最初の報告時刻を保つ（何度押しても最初の申告日が残るように）。
+ */
+export async function reportExchangeDeliveryIssue(
+  config: ExchangeHistoryTableConfig,
+  params: {
+    item: ExchangeHistoryItem;
+    note?: string;
+    reportedAt?: string;
+  },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const reportedAt = params.item.deliveryIssue?.reportedAt ?? params.reportedAt ?? new Date().toISOString();
+  const note = params.note?.trim();
+  const deliveryIssue = { reportedAt, ...(note ? { note } : {}) };
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: "SET deliveryIssue = :issue, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":issue": deliveryIssue,
+        ":updatedAt": params.reportedAt ?? new Date().toISOString(),
+      },
+    }),
+  );
+
+  return { ...params.item, deliveryIssue, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * 未着報告を取り下げる（運用者が実態を確認して、対応済みとするとき）。
+ * ステータスは動かさない。完了・キャンセルの判断は別の操作として残す。
+ */
+export async function clearExchangeDeliveryIssue(
+  config: ExchangeHistoryTableConfig,
+  params: { item: ExchangeHistoryItem; clearedAt?: string },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const updatedAt = params.clearedAt ?? new Date().toISOString();
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: "SET updatedAt = :updatedAt REMOVE deliveryIssue",
+      ExpressionAttributeValues: { ":updatedAt": updatedAt },
+    }),
+  );
+
+  const updated: ExchangeHistoryItem = { ...params.item, updatedAt };
+  delete updated.deliveryIssue;
+  return updated;
+}
+
+/**
+ * 発送情報だけを差し替える（発送済みにした後から送り状番号を足す・直すための更新）。
+ * ステータスは触らないが、発送済み以外のレコードに書いても意味がないので呼び出し側で絞る。
+ * shippedAt は最初に発送済みへ進めた時刻を保つ（番号の追記で発送日時が動かないように）。
+ */
+export async function updateExchangeShipment(
+  config: ExchangeHistoryTableConfig,
+  params: {
+    item: ExchangeHistoryItem;
+    shipment: ExchangeShipment | undefined;
+    updatedAt?: string;
+  },
+): Promise<ExchangeHistoryItem> {
+  const client = getDynamoDocumentClient(config.region);
+  const updatedAt = params.updatedAt ?? new Date().toISOString();
+  const shippedAt = params.item.shipment?.shippedAt;
+  const shipment = params.shipment ? { ...params.shipment, ...(shippedAt ? { shippedAt } : {}) } : undefined;
+
+  await client.send(
+    new UpdateCommand({
+      TableName: config.tableName,
+      Key: { pk: params.item.pk, sk: params.item.sk },
+      UpdateExpression: shipment
+        ? "SET shipment = :shipment, updatedAt = :updatedAt"
+        : "SET updatedAt = :updatedAt REMOVE shipment",
+      ExpressionAttributeValues: shipment
+        ? { ":shipment": shipment, ":updatedAt": updatedAt }
+        : { ":updatedAt": updatedAt },
+    }),
+  );
+
+  const updated: ExchangeHistoryItem = { ...params.item, updatedAt };
+  if (shipment) {
+    updated.shipment = shipment;
+  } else {
+    delete updated.shipment;
+  }
+
   return updated;
 }
 
@@ -501,6 +661,8 @@ export type TransitionExchangeStatusInput = {
   actorName?: string;
   comment?: string;
   occurredAt?: string;
+  // 発送済みへ進める際の発送情報（任意）
+  shipment?: ExchangeShipment;
   userTableName: string;
   pointTransactionTableName?: string;
 };
@@ -526,10 +688,14 @@ export async function transitionExchangeStatus(
       actorName: input.actorName,
       comment: input.comment,
       occurredAt: input.occurredAt,
+      shipment: input.shipment,
     });
   }
 
-  const refundAmount = input.item.pointHeld ?? 0;
+  // 通常のキャンセル・却下は保留中のポイントを戻すだけでよい。
+  // 完了の取り消しだけは pointHeld が 0 に落ちた後（＝消費確定済み）なので、
+  // 使用ポイントそのものを戻さないと 0 ポイントの返還になってしまう。
+  const refundAmount = fromStatus === "COMPLETED" ? (input.item.usedPoint ?? 0) : (input.item.pointHeld ?? 0);
   const occurredAt = input.occurredAt ?? new Date().toISOString();
   const event: ExchangeHistoryStatusEvent = {
     status: input.nextStatus,
@@ -568,6 +734,14 @@ export async function transitionExchangeStatus(
     );
   }
 
+  // 日程確定後にキャンセル・却下された場合、schedule も終端化してスパース GSI から外す。
+  // これを怠ると、キャンセル済みの交換に確定日前日の受取リマインドが送られてしまう。
+  if (input.item.schedule) {
+    expressionAttributeNames["#schedule"] = "schedule";
+    setExpressions.push("#schedule.scheduleStatus = :cancelledScheduleStatus");
+    expressionAttributeValues[":cancelledScheduleStatus"] = "CANCELLED";
+  }
+
   // 楽観ロック: 読み込み時のステータスと一致する場合のみ返金遷移を確定する。
   const statusConditionExpression = buildExchangeStatusConditionExpression(input.item.status, expressionAttributeValues);
 
@@ -582,7 +756,7 @@ export async function transitionExchangeStatus(
           sk: input.item.sk,
         },
         ConditionExpression: statusConditionExpression,
-        UpdateExpression: `SET ${setExpressions.join(", ")}`,
+        UpdateExpression: `SET ${setExpressions.join(", ")} REMOVE gsi4pk, gsi4sk`,
         ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
       },
@@ -642,6 +816,12 @@ export async function transitionExchangeStatus(
   if (input.item.merchantId) {
     updated.gsi2pk = buildExchangeHistoryByMerchantStatusGsiPk(input.item.merchantId, input.nextStatus);
   }
+
+  if (input.item.schedule) {
+    updated.schedule = { ...input.item.schedule, scheduleStatus: "CANCELLED" };
+  }
+  delete updated.gsi4pk;
+  delete updated.gsi4sk;
 
   return updated;
 }

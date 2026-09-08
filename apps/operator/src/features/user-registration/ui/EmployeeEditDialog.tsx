@@ -185,6 +185,7 @@ export default function EmployeeEditDialog({
   const pointAdjustmentValue = form.pointAdjustment.trim();
   const parsedPointAdjustment = /^-?\d+$/.test(pointAdjustmentValue) ? Number.parseInt(pointAdjustmentValue, 10) : null;
   const currentPointBalance = employee?.pointBalance ?? 0;
+  const pendingPointBalance = employee?.pendingPointBalance ?? 0;
   const nextPointBalance = parsedPointAdjustment === null ? currentPointBalance : currentPointBalance + parsedPointAdjustment;
   const isInvitedStatusLocked = employee?.status === "INVITED";
 
@@ -548,10 +549,16 @@ export default function EmployeeEditDialog({
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-3 text-sm font-semibold text-slate-700">ポイント調整</div>
-            <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)_180px]">
+            <div className="grid gap-4 md:grid-cols-[180px_180px_minmax(0,1fr)_180px]">
               <TextField
                 label="現在ポイント"
                 value={`${formatNumber(currentPointBalance)}${pointUnitLabel}`}
+                fullWidth
+                slotProps={{ input: { readOnly: true } }}
+              />
+              <TextField
+                label="翌月反映予定"
+                value={`${formatNumber(pendingPointBalance)}${pointUnitLabel}`}
                 fullWidth
                 slotProps={{ input: { readOnly: true } }}
               />
@@ -578,6 +585,9 @@ export default function EmployeeEditDialog({
                 slotProps={{ input: { readOnly: true } }}
               />
             </div>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+              調整は現在ポイント（利用可能分）に対して行われます。翌月反映予定分は今月獲得したポイントで、翌月1日に現在ポイントへ加算されます。
+            </Typography>
           </div>
         </Stack>
       </DialogContent>

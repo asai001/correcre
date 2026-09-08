@@ -40,7 +40,10 @@ export type EmployeeManagementEmployee = {
   email: string;
   phoneNumber?: string;
   address?: EmployeeAddress;
+  // 利用可能（反映済み）なポイント残高。
   pointBalance: number;
+  // 今月ミッションで獲得した、翌月1日に反映予定のポイント。
+  pendingPointBalance: number;
   completionRate: number;
   joinedAt?: string;
   lastLoginAt?: string;

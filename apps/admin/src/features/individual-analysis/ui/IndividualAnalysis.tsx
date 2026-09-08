@@ -60,6 +60,15 @@ export default function IndividualAnalysis({ companyId, companyRegisteredYearMon
   const [selectedEndDate, setSelectedEndDate] = useState(initialDateRange.endDate);
 
   const selectedEmployee = employees.find((employee) => employee.userId === selectedUserId);
+  const reportExportOptions = useMemo(
+    () => ({
+      fileBaseName: `individual-analysis-reports-${selectedEmployee?.name || selectedUserId || "employee"}`,
+      sheetName: "報告内容",
+      employeeName: selectedEmployee?.name || selectedUserId,
+      startYearMonth: companyRegisteredYearMonth,
+    }),
+    [selectedEmployee?.name, selectedUserId, companyRegisteredYearMonth],
+  );
   const { summary, loading, error } = useIndividualAnalysisSummary(companyId, selectedUserId, selectedStartDate, selectedEndDate);
   const currentSummary = summary ?? emptySummary;
   const showSkeleton = loading || (!summary && !error);
@@ -168,6 +177,7 @@ export default function IndividualAnalysis({ companyId, companyRegisteredYearMon
         startDate={selectedStartDate}
         endDate={selectedEndDate}
         showEmployeeName={false}
+        exportOptions={reportExportOptions}
       />
     </div>
   );

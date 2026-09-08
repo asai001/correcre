@@ -36,7 +36,8 @@ type SortKey = "popular" | "newest" | "lowestPoint";
 
 type PointRange = { min?: number; max?: number };
 
-const PAGE_SIZE = 13;
+// カード列数（md:2列 / xl:3列）の公倍数にして、最終行が欠けないようにする。
+const PAGE_SIZE = 12;
 
 const POINT_RANGES: { value: string; label: string; range: PointRange }[] = [
   { value: "any", label: "指定なし", range: {} },
@@ -582,6 +583,13 @@ export default function ExchangeList({ items, currentPointBalance, pendingPointB
     setPage(1);
   };
 
+  const handlePageChange = (next: number) => {
+    if (next === safePage) return;
+    setPage(next);
+    // ページ送りしても前のページの位置に留まると読み始めが分からないため、一覧の先頭へ戻す。
+    listSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const handleFavoriteToggle = (merchantId: string, merchandiseId: string) => (next: boolean) => {
     setFavorites((prev) => {
       const updated = new Set(prev);
@@ -671,7 +679,7 @@ export default function ExchangeList({ items, currentPointBalance, pendingPointB
           </ul>
         )}
 
-        <Pagination page={safePage} totalPages={totalPages} onChange={setPage} />
+        <Pagination page={safePage} totalPages={totalPages} onChange={handlePageChange} />
       </div>
 
       <Snackbar
