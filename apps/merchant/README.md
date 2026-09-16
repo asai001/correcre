@@ -21,9 +21,22 @@ DDB_MERCHANT_USER_TABLE_NAME=correcre-merchant-user-dev
 DDB_MERCHANDISE_TABLE_NAME=correcre-merchandise-dev
 DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
 DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
+DDB_SESSION_TABLE_NAME=correcre-session-dev
+DDB_USER_TABLE_NAME=correcre-user-dev
+DDB_COMPANY_TABLE_NAME=correcre-company-dev
+DDB_POINT_TRANSACTION_TABLE_NAME=correcre-point-transaction-dev
+DDB_EXCHANGE_FAVORITE_TABLE_NAME=correcre-exchange-favorite-dev
+# 配送日程調整（カレンダー画面・ダッシュボードのやることリスト）で必須
+DDB_MERCHANT_CALENDAR_TABLE_NAME=correcre-merchant-calendar-dev
+DDB_SCHEDULE_EVENT_TABLE_NAME=correcre-schedule-event-dev
+S3_MERCHANDISE_IMAGE_BUCKET_NAME=correcre-merchandise-image-dev-<account-id>
 # 収支・精算画面の請求メール送信（SES）
 SES_FROM_EMAIL=correcre-info@efficient-technology.com
 ```
+
+上記の `DDB_*` は `DDB_SYSTEM_SETTING_TABLE_NAME` を除いて `readRequiredServerEnv` で読むため、1 つでも欠けるとその変数を使う画面がサーバー側で例外になり、`app/error.tsx` のエラー画面になります（ログイン自体は通るため「ログイン後に必ずエラー画面が出る」形で表面化します）。
+
+テーブル名は `correcre-<テーブル>-<stage>` の規則で、`stage` は `dev` / `stg` / `prod` です（`infra/lib/dynamodb.ts` の `buildTableName`）。ローカルの `.env.local` だけでなく、**Vercel の Development / Preview / Production それぞれにも同じ変数を設定してください**。新しいテーブルを使う機能を追加したときは、CDK のデプロイと Vercel の環境変数追加がセットです。
 
 請求メールの宛先は運用者アプリの「設定」画面（system-setting テーブル）で管理します。未設定の場合は correcre-info@efficient-technology.com 宛に送信されます。
 

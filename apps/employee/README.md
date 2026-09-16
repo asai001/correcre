@@ -28,6 +28,9 @@ DDB_MERCHANT_TABLE_NAME=correcre-merchant-dev
 DDB_MERCHANT_USER_TABLE_NAME=correcre-merchant-user-dev
 DDB_EXCHANGE_FAVORITE_TABLE_NAME=correcre-exchange-favorite-dev
 DDB_SESSION_TABLE_NAME=correcre-session-dev
+# 配送日程調整。未設定だとダッシュボードの日程調整のお知らせが出なくなる
+DDB_SCHEDULE_EVENT_TABLE_NAME=correcre-schedule-event-dev
+DDB_MERCHANT_CALENDAR_TABLE_NAME=correcre-merchant-calendar-dev
 S3_MISSION_REPORT_IMAGE_BUCKET_NAME=correcre-mission-report-image-dev-<account-id>
 S3_MERCHANDISE_IMAGE_BUCKET_NAME=correcre-merchandise-image-dev-<account-id>
 MERCHANT_APP_URL=http://localhost:3003
@@ -36,7 +39,9 @@ SES_FROM_EMAIL=correcre-info@efficient-technology.com
 
 `EMPLOYEE_COGNITO_REGION`、`EMPLOYEE_COGNITO_USER_POOL_ID`、`EMPLOYEE_COGNITO_APP_CLIENT_ID` の値は、CDK スタックの `EmployeeCognitoRegion`、`EmployeeCognitoUserPoolId`、`EmployeeCognitoUserPoolClientId` として出力されます。
 
-DynamoDB / S3 のリソース名は、CDK スタックの各 `*TableName` / `*BucketName` 出力を設定してください。
+DynamoDB / S3 のリソース名は、CDK スタックの各 `*TableName` / `*BucketName` 出力を設定してください。テーブル名は `correcre-<テーブル>-<stage>` の規則です（`infra/lib/dynamodb.ts` の `buildTableName`）。新しいテーブルを使う機能を追加したときは、CDK のデプロイと Vercel（Development / Preview / Production それぞれ）の環境変数追加がセットです。
+
+`DDB_SCHEDULE_EVENT_TABLE_NAME` は `readRequiredServerEnv` で読みますが、ダッシュボードの日程調整のお知らせは例外を握りつぶすため、未設定でも画面は落ちずにお知らせだけが出なくなります。設定漏れに気づきにくいので注意してください。
 
 dev AWS アカウントに対してローカル開発を行う場合は `AWS_PROFILE=CorreCre-Dev-Account` を使用し、事前に `aws sso login --profile CorreCre-Dev-Account` を実行してください。
 
