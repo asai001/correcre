@@ -1,4 +1,4 @@
-import type { ExchangeHistoryStatus, ScheduleStatus, TemperatureZone } from "@correcre/types";
+import type { ExchangeHistoryStatus, ReservationSystem, ScheduleStatus, TemperatureZone } from "@correcre/types";
 
 // 候補 1 件の表示用ビュー。日付の解釈・整形はすべてサーバー側で行う（フロントで日付計算しない）。
 export type EmployeeScheduleCandidateView = {
@@ -78,6 +78,8 @@ export type EmployeeReservationView = {
   merchantName?: string;
   usedPoint: number;
   status: ExchangeHistoryStatus;
+  // 予約に使っているサービス。案内文（メニューの選び方・交換番号の伝え方）を切り替える
+  reservationSystem: ReservationSystem;
   reservationUrl?: string;
   instructions?: string;
 };

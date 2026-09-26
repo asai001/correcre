@@ -6,6 +6,11 @@ import { getMerchandise } from "../dynamodb/merchandise";
 import { getUserByCompanyAndUserId } from "../dynamodb/user";
 import { sendSesEmail } from "../email/ses";
 import { readRequiredServerEnv } from "../env/server";
+import {
+  getReservationCodeGuidance,
+  getReservationPageGuidance,
+  resolveReservationSystem,
+} from "../reservation/guidance";
 
 // 交換ステータス遷移に関する通知メール。すべてプレーンテキスト・fire-and-forget で送る
 // （送信失敗が業務トランザクションを巻き戻さないよう、呼び出し側で catch してログに残す）。
@@ -57,8 +62,14 @@ export async function sendEmployeeExchangeApprovedReservationEmail(params: {
     `交換番号：${params.exchange.reservationCode ?? params.exchange.exchangeId}`,
   ];
 
+  const reservationSystem = resolveReservationSystem(params.reservation);
+
   if (params.reservation.reservationUrl) {
     lines.push("", "予約ページ:", params.reservation.reservationUrl);
+    const pageGuidance = getReservationPageGuidance(reservationSystem);
+    if (pageGuidance) {
+      lines.push(pageGuidance);
+    }
   }
 
   if (params.reservation.instructions) {
@@ -67,7 +78,7 @@ export async function sendEmployeeExchangeApprovedReservationEmail(params: {
 
   lines.push(
     "",
-    "ご予約の際は、予約サイトの備考欄への記入、またはお電話・ご来店時に、上記の交換番号を必ずお伝えください。",
+    getReservationCodeGuidance(reservationSystem),
     "（店舗が交換申請とご予約を照合するために使用します）",
   );
 

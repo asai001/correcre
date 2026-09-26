@@ -17,6 +17,7 @@ import {
   sendMerchantDeliveryIssueEmail,
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
+import { resolveReservationSystem } from "@correcre/lib/reservation/guidance";
 import { isSelectable } from "@correcre/lib/schedule/engine";
 import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
 import {
@@ -295,6 +296,7 @@ export async function getReservationForEmployee(
     merchantName: item.merchantNameSnapshot,
     usedPoint: item.usedPoint,
     status: item.status ?? "REQUESTED",
+    reservationSystem: resolveReservationSystem(reservation),
     reservationUrl: reservation.reservationUrl,
     instructions: reservation.instructions,
   };
