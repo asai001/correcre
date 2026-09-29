@@ -4,6 +4,36 @@
 
 提携企業ユーザーは admin/employee/operator とは別の Cognito User Pool（merchant pool）で管理しています。これは「提携企業 ↔ 利用企業」を同一メールアドレスで両立できるようにするためです。
 
+## 本番で必須の環境変数
+
+次の環境変数は Vercel の **Production** と **Preview（stage）** の両方に設定してください。
+本番（`VERCEL_ENV=production`）のビルドでは、1 つでも欠けていると `next.config.ts` のチェックでビルドが失敗します。Vercel はビルドに失敗すると本番を差し替えないため、設定漏れがあっても稼働中の本番は壊れません。Preview では警告をビルドログに出すだけで、ビルドは止めません。
+
+環境変数を読むコードを追加・変更したら、`packages/lib/src/env/required-env.ts` の一覧とこの表を合わせて更新してください。
+
+| 環境変数 | 用途 |
+|---|---|
+| `AWS_REGION` | AWS のリージョン（ap-northeast-1） |
+| `AWS_ROLE_ARN` | Vercel OIDC で引き受ける IAM Role（`correcre-vercel-dynamodb-<stage>`） |
+| `SESSION_SECRET` | ログインセッションの署名鍵（32 文字以上） |
+| `DDB_SESSION_TABLE_NAME` | ログインセッションの保存先 |
+| `MERCHANT_COGNITO_REGION` | 提携企業用 User Pool（提携企業ユーザーの招待・管理に使う） |
+| `MERCHANT_COGNITO_USER_POOL_ID` | 提携企業用 User Pool（提携企業ユーザーの招待・管理に使う） |
+| `MERCHANT_COGNITO_APP_CLIENT_ID` | ログイン用 Cognito（CDK の出力値） |
+| `DDB_COMPANY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_EXCHANGE_FAVORITE_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_EXCHANGE_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANDISE_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_CALENDAR_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_POINT_TRANSACTION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_SCHEDULE_EVENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `S3_MERCHANDISE_IMAGE_BUCKET_NAME` | S3 バケット名（CDK の出力値） |
+| `EMPLOYEE_APP_URL` | 通知メールに入れる従業員画面のURL（本番: `https://app.correcre.jp`）。無いとメールからリンクが消える |
+| `MERCHANT_APP_URL` | 通知メールに入れる提携企業画面のURL（本番: `https://merchant.correcre.jp`）。無いとメールからリンクが消える |
+
 ## Environment Variables
 
 `MERCHANT_COGNITO_*` は merchant 専用 User Pool の ID・Client ID を指定してください（admin/employee/operator が使う内部用プールとは別です）。

@@ -2,6 +2,41 @@
 
 このアプリは [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app) をベースに作成した [Next.js](https://nextjs.org) アプリケーションです。
 
+## 本番で必須の環境変数
+
+次の環境変数は Vercel の **Production** と **Preview（stage）** の両方に設定してください。
+本番（`VERCEL_ENV=production`）のビルドでは、1 つでも欠けていると `next.config.ts` のチェックでビルドが失敗します。Vercel はビルドに失敗すると本番を差し替えないため、設定漏れがあっても稼働中の本番は壊れません。Preview では警告をビルドログに出すだけで、ビルドは止めません。
+
+環境変数を読むコードを追加・変更したら、`packages/lib/src/env/required-env.ts` の一覧とこの表を合わせて更新してください。
+
+| 環境変数 | 用途 |
+|---|---|
+| `AWS_REGION` | AWS のリージョン（ap-northeast-1） |
+| `AWS_ROLE_ARN` | Vercel OIDC で引き受ける IAM Role（`correcre-vercel-dynamodb-<stage>`） |
+| `SESSION_SECRET` | ログインセッションの署名鍵（32 文字以上） |
+| `DDB_SESSION_TABLE_NAME` | ログインセッションの保存先 |
+| `EMPLOYEE_COGNITO_REGION` | ログイン用 Cognito（CDK の出力値） |
+| `EMPLOYEE_COGNITO_USER_POOL_ID` | ログイン用 Cognito（CDK の出力値） |
+| `EMPLOYEE_COGNITO_APP_CLIENT_ID` | ログイン用 Cognito（CDK の出力値） |
+| `DDB_COMPANY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_EXCHANGE_FAVORITE_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_EXCHANGE_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANDISE_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_CALENDAR_TABLE_NAME` | 提携企業の休業日。コード上は任意だが、無いと休業日を無視したお届け候補日になるため必須扱い |
+| `DDB_MERCHANT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_REPORT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_POINT_TRANSACTION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_SCHEDULE_EVENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_USER_MONTHLY_STATS_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `S3_MERCHANDISE_IMAGE_BUCKET_NAME` | S3 バケット名（CDK の出力値） |
+| `S3_MISSION_REPORT_IMAGE_BUCKET_NAME` | S3 バケット名（CDK の出力値） |
+| `EMPLOYEE_APP_URL` | 通知メールに入れる従業員画面のURL（本番: `https://app.correcre.jp`）。無いとメールからリンクが消える |
+| `MERCHANT_APP_URL` | 通知メールに入れる提携企業画面のURL（本番: `https://merchant.correcre.jp`）。無いとメールからリンクが消える |
+
 ## Cognito ログイン設定
 
 従業員向けアプリでは、以下の環境変数を設定してください。
@@ -12,10 +47,8 @@ EMPLOYEE_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxx
 EMPLOYEE_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 AWS_REGION=ap-northeast-1
 AWS_PROFILE=CorreCre-Dev-Account
-# Vercel Preview / Production では AWS_PROFILE の代わりに環境変数で認証情報を設定します
-# AWS_ACCESS_KEY_ID=...
-# AWS_SECRET_ACCESS_KEY=...
-# AWS_SESSION_TOKEN=...  # 任意
+# Vercel Preview / Production では AWS_PROFILE の代わりに AWS_ROLE_ARN（Vercel OIDC）を使う
+# AWS_ROLE_ARN=arn:aws:iam::<account-id>:role/correcre-vercel-dynamodb-stg
 DDB_USER_TABLE_NAME=correcre-user-dev
 DDB_COMPANY_TABLE_NAME=correcre-company-dev
 DDB_MISSION_TABLE_NAME=correcre-mission-dev
@@ -40,7 +73,7 @@ DynamoDB / S3 のリソース名は、CDK スタックの各 `*TableName` / `*Bu
 
 dev AWS アカウントに対してローカル開発を行う場合は `AWS_PROFILE=CorreCre-Dev-Account` を使用し、事前に `aws sso login --profile CorreCre-Dev-Account` を実行してください。
 
-Vercel Preview / Production では `AWS_PROFILE` は使用しません。代わりに、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、必要に応じて `AWS_SESSION_TOKEN` をプロジェクトの環境変数に設定してください。
+Vercel Preview / Production では `AWS_PROFILE` は使用しません。Vercel の OIDC を有効にしたうえで、`AWS_ROLE_ARN` に CDK が作成する IAM Role（`correcre-vercel-dynamodb-<stage>`）を設定してください。
 
 `EmployeeCognitoUserPoolId` は管理者向けアプリと共通で、2 つのアプリで異なるのは app client ID のみです。
 
