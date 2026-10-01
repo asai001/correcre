@@ -1,3 +1,5 @@
+import { nowYYYYMM } from "@correcre/lib";
+import { buildCompanyBillingHistory } from "@correcre/lib/company-billing";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listMissionsByCompany } from "@correcre/lib/dynamodb/mission";
@@ -115,5 +117,6 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
     missions,
     account: toAccountSummary(currentAdminUser),
     userCounts: toUserCounts(users),
+    billingRows: buildCompanyBillingHistory(company, { currentMonth: nowYYYYMM() }),
   };
 }

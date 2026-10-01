@@ -16,3 +16,20 @@ export type NotificationSettingItem = {
   updatedAt: string;
   updatedBy?: string;
 };
+
+// 運用者画面から提携企業へ送った一斉メールの送信履歴（1 送信 = 1 アイテム）。
+// system-setting テーブルに settingKey = "MERCHANT_BROADCAST#<sentAt>#<broadcastId>" で保存する。
+export type MerchantBroadcastLogItem = {
+  settingKey: `MERCHANT_BROADCAST#${string}`;
+  broadcastId: string;
+  sentAt: string;
+  subject: string;
+  body: string;
+  // 送信対象として選択した提携企業
+  merchants: { merchantId: string; merchantName: string }[];
+  recipientCount: number;
+  sentCount: number;
+  // 送信に失敗した宛先
+  failedEmails: string[];
+  sentBy: { userId: string; email: string; displayName?: string };
+};

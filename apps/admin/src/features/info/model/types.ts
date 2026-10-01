@@ -1,4 +1,5 @@
 import type { DBUserRole, Company, Department, Mission } from "@correcre/types";
+import type { CompanyBillingRow } from "@correcre/lib/company-billing";
 import type { CompanySummary, UpdateCompanyInput } from "@correcre/lib/company-management-types";
 
 export type AdminInfoDepartmentItem = Pick<Department, "departmentId" | "name" | "status" | "sortOrder"> & {
@@ -32,6 +33,8 @@ export type AdminInfoData = {
   missions: Mission[];
   account: AdminInfoAccountSummary;
   userCounts: AdminInfoUserCounts;
+  // 月額利用料の請求履歴（当月が先頭）。
+  billingRows: CompanyBillingRow[];
 };
 
 export type UpdateAdminCompanyInfoInput = UpdateCompanyInput & {

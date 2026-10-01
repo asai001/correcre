@@ -176,6 +176,10 @@ function normalizeNonNegativeInteger(value: number | undefined, fallback: number
   return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
 }
 
+function isValidMonthlyBaseFee(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 export function toCompanySummary(company: Company): CompanySummary {
   return {
     companyId: company.companyId,
@@ -187,6 +191,7 @@ export function toCompanySummary(company: Company): CompanySummary {
     employeeCount: company.totalEmployees ?? company.activeEmployees ?? 0,
     activeEmployeeCount: company.activeEmployees ?? 0,
     companyPointBalance: normalizeNonNegativeInteger(company.companyPointBalance, 0),
+    monthlyBaseFee: normalizeNonNegativeInteger(company.monthlyBaseFee, 0),
     perEmployeeMonthlyFee: normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0),
     pointUnitLabel: company.pointUnitLabel?.trim() || "pt",
     showPointExchangeLink: company.showPointExchangeLink === true,
@@ -232,6 +237,10 @@ function validateCreateCompanyInput(input: CreateCompanyInput) {
     throw new Error("月額単価は 0 以上の整数で入力してください");
   }
 
+  if (input.monthlyBaseFee !== undefined && !isValidMonthlyBaseFee(input.monthlyBaseFee)) {
+    throw new Error("月額基本料は 0 以上の整数で入力してください");
+  }
+
   if (!Number.isInteger(companyPointBalance) || companyPointBalance < 0) {
     throw new Error("会社ポイント残高は 0 以上の整数で入力してください");
   }
@@ -265,10 +274,12 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
 
   const now = new Date().toISOString();
   const companyId = createCompanyId(companies);
+  const monthlyBaseFee = input.monthlyBaseFee ?? 0;
   const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
     month: toBillingSnapshotMonth(now),
     status: input.status,
     activeEmployees: 0,
+    monthlyBaseFee,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
     capturedAt: now,
   });
@@ -277,6 +288,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     name: input.name.trim(),
     status: input.status,
     plan: input.plan,
+    monthlyBaseFee,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
     companyPointBalance: input.companyPointBalance,
     totalEmployees: 0,
@@ -312,6 +324,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
   const effectiveName = (input.name ?? company.name).trim();
   const effectiveStatus = input.status ?? company.status;
   const effectivePlan = input.plan ?? company.plan;
+  const effectiveMonthlyBaseFee = input.monthlyBaseFee ?? company.monthlyBaseFee ?? 0;
   const effectivePerEmployeeMonthlyFee = input.perEmployeeMonthlyFee ?? company.perEmployeeMonthlyFee ?? 0;
   const effectivePointUnitLabel = input.pointUnitLabel?.trim() || company.pointUnitLabel?.trim() || "pt";
 
@@ -326,6 +339,9 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
   }
   if (!Number.isInteger(effectivePerEmployeeMonthlyFee) || effectivePerEmployeeMonthlyFee < 0) {
     throw new Error("月額単価は 0 以上の整数で入力してください");
+  }
+  if (!isValidMonthlyBaseFee(effectiveMonthlyBaseFee)) {
+    throw new Error("月額基本料は 0 以上の整数で入力してください");
   }
 
   const pointAdjustment = input.pointAdjustment ?? 0;
@@ -365,6 +381,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     month: toBillingSnapshotMonth(updatedAt),
     status: effectiveStatus,
     activeEmployees: company.activeEmployees ?? 0,
+    monthlyBaseFee: effectiveMonthlyBaseFee,
     perEmployeeMonthlyFee: effectivePerEmployeeMonthlyFee,
     capturedAt: updatedAt,
   });
@@ -373,6 +390,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     name: effectiveName,
     status: effectiveStatus,
     plan: effectivePlan,
+    monthlyBaseFee: effectiveMonthlyBaseFee,
     perEmployeeMonthlyFee: effectivePerEmployeeMonthlyFee,
     companyPointBalance: nextCompanyPointBalance,
     monthlyBillingSnapshots: upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
