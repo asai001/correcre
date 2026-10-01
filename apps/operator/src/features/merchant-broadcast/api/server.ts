@@ -120,8 +120,12 @@ export async function getMerchantBroadcastPageData(operator: DBUserItem): Promis
         createdAt: merchant.createdAt,
         merchandiseCount: merchandise.length,
         publishedMerchandiseCount: merchandise.filter((item) => item.status === "PUBLISHED").length,
-        recipientEmails: recipients.map((recipient) => recipient.email),
-        sampleRecipientName: recipients[0]?.recipientName ?? "ご担当者",
+        recipients: recipients.map((recipient) => ({
+          email: recipient.email,
+          recipientName: recipient.recipientName,
+          kind: recipient.kind,
+          userStatus: recipient.userStatus,
+        })),
       };
     }),
   );
@@ -182,21 +186,36 @@ export async function sendMerchantBroadcast(
 ): Promise<SendMerchantBroadcastResult> {
   const config = getRuntimeConfig();
   const merchantAppUrl = getMerchantAppUrl();
-  const requestedIds = new Set(input.merchantIds);
+  const requestedEmailsByMerchant = new Map<string, Set<string>>();
+  for (const selection of input.selections) {
+    const emails = requestedEmailsByMerchant.get(selection.merchantId) ?? new Set<string>();
+    for (const email of selection.emails) {
+      emails.add(email.trim().toLowerCase());
+    }
+    requestedEmailsByMerchant.set(selection.merchantId, emails);
+  }
   const allMerchants = await listMerchants({ region: config.region, tableName: config.merchantTableName });
   // 選択順ではなく一覧と同じ並び（新しい順）で処理する
   const merchants = allMerchants
-    .filter((merchant) => requestedIds.has(merchant.merchantId) && isBroadcastTargetMerchant(merchant))
+    .filter((merchant) => requestedEmailsByMerchant.has(merchant.merchantId) && isBroadcastTargetMerchant(merchant))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   if (!merchants.length) {
     throw new MerchantBroadcastInputError("送信先の提携企業が見つかりません。画面を再読み込みしてください。");
   }
 
+  // 画面で選ばれたアドレスのうち、今もその提携企業の宛先であるものだけに送る
+  // （任意のアドレスへ送れないよう、宛先はサーバー側で解決し直す）
   const recipientsByMerchant = await Promise.all(
-    merchants.map((merchant) => resolveRecipientsForMerchant(config, merchant)),
+    merchants.map(async (merchant) => {
+      const requestedEmails = requestedEmailsByMerchant.get(merchant.merchantId) ?? new Set<string>();
+      const recipients = await resolveRecipientsForMerchant(config, merchant);
+      return recipients.filter((recipient) => requestedEmails.has(recipient.email));
+    }),
   );
   const recipients = mergeMerchantBroadcastRecipients(recipientsByMerchant);
+  // 履歴には実際に宛先が残った提携企業だけを記録する
+  const sentMerchantIds = new Set(recipients.map((recipient) => recipient.merchantId));
 
   if (input.mode === "test") {
     // テスト送信: 先頭の宛先の内容で差し込んだメールを、操作中の運用者本人にだけ送る
@@ -205,6 +224,7 @@ export async function sendMerchantBroadcast(
       merchantId: merchants[0].merchantId,
       merchantName: getMerchantBroadcastMerchantName(merchants[0]),
       recipientName: "ご担当者",
+      kind: "contact" as const,
     };
     await sendOne(
       config.region,
@@ -215,7 +235,7 @@ export async function sendMerchantBroadcast(
   }
 
   if (!recipients.length) {
-    throw new MerchantBroadcastInputError("選択した提携企業に送信できるメールアドレスがありません。");
+    throw new MerchantBroadcastInputError("選択した宛先に送信できるメールアドレスがありません。画面を再読み込みしてください。");
   }
 
   if (recipients.length > options.maxRecipients) {
@@ -262,10 +282,12 @@ export async function sendMerchantBroadcast(
     sentAt,
     subject: input.subject,
     body: input.body,
-    merchants: merchants.map((merchant) => ({
-      merchantId: merchant.merchantId,
-      merchantName: getMerchantBroadcastMerchantName(merchant),
-    })),
+    merchants: merchants
+      .filter((merchant) => sentMerchantIds.has(merchant.merchantId))
+      .map((merchant) => ({
+        merchantId: merchant.merchantId,
+        merchantName: getMerchantBroadcastMerchantName(merchant),
+      })),
     recipientCount: recipients.length,
     sentCount,
     failedEmails,

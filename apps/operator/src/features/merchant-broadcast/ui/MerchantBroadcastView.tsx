@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 
+import { faChevronDown, faChevronRight } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
 
 import {
@@ -17,7 +19,13 @@ import type { MerchantStatus } from "@correcre/types";
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 
 import { sendMerchantBroadcast } from "../api/client";
-import type { MerchantBroadcastHistory, MerchantBroadcastMode, MerchantBroadcastPageData } from "../model/types";
+import type {
+  MerchantBroadcastHistory,
+  MerchantBroadcastMode,
+  MerchantBroadcastPageData,
+  MerchantBroadcastTarget,
+  MerchantBroadcastTargetRecipient,
+} from "../model/types";
 
 type Props = {
   data: MerchantBroadcastPageData;
@@ -77,6 +85,18 @@ function daysSince(iso: string) {
   return Math.floor((Date.now() - time) / (24 * 60 * 60 * 1000));
 }
 
+function recipientKindLabel(recipient: MerchantBroadcastTargetRecipient) {
+  if (recipient.kind === "contact") return "連絡先アドレス";
+  switch (recipient.userStatus) {
+    case "INVITED":
+      return "招待中（未ログイン）";
+    case "PENDING":
+      return "申請者";
+    default:
+      return "ログインユーザー";
+  }
+}
+
 function statusBadgeClassName(status: MerchantStatus) {
   switch (status) {
     case "ACTIVE":
@@ -92,7 +112,9 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
   const [statusFilter, setStatusFilter] = useState<Set<MerchantStatus>>(() => new Set<MerchantStatus>(["ACTIVE"]));
   const [merchandiseFilter, setMerchandiseFilter] = useState<MerchandiseFilter>("all");
   const [keyword, setKeyword] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  // 提携企業ごとに、送信先として選んだメールアドレス
+  const [selection, setSelection] = useState<Map<string, Set<string>>>(() => new Map());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [subject, setSubject] = useState(DEFAULT_SUBJECT);
   const [body, setBody] = useState(DEFAULT_BODY);
   const [history, setHistory] = useState<MerchantBroadcastHistory[]>(data.history);
@@ -119,23 +141,38 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
     });
   }, [data.targets, statusFilter, merchandiseFilter, keyword]);
 
-  const selectedTargets = useMemo(
-    () => data.targets.filter((target) => selectedIds.has(target.merchantId)),
-    [data.targets, selectedIds],
-  );
-  const recipientCount = useMemo(
-    () => new Set(selectedTargets.flatMap((target) => target.recipientEmails)).size,
-    [selectedTargets],
-  );
-  const selectableVisibleTargets = visibleTargets.filter((target) => target.recipientEmails.length > 0);
-  const allVisibleSelected =
-    selectableVisibleTargets.length > 0 &&
-    selectableVisibleTargets.every((target) => selectedIds.has(target.merchantId));
+  const selectedCountOf = (target: MerchantBroadcastTarget) => selection.get(target.merchantId)?.size ?? 0;
+  const isFullySelected = (target: MerchantBroadcastTarget) =>
+    target.recipients.length > 0 && selectedCountOf(target) === target.recipients.length;
 
-  const previewTarget = selectedTargets.find((target) => target.recipientEmails.length > 0) ?? selectedTargets[0];
-  const previewRecipient = {
-    merchantName: previewTarget?.merchantName ?? "（提携企業名）",
-    recipientName: previewTarget?.sampleRecipientName ?? "（担当者名）",
+  const selectedTargets = useMemo(
+    () => data.targets.filter((target) => (selection.get(target.merchantId)?.size ?? 0) > 0),
+    [data.targets, selection],
+  );
+  // 選んだ宛先（同じアドレスは 1 件。サーバー側と同じく先に出てくる提携企業ぶんを使う）
+  const selectedRecipients = useMemo(() => {
+    const recipients = new Map<string, { merchantName: string; recipientName: string }>();
+    for (const target of selectedTargets) {
+      const emails = selection.get(target.merchantId);
+      for (const recipient of target.recipients) {
+        if (emails?.has(recipient.email) && !recipients.has(recipient.email)) {
+          recipients.set(recipient.email, { merchantName: target.merchantName, recipientName: recipient.recipientName });
+        }
+      }
+    }
+    return [...recipients.values()];
+  }, [selectedTargets, selection]);
+  const recipientCount = selectedRecipients.length;
+  const selectableVisibleTargets = visibleTargets.filter((target) => target.recipients.length > 0);
+  const allVisibleSelected =
+    selectableVisibleTargets.length > 0 && selectableVisibleTargets.every((target) => isFullySelected(target));
+  const allVisibleExpanded =
+    selectableVisibleTargets.length > 0 &&
+    selectableVisibleTargets.every((target) => expandedIds.has(target.merchantId));
+
+  const previewRecipient = selectedRecipients[0] ?? {
+    merchantName: "（提携企業名）",
+    recipientName: "（担当者名）",
   };
   const previewSubject = buildMerchantBroadcastSubject({ subject, recipient: previewRecipient });
   const previewText = buildMerchantBroadcastText({
@@ -158,11 +195,9 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
         : body.length > MERCHANT_BROADCAST_BODY_MAX_LENGTH
           ? `本文は${MERCHANT_BROADCAST_BODY_MAX_LENGTH}文字以内で入力してください。`
           : null;
-  const selectionError = !selectedTargets.length
-    ? "送信先の提携企業を選択してください。"
-    : recipientCount === 0
-      ? "選択した提携企業に送信できるメールアドレスがありません。"
-      : recipientCount > MERCHANT_BROADCAST_MAX_RECIPIENTS
+  const selectionError = !recipientCount
+    ? "送信先を選択してください。"
+    : recipientCount > MERCHANT_BROADCAST_MAX_RECIPIENTS
         ? `1回に送信できるのは${MERCHANT_BROADCAST_MAX_RECIPIENTS}件までです。提携企業を分けて送信してください。`
         : null;
   const sending = sendingMode !== null;
@@ -179,8 +214,54 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
     });
   };
 
-  const toggleSelected = (merchantId: string) => {
-    setSelectedIds((prev) => {
+  // 提携企業のチェック: 全員選択済みなら全員外し、それ以外は全員選ぶ
+  const toggleMerchant = (target: MerchantBroadcastTarget) => {
+    const selectAll = !isFullySelected(target);
+    setSelection((prev) => {
+      const next = new Map(prev);
+      if (selectAll) {
+        next.set(target.merchantId, new Set(target.recipients.map((recipient) => recipient.email)));
+      } else {
+        next.delete(target.merchantId);
+      }
+      return next;
+    });
+  };
+
+  const toggleRecipient = (merchantId: string, email: string) => {
+    setSelection((prev) => {
+      const next = new Map(prev);
+      const emails = new Set(next.get(merchantId));
+      if (emails.has(email)) {
+        emails.delete(email);
+      } else {
+        emails.add(email);
+      }
+      if (emails.size) {
+        next.set(merchantId, emails);
+      } else {
+        next.delete(merchantId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelection((prev) => {
+      const next = new Map(prev);
+      for (const target of selectableVisibleTargets) {
+        if (allVisibleSelected) {
+          next.delete(target.merchantId);
+        } else {
+          next.set(target.merchantId, new Set(target.recipients.map((recipient) => recipient.email)));
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleExpanded = (merchantId: string) => {
+    setExpandedIds((prev) => {
       const next = new Set(prev);
       if (next.has(merchantId)) {
         next.delete(merchantId);
@@ -191,11 +272,11 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
     });
   };
 
-  const toggleAllVisible = () => {
-    setSelectedIds((prev) => {
+  const toggleExpandAllVisible = () => {
+    setExpandedIds((prev) => {
       const next = new Set(prev);
       for (const target of selectableVisibleTargets) {
-        if (allVisibleSelected) {
+        if (allVisibleExpanded) {
           next.delete(target.merchantId);
         } else {
           next.add(target.merchantId);
@@ -233,7 +314,10 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
         mode,
         subject: trimmedSubject,
         body,
-        merchantIds: selectedTargets.map((target) => target.merchantId),
+        selections: selectedTargets.map((target) => ({
+          merchantId: target.merchantId,
+          emails: [...(selection.get(target.merchantId) ?? [])],
+        })),
       });
 
       if (mode === "test") {
@@ -245,7 +329,7 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
       if (result.history) {
         setHistory((prev) => [result.history!, ...prev]);
       }
-      setSelectedIds(new Set());
+      setSelection(new Map());
 
       const messages = [`${result.sentCount}件のメールを送信しました。`];
       if (result.failedEmails.length) {
@@ -308,10 +392,11 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">1. 送信先の提携企業を選ぶ</h2>
+            <h2 className="text-lg font-bold text-slate-900">1. 送信先を選ぶ</h2>
             <p className="mt-1 text-xs text-slate-500">
-              選択した提携企業のログインユーザー（停止・削除済みを除く）と、登録された連絡先メールアドレスに 1 通ずつ送信します。
-              他社のメールアドレスが宛先に表示されることはありません。
+              提携企業のログインユーザー（停止・削除済みを除く）と、登録された連絡先メールアドレスが宛先の候補です。
+              提携企業にチェックすると全員を選び、宛先の件数を押して開くとユーザーごとに選べます。
+              宛先ごとに 1 通ずつ送るため、他社のアドレスが見えることはありません。
             </p>
           </div>
           <div className="text-right text-sm text-slate-600">
@@ -355,14 +440,24 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
               ))}
             </select>
           </div>
-          <input
-            type="search"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="提携企業名・IDで検索"
-            aria-label="提携企業名・IDで検索"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 lg:w-72"
-          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleExpandAllVisible}
+              disabled={!selectableVisibleTargets.length}
+              className="shrink-0 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+            >
+              {allVisibleExpanded ? "すべて閉じる" : "すべて開く"}
+            </button>
+            <input
+              type="search"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="提携企業名・IDで検索"
+              aria-label="提携企業名・IDで検索"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 lg:w-72"
+            />
+          </div>
         </div>
 
         <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
@@ -375,7 +470,7 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
                     checked={allVisibleSelected}
                     onChange={toggleAllVisible}
                     disabled={!selectableVisibleTargets.length || sending}
-                    aria-label="表示中の提携企業をすべて選択"
+                    aria-label="表示中の提携企業の宛先をすべて選択"
                     className="h-4 w-4 cursor-pointer accent-slate-900"
                   />
                 </th>
@@ -394,44 +489,100 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
                 </tr>
               ) : (
                 visibleTargets.map((target) => {
-                  const hasRecipients = target.recipientEmails.length > 0;
-                  const checked = selectedIds.has(target.merchantId);
+                  const hasRecipients = target.recipients.length > 0;
+                  const selectedCount = selectedCountOf(target);
+                  const fullySelected = isFullySelected(target);
+                  const expanded = hasRecipients && expandedIds.has(target.merchantId);
+                  const selectedEmails = selection.get(target.merchantId);
                   return (
-                    <tr key={target.merchantId} className={checked ? "bg-sky-50/60" : undefined}>
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSelected(target.merchantId)}
-                          disabled={(!hasRecipients && !checked) || sending}
-                          aria-label={`${target.merchantName} を選択`}
-                          className="h-4 w-4 cursor-pointer accent-slate-900 disabled:cursor-not-allowed"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{target.merchantName}</div>
-                        <div className="text-xs text-slate-400">{target.merchantId}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClassName(target.status)}`}
-                        >
-                          {STATUS_LABELS[target.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-700">
-                        {target.publishedMerchandiseCount} ／ {target.merchandiseCount}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {hasRecipients ? (
-                          <span className="text-slate-700" title={target.recipientEmails.join("\n")}>
-                            {target.recipientEmails.length}件
+                    <Fragment key={target.merchantId}>
+                      <tr className={selectedCount ? "bg-sky-50/60" : undefined}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={fullySelected}
+                            ref={(element) => {
+                              if (element) element.indeterminate = selectedCount > 0 && !fullySelected;
+                            }}
+                            onChange={() => toggleMerchant(target)}
+                            disabled={!hasRecipients || sending}
+                            aria-label={`${target.merchantName} の宛先をすべて選択`}
+                            className="h-4 w-4 cursor-pointer accent-slate-900 disabled:cursor-not-allowed"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900">{target.merchantName}</div>
+                          <div className="text-xs text-slate-400">{target.merchantId}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClassName(target.status)}`}
+                          >
+                            {STATUS_LABELS[target.status]}
                           </span>
-                        ) : (
-                          <span className="text-xs font-semibold text-rose-500">送信先なし</span>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-4 py-3 text-right text-slate-700">
+                          {target.publishedMerchandiseCount} ／ {target.merchandiseCount}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {hasRecipients ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(target.merchantId)}
+                              aria-expanded={expanded}
+                              aria-controls={`broadcast-recipients-${target.merchantId}`}
+                              aria-label={`${target.merchantName} の宛先を${expanded ? "閉じる" : "開く"}`}
+                              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-slate-700 transition hover:bg-slate-100"
+                            >
+                              <span>
+                                <span className="font-semibold text-slate-900">{selectedCount}</span> /{" "}
+                                {target.recipients.length}件
+                              </span>
+                              <FontAwesomeIcon icon={expanded ? faChevronDown : faChevronRight} className="w-3 text-xs" />
+                            </button>
+                          ) : (
+                            <span className="text-xs font-semibold text-rose-500">送信先なし</span>
+                          )}
+                        </td>
+                      </tr>
+                      {expanded ? (
+                        <tr id={`broadcast-recipients-${target.merchantId}`} className="bg-slate-50/70">
+                          <td />
+                          <td colSpan={4} className="px-4 pb-3 pt-1">
+                            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                              {target.recipients.map((recipient) => (
+                                <li key={recipient.email}>
+                                  <label className="flex cursor-pointer items-center gap-3 px-3 py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedEmails?.has(recipient.email) ?? false}
+                                      onChange={() => toggleRecipient(target.merchantId, recipient.email)}
+                                      disabled={sending}
+                                      className="h-4 w-4 cursor-pointer accent-slate-900"
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                      <span className="font-semibold text-slate-800">{recipient.recipientName}</span>
+                                      <span className="ml-2 break-all text-xs text-slate-500">{recipient.email}</span>
+                                    </span>
+                                    <span
+                                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                        recipient.kind === "contact"
+                                          ? "bg-violet-50 text-violet-700"
+                                          : recipient.userStatus === "ACTIVE"
+                                            ? "bg-emerald-50 text-emerald-700"
+                                            : "bg-amber-50 text-amber-700"
+                                      }`}
+                                    >
+                                      {recipientKindLabel(recipient)}
+                                    </span>
+                                  </label>
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })
               )}
@@ -504,9 +655,9 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
         <div className="flex flex-col rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <h2 className="text-lg font-bold text-slate-900">プレビュー</h2>
           <p className="mt-1 text-xs text-slate-500">
-            {previewTarget
-              ? `「${previewTarget.merchantName}」宛ての場合の表示です。`
-              : "提携企業を選択すると、その企業宛ての内容で差し込み文字が表示されます。"}
+            {selectedRecipients[0]
+              ? `「${selectedRecipients[0].merchantName}」の${selectedRecipients[0].recipientName} 様宛ての場合の表示です。`
+              : "送信先を選択すると、その宛先の内容で差し込み文字が表示されます。"}
           </p>
           <div className="mt-4 flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="border-b border-slate-200 pb-2 text-sm">
@@ -631,7 +782,13 @@ export default function MerchantBroadcastView({ data, operatorName }: Props) {
                   <span className="font-semibold">送信先:</span> {selectedTargets.length}社 ／ {recipientCount}件
                 </div>
                 <div className="max-h-32 overflow-y-auto text-slate-600">
-                  {selectedTargets.map((target) => target.merchantName).join("、")}
+                  {selectedTargets
+                    .map((target) =>
+                      isFullySelected(target)
+                        ? target.merchantName
+                        : `${target.merchantName}（${selectedCountOf(target)}/${target.recipients.length}件）`,
+                    )
+                    .join("、")}
                 </div>
               </div>
             </Alert>

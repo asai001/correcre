@@ -24,9 +24,29 @@ describe("resolveMerchantBroadcastRecipients", () => {
     ]);
 
     expect(recipients).toEqual([
-      { email: "active@example.com", merchantId: "m-001", merchantName: "ぴよちゃん", recipientName: "佐藤 太郎" },
-      { email: "invited@example.com", merchantId: "m-001", merchantName: "ぴよちゃん", recipientName: "鈴木" },
-      { email: "contact@example.com", merchantId: "m-001", merchantName: "ぴよちゃん", recipientName: "山田 花子" },
+      {
+        email: "active@example.com",
+        merchantId: "m-001",
+        merchantName: "ぴよちゃん",
+        recipientName: "佐藤 太郎",
+        kind: "user",
+        userStatus: "ACTIVE",
+      },
+      {
+        email: "invited@example.com",
+        merchantId: "m-001",
+        merchantName: "ぴよちゃん",
+        recipientName: "鈴木",
+        kind: "user",
+        userStatus: "INVITED",
+      },
+      {
+        email: "contact@example.com",
+        merchantId: "m-001",
+        merchantName: "ぴよちゃん",
+        recipientName: "山田 花子",
+        kind: "contact",
+      },
     ]);
   });
 
@@ -37,6 +57,7 @@ describe("resolveMerchantBroadcastRecipients", () => {
 
     expect(recipients).toHaveLength(1);
     expect(recipients[0].recipientName).toBe("佐藤 太郎");
+    expect(recipients[0].kind).toBe("user");
   });
 
   it("氏名が無い場合は「ご担当者」を差し込む", () => {
@@ -52,10 +73,10 @@ describe("resolveMerchantBroadcastRecipients", () => {
 describe("mergeMerchantBroadcastRecipients", () => {
   it("複数の提携企業に同じアドレスがある場合は先の提携企業ぶんだけ残す", () => {
     const merged = mergeMerchantBroadcastRecipients([
-      [{ email: "a@example.com", merchantId: "m-001", merchantName: "A", recipientName: "甲" }],
+      [{ email: "a@example.com", merchantId: "m-001", merchantName: "A", recipientName: "甲", kind: "user" }],
       [
-        { email: "a@example.com", merchantId: "m-002", merchantName: "B", recipientName: "乙" },
-        { email: "b@example.com", merchantId: "m-002", merchantName: "B", recipientName: "丙" },
+        { email: "a@example.com", merchantId: "m-002", merchantName: "B", recipientName: "乙", kind: "user" },
+        { email: "b@example.com", merchantId: "m-002", merchantName: "B", recipientName: "丙", kind: "contact" },
       ],
     ]);
 

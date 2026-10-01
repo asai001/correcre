@@ -1,4 +1,13 @@
-import type { MerchantStatus } from "@correcre/types";
+import type { MerchantStatus, MerchantUserStatus } from "@correcre/types";
+
+// 提携企業 1 社に紐づく宛先 1 件。
+export type MerchantBroadcastTargetRecipient = {
+  email: string;
+  recipientName: string;
+  // user: ログインユーザー / contact: 提携企業に登録された連絡先メールアドレス
+  kind: "user" | "contact";
+  userStatus?: MerchantUserStatus;
+};
 
 // 一斉メールの送信対象として選べる提携企業 1 社ぶんの情報。
 export type MerchantBroadcastTarget = {
@@ -10,10 +19,14 @@ export type MerchantBroadcastTarget = {
   merchandiseCount: number;
   // 公開中の商品・サービス数
   publishedMerchandiseCount: number;
-  // この提携企業に届く宛先メールアドレス
-  recipientEmails: string[];
-  // プレビューの差し込みに使う代表の宛先名
-  sampleRecipientName: string;
+  // この提携企業の宛先（運用者がこの中から送る相手を選ぶ）
+  recipients: MerchantBroadcastTargetRecipient[];
+};
+
+// 提携企業ごとに、送信先として選ばれたメールアドレス
+export type MerchantBroadcastSelection = {
+  merchantId: string;
+  emails: string[];
 };
 
 export type MerchantBroadcastHistory = {
@@ -43,7 +56,7 @@ export type SendMerchantBroadcastInput = {
   mode: MerchantBroadcastMode;
   subject: string;
   body: string;
-  merchantIds: string[];
+  selections: MerchantBroadcastSelection[];
 };
 
 export type SendMerchantBroadcastResult = {

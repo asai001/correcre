@@ -26,6 +26,9 @@ export type MerchantBroadcastRecipient = {
   merchantId: string;
   merchantName: string;
   recipientName: string;
+  // user: 提携企業のログインユーザー / contact: 提携企業に登録された連絡先メールアドレス
+  kind: "user" | "contact";
+  userStatus?: MerchantUserStatus;
 };
 
 export function getMerchantBroadcastMerchantName(merchant: Pick<Merchant, "merchantId" | "name" | "displayName">) {
@@ -59,6 +62,8 @@ export function resolveMerchantBroadcastRecipients(
       merchantId: merchant.merchantId,
       merchantName,
       recipientName: [user.lastName?.trim(), user.firstName?.trim()].filter(Boolean).join(" ") || DEFAULT_RECIPIENT_NAME,
+      kind: "user",
+      userStatus: user.status,
     });
   }
 
@@ -69,6 +74,7 @@ export function resolveMerchantBroadcastRecipients(
       merchantId: merchant.merchantId,
       merchantName,
       recipientName: merchant.contactPersonName?.trim() || DEFAULT_RECIPIENT_NAME,
+      kind: "contact",
     });
   }
 
