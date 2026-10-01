@@ -8,6 +8,7 @@ import {
   faArrowLeft,
   faBuilding,
   faBullseye,
+  faEnvelope,
   faGauge,
   faGear,
   faHeadset,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "ユーザー管理", href: "/user-registration" as Route, icon: faUsers },
   { label: "ミッション管理", href: "/missions" as Route, icon: faBullseye },
   { label: "提携企業管理", href: "/merchants" as Route, icon: faStore },
+  { label: "一斉メール", href: "/merchant-broadcast" as Route, icon: faEnvelope },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
   { label: "問い合わせ", href: "/support-inquiries" as Route, icon: faHeadset },
   { label: "設定", href: "/settings" as Route, icon: faGear },
@@ -88,7 +90,7 @@ export default function AdminPageHeader({
       </div>
       <nav aria-label="グローバルメニュー" className="border-t border-white/15 bg-black/20">
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-6">
-          <ul className="flex flex-wrap items-center gap-1">
+          <ul className="flex flex-wrap items-center gap-0.5">
             {NAV_ITEMS.map((item) => {
               const active = isActiveNav(pathname, item.href);
               return (
@@ -96,7 +98,7 @@ export default function AdminPageHeader({
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                    className={`inline-flex items-center gap-2 border-b-2 px-3 py-3 text-sm font-semibold transition ${
                       active
                         ? "border-white text-white"
                         : "border-transparent text-white/75 hover:border-white/40 hover:text-white"
