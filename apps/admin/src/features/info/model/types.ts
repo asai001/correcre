@@ -37,7 +37,8 @@ export type AdminInfoData = {
   billingRows: CompanyBillingRow[];
 };
 
-export type UpdateAdminCompanyInfoInput = UpdateCompanyInput & {
+// 管理者が更新できる項目のみ。契約・請求に関わる項目（会社名・ステータス・プラン・料金など）は含めない。
+export type UpdateAdminCompanyInfoInput = Pick<UpdateCompanyInput, "philosophyItems"> & {
   shortName?: string;
   contactName?: string;
   contactEmail?: string;
