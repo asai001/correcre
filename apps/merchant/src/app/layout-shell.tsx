@@ -7,7 +7,8 @@ type LayoutShellProps = Readonly<{
 }>;
 
 // (auth) レイアウトの画面は背景色を画面全体に敷くため、中央寄せコンテナを挟まない。
-const FULL_BLEED_PATH_PREFIXES = ["/login", "/register", "/seminar"];
+// 操作ガイド（/docs）も独自のヘッダー・目次を画面幅いっぱいに置くため同じ扱いにする。
+const FULL_BLEED_PATH_PREFIXES = ["/login", "/register", "/seminar", "/docs"];
 
 export default function LayoutShell({ children }: LayoutShellProps) {
   const pathname = usePathname();

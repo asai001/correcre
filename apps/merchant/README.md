@@ -89,6 +89,14 @@ aws dynamodb query --table-name correcre-seminar-registration-prod \
   --expression-attribute-values '{":pk":{"S":"SEMINAR#merchant-briefing"}}'
 ```
 
+## 操作ガイド（`/docs`）
+
+提携企業向けの操作説明資料です。ログイン不要の公開ページで、登録申請から各画面の操作までをスクリーンショット付きで説明しています（`src/app/docs`）。
+
+- 章立て（サイドメニュー・目次・前後ページ送り）は `src/app/docs/_components/docs-nav.ts` だけで管理しています。
+- スクリーンショットは `public/docs/screenshots/*.webp` に置き、表示サイズを `src/app/docs/_components/screenshots.ts` に記載しています。画像を差し替えたらサイズも更新してください。
+- 画面の画像はサンプルデータで撮影したものです。画面の文言・配置を変更したら、該当する章の画像と説明も見直してください。
+
 ## Merchant User Provisioning
 
 提携企業ユーザーは運用者画面（operator アプリ）から招待します。手動で Cognito / DynamoDB を編集する手順はありません。
