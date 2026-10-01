@@ -12,7 +12,8 @@
   "module": "./src/index.ts",
   "sideEffects": false,
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "test:integration": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.integration.config.cjs --runInBand"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1019.0",
