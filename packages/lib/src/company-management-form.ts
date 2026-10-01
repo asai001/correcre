@@ -16,6 +16,7 @@ export type CompanyFormState = {
   name: string;
   status: CompanyStatus;
   plan: CompanyPlan;
+  monthlyBaseFee: string;
   perEmployeeMonthlyFee: string;
   companyPointBalance: string;
   pointAdjustment: string;
@@ -26,6 +27,7 @@ export type CompanyFormState = {
 
 export type CompanyFormValidation = {
   name: boolean;
+  monthlyBaseFee: boolean;
   perEmployeeMonthlyFee: boolean;
   companyPointBalance: boolean;
   pointAdjustment: boolean;
@@ -77,6 +79,7 @@ export function createInitialCompanyFormState(): CompanyFormState {
     name: "",
     status: "ACTIVE",
     plan: "STANDARD",
+    monthlyBaseFee: "0",
     perEmployeeMonthlyFee: "3000",
     companyPointBalance: "0",
     pointAdjustment: "0",
@@ -95,6 +98,7 @@ export function createCompanyFormStateFromCompany(company: CompanySummary | null
     name: company.legalName,
     status: company.status,
     plan: company.plan,
+    monthlyBaseFee: String(normalizeNonNegativeInteger(company.monthlyBaseFee, 0)),
     perEmployeeMonthlyFee: String(normalizeNonNegativeInteger(company.perEmployeeMonthlyFee, 0)),
     companyPointBalance: String(normalizeNonNegativeInteger(company.companyPointBalance, 0)),
     pointAdjustment: "0",
@@ -111,6 +115,7 @@ export function getCompanyFormState(form: CompanyFormState): {
   nextCompanyPointBalance: number;
   validation: CompanyFormValidation;
 } {
+  const parsedMonthlyBaseFee = Number.parseInt(form.monthlyBaseFee, 10);
   const parsedMonthlyFee = Number.parseInt(form.perEmployeeMonthlyFee, 10);
   const parsedCompanyPointBalance = Number.parseInt(form.companyPointBalance, 10);
   const pointAdjustmentValue = form.pointAdjustment.trim();
@@ -129,6 +134,7 @@ export function getCompanyFormState(form: CompanyFormState): {
     nextCompanyPointBalance: Number.isInteger(nextCompanyPointBalance) ? nextCompanyPointBalance : parsedCompanyPointBalance,
     validation: {
       name: !form.name.trim(),
+      monthlyBaseFee: !Number.isInteger(parsedMonthlyBaseFee) || parsedMonthlyBaseFee < 0,
       perEmployeeMonthlyFee: !Number.isInteger(parsedMonthlyFee) || parsedMonthlyFee < 0,
       companyPointBalance: !isCompanyPointBalanceValid,
       pointAdjustment: !Number.isInteger(parsedPointAdjustment),
@@ -148,6 +154,7 @@ export function getCompanyFormState(form: CompanyFormState): {
 export function hasCompanyFormError(validation: CompanyFormValidation) {
   return (
     validation.name ||
+    validation.monthlyBaseFee ||
     validation.perEmployeeMonthlyFee ||
     validation.companyPointBalance ||
     validation.pointAdjustment ||
@@ -175,6 +182,8 @@ export function toCreateCompanyInput(
     name: form.name.trim(),
     status: form.status,
     plan: form.plan,
+    // 検証済み（getCompanyFormState）のフォーム値を整数化する。
+    monthlyBaseFee: Number.parseInt(form.monthlyBaseFee, 10),
     perEmployeeMonthlyFee: parsedMonthlyFee,
     companyPointBalance: parsedCompanyPointBalance,
     pointUnitLabel: form.pointUnitLabel.trim(),

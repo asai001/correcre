@@ -189,6 +189,21 @@ export default function CompanyEditDialog({
 
           <div className="grid gap-5 md:grid-cols-2">
             <TextField
+              label="月額基本料（円）"
+              type="number"
+              value={form.monthlyBaseFee}
+              onChange={(event) => setForm((current) => ({ ...current, monthlyBaseFee: event.target.value }))}
+              fullWidth
+              required
+              error={hasSubmitted && validation.monthlyBaseFee}
+              helperText={
+                hasSubmitted && validation.monthlyBaseFee
+                  ? "0 以上の整数で入力してください。"
+                  : "利用人数に関係なく毎月かかる基本料です。"
+              }
+            />
+
+            <TextField
               label="月額単価（円）"
               type="number"
               value={form.perEmployeeMonthlyFee}
@@ -199,10 +214,12 @@ export default function CompanyEditDialog({
               helperText={
                 hasSubmitted && validation.perEmployeeMonthlyFee
                   ? "0 以上の整数で入力してください。"
-                  : "従業員 1 人あたりの月額単価です。"
+                  : "従業員 1 人あたりの月額単価（ID 料金）です。"
               }
             />
+          </div>
 
+          <div className="grid gap-5 md:grid-cols-2">
             <TextField
               label="保有ポイント"
               type="number"

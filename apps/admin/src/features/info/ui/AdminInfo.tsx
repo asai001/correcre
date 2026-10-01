@@ -29,6 +29,7 @@ import { createDepartment } from "@admin/features/employee-management/api/client
 
 import { updateAdminCompanyInfo } from "../api/client";
 import type { AdminInfoData } from "../model/types";
+import BillingInfoPanel from "./BillingInfoPanel";
 
 type AdminInfoProps = {
   initialData: AdminInfoData;
@@ -257,7 +258,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
       <AdminPageHeader
         title="各種情報画面"
         adminName={initialData.account.name}
-        subtitle="理念体系、会社情報、登録情報、部署、ミッション項目をまとめて確認します。"
+        subtitle="理念体系、会社情報、登録情報、部署、ミッション項目、請求情報をまとめて確認します。"
       />
 
       {notice ? <Alert severity="success">{notice}</Alert> : null}
@@ -294,6 +295,12 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
             className="data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(8,145,178,0.9)]"
           >
             ミッション項目
+          </TabsTrigger>
+          <TabsTrigger
+            value="billing"
+            className="data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_-16px_rgba(8,145,178,0.9)]"
+          >
+            請求情報
           </TabsTrigger>
         </TabsList>
 
@@ -603,6 +610,15 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
                 ミッション定義はまだ登録されていません。
               </div>
             )}
+          </InfoCard>
+        </TabsContent>
+
+        <TabsContent value="billing">
+          <InfoCard
+            title="請求情報"
+            description="月額のご利用料金、請求日、お支払期限と、これまでの請求履歴を確認できます。"
+          >
+            <BillingInfoPanel rows={initialData.billingRows} />
           </InfoCard>
         </TabsContent>
       </Tabs>

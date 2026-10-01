@@ -226,6 +226,21 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
 
             <div className="grid gap-5 md:grid-cols-2">
               <TextField
+                label="月額基本料（円）"
+                type="number"
+                value={form.monthlyBaseFee}
+                onChange={(event) => setForm((current) => ({ ...current, monthlyBaseFee: event.target.value }))}
+                fullWidth
+                required
+                error={hasSubmitted && validation.monthlyBaseFee}
+                helperText={
+                  hasSubmitted && validation.monthlyBaseFee
+                    ? "0 以上の整数で入力してください。"
+                    : "利用人数に関係なく毎月かかる基本料です。税込みの金額を入力してください。"
+                }
+              />
+
+              <TextField
                 label="月額単価（円）"
                 type="number"
                 value={form.perEmployeeMonthlyFee}
@@ -236,10 +251,12 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                 helperText={
                   hasSubmitted && validation.perEmployeeMonthlyFee
                     ? "0 以上の整数で入力してください。"
-                    : "税込みの月額単価を入力してください。"
+                    : "従業員 1 人あたりの月額単価（ID 料金）です。税込みの金額を入力してください。"
                 }
               />
+            </div>
 
+            <div className="grid gap-5 md:grid-cols-2">
               <TextField
                 label="初期保有ポイント"
                 type="number"
@@ -385,7 +402,10 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                   </div>
 
                   <div className="pointer-events-none relative z-10 mt-4 grid gap-3 text-sm text-slate-500 md:grid-cols-2">
-                    <div>月額単価 {formatNumber(company.perEmployeeMonthlyFee)} 円</div>
+                    <div>
+                      月額基本料 {formatNumber(company.monthlyBaseFee)} 円 / 月額単価{" "}
+                      {formatNumber(company.perEmployeeMonthlyFee)} 円
+                    </div>
                     <div>最終更新 {formatDateTime(company.updatedAt)}</div>
                   </div>
                 </div>

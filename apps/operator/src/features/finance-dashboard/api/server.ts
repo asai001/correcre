@@ -1,6 +1,8 @@
 import "server-only";
 
+import { nowYYYYMM } from "@correcre/lib";
 import { resolveExchangeFeePercent } from "@correcre/lib/billing";
+import { addMonths, buildCompanyBillingRow, getCompanyBillingStartMonth } from "@correcre/lib/company-billing";
 import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
@@ -34,12 +36,11 @@ function getRuntimeConfig(): RuntimeConfig {
   };
 }
 
-function buildRecentMonths(count: number): string[] {
-  const now = new Date();
+// 請求管理と同じく日本時間の月で区切る。
+function buildRecentMonths(currentMonth: string, count: number): string[] {
   const months: string[] = [];
   for (let offset = count - 1; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    months.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+    months.push(addMonths(currentMonth, -offset));
   }
   return months;
 }
@@ -54,43 +55,34 @@ function toYearMonth(value: string): string {
   return value.slice(0, 7);
 }
 
-function getCompanyStartMonth(company: Company): string | null {
-  const source = company.contractStartsAt || company.createdAt;
-  return source ? toYearMonth(source) : null;
-}
-
-function buildCompanyIncomeRowForMonth(company: Company, month: string): CompanyIncomeRow | null {
-  const startMonth = getCompanyStartMonth(company);
+// 収入は請求管理（導入企業への月額利用料の請求）と同じ計算を使う。
+function buildCompanyIncomeRowForMonth(company: Company, month: string, currentMonth: string): CompanyIncomeRow | null {
+  const startMonth = getCompanyBillingStartMonth(company);
   if (startMonth && month < startMonth) {
     return null;
   }
 
-  const snapshot = company.monthlyBillingSnapshots?.[month];
-  const status = snapshot?.status ?? company.status;
-
-  if (status === "INACTIVE") {
+  const billing = buildCompanyBillingRow(company, month, currentMonth);
+  if (!billing.billable) {
     return null;
   }
-
-  const activeEmployees = snapshot?.activeEmployees ?? company.activeEmployees ?? 0;
-  const perEmployeeMonthlyFee = snapshot?.perEmployeeMonthlyFee ?? company.perEmployeeMonthlyFee ?? 0;
-  const monthlyIncomeYen = snapshot?.monthlyIncomeYen ?? activeEmployees * perEmployeeMonthlyFee;
 
   return {
     companyId: company.companyId,
     companyName: company.shortName || company.name,
-    status,
+    status: billing.status,
     month,
-    activeEmployees,
-    perEmployeeMonthlyFee,
-    monthlyIncomeYen,
-    snapshotCapturedAt: snapshot?.capturedAt,
+    activeEmployees: billing.activeEmployees,
+    monthlyBaseFee: billing.monthlyBaseFee,
+    perEmployeeMonthlyFee: billing.perEmployeeMonthlyFee,
+    monthlyIncomeYen: billing.amountYen,
+    snapshotCapturedAt: company.monthlyBillingSnapshots?.[month]?.capturedAt,
   };
 }
 
 export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
   const config = getRuntimeConfig();
-  const months = buildRecentMonths(MONTH_WINDOW);
+  const months = buildRecentMonths(nowYYYYMM(), MONTH_WINDOW);
   const monthSet = new Set(months);
 
   const [companies, merchants] = await Promise.all([
@@ -98,12 +90,14 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
     listMerchants({ region: config.region, tableName: config.merchantTableName }),
   ]);
 
-  // 収入: 導入企業ごとの月次スナップショット。未作成月は 0 として扱う。
+  const currentMonth = months[months.length - 1] ?? "";
+
+  // 収入: 導入企業ごとの月額利用料（請求金額）。
   const companyIncomeByMonth = Object.fromEntries(
     months.map((month) => [
       month,
       companies
-        .map((company) => buildCompanyIncomeRowForMonth(company, month))
+        .map((company) => buildCompanyIncomeRowForMonth(company, month, currentMonth))
         .filter((row): row is CompanyIncomeRow => row !== null)
         .sort((left, right) => right.monthlyIncomeYen - left.monthlyIncomeYen),
     ]),
@@ -114,7 +108,6 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
       (companyIncomeByMonth[month] ?? []).reduce((sum, row) => sum + row.monthlyIncomeYen, 0),
     ]),
   );
-  const currentMonth = months[months.length - 1] ?? "";
   const companyRows = companyIncomeByMonth[currentMonth] ?? [];
   const monthlyIncomeYen = monthlyIncomeByMonth[currentMonth] ?? 0;
 

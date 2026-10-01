@@ -81,7 +81,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
           <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
             <div className="text-sm font-semibold text-slate-500">当月の収入（{formatMonthLabel(current.month)}）</div>
             <div className="mt-3 text-3xl font-bold text-sky-600">{formatYen(current.incomeYen)}</div>
-            <div className="mt-1 text-xs text-slate-500">導入企業の従業員数 × 月額単価</div>
+            <div className="mt-1 text-xs text-slate-500">導入企業の月額基本料 + 従業員数 × 月額単価</div>
           </div>
           <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
             <div className="text-sm font-semibold text-slate-500">当月の支出（{formatMonthLabel(current.month)}）</div>
@@ -99,7 +99,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
       ) : null}
 
       <p className="text-xs text-slate-500">
-        ※ 収入は会社レコードに保存された月次スナップショットを優先して算出します。スナップショットがない既存月は現在値を補完しますが、企業作成前の月には収入を計上しません。
+        ※ 収入は「請求管理」と同じ計算（月次スナップショット優先。月内に変更がなかった月は直前のスナップショット、記録がない月は現在値で補完）です。企業作成前の月には収入を計上しません。
         支出は各交換の申請月をもとに集計しています。
       </p>
 
@@ -242,6 +242,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
               <tr className="border-b border-slate-200 text-left text-slate-500">
                 <th className="py-2 pr-4 font-semibold">企業</th>
                 <th className="py-2 pr-4 text-right font-semibold">従業員数</th>
+                <th className="py-2 pr-4 text-right font-semibold">月額基本料</th>
                 <th className="py-2 pr-4 text-right font-semibold">月額単価</th>
                 <th className="py-2 text-right font-semibold">月間収入</th>
               </tr>
@@ -249,7 +250,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
             <tbody>
               {selectedCompanyRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-4 text-center text-slate-400">
+                  <td colSpan={5} className="py-4 text-center text-slate-400">
                     対象の企業がありません。
                   </td>
                 </tr>
@@ -260,6 +261,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
                     <td className="py-2 pr-4 text-right text-slate-700">
                       {company.activeEmployees.toLocaleString("ja-JP")}名
                     </td>
+                    <td className="py-2 pr-4 text-right text-slate-700">{formatYen(company.monthlyBaseFee)}</td>
                     <td className="py-2 pr-4 text-right text-slate-700">{formatYen(company.perEmployeeMonthlyFee)}</td>
                     <td className="py-2 text-right font-bold text-sky-700">{formatYen(company.monthlyIncomeYen)}</td>
                   </tr>
@@ -270,6 +272,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
               <tfoot>
                 <tr className="border-t border-slate-200 font-bold text-slate-900">
                   <td className="py-2 pr-4">合計</td>
+                  <td className="py-2 pr-4" />
                   <td className="py-2 pr-4" />
                   <td className="py-2 pr-4" />
                   <td className="py-2 text-right text-sky-700">{formatYen(selectedMonthlyIncomeYen)}</td>

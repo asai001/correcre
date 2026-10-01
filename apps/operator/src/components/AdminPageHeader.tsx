@@ -9,6 +9,7 @@ import {
   faBuilding,
   faBullseye,
   faEnvelope,
+  faFileInvoiceDollar,
   faGauge,
   faGear,
   faHeadset,
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "提携企業管理", href: "/merchants" as Route, icon: faStore },
   { label: "一斉メール", href: "/merchant-broadcast" as Route, icon: faEnvelope },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
+  { label: "請求管理", href: "/billing" as Route, icon: faFileInvoiceDollar },
   { label: "問い合わせ", href: "/support-inquiries" as Route, icon: faHeadset },
   { label: "設定", href: "/settings" as Route, icon: faGear },
 ];

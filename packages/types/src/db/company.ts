@@ -7,7 +7,10 @@ export type CompanyMonthlyBillingSnapshot = {
   month: string; // YYYY-MM
   status: CompanyItemStatus;
   activeEmployees: number;
+  // 月額基本料（円）。この項目が追加される前のスナップショットには存在しない（＝基本料なし）。
+  monthlyBaseFee?: number;
   perEmployeeMonthlyFee: number;
+  // 月額利用料（円）＝ 月額基本料 + 利用人数 × 月額単価。無効の月は 0。
   monthlyIncomeYen: number;
   capturedAt: string;
 };
@@ -49,6 +52,9 @@ export type Company = {
   trialEndsAt?: string; // ISO or YYYY-MM-DD
   contractStartsAt?: string;
   contractEndsAt?: string;
+  // 月額基本料（円）。利用人数に関係なく毎月かかるシステム利用料。未設定は 0 円。
+  monthlyBaseFee?: number;
+  // 従業員 1 人あたりの月額単価（ID 料金, 円）。ミッション報酬ポイントの算出にも使う。
   perEmployeeMonthlyFee: number;
 
   // Contact information.

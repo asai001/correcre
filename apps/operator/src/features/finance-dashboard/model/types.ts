@@ -6,13 +6,14 @@ export type MonthlyFinance = {
   balanceYen: number;
 };
 
-// 導入企業ごとの月間収入（従業員数 × 月額単価）。
+// 導入企業ごとの月間収入（月額基本料 + 従業員数 × 月額単価）。
 export type CompanyIncomeRow = {
   companyId: string;
   companyName: string;
   status: string;
   month: string;
   activeEmployees: number;
+  monthlyBaseFee: number;
   perEmployeeMonthlyFee: number;
   monthlyIncomeYen: number;
   snapshotCapturedAt?: string;

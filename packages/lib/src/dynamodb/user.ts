@@ -207,6 +207,7 @@ async function resyncCompanyEmployeeCounts(
     month: toBillingSnapshotMonth(updatedAt),
     status: company.status,
     activeEmployees: activeUsers.length,
+    monthlyBaseFee: company.monthlyBaseFee ?? 0,
     perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
     capturedAt: updatedAt,
   });
