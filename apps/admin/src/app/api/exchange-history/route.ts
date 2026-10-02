@@ -4,6 +4,8 @@ import { listExchangeHistoryByCompanyAndUser } from "@correcre/lib/dynamodb/exch
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { ExchangeHistoryStatus } from "@correcre/types";
 
+import { authorizeAdminApiRequest, rejectForeignCompanyQuery } from "@admin/lib/auth/api-authorize";
+
 type ExchangeHistoryResponse = {
   date: string;
   merchandiseName: string;
@@ -17,15 +19,26 @@ function isWithinDateRange(dateTime: string, startDate?: string, endDate?: strin
 }
 
 export async function GET(req: Request) {
+  const { unauthorized, currentAdminUser } = await authorizeAdminApiRequest();
+  if (unauthorized || !currentAdminUser) {
+    return unauthorized;
+  }
+
   const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
+  const forbidden = rejectForeignCompanyQuery(searchParams, currentAdminUser);
+  if (forbidden) {
+    return forbidden;
+  }
+
+  // 対象企業はセッションの管理者の所属企業で確定する。userId は自社の従業員を指定する。
+  const companyId = currentAdminUser.companyId;
   const userId = searchParams.get("userId");
   const limitStr = searchParams.get("limit");
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
 
-  if (!companyId || !userId) {
-    return NextResponse.json({ error: "companyId and userId are required" }, { status: 400 });
+  if (!userId) {
+    return NextResponse.json({ error: "userId is required" }, { status: 400 });
   }
 
   const parsedLimit = limitStr ? Number.parseInt(limitStr, 10) : undefined;
