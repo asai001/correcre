@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 import { getExchangeHistoryFromDynamo } from "@employee/features/exchange-history/api/server";
+import { authorizeEmployeeApiRequest, rejectForeignScopeQuery } from "@employee/lib/auth/api-authorize";
 
 export async function GET(req: Request) {
+  const { unauthorized, currentUser } = await authorizeEmployeeApiRequest();
+  if (unauthorized || !currentUser) {
+    return unauthorized;
+  }
+
   const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
-  const userId = searchParams.get("userId");
+  const forbidden = rejectForeignScopeQuery(searchParams, currentUser);
+  if (forbidden) {
+    return forbidden;
+  }
+
+  // 対象はセッションの従業員本人で確定する。
+  const { companyId, userId } = currentUser;
   const limitParam = searchParams.get("limit");
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
-
-  if (!companyId || !userId) {
-    return NextResponse.json({ error: "companyId と userId は必須です" }, { status: 400 });
-  }
 
   const limit = limitParam ? Number(limitParam) : undefined;
 

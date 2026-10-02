@@ -1,14 +1,22 @@
 import { getMissionFromDynamo } from "@employee/features/mission-report/api/server";
 import { NextResponse } from "next/server";
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
-  const userId = searchParams.get("userId");
+import { authorizeEmployeeApiRequest, rejectForeignScopeQuery } from "@employee/lib/auth/api-authorize";
 
-  if (!companyId || !userId) {
-    return NextResponse.json({ error: "companyId と userId は必須です" }, { status: 400 });
+export async function GET(req: Request) {
+  const { unauthorized, currentUser } = await authorizeEmployeeApiRequest();
+  if (unauthorized || !currentUser) {
+    return unauthorized;
   }
+
+  const { searchParams } = new URL(req.url);
+  const forbidden = rejectForeignScopeQuery(searchParams, currentUser);
+  if (forbidden) {
+    return forbidden;
+  }
+
+  // 対象はセッションの従業員本人で確定する。
+  const { companyId, userId } = currentUser;
 
   try {
     const res = await getMissionFromDynamo(companyId, userId);
