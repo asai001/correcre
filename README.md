@@ -27,17 +27,23 @@ npm test
 
 | 対象 | 内容 |
 | --- | --- |
-| `packages/lib` | 4 アプリが共有するロジックのユニットテスト（`src/**/__tests__/*.test.ts`）。ポイント計算・翌月反映・請求・ミッション予約反映・交換ステータス遷移・配送追跡・日程エンジン・日付整形など |
+| `packages/lib` | 4 アプリが共有するロジックのユニットテスト（`src/**/__tests__/*.test.ts`）。ポイント計算・翌月反映・請求・ミッション予約反映・交換ステータス遷移・配送追跡・日程エンジン・日付整形・セッション寿命と署名トークンなど |
 | `packages/features/*` | 機能パッケージのユニットテスト |
+| `apps/*` | Route Handler と認可ヘルパーのユニットテスト（`src/**/__tests__/*.test.ts`）。DynamoDB など外部へ出る層は `jest.mock` で差し替え、未ログイン→401 / ロール不足→403、対象テナントや操作者がボディではなくセッション・パスから決まること、入力検証とエラー種別→HTTP ステータスの対応を検証する |
 | `infra` | CDK 合成テンプレートの回帰テスト（テーブル設計、Cognito、IAM、S3 CORS） |
 
 個別に回す場合:
 
 ```bash
 npm test --workspace @correcre/lib
+npm test --workspace @correcre/admin      # employee / operator / merchant も同様
 npm test --workspace infra
 cd packages/lib && npx jest --watch
 ```
+
+Route Handler のテストは `apps/<app>/src/app/api/<path>/__tests__/route.test.ts` に置き、
+`apps/<app>/src/test-utils/http.ts` の `jsonRequest` / `routeContext` で Request と動的セグメントを組み立てます。
+認可ゲート（`@admin/lib/auth/*` など）と機能層（`features/*/api/server`）は `jest.mock` で差し替えます。
 
 ### 統合テスト（DynamoDB Local）
 
