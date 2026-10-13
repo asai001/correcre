@@ -60,6 +60,7 @@ import type {
   MerchantCalendarItem,
 } from "@correcre/types";
 import {
+  resolveExchangeFulfillmentType,
   resolveMerchandiseFulfillment,
   SCHEDULE_PROPOSAL_ROUND_LIMIT,
   SCHEDULE_RESCHEDULE_REQUEST_LIMIT,
@@ -592,7 +593,7 @@ async function buildExchangeDetail(
     actorType,
     schedule,
     reservationRequired: Boolean(merchandise?.reservation),
-    fulfillmentType: resolveMerchandiseFulfillment(merchandise?.fulfillment).fulfillmentType,
+    fulfillmentType: resolveExchangeFulfillmentType(merchandise),
     shipment: item.shipment,
     trackingUrl: buildTrackingUrl(item.shipment),
     carrierLabel: resolveCarrierLabel(item.shipment),

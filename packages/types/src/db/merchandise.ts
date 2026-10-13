@@ -121,6 +121,18 @@ export function resolveMerchandiseFulfillment(
   };
 }
 
+// 交換の画面で使う受け渡し方法。予約型サービス（サロン等）は日程調整を使わないことが多く、
+// 受け渡し方法の設定欄が出ないまま fulfillment が既定の SHIPPING で読まれてしまう。
+// 予約型には発送の概念がないので、発送情報の入力欄や「発送済みにする」を出さないよう来店扱いにする。
+export function resolveExchangeFulfillmentType(
+  merchandise: Pick<Merchandise, "fulfillment" | "reservation"> | null | undefined,
+): FulfillmentType {
+  if (merchandise?.reservation) {
+    return "STORE_PICKUP";
+  }
+  return resolveMerchandiseFulfillment(merchandise?.fulfillment).fulfillmentType;
+}
+
 export type Merchandise = {
   merchantId: string;
   sk: `MERCHANDISE#${string}`;

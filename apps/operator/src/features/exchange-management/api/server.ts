@@ -23,7 +23,10 @@ import type {
   ExchangeHistoryActorType,
   ExchangeHistoryItem,
   ExchangeHistoryStatus,
+  ExchangeShipment,
+  Merchandise,
 } from "@correcre/types";
+import { resolveExchangeFulfillmentType } from "@correcre/types";
 
 import type {
   OperatorExchangeDetail,
@@ -229,6 +232,24 @@ export async function listExchangesForOperator(
   return summaries.sort(compareExchangedAtDesc);
 }
 
+// 送り状番号を入れずに発送済みにすると発送情報が保存されないため、そのままだと運用者の画面から
+// 「発送情報」の項目ごと消え、未登録なのか発送前なのか区別できない。発送型で発送済み以降の交換は、
+// 発送済みにした操作の日時を発送日時として補い、配送会社・送り状番号を「未登録」と表示させる。
+function resolveShipmentForDisplay(
+  item: ExchangeHistoryItem,
+  status: ExchangeHistoryStatus,
+  merchandise: Merchandise | null,
+): ExchangeShipment | undefined {
+  if (item.shipment) {
+    return item.shipment;
+  }
+  if ((status !== "IN_PROGRESS" && status !== "COMPLETED") || resolveExchangeFulfillmentType(merchandise) !== "SHIPPING") {
+    return undefined;
+  }
+  const shippedEvent = [...(item.history ?? [])].reverse().find((event) => event.status === "IN_PROGRESS");
+  return shippedEvent ? { shippedAt: shippedEvent.occurredAt } : undefined;
+}
+
 async function buildExchangeDetail(
   config: RuntimeConfig,
   item: ExchangeHistoryItem,
@@ -247,9 +268,10 @@ async function buildExchangeDetail(
   }
 
   let merchandiseImageViewUrl: string | undefined;
+  let merchandise: Merchandise | null = null;
 
   if (item.merchantId && item.merchandiseId) {
-    const merchandise = await getMerchandise(
+    merchandise = await getMerchandise(
       { region: config.region, tableName: config.merchandiseTableName },
       item.merchantId,
       item.merchandiseId,
@@ -284,7 +306,7 @@ async function buildExchangeDetail(
       : getAllowedNextExchangeStatuses(status, actorType),
     actorType,
     scheduleActive,
-    shipment: item.shipment,
+    shipment: resolveShipmentForDisplay(item, status, merchandise),
     trackingUrl: buildTrackingUrl(item.shipment),
     carrierLabel: resolveCarrierLabel(item.shipment),
     selectedArrivalDate: item.schedule?.selectedArrivalDate,
