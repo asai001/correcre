@@ -198,7 +198,9 @@ async function buildMerchantSummaryDetail(
 }
 
 function buildOverallStats(merchants: Merchant[], summaries: MerchantSummaryDetail[]): MerchantOverallStats {
-  const registeredMerchants = merchants.filter((merchant) => merchant.status !== "PENDING");
+  const registeredMerchants = merchants.filter(
+    (merchant) => merchant.status !== "PENDING" && merchant.status !== "DELETED",
+  );
 
   return summaries.reduce<MerchantOverallStats>(
     (stats, summary) => ({

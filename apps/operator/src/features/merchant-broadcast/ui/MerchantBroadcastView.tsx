@@ -44,6 +44,7 @@ const STATUS_LABELS: Record<MerchantStatus, string> = {
   ACTIVE: "登録済",
   INACTIVE: "停止中",
   REJECTED: "却下",
+  DELETED: "削除済",
 };
 
 const STATUS_FILTER_OPTIONS: MerchantStatus[] = ["ACTIVE", "PENDING", "INACTIVE"];

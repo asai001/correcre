@@ -24,6 +24,7 @@ const STATUS_LABELS: Record<MerchantSummaryDetail["status"], string> = {
   ACTIVE: "登録済",
   INACTIVE: "停止中",
   REJECTED: "却下済",
+  DELETED: "削除済",
 };
 
 function formatYen(value: number) {

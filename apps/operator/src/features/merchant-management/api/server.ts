@@ -240,7 +240,10 @@ export async function listMerchantsForOperator(): Promise<MerchantSummary[]> {
     tableName: config.merchantTableName,
   });
 
-  return merchants.sort((left, right) => left.createdAt.localeCompare(right.createdAt) * -1);
+  // 削除済み（論理削除）は管理一覧に出さない。交換履歴・サマリーには引き続き残る。
+  return merchants
+    .filter((merchant) => merchant.status !== "DELETED")
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt) * -1);
 }
 
 export async function listPendingMerchantApplicationsForOperator(): Promise<MerchantApplicationDetail[]> {
@@ -355,6 +358,11 @@ export async function updateMerchantForOperator(input: UpdateMerchantInput): Pro
 
   if (!existing) {
     throw new Error("Merchant not found");
+  }
+
+  // 削除は対応中の交換の片付けとセットで行うため、編集からは削除済みにできない（削除済みも編集させない）。
+  if (input.status === "DELETED" || existing.status === "DELETED") {
+    throw new Error("削除済みの提携企業は編集できません。削除は提携企業管理の「削除」から行ってください");
   }
 
   const normalized = normalizeMerchantInput(input);
@@ -1045,4 +1053,24 @@ export async function rejectMerchantApplicationForOperator(
   });
 
   return rejectedMerchant;
+}
+
+// 提携企業の削除を監査ログに残す（削除処理本体は deletion-server.ts）。
+export async function recordMerchantDeletedAuditLog(params: {
+  operator: DBUserItem;
+  merchant: Merchant;
+  result: OperatorAuditEventResult;
+  errorMessage?: string;
+}): Promise<void> {
+  await recordOperatorAuditLog(getRuntimeConfig(), {
+    eventType: "MERCHANT_DELETED",
+    result: params.result,
+    actor: params.operator,
+    target: {
+      merchantId: params.merchant.merchantId,
+      merchantName: params.merchant.name,
+      merchantUserId: "",
+    },
+    errorMessage: params.errorMessage,
+  });
 }

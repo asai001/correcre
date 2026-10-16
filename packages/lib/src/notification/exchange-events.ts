@@ -156,3 +156,49 @@ export async function notifyEmployeeExchangeApprovedIfReservationRequired(params
     });
   }
 }
+
+/**
+ * 運用者が提携企業を削除し、対応中だった交換をキャンセルしたことを申請者へ知らせる。
+ * ポイントはキャンセル時に返還済み。削除の事情は書かず、お詫びと返還の事実だけを伝える。
+ * 送信失敗は throw せずログに残す（呼び出し側は送れなかった宛先を画面で案内する）。
+ */
+export async function notifyEmployeeExchangeCanceledByMerchantDeletion(params: {
+  region: string;
+  recipient: string;
+  exchange: ExchangeHistoryItem;
+}): Promise<boolean> {
+  const lines = [
+    `お申し込みいただいていた「${params.exchange.merchandiseNameSnapshot}」の交換は、`,
+    "提供元の事情により、お取り扱いができなくなりました。",
+    "誠に恐れ入りますが、本交換はキャンセルとさせていただきました。",
+    "",
+    `ご利用いただいた ${params.exchange.usedPoint.toLocaleString("ja-JP")} pt は返還済みです。`,
+    "お手数をおかけし申し訳ございませんが、ほかの商品・サービスとの交換にご利用ください。",
+  ];
+
+  const url = getEmployeeExchangeUrl(params.exchange.exchangeId);
+  if (url) {
+    lines.push("", "交換内容の確認はこちら:", url);
+  }
+
+  try {
+    await sendSesEmail(
+      {
+        region: getRegion(params.region),
+        fromEmail: getSesFromEmail(),
+      },
+      {
+        to: params.recipient,
+        subject: "【コレクレ】交換申請のキャンセルとポイント返還のお知らせ",
+        text: `${lines.join("\n")}\n\n本メールはシステムより自動送信されています。`,
+      },
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to send merchant deletion cancellation notification.", {
+      error,
+      exchangeId: params.exchange.exchangeId,
+    });
+    return false;
+  }
+}
