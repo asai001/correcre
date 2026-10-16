@@ -204,7 +204,7 @@ export default function CompanyEditDialog({
             />
 
             <TextField
-              label="月額単価（円）"
+              label="ID料金（円）"
               type="number"
               value={form.perEmployeeMonthlyFee}
               onChange={(event) => setForm((current) => ({ ...current, perEmployeeMonthlyFee: event.target.value }))}
@@ -214,7 +214,7 @@ export default function CompanyEditDialog({
               helperText={
                 hasSubmitted && validation.perEmployeeMonthlyFee
                   ? "0 以上の整数で入力してください。"
-                  : "従業員 1 人あたりの月額単価（ID 料金）です。"
+                  : "従業員 1 人あたりの月額料金です。"
               }
             />
           </div>

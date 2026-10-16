@@ -241,7 +241,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
               />
 
               <TextField
-                label="月額単価（円）"
+                label="ID料金（円）"
                 type="number"
                 value={form.perEmployeeMonthlyFee}
                 onChange={(event) => setForm((current) => ({ ...current, perEmployeeMonthlyFee: event.target.value }))}
@@ -251,7 +251,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
                 helperText={
                   hasSubmitted && validation.perEmployeeMonthlyFee
                     ? "0 以上の整数で入力してください。"
-                    : "従業員 1 人あたりの月額単価（ID 料金）です。税込みの金額を入力してください。"
+                    : "従業員 1 人あたりの月額料金です。税込みの金額を入力してください。"
                 }
               />
             </div>
@@ -403,7 +403,7 @@ export default function CompanyRegistration({ initialCompanies, operatorName }: 
 
                   <div className="pointer-events-none relative z-10 mt-4 grid gap-3 text-sm text-slate-500 md:grid-cols-2">
                     <div>
-                      月額基本料 {formatNumber(company.monthlyBaseFee)} 円 / 月額単価{" "}
+                      月額基本料 {formatNumber(company.monthlyBaseFee)} 円 / ID料金{" "}
                       {formatNumber(company.perEmployeeMonthlyFee)} 円
                     </div>
                     <div>最終更新 {formatDateTime(company.updatedAt)}</div>

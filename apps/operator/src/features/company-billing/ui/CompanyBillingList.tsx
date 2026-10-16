@@ -119,7 +119,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
           </select>
         </label>
         <p className="text-xs text-slate-500">
-          請求金額 ＝ 月額基本料 ＋ 利用人数（有効ユーザー） × 月額単価。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
+          請求金額 ＝ 月額基本料 ＋ 利用人数（有効ユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
         </p>
       </section>
 
@@ -165,7 +165,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                 <th className="py-2 pr-4 font-semibold">プラン</th>
                 <th className="py-2 pr-4 text-right font-semibold">利用人数</th>
                 <th className="py-2 pr-4 text-right font-semibold">月額基本料</th>
-                <th className="py-2 pr-4 text-right font-semibold">月額単価</th>
+                <th className="py-2 pr-4 text-right font-semibold">ID料金</th>
                 <th className="py-2 pr-4 text-right font-semibold">請求金額</th>
                 <th className="py-2 text-center font-semibold">状態</th>
               </tr>
@@ -224,7 +224,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                                   <th className="py-1.5 pr-4 font-semibold">請求対象月</th>
                                   <th className="py-1.5 pr-4 text-right font-semibold">利用人数</th>
                                   <th className="py-1.5 pr-4 text-right font-semibold">月額基本料</th>
-                                  <th className="py-1.5 pr-4 text-right font-semibold">月額単価</th>
+                                  <th className="py-1.5 pr-4 text-right font-semibold">ID料金</th>
                                   <th className="py-1.5 pr-4 text-right font-semibold">請求金額</th>
                                   <th className="py-1.5 pr-4 text-center font-semibold">請求日</th>
                                   <th className="py-1.5 pr-4 text-center font-semibold">支払期限</th>
@@ -294,7 +294,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
       <p className="text-xs text-slate-500">
         ※ 過去月はその月の最終時点の記録（月内に変更がなかった月は直前の記録）から算出しています。
         {hasEstimatedRow ? " 「※」の付いた月は当時の記録がないため、現在の設定値で算出した参考値です。" : ""}
-        月額基本料・月額単価は「企業登録」の編集から変更できます。
+        月額基本料・ID料金は「企業登録」の編集から変更できます。
       </p>
     </div>
   );

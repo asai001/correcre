@@ -81,7 +81,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
           <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
             <div className="text-sm font-semibold text-slate-500">当月の収入（{formatMonthLabel(current.month)}）</div>
             <div className="mt-3 text-3xl font-bold text-sky-600">{formatYen(current.incomeYen)}</div>
-            <div className="mt-1 text-xs text-slate-500">導入企業の月額基本料 + 従業員数 × 月額単価</div>
+            <div className="mt-1 text-xs text-slate-500">導入企業の月額基本料 + 従業員数 × ID料金</div>
           </div>
           <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
             <div className="text-sm font-semibold text-slate-500">当月の支出（{formatMonthLabel(current.month)}）</div>
@@ -243,7 +243,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
                 <th className="py-2 pr-4 font-semibold">企業</th>
                 <th className="py-2 pr-4 text-right font-semibold">従業員数</th>
                 <th className="py-2 pr-4 text-right font-semibold">月額基本料</th>
-                <th className="py-2 pr-4 text-right font-semibold">月額単価</th>
+                <th className="py-2 pr-4 text-right font-semibold">ID料金</th>
                 <th className="py-2 text-right font-semibold">月間収入</th>
               </tr>
             </thead>

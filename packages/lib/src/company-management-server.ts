@@ -234,7 +234,7 @@ function validateCreateCompanyInput(input: CreateCompanyInput) {
   }
 
   if (!Number.isInteger(perEmployeeMonthlyFee) || perEmployeeMonthlyFee < 0) {
-    throw new Error("月額単価は 0 以上の整数で入力してください");
+    throw new Error("ID料金は 0 以上の整数で入力してください");
   }
 
   if (input.monthlyBaseFee !== undefined && !isValidMonthlyBaseFee(input.monthlyBaseFee)) {
@@ -338,7 +338,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     throw new Error("プランが不正です");
   }
   if (!Number.isInteger(effectivePerEmployeeMonthlyFee) || effectivePerEmployeeMonthlyFee < 0) {
-    throw new Error("月額単価は 0 以上の整数で入力してください");
+    throw new Error("ID料金は 0 以上の整数で入力してください");
   }
   if (!isValidMonthlyBaseFee(effectiveMonthlyBaseFee)) {
     throw new Error("月額基本料は 0 以上の整数で入力してください");

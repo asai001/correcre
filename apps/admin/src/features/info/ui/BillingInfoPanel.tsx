@@ -52,7 +52,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt>
-                    ID 料金（{formatYen(current.perEmployeeMonthlyFee)} × {current.activeEmployees} 人）
+                    ID料金 × 利用人数（{formatYen(current.perEmployeeMonthlyFee)} × {current.activeEmployees} 人）
                   </dt>
                   <dd className="font-semibold text-slate-800">{formatYen(current.employeeFeeYen)}</dd>
                 </div>
@@ -75,7 +75,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
       ) : null}
 
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm leading-6 text-slate-600">
-        <p>ご利用料金 ＝ 月額基本料 ＋ ID 料金（1 人あたりの月額単価 × 利用人数）です。</p>
+        <p>ご利用料金 ＝ 月額基本料 ＋ ID料金（1 人あたりの月額料金） × 利用人数です。</p>
         <p>
           利用人数は「有効」のユーザー数です。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
           日払いでのご請求となります。
@@ -90,7 +90,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                 <TableHead>請求対象月</TableHead>
                 <TableHead className="text-right">利用人数</TableHead>
                 <TableHead className="text-right">月額基本料</TableHead>
-                <TableHead className="text-right">月額単価</TableHead>
+                <TableHead className="text-right">ID料金</TableHead>
                 <TableHead className="text-right">請求金額</TableHead>
                 <TableHead className="text-center">請求日</TableHead>
                 <TableHead className="text-center">支払期限</TableHead>

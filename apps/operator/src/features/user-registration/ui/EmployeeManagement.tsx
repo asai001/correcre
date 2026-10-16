@@ -662,7 +662,7 @@ export default function EmployeeManagement({ companyId, companyOptions, operator
             {activeCompany ? `${activeCompany.plan} / ${activeCompany.status}` : "-"}
           </div>
           <div className="mt-1 text-sm text-slate-500">
-            月額単価 {formatNumber(activeCompany?.perEmployeeMonthlyFee ?? 0)} 円
+            ID料金 {formatNumber(activeCompany?.perEmployeeMonthlyFee ?? 0)} 円
           </div>
         </div>
 
