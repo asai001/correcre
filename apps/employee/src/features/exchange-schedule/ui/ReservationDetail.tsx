@@ -29,6 +29,7 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
   const isApproved = view.status === "PREPARING" || view.status === "IN_PROGRESS";
   const isClosed =
     view.status === "REJECTED" || view.status === "CANCELED" || view.status === "CANCELLED";
+  // 予約先・交換番号は承認後だけサーバーから渡ってくる（承認前に予約されるのを防ぐ）
 
   const handleCopy = async () => {
     try {
@@ -70,7 +71,8 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
 
           {view.status === "REQUESTED" ? (
             <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              交換申請は現在承認待ちです。承認されるとメールでお知らせしますので、承認後に以下の方法でご予約ください。
+              交換申請は現在承認待ちです。承認されると、予約ページと交換番号をメールでお知らせします。
+              この画面にも承認後に表示されますので、それまでお待ちください。
             </div>
           ) : null}
 
@@ -92,7 +94,7 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
             </div>
           ) : null}
 
-          {!isClosed ? (
+          {view.guidanceDisclosed ? (
             <>
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="text-xs font-semibold text-slate-500">交換番号（予約時に店舗へお伝えください）</div>

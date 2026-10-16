@@ -98,6 +98,10 @@ export default function ExchangeHistory({
                 </Link>
               );
             }
+            // 承認前は予約先・交換番号を案内しない（承認後にメールと詳細ページで案内する）
+            if (row.status === "REQUESTED") {
+              return <span className="text-xs text-slate-500">承認後にご案内</span>;
+            }
             return (
               <Link href={href} className="text-xs text-slate-700 underline">
                 予約案内

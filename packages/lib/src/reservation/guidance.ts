@@ -1,7 +1,7 @@
 // 予約が必要な商品（サロン等）で、予約サービスごとに変わる案内文とラベル。
 // merchant の商品フォーム・employee の予約案内画面・承認メールで同じ文言を使うため一か所にまとめる。
 // DB もネットワークも触らない純関数なので、サーバー・クライアントの双方から使える。
-import type { MerchandiseReservation, ReservationSystem } from "@correcre/types";
+import type { ExchangeHistoryStatus, MerchandiseReservation, ReservationSystem } from "@correcre/types";
 
 export const RESERVATION_SYSTEM_LABELS: Record<ReservationSystem, string> = {
   HOT_PEPPER_BEAUTY: "ホットペッパービューティー",
@@ -57,4 +57,11 @@ export function looksLikeHotPepperNonTopUrl(value: string): boolean {
   }
 
   return segments.length > 1 || !/^sln/i.test(segments[0]) || parsed.search !== "";
+}
+
+// 予約先（URL・予約方法）と交換番号を申請者に見せてよいか。承認前に見せると、
+// まだ却下されうる申請で予約が入ってしまうため、承認（準備中）以降だけに限る
+// （2026-10-14 定例・シナリオテスト No.52 の指摘）。却下・キャンセル後は予約させない。
+export function canDiscloseReservationGuidance(status: ExchangeHistoryStatus | undefined): boolean {
+  return status === "PREPARING" || status === "IN_PROGRESS" || status === "COMPLETED";
 }

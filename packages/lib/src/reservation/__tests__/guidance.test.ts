@@ -1,4 +1,5 @@
 import {
+  canDiscloseReservationGuidance,
   getReservationCodeGuidance,
   getReservationPageGuidance,
   isReservationSystem,
@@ -56,5 +57,24 @@ describe("looksLikeHotPepperNonTopUrl", () => {
     expect(looksLikeHotPepperNonTopUrl("https://example.com/reserve/menu/1")).toBe(false);
     expect(looksLikeHotPepperNonTopUrl("not a url")).toBe(false);
     expect(looksLikeHotPepperNonTopUrl("https://beauty.hotpepper.jp/")).toBe(false);
+  });
+});
+
+describe("canDiscloseReservationGuidance", () => {
+  it("承認待ちの間は予約先・交換番号を見せない（No.52）", () => {
+    expect(canDiscloseReservationGuidance("REQUESTED")).toBe(false);
+    expect(canDiscloseReservationGuidance(undefined)).toBe(false);
+  });
+
+  it("承認後（準備中・対応中・完了）は見せる", () => {
+    expect(canDiscloseReservationGuidance("PREPARING")).toBe(true);
+    expect(canDiscloseReservationGuidance("IN_PROGRESS")).toBe(true);
+    expect(canDiscloseReservationGuidance("COMPLETED")).toBe(true);
+  });
+
+  it("却下・キャンセル後は見せない", () => {
+    expect(canDiscloseReservationGuidance("REJECTED")).toBe(false);
+    expect(canDiscloseReservationGuidance("CANCELED")).toBe(false);
+    expect(canDiscloseReservationGuidance("CANCELLED")).toBe(false);
   });
 });

@@ -80,6 +80,9 @@ export type EmployeeReservationView = {
   status: ExchangeHistoryStatus;
   // 予約に使っているサービス。案内文（メニューの選び方・交換番号の伝え方）を切り替える
   reservationSystem: ReservationSystem;
+  // 予約先・交換番号を案内してよい状態（承認後）か。false の間は reservationCode / reservationUrl /
+  // instructions を返さない
+  guidanceDisclosed: boolean;
   reservationUrl?: string;
   instructions?: string;
 };
