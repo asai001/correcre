@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { getAvgPointsTrendFromDynamo } from "@admin/features/avg-points-trend/api/server";
+import { authorizeAdminApiRequest, rejectForeignCompanyQuery } from "@admin/lib/auth/api-authorize";
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
-  const monthsParam = searchParams.get("months");
-
-  if (!companyId) {
-    return NextResponse.json({ error: "companyId は必須です" }, { status: 400 });
+  const { unauthorized, currentAdminUser } = await authorizeAdminApiRequest();
+  if (unauthorized || !currentAdminUser) {
+    return unauthorized;
   }
+
+  const { searchParams } = new URL(req.url);
+  const forbidden = rejectForeignCompanyQuery(searchParams, currentAdminUser);
+  if (forbidden) {
+    return forbidden;
+  }
+
+  // 対象企業はセッションの管理者の所属企業で確定する。
+  const companyId = currentAdminUser.companyId;
+  const monthsParam = searchParams.get("months");
 
   const monthsRaw = monthsParam ? Number(monthsParam) : 12;
   const months = !monthsRaw || monthsRaw < 1 || !Number.isFinite(monthsRaw) ? 12 : monthsRaw; // monthsParam が Nan や負数の場合の考慮
