@@ -6,10 +6,11 @@ import { addMonths, buildCompanyBillingRow, getCompanyBillingStartMonth } from "
 import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
+import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { getSalesRecognitionMonth, isSalesRecognizedExchange } from "@correcre/lib/exchange/sales-recognition";
-import { POINT_YEN_VALUE } from "@correcre/lib/points";
-import type { Company } from "@correcre/types";
+import { joinNameParts } from "@correcre/lib/user-profile";
+import type { Company, DBUserItem, ExchangeHistoryItem } from "@correcre/types";
 
 import type {
   CompanyIncomeRow,
@@ -17,12 +18,14 @@ import type {
   MerchantExpenseRow,
   MonthlyFinance,
 } from "../model/types";
+import { aggregateMerchantExpense } from "../model/merchant-expense";
 
 type RuntimeConfig = {
   region: string;
   companyTableName: string;
   merchantTableName: string;
   exchangeHistoryTableName: string;
+  userTableName: string;
 };
 
 // 表示する月数（直近 N か月）。
@@ -34,6 +37,7 @@ function getRuntimeConfig(): RuntimeConfig {
     companyTableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME"),
     merchantTableName: readRequiredServerEnv("DDB_MERCHANT_TABLE_NAME"),
     exchangeHistoryTableName: readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME"),
+    userTableName: readRequiredServerEnv("DDB_USER_TABLE_NAME"),
   };
 }
 
@@ -71,6 +75,29 @@ function buildCompanyIncomeRowForMonth(company: Company, month: string, currentM
   };
 }
 
+function applicantKey(exchange: Pick<ExchangeHistoryItem, "companyId" | "userId">) {
+  return `${exchange.companyId}#${exchange.userId}`;
+}
+
+async function resolveApplicantNames(
+  config: RuntimeConfig,
+  exchanges: ExchangeHistoryItem[],
+): Promise<Map<string, string>> {
+  const keys = new Map(exchanges.map((exchange) => [applicantKey(exchange), exchange]));
+  const entries = await Promise.all(
+    [...keys].map(async ([key, exchange]) => {
+      const user: DBUserItem | null = await getUserByCompanyAndUserId(
+        { region: config.region, tableName: config.userTableName },
+        exchange.companyId,
+        exchange.userId,
+      ).catch(() => null);
+      const name = user ? joinNameParts(user.lastName, user.firstName) || user.email : undefined;
+      return [key, name] as const;
+    }),
+  );
+  return new Map(entries.filter((entry): entry is readonly [string, string] => Boolean(entry[1])));
+}
+
 export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
   const config = getRuntimeConfig();
   const months = buildRecentMonths(nowYYYYMM(), MONTH_WINDOW);
@@ -102,46 +129,51 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
   const companyRows = companyIncomeByMonth[currentMonth] ?? [];
   const monthlyIncomeYen = monthlyIncomeByMonth[currentMonth] ?? 0;
 
-  // 支出: 提携企業ごと・月ごと。
-  const merchantRows: MerchantExpenseRow[] = await Promise.all(
-    merchants.map(async (merchant): Promise<MerchantExpenseRow> => {
-      const exchanges = await listExchangeHistoryByMerchant(
+  // 支出: 提携企業ごと・月ごとの支払額（売上 − 交換手数料）。提携企業側の請求額と同じ金額になる。
+  const exchangesByMerchant = await Promise.all(
+    merchants.map((merchant) =>
+      listExchangeHistoryByMerchant(
         { region: config.region, tableName: config.exchangeHistoryTableName },
         merchant.merchantId,
-      );
-
-      const byMonth: Record<string, number> = {};
-      let totalExpenseYen = 0;
-
-      // 支出（提携企業への支払額）は提携企業の売上と同じく、交換が完了した月に計上する。
-      for (const exchange of exchanges) {
-        if (!isSalesRecognizedExchange(exchange)) {
-          continue;
-        }
-        const amount = (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
-        totalExpenseYen += amount;
-
-        const month = getSalesRecognitionMonth(exchange);
-        if (monthSet.has(month)) {
-          byMonth[month] = (byMonth[month] ?? 0) + amount;
-        }
-      }
-
-      return {
-        merchantId: merchant.merchantId,
-        merchantName: merchant.name,
-        exchangeFeePercent: resolveExchangeFeePercent(merchant.exchangeFeePercent),
-        byMonth,
-        totalExpenseYen,
-      };
-    }),
+      ),
+    ),
   );
+
+  // 内訳に出す申請者の名前。表示対象の月に完了した交換の申請者だけを引く。
+  const applicantNames = await resolveApplicantNames(
+    config,
+    exchangesByMerchant
+      .flat()
+      .filter((exchange) => isSalesRecognizedExchange(exchange) && monthSet.has(getSalesRecognitionMonth(exchange))),
+  );
+  const companyNameById = new Map(companies.map((company) => [company.companyId, company.shortName || company.name]));
+
+  const merchantRows: MerchantExpenseRow[] = merchants.map((merchant, index): MerchantExpenseRow => {
+    const exchangeFeePercent = resolveExchangeFeePercent(merchant.exchangeFeePercent);
+    const { byMonth, totalExpenseYen } = aggregateMerchantExpense({
+      exchanges: exchangesByMerchant[index] ?? [],
+      exchangeFeePercent,
+      months,
+      describeApplicant: (exchange) => ({
+        applicantName: applicantNames.get(applicantKey(exchange)),
+        companyName: companyNameById.get(exchange.companyId),
+      }),
+    });
+
+    return {
+      merchantId: merchant.merchantId,
+      merchantName: merchant.name,
+      exchangeFeePercent,
+      byMonth,
+      totalExpenseYen,
+    };
+  });
 
   merchantRows.sort((left, right) => right.totalExpenseYen - left.totalExpenseYen);
 
   // 月ごとの収支。収入は月次スナップショットを優先し、企業作成前の月には適用しない。
   const monthly: MonthlyFinance[] = months.map((month) => {
-    const expenseYen = merchantRows.reduce((sum, row) => sum + (row.byMonth[month] ?? 0), 0);
+    const expenseYen = merchantRows.reduce((sum, row) => sum + (row.byMonth[month]?.payableYen ?? 0), 0);
     const incomeYen = monthlyIncomeByMonth[month] ?? 0;
     return {
       month,
