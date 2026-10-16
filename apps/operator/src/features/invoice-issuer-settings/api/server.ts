@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { InvoiceIssuer } from "@correcre/lib/company-invoice";
+import { toInvoiceIssuer, type InvoiceIssuer } from "@correcre/lib/company-invoice";
 import { getInvoiceIssuerSetting, putInvoiceIssuerSetting } from "@correcre/lib/dynamodb/system-setting";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { InvoiceIssuerSettingItem } from "@correcre/types";
@@ -18,8 +18,7 @@ function toData(item: InvoiceIssuerSettingItem | null): InvoiceIssuerSettingsDat
   if (!item) {
     return { issuer: null };
   }
-  const { settingKey: _settingKey, updatedAt, updatedBy: _updatedBy, ...issuer } = item;
-  return { issuer, updatedAt };
+  return { issuer: toInvoiceIssuer(item), updatedAt: item.updatedAt };
 }
 
 export async function getInvoiceIssuerSettingsData(): Promise<InvoiceIssuerSettingsData> {

@@ -1,6 +1,11 @@
 import { nowYYYYMM } from "@correcre/lib";
 import { buildCompanyBillingHistory } from "@correcre/lib/company-billing";
-import { buildCompanyInvoice, DEFAULT_INVOICE_ISSUER_NAME, type InvoiceIssuer } from "@correcre/lib/company-invoice";
+import {
+  buildCompanyInvoice,
+  DEFAULT_INVOICE_ISSUER_NAME,
+  toInvoiceIssuer,
+  type InvoiceIssuer,
+} from "@correcre/lib/company-invoice";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listMissionsByCompany } from "@correcre/lib/dynamodb/mission";
@@ -131,8 +136,7 @@ async function resolveInvoiceIssuer(region: string): Promise<InvoiceIssuer> {
   if (!setting) {
     return { companyName: DEFAULT_INVOICE_ISSUER_NAME };
   }
-  const { settingKey: _settingKey, updatedAt: _updatedAt, updatedBy: _updatedBy, ...issuer } = setting;
-  return issuer;
+  return toInvoiceIssuer(setting);
 }
 
 // 管理者の会社の、指定月の請求書。請求書を出せない月（未確定・請求なし・請求開始前）は null。

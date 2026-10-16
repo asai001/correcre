@@ -15,6 +15,20 @@ export const DEFAULT_INVOICE_ISSUER_NAME = "em株式会社";
 
 export type InvoiceIssuer = Omit<InvoiceIssuerSettingItem, "settingKey" | "updatedAt" | "updatedBy">;
 
+// 保存済みの設定アイテムから、請求書に載せる項目だけを取り出す。
+export function toInvoiceIssuer(item: InvoiceIssuerSettingItem): InvoiceIssuer {
+  return {
+    companyName: item.companyName,
+    postalCode: item.postalCode,
+    address: item.address,
+    phone: item.phone,
+    email: item.email,
+    registrationNumber: item.registrationNumber,
+    bankAccount: item.bankAccount,
+    note: item.note,
+  };
+}
+
 export type CompanyInvoiceLine = {
   label: string;
   quantity: number;
