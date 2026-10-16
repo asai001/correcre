@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+
 import type { CompanyBillingRow } from "@correcre/lib/company-billing";
 import { BILLING_PAYMENT_DUE_DAY } from "@correcre/lib/company-billing";
+import { canIssueCompanyInvoice } from "@correcre/lib/company-invoice";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@correcre/ui";
 
 type BillingInfoPanelProps = {
@@ -80,6 +83,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
           利用人数は「有効」のユーザー数です。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
           日払いでのご請求となります。
         </p>
+        <p>請求書は、金額が確定した月（前月以前）から表示・ダウンロードできます。</p>
       </div>
 
       {rows.length ? (
@@ -95,6 +99,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                 <TableHead className="text-center">請求日</TableHead>
                 <TableHead className="text-center">支払期限</TableHead>
                 <TableHead className="text-center">状態</TableHead>
+                <TableHead className="text-center">請求書</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -112,6 +117,19 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                   <TableCell className="text-center">{formatDate(row.paymentDueDate)}</TableCell>
                   <TableCell className="text-center">
                     <BillingStatusBadge row={row} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {canIssueCompanyInvoice(row) ? (
+                      <Link
+                        href={`/info/invoice/${row.month}`}
+                        target="_blank"
+                        className="text-xs font-semibold text-cyan-700 underline"
+                      >
+                        表示・ダウンロード
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-400">-</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

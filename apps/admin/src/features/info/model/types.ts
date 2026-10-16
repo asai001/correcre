@@ -1,5 +1,6 @@
 import type { DBUserRole, Company, Department, Mission } from "@correcre/types";
 import type { CompanyBillingRow } from "@correcre/lib/company-billing";
+import type { CompanyInvoice, InvoiceIssuer } from "@correcre/lib/company-invoice";
 import type { CompanySummary, UpdateCompanyInput } from "@correcre/lib/company-management-types";
 
 export type AdminInfoDepartmentItem = Pick<Department, "departmentId" | "name" | "status" | "sortOrder"> & {
@@ -51,4 +52,15 @@ export type UpdateAdminCompanyInfoInput = Pick<UpdateCompanyInput, "philosophyIt
   representativeName?: string;
   representativePhone?: string;
   representativeEmail?: string;
+};
+
+// 請求書の出力用データ（運用者 → 導入企業の月額利用料）。
+export type CompanyInvoiceData = {
+  invoice: CompanyInvoice;
+  issuer: InvoiceIssuer;
+  recipient: {
+    companyName: string;
+    address?: string;
+    contactName?: string;
+  };
 };

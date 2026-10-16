@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 
@@ -10,6 +10,8 @@ import type { NotificationSettingsData } from "../model/types";
 type Props = {
   data: NotificationSettingsData;
   operatorName: string;
+  // 通知先の下に並べる他の設定セクション
+  children?: ReactNode;
 };
 
 type Feedback = {
@@ -38,7 +40,7 @@ function sameEmails(left: readonly string[], right: readonly string[]) {
   return left.length === right.length && left.every((email, index) => email === right[index]);
 }
 
-export default function NotificationSettingsView({ data, operatorName }: Props) {
+export default function NotificationSettingsView({ data, operatorName, children }: Props) {
   const [emails, setEmails] = useState<string[]>(data.operatorNotificationEmails);
   const [savedEmails, setSavedEmails] = useState<string[]>(data.operatorNotificationEmails);
   const [updatedAt, setUpdatedAt] = useState(data.updatedAt);
@@ -112,7 +114,7 @@ export default function NotificationSettingsView({ data, operatorName }: Props) 
       <AdminPageHeader
         title="設定"
         adminName={operatorName}
-        subtitle="運用者宛メールの送信先を管理します"
+        subtitle="運用者宛メールの送信先と、請求書の発行元情報を管理します"
         backHref="/dashboard"
       />
 
@@ -210,6 +212,8 @@ export default function NotificationSettingsView({ data, operatorName }: Props) 
           </button>
         </div>
       </section>
+
+      {children}
     </div>
   );
 }
