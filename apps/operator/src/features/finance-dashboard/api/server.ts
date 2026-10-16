@@ -7,8 +7,9 @@ import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { getSalesRecognitionMonth, isSalesRecognizedExchange } from "@correcre/lib/exchange/sales-recognition";
 import { POINT_YEN_VALUE } from "@correcre/lib/points";
-import type { Company, ExchangeHistoryStatus } from "@correcre/types";
+import type { Company } from "@correcre/types";
 
 import type {
   CompanyIncomeRow,
@@ -43,16 +44,6 @@ function buildRecentMonths(currentMonth: string, count: number): string[] {
     months.push(addMonths(currentMonth, -offset));
   }
   return months;
-}
-
-// 却下・キャンセル以外を「ポイントを消費した（＝支出が発生した）交換」とみなす。
-function isExpenseExchange(status?: ExchangeHistoryStatus): boolean {
-  const normalized = status === "CANCELLED" ? "CANCELED" : status;
-  return normalized !== "REJECTED" && normalized !== "CANCELED";
-}
-
-function toYearMonth(value: string): string {
-  return value.slice(0, 7);
 }
 
 // 収入は請求管理（導入企業への月額利用料の請求）と同じ計算を使う。
@@ -122,14 +113,15 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
       const byMonth: Record<string, number> = {};
       let totalExpenseYen = 0;
 
+      // 支出（提携企業への支払額）は提携企業の売上と同じく、交換が完了した月に計上する。
       for (const exchange of exchanges) {
-        if (!isExpenseExchange(exchange.status)) {
+        if (!isSalesRecognizedExchange(exchange)) {
           continue;
         }
         const amount = (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
         totalExpenseYen += amount;
 
-        const month = toYearMonth(exchange.exchangedAt);
+        const month = getSalesRecognitionMonth(exchange);
         if (monthSet.has(month)) {
           byMonth[month] = (byMonth[month] ?? 0) + amount;
         }

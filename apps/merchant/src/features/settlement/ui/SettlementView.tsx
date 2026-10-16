@@ -83,7 +83,7 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">当月の売上（{formatMonthLabel(current.month)}）</div>
           <div className="mt-3 text-3xl font-bold text-sky-600">{formatYen(current.salesYen)}</div>
-          <div className="mt-1 text-xs text-slate-500">交換されたポイントの金額換算（{current.exchangeCount.toLocaleString("ja-JP")}件）</div>
+          <div className="mt-1 text-xs text-slate-500">当月に完了した交換のポイントの金額換算（{current.exchangeCount.toLocaleString("ja-JP")}件）</div>
         </div>
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">交換手数料（{feePercentLabel}）</div>
@@ -113,7 +113,8 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <h2 className="text-lg font-bold text-slate-900">月ごとの収支</h2>
         <p className="mt-1 text-xs text-slate-500">
-          却下・キャンセルを除く交換を集計しています。月をクリックすると商品・サービス別の内訳を表示します。
+          ステータスが「完了」になった交換を、完了した月の売上として集計しています（申請中・準備中・対応中の交換は、完了した時点で計上されます）。
+          月をクリックすると商品・サービス別の内訳を表示します。
           「請求メールを送信」を押すと、該当月の請求内容が運用者にメールで通知されます。
           請求は月単位のため、当月分は月が締まった翌月以降に送信できます。
         </p>
