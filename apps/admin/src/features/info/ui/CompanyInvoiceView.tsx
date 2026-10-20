@@ -30,11 +30,12 @@ export default function CompanyInvoiceView({ data }: Props) {
   const { invoice, issuer, recipient } = data;
 
   return (
-    <div className="py-6 print:p-0">
-      {/* A4 縦・余白はブラウザの既定より狭くして 1 枚に収める */}
-      <style>{"@page { size: A4; margin: 14mm; }"}</style>
+    <div className="overflow-x-auto px-4 py-6 print:overflow-visible print:p-0">
+      {/* 用紙の余白を 0 にして、ブラウザが余白に印字するヘッダー・フッター（日時・タイトル・URL・ページ番号）を
+          出さないようにする。余白は請求書（article）の内側の padding で取る */}
+      <style>{"@page { size: A4; margin: 0; }"}</style>
 
-      <div className="mx-auto mb-4 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 print:hidden">
+      <div className="mx-auto mb-4 flex w-[210mm] flex-wrap items-center justify-between gap-3 print:hidden">
         <Link href="/info" className="text-sm font-semibold text-slate-600 underline">
           ← 請求情報に戻る
         </Link>
@@ -50,7 +51,8 @@ export default function CompanyInvoiceView({ data }: Props) {
         </div>
       </div>
 
-      <article className="mx-auto max-w-[210mm] bg-white px-[14mm] py-[16mm] text-[13px] leading-6 text-slate-900 shadow-lg print:max-w-none print:p-0 print:shadow-none">
+      {/* プレビューも印刷と同じ A4（210 × 297mm）の紙で表示する */}
+      <article className="mx-auto box-border min-h-[297mm] w-[210mm] bg-white px-[16mm] py-[18mm] text-[13px] leading-6 text-slate-900 shadow-lg print:m-0 print:min-h-0 print:shadow-none">
         <header className="flex items-start justify-between gap-6">
           <h1 className="text-2xl font-bold tracking-[0.4em]">請求書</h1>
           <dl className="text-right text-xs leading-5">
