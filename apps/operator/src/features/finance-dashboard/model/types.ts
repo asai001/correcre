@@ -50,6 +50,16 @@ export type MerchantExpenseRow = {
   totalExpenseYen: number;
 };
 
+// 提携企業ごとの完了待ち（申請中・準備中・対応中）の交換。完了するまで支出には計上しない。
+export type MerchantPendingRow = {
+  merchantId: string;
+  merchantName: string;
+  count: number;
+  amountYen: number; // 交換相当額の合計
+  // 今の手数料率で全件完了した場合の支払額の見込み（却下・キャンセルや完了月の分かれ方で変わる）
+  estimatedPayableYen: number;
+};
+
 export type FinanceDashboardData = {
   months: string[]; // 表示対象の月（昇順）
   monthly: MonthlyFinance[];
@@ -57,6 +67,8 @@ export type FinanceDashboardData = {
   companyIncomeByMonth: Record<string, CompanyIncomeRow[]>;
   monthlyIncomeByMonth: Record<string, number>;
   merchants: MerchantExpenseRow[];
+  // 完了待ちの交換がある提携企業（見込みの支払額の大きい順）。
+  pendingMerchants: MerchantPendingRow[];
   // 1か月あたりの収入合計（現在の従業員数・単価のスナップショット）。
   monthlyIncomeYen: number;
 };

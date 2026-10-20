@@ -152,4 +152,5 @@ export type UpdateShipmentRequest = {
   shipment: ShipmentInputRequest;
 };
 
-export type ExchangeListFilter = "ALL" | ExchangeHistoryStatus;
+// UNFINISHED は完了待ち（申請中・準備中・対応中）をまとめて表示する。収支・精算の「完了待ちの交換」から開く。
+export type ExchangeListFilter = "ALL" | "UNFINISHED" | ExchangeHistoryStatus;

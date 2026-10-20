@@ -1,14 +1,18 @@
 import "server-only";
 
 import { nowYYYYMM } from "@correcre/lib";
-import { resolveExchangeFeePercent } from "@correcre/lib/billing";
+import { calculateMerchantInvoiceYen, resolveExchangeFeePercent } from "@correcre/lib/billing";
 import { addMonths, buildCompanyBillingRow, getCompanyBillingStartMonth } from "@correcre/lib/company-billing";
 import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { getUserByCompanyAndUserId } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
-import { getSalesRecognitionMonth, isSalesRecognizedExchange } from "@correcre/lib/exchange/sales-recognition";
+import {
+  getSalesRecognitionMonth,
+  isSalesRecognizedExchange,
+  summarizeSalesPendingExchanges,
+} from "@correcre/lib/exchange/sales-recognition";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import type { Company, DBUserItem, ExchangeHistoryItem } from "@correcre/types";
 
@@ -16,6 +20,7 @@ import type {
   CompanyIncomeRow,
   FinanceDashboardData,
   MerchantExpenseRow,
+  MerchantPendingRow,
   MonthlyFinance,
 } from "../model/types";
 import { aggregateMerchantExpense } from "../model/merchant-expense";
@@ -171,6 +176,24 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
 
   merchantRows.sort((left, right) => right.totalExpenseYen - left.totalExpenseYen);
 
+  // 完了待ちの交換。月の支出には混ぜず、今後の支払予定として別に出す。
+  const pendingMerchants: MerchantPendingRow[] = merchants
+    .map((merchant, index): MerchantPendingRow => {
+      const pending = summarizeSalesPendingExchanges(exchangesByMerchant[index] ?? []);
+      return {
+        merchantId: merchant.merchantId,
+        merchantName: merchant.name,
+        count: pending.count,
+        amountYen: pending.amountYen,
+        estimatedPayableYen: calculateMerchantInvoiceYen(
+          pending.amountYen,
+          resolveExchangeFeePercent(merchant.exchangeFeePercent),
+        ),
+      };
+    })
+    .filter((row) => row.count > 0)
+    .sort((left, right) => right.estimatedPayableYen - left.estimatedPayableYen);
+
   // 月ごとの収支。収入は月次スナップショットを優先し、企業作成前の月には適用しない。
   const monthly: MonthlyFinance[] = months.map((month) => {
     const expenseYen = merchantRows.reduce((sum, row) => sum + (row.byMonth[month]?.payableYen ?? 0), 0);
@@ -190,6 +213,7 @@ export async function getFinanceDashboardData(): Promise<FinanceDashboardData> {
     companyIncomeByMonth,
     monthlyIncomeByMonth,
     merchants: merchantRows,
+    pendingMerchants,
     monthlyIncomeYen,
   };
 }

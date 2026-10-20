@@ -1,31 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { isAwsCredentialError } from "@correcre/lib/aws/credentials";
-import type { ExchangeHistoryStatus } from "@correcre/types";
 
 import { listExchangesForMerchant } from "@merchant/features/exchanges/api/server";
-import type { ExchangeListFilter } from "@merchant/features/exchanges/model/types";
+import { parseExchangeListFilter } from "@merchant/features/exchanges/model/filter";
 import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
 
 const FAILED_MESSAGE = "交換情報の取得に失敗しました。時間をおいて再度お試しください。";
-
-const ALLOWED_STATUSES: ReadonlyArray<ExchangeHistoryStatus> = [
-  "REQUESTED",
-  "PREPARING",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "REJECTED",
-  "CANCELED",
-  "CANCELLED",
-];
-
-function parseFilter(value: string | null): ExchangeListFilter {
-  if (!value || value === "ALL") return "ALL";
-  if ((ALLOWED_STATUSES as ReadonlyArray<string>).includes(value)) {
-    return value as ExchangeListFilter;
-  }
-  return "ALL";
-}
 
 async function authorize() {
   const access = await getMerchantAccessStatus();
@@ -44,7 +25,7 @@ export async function GET(req: Request) {
   const { user, error } = await authorize();
   if (error) return error;
 
-  const filter = parseFilter(new URL(req.url).searchParams.get("status"));
+  const filter = parseExchangeListFilter(new URL(req.url).searchParams.get("status"));
 
   try {
     const items = await listExchangesForMerchant(user!.merchantId, filter);

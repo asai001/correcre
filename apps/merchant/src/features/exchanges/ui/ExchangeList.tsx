@@ -21,6 +21,7 @@ type Props = {
 
 const FILTER_OPTIONS: ReadonlyArray<{ value: ExchangeListFilter; label: string }> = [
   { value: "ALL", label: "すべて" },
+  { value: "UNFINISHED", label: "未完了（申請中・準備中・対応中）" },
   { value: "REQUESTED", label: "申請中" },
   { value: "PREPARING", label: "準備中" },
   { value: "IN_PROGRESS", label: "対応中" },
@@ -139,7 +140,7 @@ export default function ExchangeList({ initialItems, initialFilter, merchantName
           label="状態で絞り込む"
           value={filter}
           onChange={(event) => handleFilterChange(event.target.value as ExchangeListFilter)}
-          className="md:w-56"
+          className="md:w-72"
           disabled={isPending}
         >
           {FILTER_OPTIONS.map((option) => (

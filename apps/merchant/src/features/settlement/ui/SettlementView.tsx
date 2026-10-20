@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useState } from "react";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
@@ -22,6 +23,13 @@ function formatYen(value: number) {
   return `¥${Math.round(value).toLocaleString("ja-JP")}`;
 }
 
+// 完了待ちのステータス別内訳の並び（申請 → 承認 → 作業の順）。
+const PENDING_STATUS_LABELS = [
+  { status: "REQUESTED", label: "申請中" },
+  { status: "PREPARING", label: "準備中" },
+  { status: "IN_PROGRESS", label: "対応中" },
+] as const;
+
 function formatMonthLabel(month: string) {
   const [year, mon] = month.split("-");
   return `${year}年${Number(mon)}月`;
@@ -36,6 +44,7 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
   );
 
   const current = data.current;
+  const pending = data.pending;
   const feePercentLabel = `${data.exchangeFeePercent}%`;
 
   const toggleBreakdown = (month: string) => {
@@ -94,6 +103,33 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
           <div className="text-sm font-semibold text-slate-500">当月のご請求額</div>
           <div className="mt-3 text-3xl font-bold text-emerald-600">{formatYen(current.invoiceYen)}</div>
           <div className="mt-1 text-xs text-slate-500">売上 − 交換手数料</div>
+        </div>
+      </section>
+
+      {/* 完了待ちの交換。確定した売上ではないため、上の3枚とは見た目を分け、月には振り分けずに現時点の残高として出す。 */}
+      <section className="rounded-[28px] border-2 border-dashed border-slate-300 bg-slate-50 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-500">完了待ちの交換（売上には未計上）</div>
+            <div className="mt-2 flex items-baseline gap-3">
+              <span className="text-3xl font-bold text-slate-600">{formatYen(pending.amountYen)}</span>
+              <span className="text-sm font-semibold text-slate-500">{pending.count.toLocaleString("ja-JP")}件</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {PENDING_STATUS_LABELS.map(({ status, label }) => `${label} ${pending.byStatus[status].count.toLocaleString("ja-JP")}件`).join(" ／ ")}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              交換は「完了」にした月の売上として計上されます。却下・キャンセルになった交換は計上されません。
+            </p>
+          </div>
+          {pending.count > 0 ? (
+            <Link
+              href="/exchanges?status=UNFINISHED"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              交換管理で対応する
+            </Link>
+          ) : null}
         </div>
       </section>
 

@@ -24,6 +24,7 @@ import {
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { isSalesPendingExchange } from "@correcre/lib/exchange/sales-recognition";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { addCalendarDays, formatWeekdayJa, getWeekday, isMerchantWorkingDay } from "@correcre/lib/date/business-days";
 import {
@@ -321,14 +322,16 @@ export async function listExchangesForMerchant(
 ): Promise<ExchangeSummary[]> {
   const config = getRuntimeConfig();
 
-  const items = filter === "ALL"
-    ? await listExchangeHistoryByMerchant(
-        {
-          region: config.region,
-          tableName: config.exchangeHistoryTableName,
-        },
-        merchantId,
-      )
+  const items = filter === "ALL" || filter === "UNFINISHED"
+    ? (
+        await listExchangeHistoryByMerchant(
+          {
+            region: config.region,
+            tableName: config.exchangeHistoryTableName,
+          },
+          merchantId,
+        )
+      ).filter((item) => filter === "ALL" || isSalesPendingExchange(item))
     : await listExchangeHistoryByMerchantAndStatus(
         {
           region: config.region,

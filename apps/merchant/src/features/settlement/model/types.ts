@@ -1,3 +1,5 @@
+import type { SalesPendingSummary } from "@correcre/lib/exchange/sales-recognition";
+
 // 月内の商品・サービスごとの売上内訳。
 export type SettlementItemRow = {
   merchandiseId: string;
@@ -22,4 +24,6 @@ export type SettlementData = {
   current: SettlementMonthRow;
   // 適用される交換手数料率（%）。運用者が提携企業ごとに設定する。
   exchangeFeePercent: number;
+  // 完了待ち（申請中・準備中・対応中）の交換。完了するまで売上には計上しない。
+  pending: SalesPendingSummary;
 };

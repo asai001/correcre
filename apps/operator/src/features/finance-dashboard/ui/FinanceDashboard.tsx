@@ -228,6 +228,14 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
     }),
     { salesYen: 0, exchangeFeeYen: 0, payableYen: 0 },
   );
+  const pendingTotal = data.pendingMerchants.reduce(
+    (sum, row) => ({
+      count: sum.count + row.count,
+      amountYen: sum.amountYen + row.amountYen,
+      estimatedPayableYen: sum.estimatedPayableYen + row.estimatedPayableYen,
+    }),
+    { count: 0, amountYen: 0, estimatedPayableYen: 0 },
+  );
   const selectedCompanyRows = data.companyIncomeByMonth[incomeMonth] ?? [];
   const selectedMonthlyIncomeYen = data.monthlyIncomeByMonth[incomeMonth] ?? 0;
 
@@ -266,6 +274,46 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
         ※ 収入は「請求管理」と同じ計算（月次スナップショット優先。月内に変更がなかった月は直前のスナップショット、記録がない月は現在値で補完）です。企業作成前の月には収入を計上しません。
         支出は提携企業への支払額（交換相当額 − 交換手数料）で、提携企業側の請求額と同じ金額です。ステータスが「完了」になった交換を、完了した月に計上しています（申請中・対応中の交換は含みません）。
       </p>
+
+      {/* 完了待ちの交換。確定した支出ではないため、月の収支には混ぜずに今後の支払予定として別枠で出す。 */}
+      <section className="rounded-[28px] border-2 border-dashed border-slate-300 bg-slate-50 p-6">
+        <h2 className="text-lg font-bold text-slate-700">支払予定（完了待ちの交換）</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          申請中・準備中・対応中の交換です。完了した月の支出に計上されます。見込み支払額は今の手数料率で全件が完了した場合の金額で、却下・キャンセルや完了月の分かれ方によって変わります。
+        </p>
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <span className="text-sm font-semibold text-slate-500">
+            {pendingTotal.count.toLocaleString("ja-JP")}件 ／ 交換相当額 {formatYen(pendingTotal.amountYen)}
+          </span>
+          <span className="text-2xl font-bold text-slate-600">見込み支払額 {formatYen(pendingTotal.estimatedPayableYen)}</span>
+        </div>
+        {data.pendingMerchants.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-slate-500">
+                  <th className="py-2 pr-4 font-semibold">提携企業</th>
+                  <th className="py-2 pr-4 text-right font-semibold">件数</th>
+                  <th className="py-2 pr-4 text-right font-semibold">交換相当額</th>
+                  <th className="py-2 text-right font-semibold">見込み支払額</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.pendingMerchants.map((merchant) => (
+                  <tr key={merchant.merchantId} className="border-b border-slate-100 last:border-b-0">
+                    <td className="py-2 pr-4 font-semibold text-slate-700">{merchant.merchantName}</td>
+                    <td className="py-2 pr-4 text-right text-slate-700">{merchant.count.toLocaleString("ja-JP")}件</td>
+                    <td className="py-2 pr-4 text-right text-slate-700">{formatYen(merchant.amountYen)}</td>
+                    <td className="py-2 text-right font-semibold text-slate-700">{formatYen(merchant.estimatedPayableYen)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-slate-400">完了待ちの交換はありません。</p>
+        )}
+      </section>
 
       {/* 月ごとの収支 */}
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
