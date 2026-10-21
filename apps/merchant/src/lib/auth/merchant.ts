@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
@@ -11,8 +12,8 @@ import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import type { MerchantUserItem } from "@correcre/types";
 
-import { MERCHANT_LOGIN_PATH } from "./constants";
-import { clearMerchantSession, getMerchantSession } from "./session";
+import { buildClearMerchantSessionRedirect } from "./redirect";
+import { getMerchantSession } from "./session";
 import type { MerchantSession } from "./verify-token";
 
 type MerchantAccessStatus =
@@ -120,8 +121,9 @@ export async function requireMerchantSession() {
   const access = await getMerchantAccessStatus();
 
   if (!access.allowed) {
-    await clearMerchantSession();
-    redirect(MERCHANT_LOGIN_PATH);
+    // ユーザーが削除・停止されたなどでセッションが使えない。Server Component では Cookie を消せないため、
+    // 消す処理は Route Handler に任せてログイン画面へ戻す。
+    redirect(buildClearMerchantSessionRedirect() as Route);
   }
 
   return access.session;
@@ -131,8 +133,9 @@ export async function requireCurrentMerchantUser() {
   const access = await getMerchantAccessStatus();
 
   if (!access.allowed) {
-    await clearMerchantSession();
-    redirect(MERCHANT_LOGIN_PATH);
+    // ユーザーが削除・停止されたなどでセッションが使えない。Server Component では Cookie を消せないため、
+    // 消す処理は Route Handler に任せてログイン画面へ戻す。
+    redirect(buildClearMerchantSessionRedirect() as Route);
   }
 
   return access.user;

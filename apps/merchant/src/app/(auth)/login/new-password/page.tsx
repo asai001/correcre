@@ -7,7 +7,7 @@ import { MERCHANT_DEFAULT_REDIRECT_PATH, MERCHANT_LOGIN_PATH } from "@merchant/l
 import { getLoginErrorMessage } from "@merchant/lib/auth/errors";
 import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
 import { pickFirstQueryValue, sanitizeRedirectTo } from "@merchant/lib/auth/redirect";
-import { clearMerchantSession, getPendingNewPasswordChallenge } from "@merchant/lib/auth/session";
+import { getPendingNewPasswordChallenge } from "@merchant/lib/auth/session";
 
 type NewPasswordPageProps = {
   searchParams: Promise<{
@@ -36,10 +36,6 @@ export default async function NewPasswordPage({ searchParams }: NewPasswordPageP
 
   if (access.allowed) {
     redirect(redirectTo as Route);
-  }
-
-  if (access.reason === "forbidden") {
-    await clearMerchantSession();
   }
 
   if (!challenge) {

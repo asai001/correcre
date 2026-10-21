@@ -7,8 +7,7 @@ import LoginForm from "@merchant/components/auth/LoginForm";
 import { MERCHANT_LOGIN_NOTICE_COOKIE_NAME } from "@merchant/lib/auth/constants";
 import { getLoginNoticeMessage } from "@merchant/lib/auth/errors";
 import { getMerchantAccessStatus } from "@merchant/lib/auth/merchant";
-import { pickFirstQueryValue, sanitizeRedirectTo } from "@merchant/lib/auth/redirect";
-import { clearMerchantSession } from "@merchant/lib/auth/session";
+import { buildClearMerchantSessionRedirect, pickFirstQueryValue, sanitizeRedirectTo } from "@merchant/lib/auth/redirect";
 
 type LoginPageProps = {
   searchParams: Promise<{
@@ -27,8 +26,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     redirect(redirectTo as Route);
   }
 
+  // 使えなくなったセッションが残っている（ユーザーが削除済みなど）。Cookie は Route Handler で消してから戻す。
   if (access.reason === "forbidden") {
-    await clearMerchantSession();
+    redirect(buildClearMerchantSessionRedirect(redirectTo) as Route);
   }
 
   return (
