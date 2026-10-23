@@ -18,7 +18,53 @@ npm run dev:employee
 npm run dev:operator
 npm run build
 npm run lint
+npm test
 ```
+
+## Testing
+
+`npm test` はルートから各 workspace の `test` スクリプト（Jest）を順に実行します。
+
+| 対象 | 内容 |
+| --- | --- |
+| `packages/lib` | 4 アプリが共有するロジックのユニットテスト（`src/**/__tests__/*.test.ts`）。ポイント計算・翌月反映・請求・ミッション予約反映・交換ステータス遷移・配送追跡・日程エンジン・日付整形・セッション寿命と署名トークンなど |
+| `packages/features/*` | 機能パッケージのユニットテスト |
+| `apps/*` | Route Handler と認可ヘルパーのユニットテスト（`src/**/__tests__/*.test.ts`）。DynamoDB など外部へ出る層は `jest.mock` で差し替え、未ログイン→401 / ロール不足→403、対象テナントや操作者がボディではなくセッション・パスから決まること、入力検証とエラー種別→HTTP ステータスの対応を検証する |
+| `infra` | CDK 合成テンプレートの回帰テスト（テーブル設計、Cognito、IAM、S3 CORS） |
+
+個別に回す場合:
+
+```bash
+npm test --workspace @correcre/lib
+npm test --workspace @correcre/admin      # employee / operator / merchant も同様
+npm test --workspace infra
+cd packages/lib && npx jest --watch
+```
+
+Route Handler のテストは `apps/<app>/src/app/api/<path>/__tests__/route.test.ts` に置き、
+`apps/<app>/src/test-utils/http.ts` の `jsonRequest` / `routeContext` で Request と動的セグメントを組み立てます。
+認可ゲート（`@admin/lib/auth/*` など）と機能層（`features/*/api/server`）は `jest.mock` で差し替えます。
+
+### 統合テスト（DynamoDB Local）
+
+4 つのアプリは同じ DynamoDB テーブルを `packages/lib` 経由で読み書きしているため、
+「従業員が交換を申請 → 提携企業/運用者がステータスを進める → 管理者が履歴を見る」のようなアプリ横断のフローは、
+lib の関数を実際の DynamoDB API に対して役割ごとに呼ぶ統合テストで検証します（`packages/lib/test/integration/`）。
+
+- テーブルは `infra/lib` の CDK スタックを合成した結果から毎回作り直します。infra 側のキー設計・GSI 名と lib 側の実装がズレていればここで落ちます
+- 接続先は環境変数 `DDB_ENDPOINT`（既定: `http://127.0.0.1:8000`）。設定されている間、`packages/lib` の DynamoDB クライアントは AWS 認証情報を解決せずダミーの静的キーを使います
+- `npm test` には含まれません。DynamoDB Local を起動したうえで別コマンドで実行します
+
+```bash
+npm run ddb:local            # docker compose で DynamoDB Local を起動（ポート 8000）
+npm run test:integration     # packages/lib の統合テストを実行
+npm run ddb:local:stop
+```
+
+Docker を使わない場合は、別途起動した DynamoDB Local のエンドポイントを `DDB_ENDPOINT` に指定してください。
+
+CI（`.github/workflows/ci.yml`）は main / stage への push と pull request ごとに `npm run lint`、`npm test`、
+`npm run test:integration`（DynamoDB Local をサービスコンテナとして起動）を実行します。
 
 ## Initial Operator Bootstrap
 

@@ -11,6 +11,7 @@ import {
   faClipboardCheck,
   faPenToSquare,
   faStore,
+  faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
@@ -22,11 +23,13 @@ import {
 } from "../api/client";
 import type {
   CreateMerchantInput,
+  DeleteMerchantResult,
   MerchantApplicationDetail,
   MerchantSummary,
   UpdateMerchantInput,
 } from "../model/types";
 import ApplicationDecisionDialog from "./ApplicationDecisionDialog";
+import MerchantDeleteDialog from "./MerchantDeleteDialog";
 import MerchantEditDialog from "./MerchantEditDialog";
 
 const storeAddressModeOptions = [
@@ -76,6 +79,7 @@ const STATUS_LABELS: Record<MerchantSummary["status"], string> = {
   ACTIVE: "登録済",
   INACTIVE: "停止中",
   REJECTED: "却下済",
+  DELETED: "削除済",
 };
 
 export default function MerchantManagement({
@@ -98,6 +102,7 @@ export default function MerchantManagement({
   const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const [editingMerchant, setEditingMerchant] = useState<MerchantSummary | null>(null);
+  const [deletingMerchant, setDeletingMerchant] = useState<MerchantSummary | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -438,6 +443,16 @@ export default function MerchantManagement({
                     >
                       編集
                     </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="error"
+                      onClick={() => setDeletingMerchant(merchant)}
+                      startIcon={<FontAwesomeIcon icon={faTrashCan} />}
+                      sx={{ borderRadius: "999px", textTransform: "none" }}
+                    >
+                      削除
+                    </Button>
                     <Link
                       href={`/merchants/${encodeURIComponent(merchant.merchantId)}/summary`}
                       className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-900 hover:text-slate-900"
@@ -474,6 +489,16 @@ export default function MerchantManagement({
         error={decisionError}
         onClose={handleCloseDecision}
         onSubmit={handleSubmitDecision}
+      />
+
+      <MerchantDeleteDialog
+        merchant={deletingMerchant}
+        onClose={() => setDeletingMerchant(null)}
+        onDeleted={(result: DeleteMerchantResult) => {
+          // 結果（申請者の連絡先）はダイアログに残し、一覧からだけ外す
+          setMerchants((prev) => prev.filter((item) => item.merchantId !== result.merchantId));
+          setNotice(`「${result.merchantName}」を削除しました。`);
+        }}
       />
 
       <MerchantEditDialog

@@ -9,6 +9,7 @@ import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-h
 import { listMerchandiseByMerchant } from "@correcre/lib/dynamodb/merchandise";
 import { getMerchantById, listMerchants } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { getSalesRecognitionMonth, isSalesRecognizedExchange } from "@correcre/lib/exchange/sales-recognition";
 import { POINT_YEN_VALUE } from "@correcre/lib/points";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import type { ExchangeHistoryItem, ExchangeHistoryStatus, Merchant } from "@correcre/types";
@@ -47,11 +48,6 @@ function normalizeExchangeStatus(value?: ExchangeHistoryStatus): ExchangeHistory
   return value;
 }
 
-// 却下・キャンセル以外は「成立した交換」としてポイントを消費したとみなす。
-function isExchangeConsumed(status: ExchangeHistoryStatus): boolean {
-  return status !== "REJECTED" && status !== "CANCELED";
-}
-
 // 準備中・対応中は「対応中の商品」とみなす。
 function isExchangeInProgress(status: ExchangeHistoryStatus): boolean {
   return status === "PREPARING" || status === "IN_PROGRESS";
@@ -84,7 +80,8 @@ function buildMerchantStats(
     if (isExchangeInProgress(status)) {
       inProgressCount += 1;
     }
-    if (isExchangeConsumed(status)) {
+    // 交換件数・金額は売上計上と同じく、完了した交換だけを数える。
+    if (isSalesRecognizedExchange({ status })) {
       totalExchangeCount += 1;
       totalPoint += exchange.usedPoint ?? 0;
     }
@@ -132,11 +129,10 @@ function buildMerchantMonthlyFinance(
   >();
 
   for (const exchange of exchanges) {
-    const status = normalizeExchangeStatus(exchange.status);
-    if (!isExchangeConsumed(status)) {
+    if (!isSalesRecognizedExchange(exchange)) {
       continue;
     }
-    const month = exchange.exchangedAt.slice(0, 7);
+    const month = getSalesRecognitionMonth(exchange);
     const entry = byMonth.get(month) ?? { salesYen: 0, count: 0, itemsByMerchandise: new Map() };
     const salesYen = (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
     const merchandiseId = exchange.merchandiseId ?? `unknown:${exchange.merchandiseNameSnapshot}`;
@@ -202,7 +198,9 @@ async function buildMerchantSummaryDetail(
 }
 
 function buildOverallStats(merchants: Merchant[], summaries: MerchantSummaryDetail[]): MerchantOverallStats {
-  const registeredMerchants = merchants.filter((merchant) => merchant.status !== "PENDING");
+  const registeredMerchants = merchants.filter(
+    (merchant) => merchant.status !== "PENDING" && merchant.status !== "DELETED",
+  );
 
   return summaries.reduce<MerchantOverallStats>(
     (stats, summary) => ({

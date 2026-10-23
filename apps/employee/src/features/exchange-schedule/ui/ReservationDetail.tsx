@@ -5,6 +5,7 @@ import { Button } from "@mui/material";
 
 import EmployeePageHeader from "@employee/components/EmployeePageHeader";
 import { getExchangeStatusBadge } from "@correcre/merchandise-public";
+import { getReservationCodeGuidance, getReservationPageGuidance } from "@correcre/lib/reservation/guidance";
 
 import type { EmployeeReservationView } from "../model/types";
 
@@ -24,9 +25,11 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
   // 連番導入前の交換には reservationCode が無いため exchangeId で案内する
   const reservationCode = view.reservationCode ?? view.exchangeId;
   const badge = getExchangeStatusBadge(view.status);
+  const pageGuidance = view.reservationUrl ? getReservationPageGuidance(view.reservationSystem) : undefined;
   const isApproved = view.status === "PREPARING" || view.status === "IN_PROGRESS";
   const isClosed =
     view.status === "REJECTED" || view.status === "CANCELED" || view.status === "CANCELLED";
+  // 予約先・交換番号は承認後だけサーバーから渡ってくる（承認前に予約されるのを防ぐ）
 
   const handleCopy = async () => {
     try {
@@ -68,7 +71,8 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
 
           {view.status === "REQUESTED" ? (
             <div className="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              交換申請は現在承認待ちです。承認されるとメールでお知らせしますので、承認後に以下の方法でご予約ください。
+              交換申請は現在承認待ちです。承認されると、予約ページと交換番号をメールでお知らせします。
+              この画面にも承認後に表示されますので、それまでお待ちください。
             </div>
           ) : null}
 
@@ -90,7 +94,7 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
             </div>
           ) : null}
 
-          {!isClosed ? (
+          {view.guidanceDisclosed ? (
             <>
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="text-xs font-semibold text-slate-500">交換番号（予約時に店舗へお伝えください）</div>
@@ -122,6 +126,8 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
                 </Button>
               ) : null}
 
+              {pageGuidance ? <p className="mt-2 text-sm text-slate-600">{pageGuidance}</p> : null}
+
               {view.instructions ? (
                 <div className="mt-4 rounded-2xl border border-slate-200 px-4 py-4">
                   <h2 className="text-sm font-bold text-slate-900">予約方法・注意事項</h2>
@@ -132,7 +138,8 @@ export default function ReservationDetail({ view, initialPointBalance }: Props) 
               ) : null}
 
               <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                ご予約の際は、予約サイトの備考欄への記入、またはお電話・ご来店時に、上記の交換番号を必ずお伝えください。店舗が交換申請とご予約を照合するために使用します。
+                {getReservationCodeGuidance(view.reservationSystem)}
+                店舗が交換申請とご予約を照合するために使用します。
               </div>
             </>
           ) : null}

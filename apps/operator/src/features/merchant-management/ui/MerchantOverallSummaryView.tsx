@@ -24,6 +24,7 @@ const STATUS_LABELS: Record<MerchantSummaryDetail["status"], string> = {
   ACTIVE: "登録済",
   INACTIVE: "停止中",
   REJECTED: "却下済",
+  DELETED: "削除済",
 };
 
 function formatYen(value: number) {
@@ -108,7 +109,7 @@ export default function MerchantOverallSummaryView({ summary, operatorName }: Pr
         <MetricCard
           label="累計交換数"
           value={`${formatCount(stats.totalExchangeCount)}件`}
-          help="却下・キャンセルを除く成立済み交換です。"
+          help="ステータスが「完了」になった交換です。"
         />
         <MetricCard
           label="累計発生金額"
@@ -137,7 +138,7 @@ export default function MerchantOverallSummaryView({ summary, operatorName }: Pr
             <h2 className="text-xl font-bold text-slate-900">今月の全体収支</h2>
           </div>
           <p className="mt-2 text-sm text-slate-500">
-            {formatMonthLabel(currentMonth.month)} の成立済み交換を集計しています。
+            {formatMonthLabel(currentMonth.month)} に完了した交換を集計しています。
           </p>
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
             <div className="rounded-2xl bg-slate-50 px-3 py-2">

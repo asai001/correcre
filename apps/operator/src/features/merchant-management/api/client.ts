@@ -1,5 +1,8 @@
 import type {
   CreateMerchantInput,
+  DeleteMerchantInput,
+  DeleteMerchantResult,
+  MerchantDeletionPreview,
   CreateMerchantUserInput,
   MerchantApplicationDecisionInput,
   MerchantSummary,
@@ -170,4 +173,35 @@ export async function rejectMerchantApplication(
   }
 
   return (await res.json()) as MerchantSummary;
+}
+
+export async function fetchMerchantDeletionPreview(merchantId: string): Promise<MerchantDeletionPreview> {
+  const res = await fetch(`/api/merchants/${encodeURIComponent(merchantId)}/deletion`, { cache: "no-store" });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "削除前の確認内容の取得に失敗しました。");
+  }
+
+  return (await res.json()) as MerchantDeletionPreview;
+}
+
+export async function deleteMerchant(input: DeleteMerchantInput): Promise<DeleteMerchantResult> {
+  const res = await fetch(`/api/merchants/${encodeURIComponent(input.merchantId)}/deletion`, {
+    method: "DELETE",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      confirmName: input.confirmName,
+      force: input.force,
+      notifyApplicants: input.notifyApplicants,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error ?? "提携企業の削除に失敗しました。");
+  }
+
+  return (await res.json()) as DeleteMerchantResult;
 }

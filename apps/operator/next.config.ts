@@ -2,6 +2,11 @@ import path from "node:path";
 
 import { NextConfig } from "next";
 
+import { assertRequiredEnvForDeploy } from "../../packages/lib/src/env/required-env";
+
+// 本番ビルドで必須の環境変数が欠けていたらビルドを失敗させる（稼働中の本番を壊さずに設定漏れに気づくため）
+assertRequiredEnvForDeploy("operator");
+
 const isLocalProductionBuild =
   process.env.NODE_ENV !== "development" && !process.env.CI && !process.env.VERCEL;
 

@@ -1,6 +1,15 @@
+import { nowYYYYMM } from "@correcre/lib";
+import { buildCompanyBillingHistory } from "@correcre/lib/company-billing";
+import {
+  buildCompanyInvoice,
+  DEFAULT_INVOICE_ISSUER_NAME,
+  toInvoiceIssuer,
+  type InvoiceIssuer,
+} from "@correcre/lib/company-invoice";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
 import { listMissionsByCompany } from "@correcre/lib/dynamodb/mission";
+import { getInvoiceIssuerSetting, resolveSystemSettingTableName } from "@correcre/lib/dynamodb/system-setting";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import { joinNameParts } from "@correcre/lib/user-profile";
@@ -12,6 +21,7 @@ import type {
   AdminInfoData,
   AdminInfoDepartmentItem,
   AdminInfoUserCounts,
+  CompanyInvoiceData,
 } from "../model/types";
 
 function toUserCounts(users: DBUserItem[]): AdminInfoUserCounts {
@@ -115,5 +125,53 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
     missions,
     account: toAccountSummary(currentAdminUser),
     userCounts: toUserCounts(users),
+    billingRows: buildCompanyBillingHistory(company, { currentMonth: nowYYYYMM() }),
+  };
+}
+
+// 発行元情報（運用者の「設定」）。未設定・テーブル未作成の場合は会社名だけにする。
+async function resolveInvoiceIssuer(region: string): Promise<InvoiceIssuer> {
+  const tableName = resolveSystemSettingTableName();
+  const setting = tableName ? await getInvoiceIssuerSetting({ region, tableName }) : null;
+  if (!setting) {
+    return { companyName: DEFAULT_INVOICE_ISSUER_NAME };
+  }
+  return toInvoiceIssuer(setting);
+}
+
+// 管理者の会社の、指定月の請求書。請求書を出せない月（未確定・請求なし・請求開始前）は null。
+// 会社はセッションのユーザーから決めるため、他社の請求書は出力できない。
+export async function getCompanyInvoiceData(
+  currentAdminUser: DBUserItem,
+  month: string,
+): Promise<CompanyInvoiceData | null> {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    return null;
+  }
+
+  const region = readRequiredServerEnv("AWS_REGION");
+  const [company, issuer] = await Promise.all([
+    getCompanyById({ region, tableName: readRequiredServerEnv("DDB_COMPANY_TABLE_NAME") }, currentAdminUser.companyId),
+    resolveInvoiceIssuer(region),
+  ]);
+
+  if (!company) {
+    return null;
+  }
+
+  const row = buildCompanyBillingHistory(company, { currentMonth: nowYYYYMM() }).find((item) => item.month === month);
+  const invoice = row ? buildCompanyInvoice(company.companyId, row) : null;
+  if (!invoice) {
+    return null;
+  }
+
+  return {
+    invoice,
+    issuer,
+    recipient: {
+      companyName: company.name,
+      address: company.address,
+      contactName: company.contactName,
+    },
   };
 }

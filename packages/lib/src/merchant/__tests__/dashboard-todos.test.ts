@@ -409,6 +409,22 @@ describe("buildMerchantTodos", () => {
     expect(
       build({ exchanges: [{ ...lastMonth, status: "CANCELED" as const }], isAdmin: true }),
     ).toEqual([]);
+    // 先月に申請されても未完了なら売上に計上されないので出さない
+    expect(
+      build({ exchanges: [{ ...lastMonth, status: "IN_PROGRESS" as const }], isAdmin: true }).map((todo) => todo.kind),
+    ).not.toContain("INVOICE_EMAIL");
+  });
+
+  it("請求メールの対象月は申請月ではなく完了月で決まる", () => {
+    const completedLastMonth = exchange({
+      exchangeId: "e1",
+      status: "COMPLETED",
+      exchangedAt: "2026-06-28T00:00:00.000Z",
+      completedAt: "2026-07-02T00:00:00.000Z",
+    });
+    const todos = build({ exchanges: [completedLastMonth], isAdmin: true });
+    expect(kinds(todos)).toEqual(["INVOICE_EMAIL"]);
+    expect(todos[0].title).toBe("7月分の請求メールを送る");
   });
 
   it("明細は上限件数で打ち切るが、件数は全件を数える", () => {

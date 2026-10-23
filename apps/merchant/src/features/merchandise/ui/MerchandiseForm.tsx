@@ -21,8 +21,17 @@ import {
 } from "@mui/material";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
-import type { FulfillmentType, ProductFulfillment, TemperatureZone } from "@correcre/types";
-import { AVAILABLE_TIME_SLOT_VALUES, resolveMerchandiseFulfillment } from "@correcre/types";
+import type { FulfillmentType, ProductFulfillment, ReservationSystem, TemperatureZone } from "@correcre/types";
+import {
+  AVAILABLE_TIME_SLOT_VALUES,
+  RESERVATION_SYSTEM_VALUES,
+  resolveMerchandiseFulfillment,
+} from "@correcre/types";
+import {
+  RESERVATION_SYSTEM_LABELS,
+  looksLikeHotPepperNonTopUrl,
+  resolveReservationSystem,
+} from "@correcre/lib/reservation/guidance";
 import {
   createMerchandise,
   fetchSchedulePreview,
@@ -139,6 +148,7 @@ function buildFulfillmentPayload(state: FulfillmentFormState): ProductFulfillmen
 // 空き枠は本システムと同期できないため、URL とテキストの案内だけを保存する。
 type ReservationFormState = {
   enabled: boolean;
+  reservationSystem: ReservationSystem;
   reservationUrl: string;
   instructions: string;
 };
@@ -146,6 +156,8 @@ type ReservationFormState = {
 function getInitialReservationState(initial: MerchandiseSummary | undefined): ReservationFormState {
   return {
     enabled: Boolean(initial?.reservation),
+    // 新規は利用の多いホットペッパービューティーを初期値にする。既存の未設定商品は従来どおり OTHER
+    reservationSystem: initial?.reservation ? resolveReservationSystem(initial.reservation) : "HOT_PEPPER_BEAUTY",
     reservationUrl: initial?.reservation?.reservationUrl ?? "",
     instructions: initial?.reservation?.instructions ?? "",
   };
@@ -220,6 +232,8 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
   const [form, setForm] = useState<FormState>(() => getInitialFormState(initial));
   const [fulfillment, setFulfillment] = useState<FulfillmentFormState>(() => getInitialFulfillmentState(initial));
   const [reservation, setReservation] = useState<ReservationFormState>(() => getInitialReservationState(initial));
+  const isHotPepperBeauty = reservation.reservationSystem === "HOT_PEPPER_BEAUTY";
+  const hotPepperUrlWarning = isHotPepperBeauty && looksLikeHotPepperNonTopUrl(reservation.reservationUrl);
   const [cardImage, setCardImage] = useState<ImageState>(() => getInitialImageState(initial, "card"));
   const [detailImage, setDetailImage] = useState<ImageState>(() => getInitialImageState(initial, "detail"));
   const [submitting, setSubmitting] = useState(false);
@@ -389,6 +403,7 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
         fulfillment: buildFulfillmentPayload(fulfillment),
         reservation: reservation.enabled
           ? {
+              reservationSystem: reservation.reservationSystem,
               reservationUrl: reservation.reservationUrl.trim() || undefined,
               instructions: reservation.instructions.trim() || undefined,
             }
@@ -875,16 +890,54 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
           {reservation.enabled ? (
             <>
               <TextField
-                label="予約ページURL"
+                select
+                label="予約に使っているサービス"
                 fullWidth
-                type="url"
-                value={reservation.reservationUrl}
+                value={reservation.reservationSystem}
                 onChange={(event) =>
-                  setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
+                  setReservation((prev) => ({
+                    ...prev,
+                    reservationSystem: event.target.value as ReservationSystem,
+                  }))
                 }
-                placeholder="https://beauty.hotpepper.jp/... （メニュー直リンクがおすすめ）"
-                helperText="ホットペッパービューティー等の予約ページのURL。対象メニューに直接飛べるURLだと申請者が迷いません。"
-              />
+              >
+                {RESERVATION_SYSTEM_VALUES.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {RESERVATION_SYSTEM_LABELS[value]}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {isHotPepperBeauty ? (
+                <TextField
+                  label="サロンのトップページURL"
+                  fullWidth
+                  required
+                  type="url"
+                  value={reservation.reservationUrl}
+                  onChange={(event) =>
+                    setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
+                  }
+                  placeholder="https://beauty.hotpepper.jp/slnH000000000/"
+                  error={hotPepperUrlWarning}
+                  helperText={
+                    hotPepperUrlWarning
+                      ? "メニュー・クーポン個別のページのURLのようです。個別のURLは申請者の環境によって予約エラーになるため、サロンのトップページのURLを設定してください。"
+                      : "メニュー・クーポン個別のURLは、申請者の環境によって予約エラーや一覧表示になるため、サロンのトップページのURLを設定してください。申請者にはトップページから対象メニューを選んで予約するよう案内します。"
+                  }
+                />
+              ) : (
+                <TextField
+                  label="予約ページURL"
+                  fullWidth
+                  type="url"
+                  value={reservation.reservationUrl}
+                  onChange={(event) =>
+                    setReservation((prev) => ({ ...prev, reservationUrl: event.target.value }))
+                  }
+                  placeholder="https://..."
+                  helperText="自社サイトや予約サービスの予約ページのURL。電話予約のみの場合は空欄で構いません。"
+                />
+              )}
               <TextField
                 label="予約方法・注意事項"
                 fullWidth
@@ -894,9 +947,24 @@ export default function MerchandiseForm({ mode, merchantName, merchantDisplayNam
                 onChange={(event) =>
                   setReservation((prev) => ({ ...prev, instructions: event.target.value }))
                 }
-                placeholder={"例）お電話（052-XXX-XXXX）でもご予約いただけます。\n予約時に備考欄へ交換番号をご記入ください。"}
-                helperText="電話予約のみの場合はこちらに記載してください。URLと予約方法のどちらか一方は必須です。"
+                placeholder={
+                  isHotPepperBeauty
+                    ? "例）サロンページの「クーポン」から「コレクレ限定 〇〇コース」を選んでご予約ください。"
+                    : "例）お電話（052-XXX-XXXX）でもご予約いただけます。\n予約時に備考欄へ交換番号をご記入ください。"
+                }
+                helperText={
+                  isHotPepperBeauty
+                    ? "トップページから迷わず選べるよう、予約してほしいメニュー・クーポンの名前を記載してください。"
+                    : "電話予約のみの場合はこちらに記載してください。URLと予約方法のどちらか一方は必須です。"
+                }
               />
+              {isHotPepperBeauty ? (
+                <Alert severity="warning">
+                  交換番号を予約と照合できるよう、SALON BOARD の予約時の質問（サロンからの質問）に
+                  「コレクレの交換番号」を入力してもらう質問を必須で追加してください。申請者には、予約画面の
+                  「サロンからの質問」欄へ交換番号を入力するよう案内します。
+                </Alert>
+              ) : null}
               <Alert severity="info">
                 申請者には、承認時のメールと交換履歴の詳細画面で「予約先」と「交換番号」を案内します。
                 予約時に交換番号を伝えてもらう運用のため、ご来店時に交換番号を確認し、

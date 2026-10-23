@@ -298,6 +298,36 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
       {error ? <Alert severity="error">{error}</Alert> : null}
       {notice ? <Alert severity="success">{notice}</Alert> : null}
 
+      {/* 申請者が待たされている状態なので、運用者が最初に気づくべき情報として上に出す。
+          終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
+      {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
+        <Alert severity="warning">
+          <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
+          <div className="mt-1 text-sm">
+            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
+            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
+          </div>
+          <div className="mt-1 text-xs">
+            配送状況を確認し、次のいずれかで解決してください。
+          </div>
+          <ul className="mt-1 list-disc pl-5 text-xs">
+            <li>受け取りが確認できた → 「完了にする」</li>
+            <li>届かないことが確定した → 「強制キャンセルする」（ポイントを返還）</li>
+            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」（ステータスは変えない）</li>
+          </ul>
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="small"
+            className="!mt-3 !rounded-full"
+            onClick={handleClearDeliveryIssue}
+            disabled={clearing || pendingStatus !== null}
+          >
+            未着の連絡を解除する
+          </Button>
+        </Alert>
+      ) : null}
+
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
@@ -381,36 +411,6 @@ export default function ExchangeDetail({ initial, operatorName }: Props) {
           ) : null}
         </dl>
       </section>
-
-      {/* 申請者が待たされている状態なので、運用者が最初に気づくべき情報として上に出す。
-          終端まで進んだ交換では対応済みなので、古い警告を残さない。 */}
-      {detail.deliveryIssue && !isCanceledStatus(detail.status) && detail.status !== "COMPLETED" ? (
-        <Alert severity="warning">
-          <div className="font-bold">申請者から「届いていない」と連絡がありました</div>
-          <div className="mt-1 text-sm">
-            {formatDateTime(detail.deliveryIssue.reportedAt)} に報告
-            {detail.deliveryIssue.note ? `／${detail.deliveryIssue.note}` : ""}
-          </div>
-          <div className="mt-1 text-xs">
-            配送状況を確認し、次のいずれかで解決してください。
-          </div>
-          <ul className="mt-1 list-disc pl-5 text-xs">
-            <li>受け取りが確認できた → 「完了にする」</li>
-            <li>届かないことが確定した → 「強制キャンセルする」（ポイントを返還）</li>
-            <li>誤報・解決済みで、受け取りまでは断定できない → 下の「未着の連絡を解除する」（ステータスは変えない）</li>
-          </ul>
-          <Button
-            variant="outlined"
-            color="inherit"
-            size="small"
-            className="!mt-3 !rounded-full"
-            onClick={handleClearDeliveryIssue}
-            disabled={clearing || pendingStatus !== null}
-          >
-            未着の連絡を解除する
-          </Button>
-        </Alert>
-      ) : null}
 
       {/* 「まだ届かない」という問い合わせに答えるための発送情報。
           送り状番号の登録は提携企業の任意なので、発送済みでも空のことがある。

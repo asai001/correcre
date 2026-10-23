@@ -6,6 +6,11 @@ import { getMerchandise } from "../dynamodb/merchandise";
 import { getUserByCompanyAndUserId } from "../dynamodb/user";
 import { sendSesEmail } from "../email/ses";
 import { readRequiredServerEnv } from "../env/server";
+import {
+  getReservationCodeGuidance,
+  getReservationPageGuidance,
+  resolveReservationSystem,
+} from "../reservation/guidance";
 
 // 交換ステータス遷移に関する通知メール。すべてプレーンテキスト・fire-and-forget で送る
 // （送信失敗が業務トランザクションを巻き戻さないよう、呼び出し側で catch してログに残す）。
@@ -57,8 +62,14 @@ export async function sendEmployeeExchangeApprovedReservationEmail(params: {
     `交換番号：${params.exchange.reservationCode ?? params.exchange.exchangeId}`,
   ];
 
+  const reservationSystem = resolveReservationSystem(params.reservation);
+
   if (params.reservation.reservationUrl) {
     lines.push("", "予約ページ:", params.reservation.reservationUrl);
+    const pageGuidance = getReservationPageGuidance(reservationSystem);
+    if (pageGuidance) {
+      lines.push(pageGuidance);
+    }
   }
 
   if (params.reservation.instructions) {
@@ -67,7 +78,7 @@ export async function sendEmployeeExchangeApprovedReservationEmail(params: {
 
   lines.push(
     "",
-    "ご予約の際は、予約サイトの備考欄への記入、またはお電話・ご来店時に、上記の交換番号を必ずお伝えください。",
+    getReservationCodeGuidance(reservationSystem),
     "（店舗が交換申請とご予約を照合するために使用します）",
   );
 
@@ -143,5 +154,51 @@ export async function notifyEmployeeExchangeApprovedIfReservationRequired(params
       error,
       exchangeId: params.exchange.exchangeId,
     });
+  }
+}
+
+/**
+ * 運用者が提携企業を削除し、対応中だった交換をキャンセルしたことを申請者へ知らせる。
+ * ポイントはキャンセル時に返還済み。削除の事情は書かず、お詫びと返還の事実だけを伝える。
+ * 送信失敗は throw せずログに残す（呼び出し側は送れなかった宛先を画面で案内する）。
+ */
+export async function notifyEmployeeExchangeCanceledByMerchantDeletion(params: {
+  region: string;
+  recipient: string;
+  exchange: ExchangeHistoryItem;
+}): Promise<boolean> {
+  const lines = [
+    `お申し込みいただいていた「${params.exchange.merchandiseNameSnapshot}」の交換は、`,
+    "提供元の事情により、お取り扱いができなくなりました。",
+    "誠に恐れ入りますが、本交換はキャンセルとさせていただきました。",
+    "",
+    `ご利用いただいた ${params.exchange.usedPoint.toLocaleString("ja-JP")} pt は返還済みです。`,
+    "お手数をおかけし申し訳ございませんが、ほかの商品・サービスとの交換にご利用ください。",
+  ];
+
+  const url = getEmployeeExchangeUrl(params.exchange.exchangeId);
+  if (url) {
+    lines.push("", "交換内容の確認はこちら:", url);
+  }
+
+  try {
+    await sendSesEmail(
+      {
+        region: getRegion(params.region),
+        fromEmail: getSesFromEmail(),
+      },
+      {
+        to: params.recipient,
+        subject: "【コレクレ】交換申請のキャンセルとポイント返還のお知らせ",
+        text: `${lines.join("\n")}\n\n本メールはシステムより自動送信されています。`,
+      },
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to send merchant deletion cancellation notification.", {
+      error,
+      exchangeId: params.exchange.exchangeId,
+    });
+    return false;
   }
 }

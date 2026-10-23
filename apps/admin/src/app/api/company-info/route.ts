@@ -39,20 +39,17 @@ export async function PATCH(req: Request) {
     const region = readRequiredServerEnv("AWS_REGION");
     const tableName = readRequiredServerEnv("DDB_COMPANY_TABLE_NAME");
     const companyId = currentAdminUser.companyId;
-    // 未指定のフィールドは updateCompanyInDynamo 側で既存値が維持される。
-    // 保有ポイント（companyPointBalance）は管理者画面では管理しないため送らず、
-    // 従業員へのポイント付与などの残高更新を巻き戻さないようにする。
-    const baseCompanyInput: UpdateCompanyInput = {
-      companyId,
-      name: body.name,
-      status: body.status,
-      plan: body.plan,
-      perEmployeeMonthlyFee: body.perEmployeeMonthlyFee,
-      pointUnitLabel: body.pointUnitLabel,
-      philosophyItems: body.philosophyItems,
-    };
+    // 管理者が変更できる契約系フィールドは理念体系のみ。会社名・ステータス・プラン・月額基本料・
+    // 月額単価・ポイント単位・保有ポイントは請求額や契約に関わるため運用者だけが変更でき、
+    // リクエストに含まれていても受け付けない（API を直接呼んで自社の請求額を書き換えられないようにする）。
+    if (body.philosophyItems !== undefined) {
+      const baseCompanyInput: UpdateCompanyInput = {
+        companyId,
+        philosophyItems: body.philosophyItems,
+      };
 
-    await updateCompanyInDynamo(companyId, baseCompanyInput);
+      await updateCompanyInDynamo(companyId, baseCompanyInput);
+    }
 
     // 詳細情報（連絡先・代表者・billing など）は、リクエストボディにキーが含まれるフィールドのみ更新し、
     // 含まれないフィールドは既存値を維持する。これにより、詳細情報を管理しないタブ（理念体系など）の

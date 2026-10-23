@@ -20,6 +20,7 @@ export type CompanySummary = {
   employeeCount: number;
   activeEmployeeCount: number;
   companyPointBalance: number;
+  monthlyBaseFee: number;
   perEmployeeMonthlyFee: number;
   pointUnitLabel: string;
   showPointExchangeLink: boolean;
@@ -33,6 +34,8 @@ export type CreateCompanyInput = {
   name: string;
   status: CompanyStatus;
   plan: CompanyPlan;
+  // 月額基本料（円）。省略時は 0 円（作成時）/ 既存値を維持（更新時）。
+  monthlyBaseFee?: number;
   perEmployeeMonthlyFee: number;
   companyPointBalance: number;
   pointUnitLabel?: string;

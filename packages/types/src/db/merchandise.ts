@@ -42,12 +42,22 @@ export type MerchandiseHistoryEvent = {
 // 1 レコードが肥大化しないよう、保持する操作履歴の上限件数（超えた分は古いものから捨てる）。
 export const MERCHANDISE_HISTORY_MAX_ENTRIES = 50;
 
+// 予約に使っている外部サービス。サロンごとに使うサービスが違うため商品の予約設定で選んでもらう。
+// ホットペッパービューティーは、メニュー・クーポンの個別 URL を未ログインや別ユーザーで開くと
+// 予約エラーやクーポン一覧の表示になるため、サロンのトップページ URL を案内し、
+// 交換番号はサロンが設定できる質問欄に入力してもらう運用にする。
+export type ReservationSystem = "HOT_PEPPER_BEAUTY" | "OTHER";
+
+export const RESERVATION_SYSTEM_VALUES: readonly ReservationSystem[] = ["HOT_PEPPER_BEAUTY", "OTHER"];
+
 // サロン等、外部予約システム（ホットペッパービューティー等）や電話での予約が必要な商品の案内設定。
 // 外部予約システムには公式 API がなく空き枠を本システムと同期できないため、予約は店舗側の
 // チャネルで完結させ、本システムは承認時の案内と交換番号（exchangeId）による突合だけを担う。
 // このオブジェクトが存在する商品 = 「交換承認後に従業員自身の予約が必要」。
 export type MerchandiseReservation = {
-  // 予約ページ URL（ホットペッパービューティーのメニュー直リンク等）
+  // 予約に使っている外部サービス。未設定（導入前の既存商品）は OTHER として扱う（resolveReservationSystem）。
+  reservationSystem?: ReservationSystem;
+  // 予約ページ URL。ホットペッパービューティーはサロンのトップページ URL
   reservationUrl?: string;
   // 予約方法・注意事項（電話予約のみの店舗、備考欄への交換番号記入依頼など）
   instructions?: string;
@@ -109,6 +119,18 @@ export function resolveMerchandiseFulfillment(
     availableTimeSlots: [],
     candidateCount: DEFAULT_CANDIDATE_COUNT,
   };
+}
+
+// 交換の画面で使う受け渡し方法。予約型サービス（サロン等）は日程調整を使わないことが多く、
+// 受け渡し方法の設定欄が出ないまま fulfillment が既定の SHIPPING で読まれてしまう。
+// 予約型には発送の概念がないので、発送情報の入力欄や「発送済みにする」を出さないよう来店扱いにする。
+export function resolveExchangeFulfillmentType(
+  merchandise: Pick<Merchandise, "fulfillment" | "reservation"> | null | undefined,
+): FulfillmentType {
+  if (merchandise?.reservation) {
+    return "STORE_PICKUP";
+  }
+  return resolveMerchandiseFulfillment(merchandise?.fulfillment).fulfillmentType;
 }
 
 export type Merchandise = {

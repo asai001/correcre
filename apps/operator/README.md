@@ -2,6 +2,43 @@
 
 運用者向けアプリです。
 
+## 本番で必須の環境変数
+
+次の環境変数は Vercel の **Production** と **Preview（stage）** の両方に設定してください。
+本番（`VERCEL_ENV=production`）のビルドでは、1 つでも欠けていると `next.config.ts` のチェックでビルドが失敗します。Vercel はビルドに失敗すると本番を差し替えないため、設定漏れがあっても稼働中の本番は壊れません。Preview では警告をビルドログに出すだけで、ビルドは止めません。
+
+環境変数を読むコードを追加・変更したら、`packages/lib/src/env/required-env.ts` の一覧とこの表を合わせて更新してください。
+
+| 環境変数 | 用途 |
+|---|---|
+| `AWS_REGION` | AWS のリージョン（ap-northeast-1） |
+| `AWS_ROLE_ARN` | Vercel OIDC で引き受ける IAM Role（`correcre-vercel-dynamodb-<stage>`） |
+| `SESSION_SECRET` | ログインセッションの署名鍵（32 文字以上） |
+| `DDB_SESSION_TABLE_NAME` | ログインセッションの保存先 |
+| `OPERATOR_COGNITO_REGION` | ログイン用 Cognito（CDK の出力値） |
+| `OPERATOR_COGNITO_USER_POOL_ID` | ログイン用 Cognito（CDK の出力値） |
+| `OPERATOR_COGNITO_APP_CLIENT_ID` | ログイン用 Cognito（CDK の出力値） |
+| `MERCHANT_COGNITO_REGION` | 提携企業用 User Pool（提携企業ユーザーの招待・管理に使う） |
+| `MERCHANT_COGNITO_USER_POOL_ID` | 提携企業用 User Pool（提携企業ユーザーの招待・管理に使う） |
+| `DDB_COMPANY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_DEPARTMENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_EXCHANGE_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANDISE_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_CALENDAR_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MERCHANT_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_OPERATOR_AUDIT_LOG_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_POINT_TRANSACTION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_SCHEDULE_EVENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_SYSTEM_SETTING_TABLE_NAME` | 「設定」画面（通知先メールアドレス）の保存先 |
+| `DDB_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `S3_MERCHANDISE_IMAGE_BUCKET_NAME` | S3 バケット名（CDK の出力値） |
+| `EMPLOYEE_APP_URL` | 通知メールに入れる従業員画面のURL（本番: `https://app.correcre.jp`）。無いとメールからリンクが消える |
+| `MERCHANT_APP_URL` | 通知メールに入れる提携企業画面のURL（本番: `https://merchant.correcre.jp`）。無いとメールからリンクが消える |
+| `CRON_SECRET` | 日次バッチ（Vercel Cron）の認証。無いとバッチが毎回 503 で止まる |
+
 ## Environment Variables
 
 ```bash
@@ -24,6 +61,17 @@ DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
 ```
 
 「設定」画面で保存した通知先メールアドレス（複数登録可）は、提携企業からの請求メールと、管理者画面でのユーザー追加通知メールの宛先として使用されます。
+
+## 提携企業 一斉メール
+
+`/merchant-broadcast`（ヘッダーの「一斉メール」）から、選択した提携企業へお知らせメールをまとめて送信できます。
+
+- 宛先は、提携企業のログインユーザー（停止・削除済みを除く）と、提携企業に登録された連絡先メールアドレスです。同じアドレスには 1 通だけ送ります
+- 提携企業にチェックするとその企業の宛先全員を選び、宛先の件数を押して開くとユーザーごとに選べます。送信時はサーバー側で宛先を解決し直し、選ばれたアドレスのうちその提携企業の宛先であるものにだけ送ります
+- 他社のアドレスが見えないよう、宛先ごとに 1 通ずつ SES で送信します（1 回あたり最大 300 件）
+- 本文の `{{提携企業名}}` `{{担当者名}}` は宛先ごとに置き換わり、末尾には配信元の案内と `MERCHANT_APP_URL` が自動で付きます
+- 「自分にテスト送信」は、操作中の運用者のメールアドレスにだけ送ります
+- 送信履歴は `DDB_SYSTEM_SETTING_TABLE_NAME` のテーブルに `settingKey = MERCHANT_BROADCAST#<送信日時>#<ID>` で保存します（新しいテーブル・環境変数は不要）
 
 ## First Operator User
 

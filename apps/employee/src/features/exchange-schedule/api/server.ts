@@ -17,6 +17,7 @@ import {
   sendMerchantDeliveryIssueEmail,
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
+import { canDiscloseReservationGuidance, resolveReservationSystem } from "@correcre/lib/reservation/guidance";
 import { isSelectable } from "@correcre/lib/schedule/engine";
 import { buildTrackingUrl, resolveCarrierLabel } from "@correcre/lib/shipment/tracking";
 import {
@@ -288,13 +289,25 @@ export async function getReservationForEmployee(
     return null;
   }
 
-  return {
+  const status = item.status ?? "REQUESTED";
+  const base = {
     exchangeId: item.exchangeId,
-    reservationCode: item.reservationCode,
     merchandiseName: item.merchandiseNameSnapshot,
     merchantName: item.merchantNameSnapshot,
     usedPoint: item.usedPoint,
-    status: item.status ?? "REQUESTED",
+    status,
+    reservationSystem: resolveReservationSystem(reservation),
+  };
+
+  // 承認前は予約先・交換番号をクライアントへ渡さない（画面で隠すだけだと HTML から読めてしまう）。
+  if (!canDiscloseReservationGuidance(status)) {
+    return { ...base, guidanceDisclosed: false };
+  }
+
+  return {
+    ...base,
+    guidanceDisclosed: true,
+    reservationCode: item.reservationCode,
     reservationUrl: reservation.reservationUrl,
     instructions: reservation.instructions,
   };

@@ -5,6 +5,7 @@ import {
   faBuilding,
   faBullseye,
   faChartLine,
+  faEnvelope,
   faHeadset,
   faRightLeft,
   faStore,
@@ -51,6 +52,13 @@ const dashboardCards = [
     description: "商品・サービスを提供する提携企業の登録と、ログインユーザーの招待を行います。",
     icon: faStore,
     accentClassName: "from-violet-500 to-fuchsia-600",
+  },
+  {
+    href: "/merchant-broadcast",
+    title: "提携企業 一斉メール",
+    description: "新機能のお知らせや商品登録のお願いなどを、選択した提携企業へまとめてメール送信します。",
+    icon: faEnvelope,
+    accentClassName: "from-indigo-500 to-blue-600",
   },
   {
     href: "/exchanges",

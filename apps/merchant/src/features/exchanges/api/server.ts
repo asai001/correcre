@@ -24,6 +24,7 @@ import {
   sendScheduleConfirmedEmails,
 } from "@correcre/lib/notification/schedule-events";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { isSalesPendingExchange } from "@correcre/lib/exchange/sales-recognition";
 import { createMerchandiseImageViewUrl } from "@correcre/lib/s3/merchandise-image";
 import { addCalendarDays, formatWeekdayJa, getWeekday, isMerchantWorkingDay } from "@correcre/lib/date/business-days";
 import {
@@ -60,6 +61,7 @@ import type {
   MerchantCalendarItem,
 } from "@correcre/types";
 import {
+  resolveExchangeFulfillmentType,
   resolveMerchandiseFulfillment,
   SCHEDULE_PROPOSAL_ROUND_LIMIT,
   SCHEDULE_RESCHEDULE_REQUEST_LIMIT,
@@ -320,14 +322,16 @@ export async function listExchangesForMerchant(
 ): Promise<ExchangeSummary[]> {
   const config = getRuntimeConfig();
 
-  const items = filter === "ALL"
-    ? await listExchangeHistoryByMerchant(
-        {
-          region: config.region,
-          tableName: config.exchangeHistoryTableName,
-        },
-        merchantId,
-      )
+  const items = filter === "ALL" || filter === "UNFINISHED"
+    ? (
+        await listExchangeHistoryByMerchant(
+          {
+            region: config.region,
+            tableName: config.exchangeHistoryTableName,
+          },
+          merchantId,
+        )
+      ).filter((item) => filter === "ALL" || isSalesPendingExchange(item))
     : await listExchangeHistoryByMerchantAndStatus(
         {
           region: config.region,
@@ -592,7 +596,7 @@ async function buildExchangeDetail(
     actorType,
     schedule,
     reservationRequired: Boolean(merchandise?.reservation),
-    fulfillmentType: resolveMerchandiseFulfillment(merchandise?.fulfillment).fulfillmentType,
+    fulfillmentType: resolveExchangeFulfillmentType(merchandise),
     shipment: item.shipment,
     trackingUrl: buildTrackingUrl(item.shipment),
     carrierLabel: resolveCarrierLabel(item.shipment),

@@ -20,6 +20,7 @@ import { getMerchantCalendar } from "@correcre/lib/dynamodb/merchant-calendar";
 import { formatWeekdayJa } from "@correcre/lib/date/business-days";
 import { generateCandidates } from "@correcre/lib/schedule/engine";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import { isReservationSystem } from "@correcre/lib/reservation/guidance";
 import { joinNameParts } from "@correcre/lib/user-profile";
 import {
   sendOperatorMerchandiseCreatedEmail,
@@ -276,11 +277,21 @@ function normalizeReservation(
   const reservationUrl = input.reservationUrl?.trim() || undefined;
   const instructions = input.instructions?.trim() || undefined;
 
+  if (input.reservationSystem !== undefined && !isReservationSystem(input.reservationSystem)) {
+    throw new Error("予約に使っているサービスの指定が正しくありません");
+  }
+  const reservationSystem = input.reservationSystem;
+
   if (!reservationUrl && !instructions) {
     if (draft) {
       return undefined;
     }
     throw new Error("予約ページURLまたは予約方法のどちらかを入力してください");
+  }
+
+  // ホットペッパービューティーは予約ページから予約してもらう前提のため、URL を必須にする
+  if (reservationSystem === "HOT_PEPPER_BEAUTY" && !reservationUrl && !draft) {
+    throw new Error("ホットペッパービューティーをお使いの場合は、サロンのトップページURLを入力してください");
   }
 
   if (reservationUrl) {
@@ -304,7 +315,7 @@ function normalizeReservation(
     throw new Error(`予約方法は ${RESERVATION_INSTRUCTIONS_MAX_LENGTH} 文字以内で入力してください`);
   }
 
-  return { reservationUrl, instructions };
+  return { reservationSystem, reservationUrl, instructions };
 }
 
 // "YYYY-MM-DD" を「9月4日(金)」形式にする
@@ -456,6 +467,9 @@ function collectMerchandisePublishBlockers(item: Merchandise): string[] {
   if (item.genre === "その他" && !item.genreOther?.trim()) blockers.push("ジャンル（その他）");
   if (item.fulfillment?.requiresScheduling && item.fulfillment.shippableWeekdays.length === 0) {
     blockers.push("発送できる曜日");
+  }
+  if (item.reservation?.reservationSystem === "HOT_PEPPER_BEAUTY" && !item.reservation.reservationUrl) {
+    blockers.push("サロンのトップページURL");
   }
 
   return blockers;

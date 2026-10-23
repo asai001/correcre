@@ -15,6 +15,7 @@ import { resolveMerchandiseFulfillment } from "@correcre/types";
 
 import { addCalendarDays, formatWeekdayJa } from "../date/business-days";
 import { toYYYYMMDD } from "../date/format";
+import { getSalesRecognitionMonth, isSalesRecognizedExchange } from "../exchange/sales-recognition";
 import { isTrackingNumberMissing } from "../shipment/tracking";
 
 export type MerchantTodoSeverity = "URGENT" | "NORMAL" | "INFO";
@@ -439,12 +440,10 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
   if (isAdmin) {
     const previousMonth = previousYearMonth(now);
     const alreadySent = Boolean(input.invoiceEmailSentMonths?.[previousMonth]);
-    const previousMonthExchanges = exchanges.filter((item) => {
-      const status = normalizeStatus(item.status);
-      // 却下・キャンセルは売上に含めない（収支・精算画面の集計と同じ基準）
-      if (status === "REJECTED" || status === "CANCELED") return false;
-      return item.exchangedAt.slice(0, 7) === previousMonth;
-    });
+    // 完了した交換を完了月の売上に数える（収支・精算画面の集計と同じ基準）
+    const previousMonthExchanges = exchanges.filter(
+      (item) => isSalesRecognizedExchange(item) && getSalesRecognitionMonth(item) === previousMonth,
+    );
     // 請求メール API は売上 0 円の月を弾くため、ポイントが動いていない月はやることに出さない。
     const hasSales = previousMonthExchanges.some((item) => (item.usedPoint ?? 0) > 0);
 
@@ -454,7 +453,7 @@ export function buildMerchantTodos(input: BuildMerchantTodosInput): MerchantTodo
         kind: "INVOICE_EMAIL",
         severity: "NORMAL",
         title: `${Number(month)}月分の請求メールを送る`,
-        description: `${year}年${Number(month)}月の交換 ${previousMonthExchanges.length} 件分です。まだ運用者へ請求メールを送っていません。`,
+        description: `${year}年${Number(month)}月に完了した交換 ${previousMonthExchanges.length} 件分です。まだ運用者へ請求メールを送っていません。`,
         count: 1,
         entries: [],
         actionLabel: "収支・精算を開く",

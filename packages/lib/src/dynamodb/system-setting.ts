@@ -2,7 +2,9 @@ import "server-only";
 
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
-import type { NotificationSettingItem } from "@correcre/types";
+import type { InvoiceIssuerSettingItem, NotificationSettingItem } from "@correcre/types";
+
+import type { InvoiceIssuer } from "../company-invoice";
 
 import { getDynamoDocumentClient } from "./client";
 
@@ -12,6 +14,7 @@ export type SystemSettingTableConfig = {
 };
 
 export const NOTIFICATION_SETTING_KEY = "NOTIFICATION";
+export const INVOICE_ISSUER_SETTING_KEY = "INVOICE_ISSUER";
 
 const TABLE_NAME_STAGE_PATTERN = /^correcre-(user|company|merchant|exchange-history)-(.+)$/;
 
@@ -114,4 +117,51 @@ export async function getOperatorNotificationEmails(
   }
 
   return [];
+}
+
+// 導入企業向け請求書の発行元情報。未設定（またはテーブル未作成）の場合は null。
+export async function getInvoiceIssuerSetting(
+  config: SystemSettingTableConfig,
+): Promise<InvoiceIssuerSettingItem | null> {
+  const client = getDynamoDocumentClient(config.region);
+
+  try {
+    const { Item } = await client.send(
+      new GetCommand({
+        TableName: config.tableName,
+        Key: { settingKey: INVOICE_ISSUER_SETTING_KEY },
+      }),
+    );
+    return (Item as InvoiceIssuerSettingItem | undefined) ?? null;
+  } catch (error) {
+    if (isSystemSettingTableMissingError(error)) {
+      console.warn(`System setting table "${config.tableName}" not found. Treating invoice issuer as unconfigured.`);
+      return null;
+    }
+    throw error;
+  }
+}
+
+// 入力は normalizeInvoiceIssuerInput で検証済みのものを渡す。
+export async function putInvoiceIssuerSetting(
+  config: SystemSettingTableConfig,
+  input: { issuer: InvoiceIssuer; updatedBy?: string },
+): Promise<InvoiceIssuerSettingItem> {
+  // 未設定（undefined）の項目は DynamoDB クライアントが保存時に落とす。
+  const item: InvoiceIssuerSettingItem = {
+    ...input.issuer,
+    settingKey: INVOICE_ISSUER_SETTING_KEY,
+    updatedAt: new Date().toISOString(),
+    ...(input.updatedBy ? { updatedBy: input.updatedBy } : {}),
+  };
+
+  const client = getDynamoDocumentClient(config.region);
+  await client.send(
+    new PutCommand({
+      TableName: config.tableName,
+      Item: item,
+    }),
+  );
+
+  return item;
 }

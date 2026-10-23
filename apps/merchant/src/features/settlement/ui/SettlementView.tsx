@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Fragment, useState } from "react";
 
 import AdminPageHeader from "@merchant/components/AdminPageHeader";
@@ -22,6 +23,13 @@ function formatYen(value: number) {
   return `¥${Math.round(value).toLocaleString("ja-JP")}`;
 }
 
+// 完了待ちのステータス別内訳の並び（申請 → 承認 → 作業の順）。
+const PENDING_STATUS_LABELS = [
+  { status: "REQUESTED", label: "申請中" },
+  { status: "PREPARING", label: "準備中" },
+  { status: "IN_PROGRESS", label: "対応中" },
+] as const;
+
 function formatMonthLabel(month: string) {
   const [year, mon] = month.split("-");
   return `${year}年${Number(mon)}月`;
@@ -36,6 +44,7 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
   );
 
   const current = data.current;
+  const pending = data.pending;
   const feePercentLabel = `${data.exchangeFeePercent}%`;
 
   const toggleBreakdown = (month: string) => {
@@ -83,7 +92,7 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">当月の売上（{formatMonthLabel(current.month)}）</div>
           <div className="mt-3 text-3xl font-bold text-sky-600">{formatYen(current.salesYen)}</div>
-          <div className="mt-1 text-xs text-slate-500">交換されたポイントの金額換算（{current.exchangeCount.toLocaleString("ja-JP")}件）</div>
+          <div className="mt-1 text-xs text-slate-500">当月に完了した交換のポイントの金額換算（{current.exchangeCount.toLocaleString("ja-JP")}件）</div>
         </div>
         <div className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
           <div className="text-sm font-semibold text-slate-500">交換手数料（{feePercentLabel}）</div>
@@ -94,6 +103,33 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
           <div className="text-sm font-semibold text-slate-500">当月のご請求額</div>
           <div className="mt-3 text-3xl font-bold text-emerald-600">{formatYen(current.invoiceYen)}</div>
           <div className="mt-1 text-xs text-slate-500">売上 − 交換手数料</div>
+        </div>
+      </section>
+
+      {/* 完了待ちの交換。確定した売上ではないため、上の3枚とは見た目を分け、月には振り分けずに現時点の残高として出す。 */}
+      <section className="rounded-[28px] border-2 border-dashed border-slate-300 bg-slate-50 p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-500">完了待ちの交換（売上には未計上）</div>
+            <div className="mt-2 flex items-baseline gap-3">
+              <span className="text-3xl font-bold text-slate-600">{formatYen(pending.amountYen)}</span>
+              <span className="text-sm font-semibold text-slate-500">{pending.count.toLocaleString("ja-JP")}件</span>
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              {PENDING_STATUS_LABELS.map(({ status, label }) => `${label} ${pending.byStatus[status].count.toLocaleString("ja-JP")}件`).join(" ／ ")}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              交換は「完了」にした月の売上として計上されます。却下・キャンセルになった交換は計上されません。
+            </p>
+          </div>
+          {pending.count > 0 ? (
+            <Link
+              href="/exchanges?status=UNFINISHED"
+              className="inline-flex shrink-0 items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              交換管理で対応する
+            </Link>
+          ) : null}
         </div>
       </section>
 
@@ -113,7 +149,8 @@ export default function SettlementView({ data, merchantUserName, merchantDisplay
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">
         <h2 className="text-lg font-bold text-slate-900">月ごとの収支</h2>
         <p className="mt-1 text-xs text-slate-500">
-          却下・キャンセルを除く交換を集計しています。月をクリックすると商品・サービス別の内訳を表示します。
+          ステータスが「完了」になった交換を、完了した月の売上として集計しています（申請中・準備中・対応中の交換は、完了した時点で計上されます）。
+          月をクリックすると商品・サービス別の内訳を表示します。
           「請求メールを送信」を押すと、該当月の請求内容が運用者にメールで通知されます。
           請求は月単位のため、当月分は月が締まった翌月以降に送信できます。
         </p>

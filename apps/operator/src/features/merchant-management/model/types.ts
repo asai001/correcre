@@ -1,4 +1,5 @@
 import type {
+  ExchangeHistoryStatus,
   Merchandise,
   Merchant,
   MerchantStatus,
@@ -164,3 +165,42 @@ export type MerchantApplicationDetail = {
 };
 
 export type MerchantUser = MerchantUserItem;
+
+// 提携企業の削除で影響を受ける交換と、その申請者の連絡先。削除後も申請者へ連絡できるよう画面に残す。
+export type MerchantDeletionExchange = {
+  exchangeId: string;
+  status: ExchangeHistoryStatus;
+  merchandiseName: string;
+  usedPoint: number;
+  exchangedAt: string;
+  applicantName: string;
+  applicantEmail?: string;
+  companyName?: string;
+};
+
+// 削除前の確認内容。
+export type MerchantDeletionPreview = {
+  merchantId: string;
+  merchantName: string;
+  status: MerchantStatus;
+  openExchanges: MerchantDeletionExchange[];
+  merchandiseCount: number;
+  publishedMerchandiseCount: number;
+  userCount: number;
+};
+
+export type DeleteMerchantInput = {
+  merchantId: string;
+  // 誤操作防止のため、提携企業名をそのまま入力してもらう
+  confirmName: string;
+  // 対応中の交換が残っていてもキャンセルして削除する
+  force: boolean;
+  // キャンセルした交換の申請者にお知らせメールを送る
+  notifyApplicants: boolean;
+};
+
+export type DeleteMerchantResult = {
+  merchantId: string;
+  merchantName: string;
+  cancelledExchanges: (MerchantDeletionExchange & { notified: boolean })[];
+};

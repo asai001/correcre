@@ -8,19 +8,18 @@ import {
 import { listExchangeHistoryByMerchant } from "@correcre/lib/dynamodb/exchange-history";
 import { getMerchantById } from "@correcre/lib/dynamodb/merchant";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
+import {
+  getSalesRecognitionMonth,
+  isSalesRecognizedExchange,
+  summarizeSalesPendingExchanges,
+} from "@correcre/lib/exchange/sales-recognition";
 import { POINT_YEN_VALUE } from "@correcre/lib/points";
-import type { ExchangeHistoryStatus, Merchant } from "@correcre/types";
+import type { ExchangeHistoryItem, Merchant } from "@correcre/types";
 
 import type { SettlementData, SettlementItemRow, SettlementMonthRow } from "../model/types";
 
 // 表示する月数（直近 N か月）。運用者側の収支ダッシュボードと揃える。
 const MONTH_WINDOW = 12;
-
-// 却下・キャンセル以外を売上対象の交換とみなす（運用者側の支出集計と同じ基準）。
-function isSalesExchange(status?: ExchangeHistoryStatus): boolean {
-  const normalized = status === "CANCELLED" ? "CANCELED" : status;
-  return normalized !== "REJECTED" && normalized !== "CANCELED";
-}
 
 function buildRecentMonths(count: number): string[] {
   const now = new Date();
@@ -30,10 +29,6 @@ function buildRecentMonths(count: number): string[] {
     months.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
   }
   return months;
-}
-
-function toYearMonth(value: string): string {
-  return value.slice(0, 7);
 }
 
 type MonthAggregate = {
@@ -69,18 +64,20 @@ async function getMerchantForSettlement(merchantId: string): Promise<Merchant | 
   return getMerchantById({ region, tableName }, merchantId);
 }
 
-async function aggregateSalesByMonth(merchantId: string): Promise<Map<string, MonthAggregate>> {
+async function listMerchantExchanges(merchantId: string): Promise<ExchangeHistoryItem[]> {
   const region = readRequiredServerEnv("AWS_REGION");
   const tableName = readRequiredServerEnv("DDB_EXCHANGE_HISTORY_TABLE_NAME");
+  return listExchangeHistoryByMerchant({ region, tableName }, merchantId);
+}
 
-  const exchanges = await listExchangeHistoryByMerchant({ region, tableName }, merchantId);
-
+function aggregateSalesByMonth(exchanges: ExchangeHistoryItem[]): Map<string, MonthAggregate> {
   const byMonth = new Map<string, MonthAggregate>();
+  // 売上は交換が完了した月に計上する（運用者側の支出集計と同じ基準）。
   for (const exchange of exchanges) {
-    if (!isSalesExchange(exchange.status)) {
+    if (!isSalesRecognizedExchange(exchange)) {
       continue;
     }
-    const month = toYearMonth(exchange.exchangedAt);
+    const month = getSalesRecognitionMonth(exchange);
     const entry = byMonth.get(month) ?? { salesYen: 0, count: 0, itemsByMerchandise: new Map() };
     const amountYen = (exchange.usedPoint ?? 0) * POINT_YEN_VALUE;
     entry.salesYen += amountYen;
@@ -103,10 +100,11 @@ async function aggregateSalesByMonth(merchantId: string): Promise<Map<string, Mo
 }
 
 export async function getMerchantSettlementData(merchantId: string): Promise<SettlementData> {
-  const [byMonth, merchant] = await Promise.all([
-    aggregateSalesByMonth(merchantId),
+  const [exchanges, merchant] = await Promise.all([
+    listMerchantExchanges(merchantId),
     getMerchantForSettlement(merchantId),
   ]);
+  const byMonth = aggregateSalesByMonth(exchanges);
   const exchangeFeePercent = resolveExchangeFeePercent(merchant?.exchangeFeePercent);
 
   const months: SettlementMonthRow[] = buildRecentMonths(MONTH_WINDOW).map((month) =>
@@ -117,6 +115,8 @@ export async function getMerchantSettlementData(merchantId: string): Promise<Set
     months,
     current: months[0],
     exchangeFeePercent,
+    // 完了待ちの交換は月の売上に混ぜず、現時点の残高として別に見せる（未反映をエラーと誤認させないため）。
+    pending: summarizeSalesPendingExchanges(exchanges),
   };
 }
 
@@ -125,10 +125,11 @@ export async function getSettlementForMonth(
   merchantId: string,
   month: string,
 ): Promise<{ settlement: SettlementMonthRow; exchangeFeePercent: number }> {
-  const [byMonth, merchant] = await Promise.all([
-    aggregateSalesByMonth(merchantId),
+  const [exchanges, merchant] = await Promise.all([
+    listMerchantExchanges(merchantId),
     getMerchantForSettlement(merchantId),
   ]);
+  const byMonth = aggregateSalesByMonth(exchanges);
   const exchangeFeePercent = resolveExchangeFeePercent(merchant?.exchangeFeePercent);
   return {
     settlement: buildRow(month, exchangeFeePercent, byMonth.get(month), merchant?.invoiceEmailSentMonths?.[month]),
