@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { buildAwsCredentialErrorMessage, isAwsCredentialError } from "@correcre/lib/aws/credentials";
@@ -8,7 +9,7 @@ import { listUsersByCognitoSub } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 import type { DBUserItem } from "@correcre/types";
 
-import { ADMIN_LOGIN_PATH } from "./constants";
+import { buildClearAdminSessionRedirect } from "./redirect";
 import { getAdminSession } from "./session";
 import type { AdminSession } from "./verify-token";
 
@@ -71,14 +72,17 @@ export async function getAdminUserForSession(session: AdminSession): Promise<DBU
 export async function requireCurrentAdminUser() {
   const session = await getAdminSession();
 
+  // セッションが使えない（Cookie はあるがセッションが失効・破棄済み、ユーザーが削除された、所属企業が無効化された など）
+  // ときは、Cookie を消してからログイン画面へ戻す。Server Component では Cookie を消せないため Route Handler に任せる。
+  // Cookie を残したままログイン画面へ戻すと、middleware が Cookie を見てページへ戻し、行き来が止まらなくなる。
   if (!session) {
-    redirect(ADMIN_LOGIN_PATH);
+    redirect(buildClearAdminSessionRedirect() as Route);
   }
 
   const user = await getAdminUserForSession(session);
 
   if (!user) {
-    throw new Error("Admin user was not found in the DynamoDB User table.");
+    redirect(buildClearAdminSessionRedirect() as Route);
   }
 
   return user;

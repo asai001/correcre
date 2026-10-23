@@ -5,6 +5,8 @@ export const ADMIN_LOGIN_PATH = "/login";
 export const ADMIN_NEW_PASSWORD_PATH = "/login/new-password";
 export const ADMIN_FORGOT_PASSWORD_PATH = "/login/forgot-password";
 export const ADMIN_DEFAULT_REDIRECT_PATH = "/dashboard";
+// Cookie の削除は Route Handler でしかできないため、Server Component からはここへリダイレクトして消す。
+export const ADMIN_CLEAR_SESSION_PATH = "/api/auth/clear-session";
 
 export const ADMIN_PROTECTED_PATH_PREFIXES = [
   "/dashboard",

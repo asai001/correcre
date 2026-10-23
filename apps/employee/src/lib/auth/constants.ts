@@ -5,6 +5,8 @@ export const EMPLOYEE_LOGIN_PATH = "/login";
 export const EMPLOYEE_NEW_PASSWORD_PATH = "/login/new-password";
 export const EMPLOYEE_FORGOT_PASSWORD_PATH = "/login/forgot-password";
 export const EMPLOYEE_DEFAULT_REDIRECT_PATH = "/dashboard";
+// Cookie の削除は Route Handler でしかできないため、Server Component からはここへリダイレクトして消す。
+export const EMPLOYEE_CLEAR_SESSION_PATH = "/api/auth/clear-session";
 
 export const EMPLOYEE_PROTECTED_PATH_PREFIXES = [
   "/dashboard",
