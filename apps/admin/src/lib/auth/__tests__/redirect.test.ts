@@ -1,5 +1,5 @@
-import { ADMIN_DEFAULT_REDIRECT_PATH } from "../constants";
-import { pickFirstQueryValue, sanitizeRedirectTo } from "../redirect";
+import { ADMIN_CLEAR_SESSION_PATH, ADMIN_DEFAULT_REDIRECT_PATH } from "../constants";
+import { buildClearAdminSessionRedirect, pickFirstQueryValue, sanitizeRedirectTo } from "../redirect";
 
 // ログイン後の戻り先（?from=）はユーザーが自由に書ける値。外部サイトへ飛ばせると
 // 本物のログイン画面を踏ませてから偽サイトへ誘導するフィッシングに使われる。
@@ -36,5 +36,25 @@ describe("pickFirstQueryValue", () => {
     expect(pickFirstQueryValue(["/a", "/b"])).toBe("/a");
     expect(pickFirstQueryValue("/a")).toBe("/a");
     expect(pickFirstQueryValue(undefined)).toBeUndefined();
+  });
+});
+
+// 使えなくなったセッション（ユーザーが削除済みなど）は Server Component では Cookie を消せないため、
+// セッション破棄の Route Handler へリダイレクトして消してからログイン画面へ戻す。
+describe("buildClearAdminSessionRedirect", () => {
+  test("戻り先が既定なら from を付けずにセッション破棄 API へ", () => {
+    expect(buildClearAdminSessionRedirect()).toBe(ADMIN_CLEAR_SESSION_PATH);
+    expect(buildClearAdminSessionRedirect(ADMIN_DEFAULT_REDIRECT_PATH)).toBe(ADMIN_CLEAR_SESSION_PATH);
+  });
+
+  test("アプリ内の戻り先は from に URL エンコードして引き継ぐ", () => {
+    expect(buildClearAdminSessionRedirect("/employee-management?tab=active")).toBe(
+      `${ADMIN_CLEAR_SESSION_PATH}?from=%2Femployee-management%3Ftab%3Dactive`,
+    );
+  });
+
+  test("外部 URL は from に乗らない", () => {
+    expect(buildClearAdminSessionRedirect("https://evil.example.com")).toBe(ADMIN_CLEAR_SESSION_PATH);
+    expect(buildClearAdminSessionRedirect("//evil.example.com")).toBe(ADMIN_CLEAR_SESSION_PATH);
   });
 });
