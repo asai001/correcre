@@ -2,14 +2,26 @@ import { NextResponse } from "next/server";
 
 import { getMissionFromDynamo } from "@employee/features/mission-report/api/server";
 import type { FormConfig, Mission } from "@employee/features/mission-report/model/types";
+import { authorizeEmployeeApiRequest, rejectForeignScopeQuery } from "@employee/lib/auth/api-authorize";
 
 export async function GET(req: Request) {
+  const { unauthorized, currentUser } = await authorizeEmployeeApiRequest();
+  if (unauthorized || !currentUser) {
+    return unauthorized;
+  }
+
   const { searchParams } = new URL(req.url);
-  const companyId = searchParams.get("companyId");
+  const forbidden = rejectForeignScopeQuery(searchParams, currentUser, { checkUserId: false });
+  if (forbidden) {
+    return forbidden;
+  }
+
+  // 対象企業はセッションの従業員の所属企業で確定する。
+  const { companyId } = currentUser;
   const missionId = searchParams.get("missionId");
 
-  if (!companyId || !missionId) {
-    return NextResponse.json({ error: "companyId and missionId are required" }, { status: 400 });
+  if (!missionId) {
+    return NextResponse.json({ error: "missionId is required" }, { status: 400 });
   }
 
   try {
