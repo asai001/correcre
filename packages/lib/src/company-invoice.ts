@@ -86,7 +86,7 @@ export function buildCompanyInvoice(companyId: string, row: CompanyBillingRow): 
   if (row.employeeFeeYen > 0) {
     lines.push({
       label: "ID料金",
-      quantity: row.activeEmployees,
+      quantity: row.billableEmployees,
       unit: "人",
       unitPriceYen: row.perEmployeeMonthlyFee,
       amountYen: row.employeeFeeYen,

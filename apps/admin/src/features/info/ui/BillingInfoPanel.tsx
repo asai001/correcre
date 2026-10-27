@@ -55,7 +55,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt>
-                    ID料金 × 利用人数（{formatYen(current.perEmployeeMonthlyFee)} × {current.activeEmployees} 人）
+                    ID料金 × 利用人数（{formatYen(current.perEmployeeMonthlyFee)} × {current.billableEmployees} 人）
                   </dt>
                   <dd className="font-semibold text-slate-800">{formatYen(current.employeeFeeYen)}</dd>
                 </div>
@@ -80,7 +80,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm leading-6 text-slate-600">
         <p>ご利用料金 ＝ 月額基本料 ＋ ID料金（1 人あたりの月額料金） × 利用人数です。</p>
         <p>
-          利用人数は「有効」のユーザー数です。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
+          利用人数は「有効」と「招待中」のユーザー数です。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
           日払いでのご請求となります。
         </p>
         <p>請求書は、金額が確定した月（前月以前）から表示・ダウンロードできます。</p>
@@ -109,7 +109,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                     {formatMonthLabel(row.month)}
                     {row.source === "estimated" ? <span className="ml-1 text-xs text-slate-400">※</span> : null}
                   </TableCell>
-                  <TableCell className="text-right">{row.activeEmployees} 人</TableCell>
+                  <TableCell className="text-right">{row.billableEmployees} 人</TableCell>
                   <TableCell className="text-right">{formatYen(row.monthlyBaseFee)}</TableCell>
                   <TableCell className="text-right">{formatYen(row.perEmployeeMonthlyFee)}</TableCell>
                   <TableCell className="text-right font-bold text-slate-900">{formatYen(row.amountYen)}</TableCell>

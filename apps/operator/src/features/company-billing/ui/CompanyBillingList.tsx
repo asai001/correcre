@@ -119,7 +119,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
           </select>
         </label>
         <p className="text-xs text-slate-500">
-          請求金額 ＝ 月額基本料 ＋ 利用人数（有効ユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
+          請求金額 ＝ 月額基本料 ＋ 利用人数（有効・招待中のユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
         </p>
       </section>
 
@@ -200,7 +200,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                         </td>
                         <td className="py-2 pr-4 text-slate-700">{company.plan}</td>
                         <td className="py-2 pr-4 text-right text-slate-700">
-                          {row.activeEmployees.toLocaleString("ja-JP")}名
+                          {row.billableEmployees.toLocaleString("ja-JP")}名
                         </td>
                         <td className="py-2 pr-4 text-right text-slate-700">{formatYen(row.monthlyBaseFee)}</td>
                         <td className="py-2 pr-4 text-right text-slate-700">{formatYen(row.perEmployeeMonthlyFee)}</td>
@@ -244,7 +244,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                                       <SourceNote row={historyRow} />
                                     </td>
                                     <td className="py-1.5 pr-4 text-right text-slate-700">
-                                      {historyRow.activeEmployees.toLocaleString("ja-JP")}名
+                                      {historyRow.billableEmployees.toLocaleString("ja-JP")}名
                                     </td>
                                     <td className="py-1.5 pr-4 text-right text-slate-700">
                                       {formatYen(historyRow.monthlyBaseFee)}

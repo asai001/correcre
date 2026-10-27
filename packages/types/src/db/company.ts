@@ -7,10 +7,13 @@ export type CompanyMonthlyBillingSnapshot = {
   month: string; // YYYY-MM
   status: CompanyItemStatus;
   activeEmployees: number;
+  // 請求対象の人数（有効 + 招待中）。この項目が追加される前のスナップショットには存在しない
+  // （その頃は activeEmployees ＝ 有効ユーザー数で請求していた）。
+  billableEmployees?: number;
   // 月額基本料（円）。この項目が追加される前のスナップショットには存在しない（＝基本料なし）。
   monthlyBaseFee?: number;
   perEmployeeMonthlyFee: number;
-  // 月額利用料（円）＝ 月額基本料 + 利用人数 × 月額単価。無効の月は 0。
+  // 月額利用料（円）＝ 月額基本料 + 請求対象の人数 × 月額単価。無効の月は 0。
   monthlyIncomeYen: number;
   capturedAt: string;
 };
@@ -75,6 +78,8 @@ export type Company = {
   // Employee counts.
   totalEmployees?: number;
   activeEmployees: number;
+  // 月額請求の対象人数（有効 + 招待中）。未設定の古いレコードは activeEmployees で代用する。
+  billableEmployees?: number;
   monthlyBillingSnapshots?: Record<string, CompanyMonthlyBillingSnapshot>;
 
   // Settings and presentation.

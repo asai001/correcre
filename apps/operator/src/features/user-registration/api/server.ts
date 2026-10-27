@@ -8,6 +8,7 @@ import {
   resendCognitoUserInvitation,
   updateCognitoUserEmail,
 } from "@correcre/lib/cognito/user";
+import { countCompanyEmployees } from "@correcre/lib/company-billing";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import {
   buildCompanyMonthlyBillingSnapshot,
@@ -462,13 +463,13 @@ async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, u
       companyId,
     ),
   ]);
-  const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const activeUsers = currentUsers.filter((user) => user.status === "ACTIVE");
+  const employeeCounts = countCompanyEmployees(users);
   const billingSnapshot = company
     ? buildCompanyMonthlyBillingSnapshot({
         month: toBillingSnapshotMonth(updatedAt),
         status: company.status,
-        activeEmployees: activeUsers.length,
+        activeEmployees: employeeCounts.activeEmployees,
+        billableEmployees: employeeCounts.billableEmployees,
         monthlyBaseFee: company.monthlyBaseFee ?? 0,
         perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
         capturedAt: updatedAt,
@@ -483,11 +484,12 @@ async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, u
         companyId,
       },
       UpdateExpression: billingSnapshot
-        ? "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt"
-        : "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, updatedAt = :updatedAt",
+        ? "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, billableEmployees = :billableEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt"
+        : "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, billableEmployees = :billableEmployees, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
-        ":totalEmployees": currentUsers.length,
-        ":activeEmployees": activeUsers.length,
+        ":totalEmployees": employeeCounts.totalEmployees,
+        ":activeEmployees": employeeCounts.activeEmployees,
+        ":billableEmployees": employeeCounts.billableEmployees,
         ...(billingSnapshot && company
           ? {
               ":monthlyBillingSnapshots": upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),

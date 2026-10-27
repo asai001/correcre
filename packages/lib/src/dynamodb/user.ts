@@ -4,6 +4,7 @@ import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand } from
 
 import type { DBUserItem, DBUserStatus } from "@correcre/types";
 
+import { countCompanyEmployees } from "../company-billing";
 import { getDynamoDocumentClient } from "./client";
 import {
   buildCompanyMonthlyBillingSnapshot,
@@ -185,7 +186,7 @@ export async function putUser(config: UserTableConfig, user: DBUserItem): Promis
 
 // 初回ログイン等で INVITED→ACTIVE に昇格した会社の在籍者数・当月課金スナップショットを再集計する。
 // 昇格は 1 ユーザーにつき一度きりのため、ログインのホットパスに毎回スキャンを課すことはない。
-// 課金額に影響するが致命的ではないため、失敗してもログイン自体は継続させる（best-effort）。
+// 招待中も請求対象のため課金額は変わらず、有効人数の表示が揃うだけなので、失敗してもログイン自体は継続させる（best-effort）。
 async function resyncCompanyEmployeeCounts(
   config: UserTableConfig,
   companyTableName: string,
@@ -201,12 +202,12 @@ async function resyncCompanyEmployeeCounts(
     return;
   }
 
-  const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const activeUsers = currentUsers.filter((user) => user.status === "ACTIVE");
+  const employeeCounts = countCompanyEmployees(users);
   const billingSnapshot = buildCompanyMonthlyBillingSnapshot({
     month: toBillingSnapshotMonth(updatedAt),
     status: company.status,
-    activeEmployees: activeUsers.length,
+    activeEmployees: employeeCounts.activeEmployees,
+    billableEmployees: employeeCounts.billableEmployees,
     monthlyBaseFee: company.monthlyBaseFee ?? 0,
     perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
     capturedAt: updatedAt,
@@ -220,10 +221,11 @@ async function resyncCompanyEmployeeCounts(
         companyId,
       },
       UpdateExpression:
-        "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt",
+        "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, billableEmployees = :billableEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
-        ":totalEmployees": currentUsers.length,
-        ":activeEmployees": activeUsers.length,
+        ":totalEmployees": employeeCounts.totalEmployees,
+        ":activeEmployees": employeeCounts.activeEmployees,
+        ":billableEmployees": employeeCounts.billableEmployees,
         ":monthlyBillingSnapshots": upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
         ":updatedAt": updatedAt,
       },
