@@ -8,7 +8,6 @@ import {
 } from "@correcre/lib/company-invoice";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { listDepartmentsByCompany } from "@correcre/lib/dynamodb/department";
-import { listMissionsByCompany } from "@correcre/lib/dynamodb/mission";
 import { getInvoiceIssuerSetting, resolveSystemSettingTableName } from "@correcre/lib/dynamodb/system-setting";
 import { listUsersByCompany } from "@correcre/lib/dynamodb/user";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -83,7 +82,8 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
   const region = readRequiredServerEnv("AWS_REGION");
   const companyId = currentAdminUser.companyId;
 
-  const [company, departments, users, missions] = await Promise.all([
+  // ミッション項目は「ミッション項目」タブが開いたときに /api/missions から読み込む（予約の反映もそこで行う）。
+  const [company, departments, users] = await Promise.all([
     getCompanyById(
       {
         region,
@@ -105,13 +105,6 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
       },
       companyId,
     ),
-    listMissionsByCompany(
-      {
-        region,
-        tableName: readRequiredServerEnv("DDB_MISSION_TABLE_NAME"),
-      },
-      companyId,
-    ),
   ]);
 
   if (!company) {
@@ -122,7 +115,6 @@ export async function getAdminInfoData(currentAdminUser: DBUserItem): Promise<Ad
     company,
     editableCompany: toCompanySummary(company),
     departments: toDepartmentItems(companyId, departments, users),
-    missions,
     account: toAccountSummary(currentAdminUser),
     userCounts: toUserCounts(users),
     billingRows: buildCompanyBillingHistory(company, { currentMonth: nowYYYYMM() }),

@@ -24,12 +24,21 @@ import {
   type CompanyFormState,
 } from "@correcre/lib/company-management-form";
 import { toYYYYMMDDHHmm } from "@correcre/lib";
+import {
+  MISSION_SLOT_COUNT,
+  MISSION_TOTAL_POINTS_CAP,
+  MissionBoard,
+  createMissionApiClient,
+} from "@correcre/mission-management";
 import AdminPageHeader from "@admin/components/AdminPageHeader";
 import { createDepartment } from "@admin/features/employee-management/api/client";
 
 import { updateAdminCompanyInfo } from "../api/client";
 import type { AdminInfoData } from "../model/types";
 import BillingInfoPanel from "./BillingInfoPanel";
+
+// 管理者のミッション API は企業を指定しない。対象企業はサーバー側でセッションの管理者が所属する企業に固定される。
+const missionApi = createMissionApiClient();
 
 type AdminInfoProps = {
   initialData: AdminInfoData;
@@ -566,45 +575,16 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
 
         <TabsContent value="missions">
           <InfoCard
-            title="ミッション項目一覧"
-            description="現在有効なミッション項目を一覧で確認できます。"
+            title="ミッション項目"
+            description="自社のミッション項目を設定・編集できます。変更は即時反映するか、翌月の月初から反映するよう予約できます。"
           >
-            {/* TODO: ミッション編集 API が整い次第、この画面に編集導線を追加する */}
-            {initialData.missions.length ? (
-              <div className="rounded-2xl border border-slate-200">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>項目名</TableHead>
-                      <TableHead className="text-center">カテゴリ</TableHead>
-                      <TableHead className="text-center">点数</TableHead>
-                      <TableHead className="text-center">回数</TableHead>
-                      <TableHead className="text-center">入力項目数</TableHead>
-                      <TableHead className="text-center">状態</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {initialData.missions.map((mission) => (
-                      <TableRow key={`${mission.missionId}-${mission.version}`}>
-                        <TableCell>
-                          <div className="font-medium text-slate-900">{mission.title}</div>
-                          <div className="mt-1 text-xs text-slate-500">{mission.description}</div>
-                        </TableCell>
-                        <TableCell className="text-center">{mission.category}</TableCell>
-                        <TableCell className="text-center">{mission.score} 点</TableCell>
-                        <TableCell className="text-center">{mission.monthlyCount} 回</TableCell>
-                        <TableCell className="text-center">{mission.fields.length} 項目</TableCell>
-                        <TableCell className="text-center">{mission.enabled ? "有効" : "無効"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
-                ミッション定義はまだ登録されていません。
-              </div>
-            )}
+            <div className="space-y-4">
+              <Alert severity="info">
+                ミッション項目は最大 {MISSION_SLOT_COUNT} つまで設定できます。有効なミッションの「月間実施回数 × 点数」の合計は{" "}
+                {MISSION_TOTAL_POINTS_CAP} 点以内にしてください。
+              </Alert>
+              <MissionBoard api={missionApi} companyThresholds={initialData.company.analysisThresholds ?? null} />
+            </div>
           </InfoCard>
         </TabsContent>
 

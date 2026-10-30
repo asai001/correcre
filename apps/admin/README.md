@@ -21,6 +21,7 @@
 | `DDB_COMPANY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
 | `DDB_DEPARTMENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
 | `DDB_EXCHANGE_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_MISSION_HISTORY_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`）。各種情報画面のミッション項目の編集履歴 |
 | `DDB_MISSION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
 | `DDB_MISSION_REPORT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
 | `DDB_POINT_TRANSACTION_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
@@ -45,6 +46,7 @@ DDB_USER_TABLE_NAME=correcre-user-dev
 DDB_COMPANY_TABLE_NAME=correcre-company-dev
 DDB_DEPARTMENT_TABLE_NAME=correcre-department-dev
 DDB_MISSION_TABLE_NAME=correcre-mission-dev
+DDB_MISSION_HISTORY_TABLE_NAME=correcre-mission-history-dev
 DDB_MISSION_REPORT_TABLE_NAME=correcre-mission-report-dev
 DDB_USER_MONTHLY_STATS_TABLE_NAME=correcre-user-monthly-stats-dev
 DDB_EXCHANGE_HISTORY_TABLE_NAME=correcre-exchange-history-dev
