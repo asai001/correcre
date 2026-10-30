@@ -64,6 +64,7 @@ type EmployeeFormFields = {
   street?: string;
   building?: string;
   roles: EmployeeAssignableRole[];
+  // 利用開始日（YYYY-MM-DD）。
   joinedAt: string;
 };
 

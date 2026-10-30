@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DeleteCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { nowYYYYMMDD, reflectPoints } from "@correcre/lib";
+import { reflectPoints } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -413,7 +413,7 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
-    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
+    throw new Error("利用開始日は YYYY-MM-DD 形式で入力してください");
   }
 
   if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
@@ -605,8 +605,8 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const registeredAt = nowYYYYMMDD();
-  const normalizedInput = normalizeEmployeeInput({ ...input, joinedAt: registeredAt });
+  // 利用開始日は登録者が指定する（月の途中で登録しても翌月 1 日から使い始められるように）。
+  const normalizedInput = normalizeEmployeeInput(input);
   await assertUniqueEmail(config, normalizedInput.email);
 
   const now = new Date().toISOString();
@@ -1024,10 +1024,14 @@ export async function updateEmployeeInDynamo(
     throw error;
   }
 
-  // ステータスか従業員ロールの有無が変わった場合は、会社の在籍者数・当月課金スナップショットを再集計する。
+  // ステータス・従業員ロールの有無・利用開始日が変わった場合は、会社の在籍者数・当月課金スナップショットを再集計する。
   // （従来は作成/削除時のみ同期しており、有効/無効の切り替えで activeEmployees と請求額が
-  //  次の作成・削除まで古いままになっていた。請求対象は従業員ロールの有無でも変わる。）
-  if (targetUser.status !== nextStatus || hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles)) {
+  //  次の作成・削除まで古いままになっていた。請求対象は従業員ロールの有無と利用開始日でも変わる。）
+  if (
+    targetUser.status !== nextStatus ||
+    hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles) ||
+    targetUser.joinedAt !== normalizedInput.joinedAt
+  ) {
     await syncCompanyUserCounts(config, companyId, now);
   }
 

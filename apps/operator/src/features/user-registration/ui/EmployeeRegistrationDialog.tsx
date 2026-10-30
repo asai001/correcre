@@ -23,6 +23,7 @@ import {
 import { DepartmentAutocompleteField } from "@correcre/ui";
 
 import type { CreateEmployeeInput, EmployeeAssignableRole, EmployeeDepartmentOption } from "../model/types";
+import { getDefaultUsageStartDate } from "@correcre/lib/company-billing";
 
 type EmployeeRegistrationDialogProps = {
   open: boolean;
@@ -57,10 +58,6 @@ const roleOptions: Array<{ value: EmployeeAssignableRole; label: string }> = [
   { value: "OPERATOR", label: "運用者" },
 ];
 
-function getToday() {
-  return new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-}
-
 function createInitialFormState(): FormState {
   return {
     lastName: "",
@@ -77,7 +74,7 @@ function createInitialFormState(): FormState {
     street: "",
     building: "",
     roles: ["EMPLOYEE"],
-    joinedAt: getToday(),
+    joinedAt: getDefaultUsageStartDate(),
   };
 }
 
@@ -421,13 +418,19 @@ export default function EmployeeRegistrationDialog({
             </FormControl>
 
             <TextField
-              label="入社日"
+              label="利用開始日"
               type="date"
               value={form.joinedAt}
+              onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
               fullWidth
-              disabled
+              required
               slotProps={{ inputLabel: { shrink: true } }}
-              helperText="登録日が自動設定されます"
+              error={hasSubmitted && validation.joinedAt}
+              helperText={
+                hasSubmitted && validation.joinedAt
+                  ? "利用開始日を入力してください"
+                  : "原則として翌月 1 日。この日からポイント・請求の対象になります"
+              }
             />
           </div>
         </Stack>

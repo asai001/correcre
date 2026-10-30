@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { nowYYYYMMDD, reflectPoints } from "@correcre/lib";
+import { reflectPoints } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -339,7 +339,7 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
-    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
+    throw new Error("利用開始日は YYYY-MM-DD 形式で入力してください");
   }
 
   if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
@@ -410,7 +410,7 @@ function buildOperatorUserCreatedEmailBody(params: {
 メールアドレス：${params.email}
 所属部署：${params.departmentName}
 権限：${roleLabels}
-入社日：${params.joinedAt.replace(/-/g, "/")}
+利用開始日：${params.joinedAt.replace(/-/g, "/")}
 
 ■ 登録操作
 操作者：${params.actorName}
@@ -673,8 +673,8 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const registeredAt = nowYYYYMMDD();
-  const normalizedInput = normalizeEmployeeInput({ ...input, joinedAt: registeredAt }, departments);
+  // 利用開始日は管理者が指定する（月の途中で登録しても翌月 1 日から使い始められるように）。
+  const normalizedInput = normalizeEmployeeInput(input, departments);
 
   if (normalizedInput.roles.includes("OPERATOR")) {
     throw new Error("運用者権限のユーザーは作成できません");
@@ -1117,8 +1117,11 @@ export async function updateEmployeeInDynamo(
     throw error;
   }
 
-  // 従業員ロールの有無で請求対象人数が変わるため、会社の在籍者数・当月課金スナップショットを再集計する。
-  if (hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles)) {
+  // 従業員ロールの有無・利用開始日で請求対象人数が変わるため、会社の在籍者数・当月課金スナップショットを再集計する。
+  if (
+    hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles) ||
+    targetUser.joinedAt !== normalizedInput.joinedAt
+  ) {
     await syncCompanyUserCounts(config, companyId, now);
   }
 

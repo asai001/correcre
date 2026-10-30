@@ -535,7 +535,7 @@ export default function EmployeeEditDialog({
             </FormControl>
 
             <TextField
-              label="入社日"
+              label="利用開始日"
               type="date"
               value={form.joinedAt}
               onChange={(event) => setForm((current) => ({ ...current, joinedAt: event.target.value }))}
@@ -543,7 +543,7 @@ export default function EmployeeEditDialog({
               required
               slotProps={{ inputLabel: { shrink: true } }}
               error={hasSubmitted && validation.joinedAt}
-              helperText={hasSubmitted && validation.joinedAt ? "入社日を入力してください" : " "}
+              helperText={hasSubmitted && validation.joinedAt ? "利用開始日を入力してください" : " "}
             />
           </div>
 

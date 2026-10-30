@@ -1,6 +1,6 @@
 import type { Company, DBUserRole, DBUserStatus } from "@correcre/types";
 
-import { toYYYYMM } from "./date/format";
+import { nowYYYYMMDD, toYYYYMM } from "./date/format";
 
 // 導入企業への月額利用料の請求（運用者 → 導入企業）に関する計算。
 // 金額 ＝ 月額基本料 + 利用人数（請求対象のユーザー数）× 月額単価（ID 料金）。無効（INACTIVE）の月は請求しない。
@@ -14,22 +14,35 @@ export const BILLING_PAYMENT_DUE_DAY = 15;
 // 有効（ACTIVE）に加えて招待中（INVITED）も請求対象にする（2026-10-14 定例で合意、10-28 定例で維持）。
 const BILLABLE_USER_STATUSES: ReadonlySet<DBUserStatus> = new Set<DBUserStatus>(["ACTIVE", "INVITED"]);
 
-type CountableUser = { status: DBUserStatus; roles?: ReadonlyArray<DBUserRole> };
+type CountableUser = { status: DBUserStatus; roles?: ReadonlyArray<DBUserRole>; joinedAt?: string };
 
-// 請求対象は「従業員」ロールを持ち、有効または招待中のユーザーだけ。
-// 従業員ロールのない管理者・運用担当は請求人数に数えない（2026-10-28 定例で合意）。
-// ロール未設定の古いレコードは、従業員管理画面と同じく従業員として扱う。
-export function isBillableUser(user: CountableUser) {
-  return BILLABLE_USER_STATUSES.has(user.status) && (user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE");
+// 請求対象は「従業員」ロールを持ち、有効または招待中で、利用開始日（joinedAt）を迎えたユーザーだけ。
+// - 従業員ロールのない管理者・運用担当は請求人数に数えない（2026-10-28 定例で合意）。
+//   ロール未設定の古いレコードは、従業員管理画面と同じく従業員として扱う。
+// - 月の途中で登録しても利用開始日を翌月 1 日にしておけば、その日から数える（2026-10-28 定例で合意）。
+//   利用開始日を迎えた日に人数を数え直すのは日次バッチ（/api/cron/company-monthly）が担う。
+export function isBillableUser(user: CountableUser, asOfDate: string = nowYYYYMMDD()) {
+  if (!BILLABLE_USER_STATUSES.has(user.status) || !(user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE")) {
+    return false;
+  }
+  // YYYY-MM-DD は辞書順比較で日付の前後を判定できる。
+  return !user.joinedAt || user.joinedAt <= asOfDate;
+}
+
+// 新しく登録するユーザーの利用開始日の既定値。月の途中からは使い始めず翌月 1 日からとする
+// （2026-10-28 定例で合意）。今日が 1 日ならその日から。today は日本時間の YYYY-MM-DD。
+export function getDefaultUsageStartDate(today: string = nowYYYYMMDD()) {
+  return today.endsWith("-01") ? today : `${addMonths(today.slice(0, 7), 1)}-01`;
 }
 
 // 会社レコードに持たせる在籍者数（削除済みを除く総数・有効・請求対象）を数える。
-export function countCompanyEmployees(users: ReadonlyArray<CountableUser>) {
+// asOfDate は日本時間の YYYY-MM-DD（既定は今日）。
+export function countCompanyEmployees(users: ReadonlyArray<CountableUser>, asOfDate: string = nowYYYYMMDD()) {
   const currentUsers = users.filter((user) => user.status !== "DELETED");
   return {
     totalEmployees: currentUsers.length,
     activeEmployees: currentUsers.filter((user) => user.status === "ACTIVE").length,
-    billableEmployees: currentUsers.filter(isBillableUser).length,
+    billableEmployees: currentUsers.filter((user) => isBillableUser(user, asOfDate)).length,
   };
 }
 

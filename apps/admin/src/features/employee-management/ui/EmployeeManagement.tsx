@@ -156,7 +156,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "ポイント",
       "翌月反映予定ポイント",
       "達成率",
-      "入社日",
+      "利用開始日",
       "最終ログイン",
     ],
     ...employees.map((employee) => [
@@ -197,7 +197,7 @@ function getEmployeeColumns(
           <div className="font-semibold text-slate-900">{row.name}</div>
           <div className="mt-1 text-xs text-slate-500">{row.nameKana || "-"}</div>
           <div className="mt-1 text-xs text-slate-500">
-            {row.userId} / 入社日 {formatDate(row.joinedAt)}
+            {row.userId} / 利用開始日 {formatDate(row.joinedAt)}
           </div>
         </div>
       ),

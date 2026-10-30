@@ -31,6 +31,7 @@ type UserItem = {
   companyId: string;
   status?: string;
   roles?: string[];
+  joinedAt?: string;
 };
 
 type CompanyItem = {
@@ -50,11 +51,15 @@ const PROFILE = process.env.AWS_PROFILE;
 const DRY_RUN = process.argv.includes("--dry-run");
 
 // アプリ側（@correcre/lib/company-billing の isBillableUser）と同じく、
-// 従業員ロールを持つ有効・招待中のユーザーを請求対象にする（ロール未設定は従業員扱い）。
+// 従業員ロールを持つ有効・招待中で、利用開始日を迎えたユーザーを請求対象にする（ロール未設定は従業員扱い）。
 const BILLABLE_USER_STATUSES = new Set(["ACTIVE", "INVITED"]);
 
-function isBillableUser(user: UserItem) {
-  return BILLABLE_USER_STATUSES.has(user.status ?? "") && (user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE");
+function isBillableUser(user: UserItem, today: string) {
+  return (
+    BILLABLE_USER_STATUSES.has(user.status ?? "") &&
+    (user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE") &&
+    (!user.joinedAt || user.joinedAt <= today)
+  );
 }
 
 async function scanAll<T>(client: DynamoDBDocumentClient, tableName: string): Promise<T[]> {
@@ -79,16 +84,18 @@ async function scanAll<T>(client: DynamoDBDocumentClient, tableName: string): Pr
   return items;
 }
 
-// 請求の対象月は日本時間で区切る（アプリの toBillingSnapshotMonth と同じ）。
-function toJstYearMonth(date: Date) {
+// 日付は日本時間で区切る（アプリの toBillingSnapshotMonth・nowYYYYMMDD と同じ）。YYYY-MM-DD を返す。
+function toJstDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "2-digit",
+    day: "2-digit",
   }).formatToParts(date);
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
-  return `${year}-${month}`;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
 }
 
 function toNonNegativeInteger(value: number | undefined) {
@@ -113,7 +120,8 @@ async function main() {
 
   const now = new Date();
   const updatedAt = now.toISOString();
-  const month = toJstYearMonth(now);
+  const today = toJstDate(now);
+  const month = today.slice(0, 7);
   let touched = 0;
   let unchanged = 0;
 
@@ -121,7 +129,7 @@ async function main() {
     const currentUsers = users.filter((user) => user.companyId === company.companyId && user.status !== "DELETED");
     const totalEmployees = currentUsers.length;
     const activeEmployees = currentUsers.filter((user) => user.status === "ACTIVE").length;
-    const billableEmployees = currentUsers.filter(isBillableUser).length;
+    const billableEmployees = currentUsers.filter((user) => isBillableUser(user, today)).length;
 
     if (
       company.billableEmployees === billableEmployees &&

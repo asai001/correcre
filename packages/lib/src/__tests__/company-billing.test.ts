@@ -4,6 +4,7 @@ import {
   buildCompanyBillingRow,
   calculateCompanyBillingAmount,
   countCompanyEmployees,
+  getDefaultUsageStartDate,
   getBillingDate,
   getPaymentDueDate,
 } from "../company-billing";
@@ -88,6 +89,26 @@ describe("countCompanyEmployees", () => {
 
   it("ロール未設定の古いレコードは従業員として数える", () => {
     expect(countCompanyEmployees([{ status: "ACTIVE" }]).billableEmployees).toBe(1);
+  });
+
+  it("利用開始日を迎えていないユーザーはその日まで請求対象に数えない", () => {
+    const users = [
+      { status: "ACTIVE" as const, roles: ["EMPLOYEE" as const], joinedAt: "2026-10-01" },
+      { status: "INVITED" as const, roles: ["EMPLOYEE" as const], joinedAt: "2026-11-01" },
+    ];
+    expect(countCompanyEmployees(users, "2026-10-31").billableEmployees).toBe(1);
+    expect(countCompanyEmployees(users, "2026-11-01").billableEmployees).toBe(2);
+  });
+});
+
+describe("getDefaultUsageStartDate", () => {
+  it("月の途中なら翌月 1 日（年をまたぐ場合も含む）", () => {
+    expect(getDefaultUsageStartDate("2026-10-30")).toBe("2026-11-01");
+    expect(getDefaultUsageStartDate("2026-12-15")).toBe("2027-01-01");
+  });
+
+  it("今日が 1 日ならその日", () => {
+    expect(getDefaultUsageStartDate("2026-11-01")).toBe("2026-11-01");
   });
 });
 
