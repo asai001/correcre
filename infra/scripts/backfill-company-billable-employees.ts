@@ -3,6 +3,7 @@
  * backfill スクリプト。
  *
  * 2026-10-14 定例で、月額請求の対象を「有効」に加えて「招待中」のユーザーにも広げた。
+ * 2026-10-28 定例で、従業員ロールを持たない管理者・運用担当は対象外にした。
  * アプリはユーザーの追加・削除・ステータス変更のたびに会社の人数を再集計するが、それまでの間
  * 既存の会社レコードには billableEmployees がなく、有効ユーザー数だけで請求額が出てしまう。
  * このスクリプトで全社を一度に集計し直す。
@@ -29,6 +30,7 @@ type Stage = "dev" | "stg" | "prod";
 type UserItem = {
   companyId: string;
   status?: string;
+  roles?: string[];
 };
 
 type CompanyItem = {
@@ -47,8 +49,13 @@ const REGION = process.env.AWS_REGION ?? "ap-northeast-1";
 const PROFILE = process.env.AWS_PROFILE;
 const DRY_RUN = process.argv.includes("--dry-run");
 
-// アプリ側（@correcre/lib/company-billing）と同じく、有効と招待中を請求対象にする。
+// アプリ側（@correcre/lib/company-billing の isBillableUser）と同じく、
+// 従業員ロールを持つ有効・招待中のユーザーを請求対象にする（ロール未設定は従業員扱い）。
 const BILLABLE_USER_STATUSES = new Set(["ACTIVE", "INVITED"]);
+
+function isBillableUser(user: UserItem) {
+  return BILLABLE_USER_STATUSES.has(user.status ?? "") && (user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE");
+}
 
 async function scanAll<T>(client: DynamoDBDocumentClient, tableName: string): Promise<T[]> {
   const items: T[] = [];
@@ -114,7 +121,7 @@ async function main() {
     const currentUsers = users.filter((user) => user.companyId === company.companyId && user.status !== "DELETED");
     const totalEmployees = currentUsers.length;
     const activeEmployees = currentUsers.filter((user) => user.status === "ACTIVE").length;
-    const billableEmployees = currentUsers.filter((user) => BILLABLE_USER_STATUSES.has(user.status ?? "")).length;
+    const billableEmployees = currentUsers.filter(isBillableUser).length;
 
     if (
       company.billableEmployees === billableEmployees &&

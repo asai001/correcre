@@ -103,6 +103,10 @@ function normalizeRoles(roles?: DBUserRole[]) {
   return roles.filter(isEmployeeManagementRole);
 }
 
+function hasEmployeeRole(roles?: DBUserRole[]) {
+  return normalizeRoles(roles).includes("EMPLOYEE");
+}
+
 function normalizeUserStatus(status: DBUserItem["status"]): EmployeeManagementStatus | "DELETED" {
   return status === "DELETED" ? "DELETED" : status;
 }
@@ -1020,10 +1024,10 @@ export async function updateEmployeeInDynamo(
     throw error;
   }
 
-  // ステータスが変わった場合は、会社の在籍者数・当月課金スナップショットを再集計する。
+  // ステータスか従業員ロールの有無が変わった場合は、会社の在籍者数・当月課金スナップショットを再集計する。
   // （従来は作成/削除時のみ同期しており、有効/無効の切り替えで activeEmployees と請求額が
-  //  次の作成・削除まで古いままになっていた。）
-  if (targetUser.status !== nextStatus) {
+  //  次の作成・削除まで古いままになっていた。請求対象は従業員ロールの有無でも変わる。）
+  if (targetUser.status !== nextStatus || hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles)) {
     await syncCompanyUserCounts(config, companyId, now);
   }
 

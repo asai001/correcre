@@ -119,7 +119,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
           </select>
         </label>
         <p className="text-xs text-slate-500">
-          請求金額 ＝ 月額基本料 ＋ 利用人数（有効・招待中のユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
+          請求金額 ＝ 月額基本料 ＋ 利用人数（従業員ロールの有効・招待中ユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
         </p>
       </section>
 

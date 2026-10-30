@@ -116,6 +116,10 @@ function normalizeRoles(roles?: DBUserRole[]) {
   return roles.filter(isEmployeeManagementRole);
 }
 
+function hasEmployeeRole(roles?: DBUserRole[]) {
+  return normalizeRoles(roles).includes("EMPLOYEE");
+}
+
 function normalizeUserStatus(status: DBUserItem["status"]): EmployeeManagementStatus | "DELETED" {
   return status === "DELETED" ? "DELETED" : status;
 }
@@ -1111,6 +1115,11 @@ export async function updateEmployeeInDynamo(
     }
 
     throw error;
+  }
+
+  // 従業員ロールの有無で請求対象人数が変わるため、会社の在籍者数・当月課金スナップショットを再集計する。
+  if (hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles)) {
+    await syncCompanyUserCounts(config, companyId, now);
   }
 
   const updatedEmployee = toEmployee({

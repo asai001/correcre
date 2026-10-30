@@ -80,7 +80,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
       <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm leading-6 text-slate-600">
         <p>ご利用料金 ＝ 月額基本料 ＋ ID料金（1 人あたりの月額料金） × 利用人数です。</p>
         <p>
-          利用人数は「有効」と「招待中」のユーザー数です。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
+          利用人数は、従業員のうち「有効」と「招待中」のユーザー数です（従業員ロールのない管理者は含みません）。当月分は月末時点の内容で確定し、月末締め・翌月 {BILLING_PAYMENT_DUE_DAY}{" "}
           日払いでのご請求となります。
         </p>
         <p>請求書は、金額が確定した月（前月以前）から表示・ダウンロードできます。</p>

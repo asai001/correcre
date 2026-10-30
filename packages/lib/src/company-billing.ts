@@ -1,4 +1,4 @@
-import type { Company, DBUserStatus } from "@correcre/types";
+import type { Company, DBUserRole, DBUserStatus } from "@correcre/types";
 
 import { toYYYYMM } from "./date/format";
 
@@ -11,20 +11,25 @@ import { toYYYYMM } from "./date/format";
 export const BILLING_PAYMENT_DUE_DAY = 15;
 
 // 月額請求の対象になるユーザーのステータス。招待された社員に登録を促すため、
-// 有効（ACTIVE）に加えて招待中（INVITED）も請求対象にする（2026-10-14 定例で合意）。
+// 有効（ACTIVE）に加えて招待中（INVITED）も請求対象にする（2026-10-14 定例で合意、10-28 定例で維持）。
 const BILLABLE_USER_STATUSES: ReadonlySet<DBUserStatus> = new Set<DBUserStatus>(["ACTIVE", "INVITED"]);
 
-function isBillableUserStatus(status: DBUserStatus) {
-  return BILLABLE_USER_STATUSES.has(status);
+type CountableUser = { status: DBUserStatus; roles?: ReadonlyArray<DBUserRole> };
+
+// 請求対象は「従業員」ロールを持ち、有効または招待中のユーザーだけ。
+// 従業員ロールのない管理者・運用担当は請求人数に数えない（2026-10-28 定例で合意）。
+// ロール未設定の古いレコードは、従業員管理画面と同じく従業員として扱う。
+export function isBillableUser(user: CountableUser) {
+  return BILLABLE_USER_STATUSES.has(user.status) && (user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE");
 }
 
 // 会社レコードに持たせる在籍者数（削除済みを除く総数・有効・請求対象）を数える。
-export function countCompanyEmployees(users: ReadonlyArray<{ status: DBUserStatus }>) {
+export function countCompanyEmployees(users: ReadonlyArray<CountableUser>) {
   const currentUsers = users.filter((user) => user.status !== "DELETED");
   return {
     totalEmployees: currentUsers.length,
     activeEmployees: currentUsers.filter((user) => user.status === "ACTIVE").length,
-    billableEmployees: currentUsers.filter((user) => isBillableUserStatus(user.status)).length,
+    billableEmployees: currentUsers.filter(isBillableUser).length,
   };
 }
 

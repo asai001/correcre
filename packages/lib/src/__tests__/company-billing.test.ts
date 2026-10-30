@@ -64,16 +64,30 @@ describe("calculateCompanyBillingAmount", () => {
 });
 
 describe("countCompanyEmployees", () => {
-  it("有効と招待中を請求対象として数え、休止中・削除済みは数えない", () => {
+  it("従業員ロールを持つ有効・招待中のユーザーだけを請求対象として数える", () => {
     expect(
       countCompanyEmployees([
-        { status: "ACTIVE" },
-        { status: "ACTIVE" },
-        { status: "INVITED" },
-        { status: "INACTIVE" },
-        { status: "DELETED" },
+        { status: "ACTIVE", roles: ["EMPLOYEE"] },
+        { status: "ACTIVE", roles: ["EMPLOYEE", "ADMIN"] },
+        { status: "INVITED", roles: ["EMPLOYEE"] },
+        { status: "INACTIVE", roles: ["EMPLOYEE"] },
+        { status: "DELETED", roles: ["EMPLOYEE"] },
       ]),
     ).toEqual({ totalEmployees: 4, activeEmployees: 2, billableEmployees: 3 });
+  });
+
+  it("従業員ロールのない管理者・運用担当は請求対象に数えない", () => {
+    expect(
+      countCompanyEmployees([
+        { status: "ACTIVE", roles: ["EMPLOYEE"] },
+        { status: "ACTIVE", roles: ["ADMIN"] },
+        { status: "INVITED", roles: ["OPERATOR"] },
+      ]),
+    ).toEqual({ totalEmployees: 3, activeEmployees: 2, billableEmployees: 1 });
+  });
+
+  it("ロール未設定の古いレコードは従業員として数える", () => {
+    expect(countCompanyEmployees([{ status: "ACTIVE" }]).billableEmployees).toBe(1);
   });
 });
 
