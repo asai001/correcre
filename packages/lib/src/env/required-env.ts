@@ -100,6 +100,8 @@ export const REQUIRED_ENV_BY_APP: Record<CorrecreAppName, readonly string[]> = {
     "DDB_SCHEDULE_EVENT_TABLE_NAME",
     "DDB_SYSTEM_SETTING_TABLE_NAME",
     "DDB_USER_TABLE_NAME",
+    // 導入企業の日次バッチ（未付与ポイントの会社還元）で月ごとの獲得ポイントを読む
+    "DDB_USER_MONTHLY_STATS_TABLE_NAME",
     "S3_MERCHANDISE_IMAGE_BUCKET_NAME",
     "EMPLOYEE_APP_URL",
     "MERCHANT_APP_URL",
