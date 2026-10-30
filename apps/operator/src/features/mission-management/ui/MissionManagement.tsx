@@ -1,20 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Button, MenuItem, TextField } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faBullseye } from "@fortawesome/free-solid-svg-icons";
 
 import { resolveAnalysisThresholds, validateAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import type { AnalysisThresholds } from "@correcre/types";
+import { MissionBoard, createMissionApiClient } from "@correcre/mission-management";
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 import { updateCompany } from "@operator/features/company-registration/api/client";
 import type { OperatorCompanySummary } from "@operator/features/company-registration/model/types";
-import { cancelScheduledChange, fetchMissions } from "../api/client";
-import type { OperatorMissionSummary } from "../model/types";
-import MissionCard from "./MissionCard";
-import MissionEditDialog from "./MissionEditDialog";
-import MissionHistoryDialog from "./MissionHistoryDialog";
 
 type MissionManagementProps = {
   initialCompanies: OperatorCompanySummary[];
@@ -27,6 +23,8 @@ function toThresholdForm(company: OperatorCompanySummary | undefined) {
   return { goodRate: String(effective.goodRate), improvementRate: String(effective.improvementRate) };
 }
 
+const OPERATOR_EMPTY_SLOT_DESCRIPTION = "企業登録時には自動生成されません。運用者がこの画面から手動で設定してください。";
+
 function toIntegerFormValue(value: string) {
   return /^\d*$/.test(value) ? value : null;
 }
@@ -34,13 +32,11 @@ function toIntegerFormValue(value: string) {
 export default function MissionManagement({ initialCompanies, operatorName }: MissionManagementProps) {
   const [companies, setCompanies] = useState<OperatorCompanySummary[]>(initialCompanies);
   const [selectedCompanyId, setSelectedCompanyId] = useState(initialCompanies[0]?.companyId ?? "");
-  const [missions, setMissions] = useState<OperatorMissionSummary[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editingMission, setEditingMission] = useState<OperatorMissionSummary | null>(null);
-  const [historySlotIndex, setHistorySlotIndex] = useState<number | null>(null);
-  const [cancelingSlotIndex, setCancelingSlotIndex] = useState<number | null>(null);
-  const historyMission = historySlotIndex !== null ? missions.find((m) => m.slotIndex === historySlotIndex) : null;
+  // 運用者は対象企業をクエリ（?companyId=）で指定する。企業を切り替えるとクライアントが変わり、一覧を読み直す。
+  const missionApi = useMemo(
+    () => createMissionApiClient({ companyId: selectedCompanyId }),
+    [selectedCompanyId],
+  );
 
   const selectedCompany = companies.find((company) => company.companyId === selectedCompanyId);
   const companyThresholds = selectedCompany?.analysisThresholds ?? null;
@@ -49,42 +45,8 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
   const [thresholdError, setThresholdError] = useState<string | null>(null);
   const [thresholdNotice, setThresholdNotice] = useState<string | null>(null);
 
-  const loadMissions = useCallback(async (companyId: string) => {
-    if (!companyId) {
-      setMissions([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await fetchMissions(companyId);
-      setMissions(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "ミッションの取得に失敗しました。");
-      setMissions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedCompanyId) {
-      loadMissions(selectedCompanyId);
-    }
-  }, [selectedCompanyId, loadMissions]);
-
-  const handleMissionUpdated = (updated: OperatorMissionSummary) => {
-    setMissions((current) =>
-      current.map((m) => (m.slotIndex === updated.slotIndex ? updated : m)),
-    );
-    setEditingMission(null);
-  };
-
   const handleCompanyChange = (companyId: string) => {
     setSelectedCompanyId(companyId);
-    setEditingMission(null);
-    setHistorySlotIndex(null);
     setThresholdForm(toThresholdForm(companies.find((company) => company.companyId === companyId)));
     setThresholdError(null);
     setThresholdNotice(null);
@@ -122,23 +84,6 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
       setThresholdError(err instanceof Error ? err.message : "既定閾値の保存に失敗しました。");
     } finally {
       setSavingThresholds(false);
-    }
-  };
-
-  const handleCancelSchedule = async (slotIndex: number) => {
-    if (!selectedCompanyId) {
-      return;
-    }
-
-    try {
-      setCancelingSlotIndex(slotIndex);
-      setError(null);
-      const updated = await cancelScheduledChange(selectedCompanyId, slotIndex);
-      setMissions((current) => current.map((m) => (m.slotIndex === updated.slotIndex ? updated : m)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "予約の取り消しに失敗しました。");
-    } finally {
-      setCancelingSlotIndex(null);
     }
   };
 
@@ -253,50 +198,13 @@ export default function MissionManagement({ initialCompanies, operatorName }: Mi
         <Alert severity="info">登録済み企業がありません。先に企業登録を行ってください。</Alert>
       )}
 
-      {error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : null}
-
-      {loading ? (
-        <div className="flex min-h-[200px] items-center justify-center">
-          <div className="text-slate-500">ミッションを読み込み中...</div>
-        </div>
-      ) : selectedCompanyId && !error ? (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {missions.map((mission) => (
-            <MissionCard
-              key={mission.slotIndex}
-              mission={mission}
-              onEdit={() => setEditingMission(mission)}
-              onHistory={() => setHistorySlotIndex(mission.slotIndex)}
-              onCancelSchedule={() => handleCancelSchedule(mission.slotIndex)}
-              cancelingSchedule={cancelingSlotIndex === mission.slotIndex}
-              companyThresholds={companyThresholds}
-            />
-          ))}
-        </section>
-      ) : null}
-
-      {editingMission ? (
-        <MissionEditDialog
-          open
-          companyId={selectedCompanyId}
-          mission={editingMission}
-          otherMissionsTotalPoints={missions
-            .filter((m) => m.slotIndex !== editingMission.slotIndex && m.configured && m.enabled)
-            .reduce((sum, m) => sum + m.monthlyCount * m.score, 0)}
+      {selectedCompanyId ? (
+        // 企業ごとに編集中・履歴表示中の状態を持ち越さないよう、企業 ID をキーに作り直す。
+        <MissionBoard
+          key={selectedCompanyId}
+          api={missionApi}
           companyThresholds={companyThresholds}
-          onClose={() => setEditingMission(null)}
-          onUpdated={handleMissionUpdated}
-        />
-      ) : null}
-
-      {historyMission ? (
-        <MissionHistoryDialog
-          open
-          companyId={selectedCompanyId}
-          mission={historyMission}
-          onClose={() => setHistorySlotIndex(null)}
+          emptySlotDescription={OPERATOR_EMPTY_SLOT_DESCRIPTION}
         />
       ) : null}
     </div>

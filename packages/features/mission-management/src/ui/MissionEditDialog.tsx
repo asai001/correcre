@@ -16,22 +16,23 @@ import {
 import { nextMonthYYYYMM, nowYYYYMM } from "@correcre/lib";
 import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import type { AnalysisThresholds, MissionField } from "@correcre/types";
-import { updateMission } from "../api/client";
+import type { MissionApiClient } from "../api/client";
 import { MISSION_TOTAL_POINTS_CAP } from "../model/types";
-import type { MissionApplyMode, OperatorMissionSummary, UpdateMissionInput } from "../model/types";
+import type { MissionApplyMode, MissionSlotSummary, UpdateMissionInput } from "../model/types";
 import { validateMissionInput } from "../model/validation";
 import FieldBuilder from "./FieldBuilder";
 
 type MissionEditDialogProps = {
   open: boolean;
-  companyId: string;
-  mission: OperatorMissionSummary;
+  // 保存先の API（アプリごとのベースパス・企業の指定方法を含む）。
+  api: MissionApiClient;
+  mission: MissionSlotSummary;
   // 編集中のスロットを除いた、有効なミッションの「月間実施回数 × 点数」の合計。
   otherMissionsTotalPoints: number;
   // 企業の項目分析の既定閾値（未設定なら null）。ミッション個別設定の初期値・プレースホルダに使う。
   companyThresholds: AnalysisThresholds | null;
   onClose: () => void;
-  onUpdated: (mission: OperatorMissionSummary) => void;
+  onUpdated: (mission: MissionSlotSummary) => void;
 };
 
 type FormState = {
@@ -48,7 +49,7 @@ type FormState = {
   improvementRate: string;
 };
 
-function initFormState(mission: OperatorMissionSummary, companyThresholds: AnalysisThresholds | null): FormState {
+function initFormState(mission: MissionSlotSummary, companyThresholds: AnalysisThresholds | null): FormState {
   // 個別設定が無い場合は、実際に適用される値（企業既定 → システム既定）を初期表示にする。
   const effectiveThresholds = resolveAnalysisThresholds(mission.analysisThresholds, companyThresholds);
 
@@ -79,7 +80,7 @@ function toIntegerFormValue(value: string) {
 
 export default function MissionEditDialog({
   open,
-  companyId,
+  api,
   mission,
   otherMissionsTotalPoints,
   companyThresholds,
@@ -147,7 +148,7 @@ export default function MissionEditDialog({
     try {
       setSubmitting(true);
       setError(null);
-      const updated = await updateMission(companyId, mission.slotIndex, buildInput(), mode);
+      const updated = await api.updateMission(mission.slotIndex, buildInput(), mode);
       onUpdated(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "ミッションの保存に失敗しました。");

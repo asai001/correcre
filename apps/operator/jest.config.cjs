@@ -30,6 +30,8 @@ module.exports = {
     "^@correcre/individual-analysis$": "<rootDir>/../../packages/features/individual-analysis/src/index.ts",
     "^@correcre/individual-analysis/(.*)$": "<rootDir>/../../packages/features/individual-analysis/src/$1",
     "^@correcre/merchandise-public$": "<rootDir>/../../packages/features/merchandise-public/src/index.ts",
+    "^@correcre/mission-management$": "<rootDir>/../../packages/features/mission-management/src/index.ts",
+    "^@correcre/mission-management/(.*)$": "<rootDir>/../../packages/features/mission-management/src/$1",
     // "server-only" は Next.js の実行時にしか意味を持たないため、テストでは空モジュールに差し替える。
     "^server-only$": "<rootDir>/../../packages/lib/test/stubs/server-only.ts",
   },

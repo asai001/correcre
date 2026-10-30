@@ -12,13 +12,14 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
-import { fetchMissionHistory } from "../api/client";
-import type { OperatorMissionHistoryItem, OperatorMissionSummary } from "../model/types";
+import type { MissionApiClient } from "../api/client";
+import type { MissionHistoryItem, MissionSlotSummary } from "../model/types";
 
 type MissionHistoryDialogProps = {
   open: boolean;
-  companyId: string;
-  mission: OperatorMissionSummary;
+  // 取得先の API（アプリごとのベースパス・企業の指定方法を含む）。
+  api: MissionApiClient;
+  mission: MissionSlotSummary;
   onClose: () => void;
 };
 
@@ -35,11 +36,11 @@ function formatDateTime(iso: string) {
 
 export default function MissionHistoryDialog({
   open,
-  companyId,
+  api,
   mission,
   onClose,
 }: MissionHistoryDialogProps) {
-  const [history, setHistory] = useState<OperatorMissionHistoryItem[]>([]);
+  const [history, setHistory] = useState<MissionHistoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +53,7 @@ export default function MissionHistoryDialog({
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchMissionHistory(companyId, mission.slotIndex);
+        const data = await api.fetchMissionHistory(mission.slotIndex);
 
         if (!cancelled) {
           setHistory(data);
@@ -73,7 +74,7 @@ export default function MissionHistoryDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, companyId, mission.slotIndex]);
+  }, [open, api, mission.slotIndex]);
 
   return (
     <Dialog

@@ -15,7 +15,7 @@ export type MissionApplyMode = "immediate" | "scheduled";
 export const MISSION_TOTAL_POINTS_CAP = 100;
 
 // API レスポンス用のミッションサマリー
-export type OperatorMissionSummary = {
+export type MissionSlotSummary = {
   missionId: string | null;
   slotIndex: number;
   version: number;
@@ -48,7 +48,7 @@ export type UpdateMissionInput = {
 };
 
 // ミッション履歴のレスポンス
-export type OperatorMissionHistoryItem = {
+export type MissionHistoryItem = {
   version: number;
   title: string;
   description: string;
@@ -63,7 +63,7 @@ export type OperatorMissionHistoryItem = {
   createdAt: string;
 };
 
-export function createEmptyMissionSummary(slotIndex: number): OperatorMissionSummary {
+export function createEmptyMissionSummary(slotIndex: number): MissionSlotSummary {
   return {
     missionId: null,
     slotIndex,
@@ -82,7 +82,7 @@ export function createEmptyMissionSummary(slotIndex: number): OperatorMissionSum
   };
 }
 
-export function toMissionSummary(mission: Mission): OperatorMissionSummary {
+export function toMissionSummary(mission: Mission): MissionSlotSummary {
   return {
     missionId: mission.missionId,
     slotIndex: mission.slotIndex,
@@ -101,7 +101,7 @@ export function toMissionSummary(mission: Mission): OperatorMissionSummary {
   };
 }
 
-export function toHistoryItem(history: MissionHistory): OperatorMissionHistoryItem {
+export function toHistoryItem(history: MissionHistory): MissionHistoryItem {
   return {
     version: history.version,
     title: history.title,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listMissionsForCompany } from "@operator/features/mission-management/api/server";
+import { listMissionsForCompany } from "@correcre/mission-management/server";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
 async function authorizeOperator() {

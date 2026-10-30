@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
     "@correcre/lib",
     "@correcre/individual-analysis",
     "@correcre/merchandise-public",
+    "@correcre/mission-management",
   ],
 };
 export default nextConfig;
