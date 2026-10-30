@@ -20,7 +20,7 @@ type CountableUser = { status: DBUserStatus; roles?: ReadonlyArray<DBUserRole>; 
 // - 従業員ロールのない管理者・運用担当は請求人数に数えない（2026-10-28 定例で合意）。
 //   ロール未設定の古いレコードは、従業員管理画面と同じく従業員として扱う。
 // - 月の途中で登録しても利用開始日を翌月 1 日にしておけば、その日から数える（2026-10-28 定例で合意）。
-//   利用開始日を迎えた日に人数を数え直すのは日次バッチ（/api/cron/company-monthly）が担う。
+//   利用開始日を迎えた日に人数を数え直すのは運用者アプリの日次バッチ（/api/cron/company-daily）が担う。
 export function isBillableUser(user: CountableUser, asOfDate: string = nowYYYYMMDD()) {
   if (!BILLABLE_USER_STATUSES.has(user.status) || !(user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE")) {
     return false;
@@ -148,7 +148,7 @@ export function calculateCompanyBillingAmount(params: {
 }
 
 // 請求開始月（契約開始日、なければ企業作成日の月。日本時間）。
-export function getCompanyBillingStartMonth(company: BillingCompany): string | null {
+export function getCompanyBillingStartMonth(company: Pick<Company, "contractStartsAt" | "createdAt">): string | null {
   const source = company.contractStartsAt || company.createdAt;
   if (!source) {
     return null;

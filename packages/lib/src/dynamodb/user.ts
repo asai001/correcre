@@ -184,10 +184,12 @@ export async function putUser(config: UserTableConfig, user: DBUserItem): Promis
   );
 }
 
-// 初回ログイン等で INVITED→ACTIVE に昇格した会社の在籍者数・当月課金スナップショットを再集計する。
-// 昇格は 1 ユーザーにつき一度きりのため、ログインのホットパスに毎回スキャンを課すことはない。
-// 招待中も請求対象のため課金額は変わらず、有効人数の表示が揃うだけなので、失敗してもログイン自体は継続させる（best-effort）。
-async function resyncCompanyEmployeeCounts(
+// 会社の在籍者数・当月課金スナップショットを再集計する。
+// - 初回ログイン等で INVITED→ACTIVE に昇格したとき。昇格は 1 ユーザーにつき一度きりのため、
+//   ログインのホットパスに毎回スキャンを課すことはない。招待中も請求対象のため課金額は変わらず、
+//   有効人数の表示が揃うだけなので、失敗してもログイン自体は継続させる（best-effort）。
+// - 利用開始日を迎えたユーザーを請求人数に入れるため、運用者アプリの日次バッチからも呼ぶ。
+export async function resyncCompanyEmployeeCounts(
   config: UserTableConfig,
   companyTableName: string,
   companyId: string,

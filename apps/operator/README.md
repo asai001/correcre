@@ -34,6 +34,7 @@
 | `DDB_SCHEDULE_EVENT_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
 | `DDB_SYSTEM_SETTING_TABLE_NAME` | 「設定」画面（通知先メールアドレス）の保存先 |
 | `DDB_USER_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`） |
+| `DDB_USER_MONTHLY_STATS_TABLE_NAME` | DynamoDB テーブル名（`correcre-<名前>-<stage>`）。導入企業の日次バッチ（未付与ポイントの会社還元）で使う |
 | `S3_MERCHANDISE_IMAGE_BUCKET_NAME` | S3 バケット名（CDK の出力値） |
 | `EMPLOYEE_APP_URL` | 通知メールに入れる従業員画面のURL（本番: `https://app.correcre.jp`）。無いとメールからリンクが消える |
 | `MERCHANT_APP_URL` | 通知メールに入れる提携企業画面のURL（本番: `https://merchant.correcre.jp`）。無いとメールからリンクが消える |
@@ -61,6 +62,13 @@ DDB_SYSTEM_SETTING_TABLE_NAME=correcre-system-setting-dev
 ```
 
 「設定」画面で保存した通知先メールアドレス（複数登録可）は、提携企業からの請求メールと、管理者画面でのユーザー追加通知メールの宛先として使用されます。
+
+## 導入企業の日次バッチ
+
+`/api/cron/company-daily`（Vercel Cron、毎日 0:10 JST）で導入企業ごとに次を行います。`CRON_SECRET` を付ければ手動でも実行できます。
+
+- 利用開始日を迎えたユーザーを請求人数に入れるため、在籍者数を数え直します（変化があった会社だけ書き込みます）
+- 月が明けたら、前月に従業員へ付与されなかったポイントを会社の保有ポイントへ還元します（2026 年 11 月利用分から）。還元ポイント ＝ 請求対象人数 × ID 料金分のポイント − 従業員がその月に獲得したポイント。月ごとの内訳は会社レコードの `companyPointReturns` に残し、`lastCompanyPointReturnMonth` で同じ月を二重に還元しないようにしています
 
 ## 提携企業 一斉メール
 

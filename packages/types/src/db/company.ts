@@ -18,6 +18,17 @@ export type CompanyMonthlyBillingSnapshot = {
   capturedAt: string;
 };
 
+// 従業員に付与されなかったポイントを会社の保有ポイントへ還元した記録（対象月ごと）。
+export type CompanyPointReturnRecord = {
+  month: string; // 対象月 YYYY-MM
+  billableEmployees: number;
+  fullPointPerEmployee: number;
+  releasedPoints: number;
+  earnedPoints: number;
+  returnedPoints: number;
+  returnedAt: string; // ISO 8601
+};
+
 export type CompanyPhilosophyValue = {
   title: string;
   description?: string;
@@ -74,6 +85,9 @@ export type Company = {
 
   // Company point balance.
   companyPointBalance: number;
+  // 未付与ポイントの会社還元。最後に処理した対象月と、月ごとの内訳。
+  lastCompanyPointReturnMonth?: string;
+  companyPointReturns?: Record<string, CompanyPointReturnRecord>;
 
   // Employee counts.
   totalEmployees?: number;
