@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { nextMonthYYYYMM, nowYYYYMM, reflectMission } from "@correcre/lib";
-import { validateAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import {
   buildMissionSk,
@@ -16,19 +15,20 @@ import {
 } from "@correcre/lib/dynamodb/mission-history";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
-import type { Mission, MissionField, MissionHistory, ScheduledMissionChange } from "@correcre/types";
+import type { Mission, MissionHistory, ScheduledMissionChange } from "@correcre/types";
 
-export type MissionApplyMode = "immediate" | "scheduled";
 import {
   MISSION_SLOT_COUNT,
   MISSION_TOTAL_POINTS_CAP,
   createEmptyMissionSummary,
   toMissionSummary,
   toHistoryItem,
-  type OperatorMissionSummary,
-  type OperatorMissionHistoryItem,
+  type MissionApplyMode,
+  type MissionSlotSummary,
+  type MissionHistoryItem,
   type UpdateMissionInput,
 } from "../model/types";
+import { validateMissionInput } from "../model/validation";
 
 type RuntimeConfig = {
   region: string;
@@ -44,92 +44,21 @@ function getRuntimeConfig(): RuntimeConfig {
   };
 }
 
-function isValidSlotIndex(slotIndex: number): boolean {
+export function isValidSlotIndex(slotIndex: number): boolean {
   return Number.isInteger(slotIndex) && slotIndex >= 1 && slotIndex <= MISSION_SLOT_COUNT;
 }
 
-function isOptionalNonNegativeInteger(value?: number) {
-  return value === undefined || (Number.isInteger(value) && value >= 0);
-}
-
-function validateMissionFields(fields: MissionField[]): void {
-  const keys = new Set<string>();
-
-  for (const field of fields) {
-    if (!field.key || !/^[a-zA-Z0-9_]+$/.test(field.key)) {
-      throw new Error(`フィールドキー「${field.key}」が不正です。英数字とアンダースコアのみ使用できます。`);
-    }
-
-    if (keys.has(field.key)) {
-      throw new Error(`フィールドキー「${field.key}」が重複しています。`);
-    }
-
-    keys.add(field.key);
-
-    if (!field.label.trim()) {
-      throw new Error("フィールドのラベルは必須です。");
-    }
-
-    if ((field.type === "select" || field.type === "multiSelect") && (!field.options || field.options.length === 0)) {
-      throw new Error(`フィールド「${field.label}」の選択肢が設定されていません。`);
-    }
-
-    if (field.type === "text" || field.type === "textarea") {
-      if (!isOptionalNonNegativeInteger(field.minLength) || !isOptionalNonNegativeInteger(field.maxLength)) {
-        throw new Error(`フィールド「${field.label}」の文字数制限は 0 以上の整数で入力してください。`);
-      }
-
-      if (field.minLength !== undefined && field.maxLength !== undefined && field.minLength > field.maxLength) {
-        throw new Error(`フィールド「${field.label}」の最小文字数は最大文字数以下にしてください。`);
-      }
-    }
-
-    if (field.type === "multiSelect") {
-      if (!isOptionalNonNegativeInteger(field.minSelected) || !isOptionalNonNegativeInteger(field.maxSelected)) {
-        throw new Error(`フィールド「${field.label}」の選択数制限は 0 以上の整数で入力してください。`);
-      }
-
-      if (field.minSelected !== undefined && field.maxSelected !== undefined && field.minSelected > field.maxSelected) {
-        throw new Error(`フィールド「${field.label}」の最小選択数は最大選択数以下にしてください。`);
-      }
-    }
-  }
-}
-
+// 画面側（MissionEditDialog）と同じ検証をサーバーでも行う。API を直接呼ばれても不正な値を保存しないため。
 function validateUpdateInput(input: UpdateMissionInput): void {
-  if (!input.title.trim()) {
-    throw new Error("ミッションタイトルは必須です。");
-  }
+  const validationError = validateMissionInput(input);
 
-  if (!input.description.trim()) {
-    throw new Error("ミッション説明は必須です。");
+  if (validationError) {
+    throw new Error(validationError);
   }
-
-  if (!input.category.trim()) {
-    throw new Error("カテゴリは必須です。");
-  }
-
-  if (!Number.isInteger(input.monthlyCount) || input.monthlyCount < 1) {
-    throw new Error("月間実施回数は 1 以上の整数で入力してください。");
-  }
-
-  if (!Number.isInteger(input.score) || input.score < 1) {
-    throw new Error("点数は 1 以上の整数で入力してください。");
-  }
-
-  // null / undefined は「企業既定値に従う」を意味するので検証不要。
-  if (input.analysisThresholds) {
-    const thresholdError = validateAnalysisThresholds(input.analysisThresholds);
-    if (thresholdError) {
-      throw new Error(thresholdError);
-    }
-  }
-
-  validateMissionFields(input.fields);
 }
 
 // 企業の全ミッション（5 件）を取得
-export async function listMissionsForCompany(companyId: string): Promise<OperatorMissionSummary[]> {
+export async function listMissionsForCompany(companyId: string): Promise<MissionSlotSummary[]> {
   const config = getRuntimeConfig();
   const missions = await listMissionsByCompany(
     { region: config.region, tableName: config.missionTableName },
@@ -174,7 +103,7 @@ export async function updateMissionInDynamo(
   input: UpdateMissionInput,
   changedByUserId: string,
   applyMode: MissionApplyMode = "immediate",
-): Promise<OperatorMissionSummary> {
+): Promise<MissionSlotSummary> {
   if (!isValidSlotIndex(slotIndex)) {
     throw new Error("スロット番号が不正です。");
   }
@@ -343,7 +272,7 @@ export async function updateMissionInDynamo(
 export async function cancelScheduledMissionChange(
   companyId: string,
   slotIndex: number,
-): Promise<OperatorMissionSummary> {
+): Promise<MissionSlotSummary> {
   if (!isValidSlotIndex(slotIndex)) {
     throw new Error("スロット番号が不正です。");
   }
@@ -374,7 +303,7 @@ export async function cancelScheduledMissionChange(
 export async function listMissionHistoryForSlot(
   companyId: string,
   slotIndex: number,
-): Promise<OperatorMissionHistoryItem[]> {
+): Promise<MissionHistoryItem[]> {
   if (!isValidSlotIndex(slotIndex)) {
     throw new Error("スロット番号が不正です。");
   }

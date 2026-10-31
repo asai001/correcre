@@ -27,6 +27,8 @@ export const REQUIRED_ENV_BY_APP: Record<CorrecreAppName, readonly string[]> = {
     "DDB_COMPANY_TABLE_NAME",
     "DDB_DEPARTMENT_TABLE_NAME",
     "DDB_EXCHANGE_HISTORY_TABLE_NAME",
+    // 各種情報画面のミッション項目の編集（版の履歴・翌月反映の予約の繰り入れ）
+    "DDB_MISSION_HISTORY_TABLE_NAME",
     "DDB_MISSION_TABLE_NAME",
     "DDB_MISSION_REPORT_TABLE_NAME",
     "DDB_POINT_TRANSACTION_TABLE_NAME",

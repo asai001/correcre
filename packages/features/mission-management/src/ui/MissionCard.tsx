@@ -6,17 +6,21 @@ import { Button } from "@mui/material";
 
 import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
 import type { AnalysisThresholds } from "@correcre/types";
-import type { OperatorMissionSummary } from "../model/types";
+import type { MissionSlotSummary } from "../model/types";
 
 type MissionCardProps = {
-  mission: OperatorMissionSummary;
+  mission: MissionSlotSummary;
   onEdit: () => void;
   onHistory: () => void;
   onCancelSchedule: () => void;
   cancelingSchedule?: boolean;
   // 企業の項目分析の既定閾値（未設定なら null）。個別設定が無いミッションの実効値表示に使う。
   companyThresholds: AnalysisThresholds | null;
+  // 未設定スロットに表示する案内文。アプリ（運用者 / 管理者）ごとに言い回しを変えられるようにする。
+  emptySlotDescription?: string;
 };
+
+export const DEFAULT_EMPTY_SLOT_DESCRIPTION = "企業登録時には自動生成されません。「新規設定」から設定してください。";
 
 export default function MissionCard({
   mission,
@@ -25,6 +29,7 @@ export default function MissionCard({
   onCancelSchedule,
   cancelingSchedule,
   companyThresholds,
+  emptySlotDescription = DEFAULT_EMPTY_SLOT_DESCRIPTION,
 }: MissionCardProps) {
   const actionLabel = mission.configured ? "編集" : "新規設定";
   const pending = mission.pendingChange;
@@ -104,9 +109,7 @@ export default function MissionCard({
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5">
           <h3 className="text-lg font-bold text-slate-900">このスロットは未設定です</h3>
-          <p className="mt-1 text-sm text-slate-500">
-            企業登録時には自動生成されません。運用者がこの画面から手動で設定してください。
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{emptySlotDescription}</p>
         </div>
       )}
 

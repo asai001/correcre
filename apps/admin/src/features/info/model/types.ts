@@ -1,4 +1,4 @@
-import type { DBUserRole, Company, Department, Mission } from "@correcre/types";
+import type { DBUserRole, Company, Department } from "@correcre/types";
 import type { CompanyBillingRowWithPointReturn } from "@correcre/lib/company-point-return";
 import type { CompanyInvoice, InvoiceIssuer } from "@correcre/lib/company-invoice";
 import type { CompanySummary, UpdateCompanyInput } from "@correcre/lib/company-management-types";
@@ -31,7 +31,6 @@ export type AdminInfoData = {
   company: Company;
   editableCompany: CompanySummary;
   departments: AdminInfoDepartmentItem[];
-  missions: Mission[];
   account: AdminInfoAccountSummary;
   userCounts: AdminInfoUserCounts;
   // 月額利用料の請求履歴（当月が先頭）。各月の会社ポイントへの還元を添える。
