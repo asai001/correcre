@@ -118,7 +118,7 @@ export default function BillingInfoPanel({ rows, pointUnitLabel }: BillingInfoPa
         <p>請求書は、金額が確定した月（前月以前）から表示・ダウンロードできます。</p>
         <p>
           会社への還元：ID料金分のポイントのうち、その月に従業員が獲得しなかった分を翌月 1 日に会社ポイントとして戻します
-          （{formatMonthLabel(COMPANY_POINT_RETURN_START_MONTH)}から）。戻したポイントは「従業員管理」から従業員へ付与できます。
+          （{formatMonthLabel(COMPANY_POINT_RETURN_START_MONTH)}から）。戻したポイントは「ユーザー管理」から従業員へ付与できます。
         </p>
       </div>
 
