@@ -2,6 +2,7 @@ import "server-only";
 
 import { nowYYYYMM } from "@correcre/lib";
 import { buildCompanyBillingHistory } from "@correcre/lib/company-billing";
+import { attachCompanyPointReturns } from "@correcre/lib/company-point-return";
 import { listCompanies } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
 
@@ -20,7 +21,8 @@ export async function getCompanyBillingListData(): Promise<CompanyBillingListDat
       companyName: company.shortName || company.name,
       status: company.status,
       plan: company.plan,
-      rows: buildCompanyBillingHistory(company, { currentMonth }),
+      pointUnitLabel: company.pointUnitLabel || "pt",
+      rows: attachCompanyPointReturns(company, buildCompanyBillingHistory(company, { currentMonth })),
     }))
     .sort((left, right) => left.companyName.localeCompare(right.companyName, "ja"));
 

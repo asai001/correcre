@@ -613,7 +613,7 @@ export default function AdminInfo({ initialData }: AdminInfoProps) {
             title="請求情報"
             description="月額のご利用料金、請求日、お支払期限と、これまでの請求履歴を確認できます。"
           >
-            <BillingInfoPanel rows={initialData.billingRows} />
+            <BillingInfoPanel rows={initialData.billingRows} pointUnitLabel={initialData.company.pointUnitLabel || "pt"} />
           </InfoCard>
         </TabsContent>
       </Tabs>

@@ -1,4 +1,4 @@
-import type { Company } from "@correcre/types";
+import type { Company, CompanyPointReturnRecord } from "@correcre/types";
 
 import { addMonths, getCompanyBillingStartMonth, type CompanyBillingRow } from "./company-billing";
 import { calculateMissionRewardPoint, FULL_SCORE } from "./points";
@@ -57,4 +57,34 @@ export function listPendingPointReturnMonths(
     month = addMonths(month, 1);
   }
   return months;
+}
+
+// 画面に出す月ごとの還元の状態。
+// - not_applicable: 還元の開始月より前
+// - pending: 開始月以降で、まだ還元していない（当月は月明けに確定。前月分は日次バッチの処理待ち）
+// - returned: 還元済み。内訳を持つ
+export type CompanyPointReturnView =
+  | { status: "not_applicable" }
+  | { status: "pending" }
+  | { status: "returned"; record: CompanyPointReturnRecord };
+
+export function getCompanyPointReturnView(
+  company: Pick<Company, "companyPointReturns">,
+  month: string,
+): CompanyPointReturnView {
+  const record = company.companyPointReturns?.[month];
+  if (record) {
+    return { status: "returned", record };
+  }
+  return month < COMPANY_POINT_RETURN_START_MONTH ? { status: "not_applicable" } : { status: "pending" };
+}
+
+export type CompanyBillingRowWithPointReturn = CompanyBillingRow & { pointReturn: CompanyPointReturnView };
+
+// 請求履歴の各月に、その月の会社への還元を添える（請求情報・請求管理の表で同じ行に並べるため）。
+export function attachCompanyPointReturns(
+  company: Pick<Company, "companyPointReturns">,
+  rows: CompanyBillingRow[],
+): CompanyBillingRowWithPointReturn[] {
+  return rows.map((row) => ({ ...row, pointReturn: getCompanyPointReturnView(company, row.month) }));
 }

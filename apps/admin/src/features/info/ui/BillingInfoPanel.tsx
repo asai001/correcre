@@ -5,10 +5,15 @@ import Link from "next/link";
 import type { CompanyBillingRow } from "@correcre/lib/company-billing";
 import { BILLING_PAYMENT_DUE_DAY } from "@correcre/lib/company-billing";
 import { canIssueCompanyInvoice } from "@correcre/lib/company-invoice";
+import {
+  COMPANY_POINT_RETURN_START_MONTH,
+  type CompanyBillingRowWithPointReturn,
+} from "@correcre/lib/company-point-return";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@correcre/ui";
 
 type BillingInfoPanelProps = {
-  rows: CompanyBillingRow[];
+  rows: CompanyBillingRowWithPointReturn[];
+  pointUnitLabel: string;
 };
 
 function formatYen(value: number) {
@@ -36,7 +41,34 @@ function BillingStatusBadge({ row }: { row: CompanyBillingRow }) {
   return <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">確定</span>;
 }
 
-export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
+// その月に従業員へ付与されなかった分のうち、会社ポイントへ戻した量。
+function PointReturnCell({ row, pointUnitLabel }: { row: CompanyBillingRowWithPointReturn; pointUnitLabel: string }) {
+  const { pointReturn } = row;
+
+  if (pointReturn.status === "returned") {
+    const { record } = pointReturn;
+    return (
+      <div title={`ID料金分 ${record.releasedPoints.toLocaleString("ja-JP")}${pointUnitLabel} − 従業員の獲得 ${record.earnedPoints.toLocaleString("ja-JP")}${pointUnitLabel}`}>
+        <div className="font-semibold text-emerald-700">
+          +{record.returnedPoints.toLocaleString("ja-JP")}
+          {pointUnitLabel}
+        </div>
+        <div className="text-[11px] text-slate-400">
+          {record.releasedPoints.toLocaleString("ja-JP")} − {record.earnedPoints.toLocaleString("ja-JP")}
+          {pointUnitLabel}
+        </div>
+      </div>
+    );
+  }
+
+  if (pointReturn.status === "pending" && row.billable) {
+    return <span className="text-xs text-slate-400">{row.finalized ? "集計中" : "翌月 1 日に確定"}</span>;
+  }
+
+  return <span className="text-xs text-slate-400">-</span>;
+}
+
+export default function BillingInfoPanel({ rows, pointUnitLabel }: BillingInfoPanelProps) {
   const current = rows.find((row) => !row.finalized) ?? null;
   const hasEstimatedRow = rows.some((row) => row.source === "estimated");
 
@@ -84,6 +116,10 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
           日払いでのご請求となります。
         </p>
         <p>請求書は、金額が確定した月（前月以前）から表示・ダウンロードできます。</p>
+        <p>
+          会社への還元：ID料金分のポイントのうち、その月に従業員が獲得しなかった分を翌月 1 日に会社ポイントとして戻します
+          （{formatMonthLabel(COMPANY_POINT_RETURN_START_MONTH)}から）。戻したポイントは「従業員管理」から従業員へ付与できます。
+        </p>
       </div>
 
       {rows.length ? (
@@ -96,6 +132,7 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                 <TableHead className="text-right">月額基本料</TableHead>
                 <TableHead className="text-right">ID料金</TableHead>
                 <TableHead className="text-right">請求金額</TableHead>
+                <TableHead className="text-right">会社への還元</TableHead>
                 <TableHead className="text-center">請求日</TableHead>
                 <TableHead className="text-center">支払期限</TableHead>
                 <TableHead className="text-center">状態</TableHead>
@@ -113,6 +150,9 @@ export default function BillingInfoPanel({ rows }: BillingInfoPanelProps) {
                   <TableCell className="text-right">{formatYen(row.monthlyBaseFee)}</TableCell>
                   <TableCell className="text-right">{formatYen(row.perEmployeeMonthlyFee)}</TableCell>
                   <TableCell className="text-right font-bold text-slate-900">{formatYen(row.amountYen)}</TableCell>
+                  <TableCell className="text-right">
+                    <PointReturnCell row={row} pointUnitLabel={pointUnitLabel} />
+                  </TableCell>
                   <TableCell className="text-center">{formatDate(row.billingDate)}</TableCell>
                   <TableCell className="text-center">{formatDate(row.paymentDueDate)}</TableCell>
                   <TableCell className="text-center">

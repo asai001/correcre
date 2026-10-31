@@ -586,6 +586,13 @@ async function touchCompany(config: RuntimeConfig, companyId: string, updatedAt:
   );
 }
 
+// 最後に会社ポイントへ還元した月と量（会社ポイント残高のカードに添える）。
+function toLatestCompanyPointReturn(company: Company | null) {
+  const month = company?.lastCompanyPointReturnMonth;
+  const record = month ? company?.companyPointReturns?.[month] : undefined;
+  return month && record ? { month, returnedPoints: record.returnedPoints } : undefined;
+}
+
 export async function getEmployeeManagementSummaryFromDynamo(
   companyId: string,
   adminUserId?: string,
@@ -642,6 +649,7 @@ export async function getEmployeeManagementSummaryFromDynamo(
     departmentCount: departmentOptions.length,
     totalEmployeePoints,
     companyPointBalance: company?.companyPointBalance ?? 0,
+    latestCompanyPointReturn: toLatestCompanyPointReturn(company),
     averageCompletionRate: activeEmployees.length ? Math.round(totalCompletionRate / activeEmployees.length) : 0,
     pointUnitLabel: company?.pointUnitLabel ?? "pt",
     departmentOptions,
