@@ -1,3 +1,6 @@
+import Link from "next/link";
+import type { Route } from "next";
+
 import { toYYYYMM } from "@correcre/lib";
 import { getCompanyById } from "@correcre/lib/dynamodb/company";
 import { readRequiredServerEnv } from "@correcre/lib/env/server";
@@ -57,14 +60,25 @@ export default async function DashboardPage() {
         <div className="min-w-0">
           <div className="mt-1 break-words text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{companyName}</div>
         </div>
-        <form action={logout}>
-          <button
-            type="submit"
+        <div className="flex shrink-0 items-center gap-2">
+          {/* 操作ガイドはログイン不要の公開ページ。作業中の画面を残せるよう別タブで開く。 */}
+          <Link
+            href={"/docs" as Route}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
           >
-            ログアウト
-          </button>
-        </form>
+            利用ガイド
+          </Link>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-900"
+            >
+              ログアウト
+            </button>
+          </form>
+        </div>
       </div>
       <div className="mt-5">
         <Philosophy companyId={companyId} />

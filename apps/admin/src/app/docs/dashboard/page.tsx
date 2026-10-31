@@ -12,6 +12,7 @@ const MENU = [
   { name: "分析・レポート", desc: "全体分析と個人分析。達成率の推移や報告内容を確認できます。", href: "/docs/analysis-overall" },
   { name: "各種情報", desc: "理念体系・会社情報・登録人数・部署一覧・ミッション項目・請求情報。", href: "/docs/info" },
   { name: "問い合わせ", desc: "運用者（コレクレ運営）への問い合わせ。", href: "/docs/support" },
+  { name: "利用ガイド", desc: "この操作ガイドを別のタブで開きます（ダッシュボードでは右上のボタン）。", href: "/docs" },
 ];
 
 const CARDS = [

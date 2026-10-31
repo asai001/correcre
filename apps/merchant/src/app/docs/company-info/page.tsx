@@ -21,7 +21,7 @@ export default function CompanyInfoDocPage() {
 
       <Section id="edit" title="会社情報を変更する">
         <p>
-          上部メニューの <Ui>会社情報</Ui> を押すと、登録内容が表示されます。変更したい項目を書き換えて、
+          上部メニューの <Ui>各種設定</Ui> を開き、<Ui>会社情報</Ui> を押すと、登録内容が表示されます。変更したい項目を書き換えて、
           最後に <Mark>1</Mark> <Ui>会社情報を保存</Ui> を押してください。「会社情報を更新しました」と表示されれば完了です。
         </p>
         <Shot name="company-info" alt="会社情報の画面" />

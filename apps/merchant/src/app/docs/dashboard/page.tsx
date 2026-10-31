@@ -22,11 +22,20 @@ const MENU = [
   { name: "ダッシュボード", desc: "ホーム画面です。いま対応が必要なことがまとめて表示されます。", href: "/docs/dashboard" },
   { name: "商品・サービス管理", desc: "掲載する商品の登録・編集・公開／非公開の切り替え。", href: "/docs/merchandise" },
   { name: "交換管理", desc: "申請者からの交換申請の確認と、状態（承認・発送・完了など）の更新。", href: "/docs/exchanges" },
-  { name: "休業日カレンダー", desc: "定休日や臨時休業日の登録。お届け日の候補から自動で外れます。", href: "/docs/calendar" },
   { name: "収支・精算", desc: "月ごとの売上・手数料・請求額の確認と、請求メールの送信。", href: "/docs/settlement", admin: true },
-  { name: "会社情報", desc: "登録した会社情報・振込先の確認と変更。", href: "/docs/company-info", admin: true },
+  {
+    name: "各種設定",
+    desc: "休業日カレンダー（定休日・臨時休業日の登録）、会社情報（会社情報・振込先の確認と変更。管理者のみ）、ユーザー管理（社内の担当者の招待。管理者のみ）への入口です。",
+    href: "/docs/calendar",
+  },
+  { name: "利用ガイド", desc: "この操作ガイドを別のタブで開きます。", href: "/docs" },
+];
+
+// 画面下部（フッター）のメニュー。
+const FOOTER_MENU = [
   { name: "問い合わせ", desc: "運用者（コレクレ運営）への問い合わせ。", href: "/docs/support" },
-  { name: "ユーザー管理", desc: "社内のほかの担当者を招待して、ログインできるようにします。", href: "/docs/users", admin: true },
+  { name: "利用ガイド", desc: "この操作ガイドを別のタブで開きます。", href: "/docs" },
+  { name: "利用規約", desc: "コレクレの利用規約を別のタブで開きます。" },
 ];
 
 const TODOS = [
@@ -101,11 +110,21 @@ export default function DashboardDocPage() {
         </div>
         <Callout kind="info" title="メニューの数が少ないときは">
           <p>
-            <Ui>収支・精算</Ui>・<Ui>会社情報</Ui>・<Ui>ユーザー管理</Ui> は<strong>管理者</strong>にだけ表示されます。
+            <Ui>収支・精算</Ui> と、<Ui>各種設定</Ui> の中の <Ui>会社情報</Ui>・<Ui>ユーザー管理</Ui> は<strong>管理者</strong>にだけ表示されます。
             一般のユーザーには、次のように 5 つのメニューだけが表示されます。管理者にしてほしい場合は、運用者にご相談ください。
           </p>
           <Shot name="dashboard-header-general" alt="一般ユーザーに表示されるメニュー" />
         </Callout>
+        <SubSection title="画面下部のメニュー">
+          <p>どの画面でも、いちばん下に次のメニューがあります。</p>
+          <ul className="list-disc space-y-2 pl-6">
+            {FOOTER_MENU.map((item) => (
+              <li key={item.name}>
+                {item.href ? <DocLink href={item.href}>{item.name}</DocLink> : <strong>{item.name}</strong>}：{item.desc}
+              </li>
+            ))}
+          </ul>
+        </SubSection>
       </Section>
 
       <Section id="todo" title="やることリスト">

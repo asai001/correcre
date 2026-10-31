@@ -28,7 +28,7 @@ export default function SupportDocPage() {
       <Section id="send" title="問い合わせを送る">
         <Shot name="support" alt="運用者に問い合わせの画面。カテゴリ・件名・内容と送信ボタン" />
         <Steps>
-          <Step number={1} title={<>上部メニューの <Ui>問い合わせ</Ui> を開きます</>}/>
+          <Step number={1} title={<>画面のいちばん下のメニューにある <Ui>問い合わせ</Ui> を開きます</>}/>
           <Step number={2} title={<><Mark>1</Mark> <Ui>カテゴリ</Ui> を選びます</>}>
             <div className="overflow-x-auto rounded-2xl border border-slate-200">
               <table className="w-full min-w-[480px] text-sm">
