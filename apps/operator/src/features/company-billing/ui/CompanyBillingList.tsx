@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState } from "react";
 
 import { BILLING_PAYMENT_DUE_DAY, type CompanyBillingRow } from "@correcre/lib/company-billing";
 import { statusOptions } from "@correcre/lib/company-management-form";
+import type { CompanyBillingRowWithPointReturn } from "@correcre/lib/company-point-return";
 
 import AdminPageHeader from "@operator/components/AdminPageHeader";
 
@@ -16,7 +17,7 @@ type Props = {
 
 type MonthlyBillingItem = {
   company: CompanyBillingListItem;
-  row: CompanyBillingRow;
+  row: CompanyBillingRowWithPointReturn;
 };
 
 function formatYen(value: number) {
@@ -46,6 +47,33 @@ function BillingStatusBadge({ row }: { row: CompanyBillingRow }) {
   }
 
   return <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">確定</span>;
+}
+
+// その月に従業員へ付与されなかった分のうち、会社ポイントへ戻した量（内訳は title で出す）。
+function PointReturnCell({ row, pointUnitLabel }: { row: CompanyBillingRowWithPointReturn; pointUnitLabel: string }) {
+  const { pointReturn } = row;
+
+  if (pointReturn.status === "returned") {
+    const { record } = pointReturn;
+    return (
+      <span
+        className="font-semibold text-emerald-700"
+        title={`ID料金分 ${record.releasedPoints.toLocaleString("ja-JP")}${pointUnitLabel}（${record.billableEmployees}名 × ${record.fullPointPerEmployee.toLocaleString("ja-JP")}${pointUnitLabel}）− 従業員の獲得 ${record.earnedPoints.toLocaleString("ja-JP")}${pointUnitLabel}`}
+      >
+        +{record.returnedPoints.toLocaleString("ja-JP")}
+        {pointUnitLabel}
+        <span className="ml-1 text-[11px] font-normal text-slate-400">
+          ({record.releasedPoints.toLocaleString("ja-JP")} − {record.earnedPoints.toLocaleString("ja-JP")})
+        </span>
+      </span>
+    );
+  }
+
+  if (pointReturn.status === "pending" && row.billable) {
+    return <span className="text-xs text-slate-400">{row.finalized ? "集計中" : "翌月 1 日に確定"}</span>;
+  }
+
+  return <span className="text-xs text-slate-400">-</span>;
 }
 
 function SourceNote({ row }: { row: CompanyBillingRow }) {
@@ -119,7 +147,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
           </select>
         </label>
         <p className="text-xs text-slate-500">
-          請求金額 ＝ 月額基本料 ＋ 利用人数（有効ユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
+          請求金額 ＝ 月額基本料 ＋ 利用人数（従業員ロールの有効・招待中ユーザー） × ID料金。月末締め・翌月 {BILLING_PAYMENT_DUE_DAY} 日払い。
         </p>
       </section>
 
@@ -167,13 +195,14 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                 <th className="py-2 pr-4 text-right font-semibold">月額基本料</th>
                 <th className="py-2 pr-4 text-right font-semibold">ID料金</th>
                 <th className="py-2 pr-4 text-right font-semibold">請求金額</th>
+                <th className="py-2 pr-4 text-right font-semibold">会社への還元</th>
                 <th className="py-2 text-center font-semibold">状態</th>
               </tr>
             </thead>
             <tbody>
               {monthlyItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-4 text-center text-slate-400">
+                  <td colSpan={8} className="py-4 text-center text-slate-400">
                     対象の企業がありません。
                   </td>
                 </tr>
@@ -200,11 +229,14 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                         </td>
                         <td className="py-2 pr-4 text-slate-700">{company.plan}</td>
                         <td className="py-2 pr-4 text-right text-slate-700">
-                          {row.activeEmployees.toLocaleString("ja-JP")}名
+                          {row.billableEmployees.toLocaleString("ja-JP")}名
                         </td>
                         <td className="py-2 pr-4 text-right text-slate-700">{formatYen(row.monthlyBaseFee)}</td>
                         <td className="py-2 pr-4 text-right text-slate-700">{formatYen(row.perEmployeeMonthlyFee)}</td>
                         <td className="py-2 pr-4 text-right font-bold text-sky-700">{formatYen(row.amountYen)}</td>
+                        <td className="py-2 pr-4 text-right">
+                          <PointReturnCell row={row} pointUnitLabel={company.pointUnitLabel} />
+                        </td>
                         <td className="py-2 text-center">
                           <BillingStatusBadge row={row} />
                           {!row.billable ? (
@@ -214,7 +246,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                       </tr>
                       {expanded ? (
                         <tr className="border-b border-slate-100 last:border-b-0">
-                          <td colSpan={7} className="bg-slate-50 px-4 py-3">
+                          <td colSpan={8} className="bg-slate-50 px-4 py-3">
                             <div className="text-xs font-semibold text-slate-500">
                               {company.companyName} の請求履歴（現在のステータス: {getStatusLabel(company.status)}）
                             </div>
@@ -226,6 +258,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                                   <th className="py-1.5 pr-4 text-right font-semibold">月額基本料</th>
                                   <th className="py-1.5 pr-4 text-right font-semibold">ID料金</th>
                                   <th className="py-1.5 pr-4 text-right font-semibold">請求金額</th>
+                                  <th className="py-1.5 pr-4 text-right font-semibold">会社への還元</th>
                                   <th className="py-1.5 pr-4 text-center font-semibold">請求日</th>
                                   <th className="py-1.5 pr-4 text-center font-semibold">支払期限</th>
                                   <th className="py-1.5 text-center font-semibold">状態</th>
@@ -244,7 +277,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                                       <SourceNote row={historyRow} />
                                     </td>
                                     <td className="py-1.5 pr-4 text-right text-slate-700">
-                                      {historyRow.activeEmployees.toLocaleString("ja-JP")}名
+                                      {historyRow.billableEmployees.toLocaleString("ja-JP")}名
                                     </td>
                                     <td className="py-1.5 pr-4 text-right text-slate-700">
                                       {formatYen(historyRow.monthlyBaseFee)}
@@ -254,6 +287,9 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                                     </td>
                                     <td className="py-1.5 pr-4 text-right font-semibold text-sky-700">
                                       {formatYen(historyRow.amountYen)}
+                                    </td>
+                                    <td className="py-1.5 pr-4 text-right">
+                                      <PointReturnCell row={historyRow} pointUnitLabel={company.pointUnitLabel} />
                                     </td>
                                     <td className="py-1.5 pr-4 text-center text-slate-700">
                                       {formatDate(historyRow.billingDate)}
@@ -283,6 +319,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
                     合計
                   </td>
                   <td className="py-2 pr-4 text-right text-sky-700">{formatYen(totalAmountYen)}</td>
+                  <td className="py-2 pr-4" />
                   <td className="py-2" />
                 </tr>
               </tfoot>
@@ -295,6 +332,7 @@ export default function CompanyBillingList({ data, operatorName }: Props) {
         ※ 過去月はその月の最終時点の記録（月内に変更がなかった月は直前の記録）から算出しています。
         {hasEstimatedRow ? " 「※」の付いた月は当時の記録がないため、現在の設定値で算出した参考値です。" : ""}
         月額基本料・ID料金は「企業登録」の編集から変更できます。
+        「会社への還元」は、ID料金分のポイントのうち従業員が獲得しなかった分を翌月 1 日の日次バッチで会社ポイントへ戻した量です（2026年11月分から）。
       </p>
     </div>
   );

@@ -64,6 +64,7 @@ type EmployeeFormFields = {
   street?: string;
   building?: string;
   roles: EmployeeAssignableRole[];
+  // 利用開始日（YYYY-MM-DD）。
   joinedAt: string;
 };
 
@@ -96,6 +97,8 @@ export type EmployeeManagementSummary = {
   departmentCount: number;
   totalEmployeePoints: number;
   companyPointBalance: number;
+  // 最後に会社ポイントへ還元した月（YYYY-MM）と還元したポイント。まだ一度も還元していなければ undefined。
+  latestCompanyPointReturn?: { month: string; returnedPoints: number };
   averageCompletionRate: number;
   pointUnitLabel: string;
   departmentOptions: EmployeeDepartmentOption[];

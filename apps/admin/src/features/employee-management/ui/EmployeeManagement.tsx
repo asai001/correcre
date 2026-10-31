@@ -100,6 +100,11 @@ function formatDate(value?: string) {
   return value || "-";
 }
 
+function formatYearMonth(month: string) {
+  const [year, mon] = month.split("-");
+  return `${year}年${Number(mon)}月`;
+}
+
 function formatNumber(value: number) {
   return value.toLocaleString("ja-JP");
 }
@@ -156,7 +161,7 @@ function buildExportRows(employees: EmployeeManagementEmployee[]) {
       "ポイント",
       "翌月反映予定ポイント",
       "達成率",
-      "入社日",
+      "利用開始日",
       "最終ログイン",
     ],
     ...employees.map((employee) => [
@@ -197,7 +202,7 @@ function getEmployeeColumns(
           <div className="font-semibold text-slate-900">{row.name}</div>
           <div className="mt-1 text-xs text-slate-500">{row.nameKana || "-"}</div>
           <div className="mt-1 text-xs text-slate-500">
-            {row.userId} / 入社日 {formatDate(row.joinedAt)}
+            {row.userId} / 利用開始日 {formatDate(row.joinedAt)}
           </div>
         </div>
       ),
@@ -667,7 +672,11 @@ export default function EmployeeManagement({ companyId, adminUserId }: EmployeeM
         <StatCard
           label="会社ポイント残高"
           value={`${formatNumber(summary.companyPointBalance)}${pointUnitLabel}`}
-          description="会社が保有しているポイント残高"
+          description={
+            summary.latestCompanyPointReturn
+              ? `会社が保有しているポイント残高（${formatYearMonth(summary.latestCompanyPointReturn.month)}分の未獲得 +${formatNumber(summary.latestCompanyPointReturn.returnedPoints)}${pointUnitLabel} を還元済み）`
+              : "会社が保有しているポイント残高"
+          }
           accentClassName="bg-blue-500"
         />
       </section>

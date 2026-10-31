@@ -22,20 +22,23 @@ export function buildCompanyMonthlyBillingSnapshot(params: {
   month: string;
   status: Company["status"];
   activeEmployees: number;
+  billableEmployees: number;
   monthlyBaseFee?: number;
   perEmployeeMonthlyFee: number;
   capturedAt: string;
 }) {
   const activeEmployees = Math.max(0, Math.trunc(params.activeEmployees));
+  const billableEmployees = Math.max(0, Math.trunc(params.billableEmployees));
   const monthlyBaseFee = Math.max(0, Math.trunc(params.monthlyBaseFee ?? 0));
   const perEmployeeMonthlyFee = Math.max(0, Math.trunc(params.perEmployeeMonthlyFee));
   const monthlyIncomeYen =
-    params.status === "INACTIVE" ? 0 : monthlyBaseFee + activeEmployees * perEmployeeMonthlyFee;
+    params.status === "INACTIVE" ? 0 : monthlyBaseFee + billableEmployees * perEmployeeMonthlyFee;
 
   return {
     month: params.month,
     status: params.status,
     activeEmployees,
+    billableEmployees,
     monthlyBaseFee,
     perEmployeeMonthlyFee,
     monthlyIncomeYen,

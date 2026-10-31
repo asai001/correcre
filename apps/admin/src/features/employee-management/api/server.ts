@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { nowYYYYMMDD, reflectPoints } from "@correcre/lib";
+import { reflectPoints } from "@correcre/lib";
 import {
   createCognitoUser,
   deleteCognitoUser,
@@ -8,6 +8,7 @@ import {
   updateCognitoUserEmail,
 } from "@correcre/lib/cognito/user";
 import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { countCompanyEmployees } from "@correcre/lib/company-billing";
 import { getDynamoDocumentClient } from "@correcre/lib/dynamodb/client";
 import {
   buildCompanyMonthlyBillingSnapshot,
@@ -113,6 +114,10 @@ function normalizeRoles(roles?: DBUserRole[]) {
   }
 
   return roles.filter(isEmployeeManagementRole);
+}
+
+function hasEmployeeRole(roles?: DBUserRole[]) {
+  return normalizeRoles(roles).includes("EMPLOYEE");
 }
 
 function normalizeUserStatus(status: DBUserItem["status"]): EmployeeManagementStatus | "DELETED" {
@@ -334,7 +339,7 @@ function normalizeEmployeeInput(input: CreateEmployeeInput | UpdateEmployeeInput
   }
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) {
-    throw new Error("入社日は YYYY-MM-DD 形式で入力してください");
+    throw new Error("利用開始日は YYYY-MM-DD 形式で入力してください");
   }
 
   if (phoneNumber && !isValidPhoneNumber(phoneNumber)) {
@@ -405,7 +410,7 @@ function buildOperatorUserCreatedEmailBody(params: {
 メールアドレス：${params.email}
 所属部署：${params.departmentName}
 権限：${roleLabels}
-入社日：${params.joinedAt.replace(/-/g, "/")}
+利用開始日：${params.joinedAt.replace(/-/g, "/")}
 
 ■ 登録操作
 操作者：${params.actorName}
@@ -526,13 +531,13 @@ async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, u
       companyId,
     ),
   ]);
-  const currentUsers = users.filter((user) => user.status !== "DELETED");
-  const activeUsers = currentUsers.filter((user) => user.status === "ACTIVE");
+  const employeeCounts = countCompanyEmployees(users);
   const billingSnapshot = company
     ? buildCompanyMonthlyBillingSnapshot({
         month: toBillingSnapshotMonth(updatedAt),
         status: company.status,
-        activeEmployees: activeUsers.length,
+        activeEmployees: employeeCounts.activeEmployees,
+        billableEmployees: employeeCounts.billableEmployees,
         monthlyBaseFee: company.monthlyBaseFee ?? 0,
         perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
         capturedAt: updatedAt,
@@ -547,11 +552,12 @@ async function syncCompanyUserCounts(config: RuntimeConfig, companyId: string, u
         companyId,
       },
       UpdateExpression: billingSnapshot
-        ? "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt"
-        : "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, updatedAt = :updatedAt",
+        ? "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, billableEmployees = :billableEmployees, monthlyBillingSnapshots = :monthlyBillingSnapshots, updatedAt = :updatedAt"
+        : "SET totalEmployees = :totalEmployees, activeEmployees = :activeEmployees, billableEmployees = :billableEmployees, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
-        ":totalEmployees": currentUsers.length,
-        ":activeEmployees": activeUsers.length,
+        ":totalEmployees": employeeCounts.totalEmployees,
+        ":activeEmployees": employeeCounts.activeEmployees,
+        ":billableEmployees": employeeCounts.billableEmployees,
         ...(billingSnapshot && company
           ? {
               ":monthlyBillingSnapshots": upsertCompanyMonthlyBillingSnapshot(company, billingSnapshot),
@@ -578,6 +584,13 @@ async function touchCompany(config: RuntimeConfig, companyId: string, updatedAt:
       },
     }),
   );
+}
+
+// 最後に会社ポイントへ還元した月と量（会社ポイント残高のカードに添える）。
+function toLatestCompanyPointReturn(company: Company | null) {
+  const month = company?.lastCompanyPointReturnMonth;
+  const record = month ? company?.companyPointReturns?.[month] : undefined;
+  return month && record ? { month, returnedPoints: record.returnedPoints } : undefined;
 }
 
 export async function getEmployeeManagementSummaryFromDynamo(
@@ -636,6 +649,7 @@ export async function getEmployeeManagementSummaryFromDynamo(
     departmentCount: departmentOptions.length,
     totalEmployeePoints,
     companyPointBalance: company?.companyPointBalance ?? 0,
+    latestCompanyPointReturn: toLatestCompanyPointReturn(company),
     averageCompletionRate: activeEmployees.length ? Math.round(totalCompletionRate / activeEmployees.length) : 0,
     pointUnitLabel: company?.pointUnitLabel ?? "pt",
     departmentOptions,
@@ -667,8 +681,8 @@ export async function createEmployeeInDynamo(
     ),
   ]);
 
-  const registeredAt = nowYYYYMMDD();
-  const normalizedInput = normalizeEmployeeInput({ ...input, joinedAt: registeredAt }, departments);
+  // 利用開始日は管理者が指定する（月の途中で登録しても翌月 1 日から使い始められるように）。
+  const normalizedInput = normalizeEmployeeInput(input, departments);
 
   if (normalizedInput.roles.includes("OPERATOR")) {
     throw new Error("運用者権限のユーザーは作成できません");
@@ -1109,6 +1123,14 @@ export async function updateEmployeeInDynamo(
     }
 
     throw error;
+  }
+
+  // 従業員ロールの有無・利用開始日で請求対象人数が変わるため、会社の在籍者数・当月課金スナップショットを再集計する。
+  if (
+    hasEmployeeRole(targetUser.roles) !== hasEmployeeRole(finalRoles) ||
+    targetUser.joinedAt !== normalizedInput.joinedAt
+  ) {
+    await syncCompanyUserCounts(config, companyId, now);
   }
 
   const updatedEmployee = toEmployee({

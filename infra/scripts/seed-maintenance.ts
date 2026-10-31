@@ -367,6 +367,7 @@ function buildCompanyItem(spec: CompanySpec, now: string): DynamoItem {
     companyPointBalance,
     totalEmployees: USERS.length,
     activeEmployees: USERS.length,
+    billableEmployees: USERS.length,
     pointUnitLabel: "pt",
     pointConversionRate: 1,
     pointExpirationMonths: 12,
