@@ -63,7 +63,12 @@ export default function UsersDocPage() {
                       <strong>従業員</strong>（ミッション報告をする人）か<strong>管理者</strong>（この画面を使う人）か、または両方を選びます。ふつうの従業員は「従業員」だけにします。
                     </>
                   ) },
-                { name: "入社日", required: false, description: "登録した日が自動で入ります（あとから編集画面で変更できます）。" },
+                { name: "利用開始日", required: true, description: (
+                    <>
+                      この日から<strong>月額の利用人数</strong>に数えられ、分析の対象にもなります。最初は<strong>翌月 1 日</strong>が入っています（今日が 1 日なら今日）。
+                      月の途中で登録するときは、原則として翌月 1 日のままにしてください。あとから編集画面で変更できます。
+                    </>
+                  ) },
                 { name: "メールアドレス", required: true, description: "ログイン ID になり、招待メールの宛先にもなります。ほかの人と同じメールアドレスは登録できません。" },
                 { name: "電話番号", required: false, description: "数字とハイフンで 10 けたまたは 11 けた。", example: "090-1234-5678" },
                 { name: "都道府県・郵便番号・市区町村・丁目・番地・建物名", required: false, description: "住所です。ポイント交換で商品を受け取るときのお届け先になります。従業員本人があとから登録することもできます。" },
@@ -94,7 +99,7 @@ export default function UsersDocPage() {
         <Shot name="users-list" alt="ユーザー一覧の表。氏名、部署・権限・状態、連絡先、ポイント、操作" />
         <ul className="list-disc space-y-2 pl-6">
           <li>
-            <strong>氏名</strong>：お名前・フリガナ・ユーザー ID・入社日。
+            <strong>氏名</strong>：お名前・フリガナ・ユーザー ID・利用開始日。
           </li>
           <li>
             <strong>部署 / 権限 / 状態</strong>：部署名、権限（従業員・管理者）、状態、認証連携のバッジが並びます（意味は下の表）。
@@ -171,7 +176,7 @@ export default function UsersDocPage() {
       <Section id="csv" title="一覧を CSV に保存する">
         <p>
           <Ui>CSV 出力</Ui> を押すと、<strong>いま表示している（検索・部署で絞り込んだあとの）</strong>一覧が CSV ファイルとしてダウンロードされます。
-          氏名・部署・権限・状態・連絡先・住所・ポイント・達成率・入社日・最終ログインが含まれます。Excel などで開けます。
+          氏名・部署・権限・状態・連絡先・住所・ポイント・達成率・利用開始日・最終ログインが含まれます。Excel などで開けます。
         </p>
         <Callout kind="caution">
           <p>CSV には従業員の個人情報が含まれます。取り扱いにはご注意ください。</p>

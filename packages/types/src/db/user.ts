@@ -26,7 +26,7 @@ export type DBUserItem = {
   departmentName?: string;
   roles: DBUserRole[];
   status: DBUserStatus;
-  // 利用開始日（YYYY-MM-DD, 日本時間）。この日からポイント・請求の対象になる。属性名は旧称「入社日」のまま。
+  // 利用開始日（YYYY-MM-DD, 日本時間）。この日から月額請求の利用人数に数え、分析の開始日にもなる。属性名は旧称「入社日」のまま。
   joinedAt?: string;
   lastLoginAt?: string;
   // 招待メール（仮パスワード）を最後に送信した日時（ISO 8601）。招待メール再送のたびに更新する。

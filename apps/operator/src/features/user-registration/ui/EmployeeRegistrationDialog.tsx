@@ -429,7 +429,7 @@ export default function EmployeeRegistrationDialog({
               helperText={
                 hasSubmitted && validation.joinedAt
                   ? "利用開始日を入力してください"
-                  : "原則として翌月 1 日。この日からポイント・請求の対象になります"
+                  : "原則として翌月 1 日。この日から月額の利用人数に数えます"
               }
             />
           </div>

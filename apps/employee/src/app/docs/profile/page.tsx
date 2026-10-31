@@ -59,7 +59,7 @@ export default function ProfileDocPage() {
         </Callout>
         <Callout kind="info" title="変更できない項目">
           <p>
-            所属部署・権限・入社日は、ご自身では変更できません。変更が必要な場合は会社の管理者にご相談ください。
+            所属部署・権限・利用開始日は、ご自身では変更できません。変更が必要な場合は会社の管理者にご相談ください。
             管理者は <strong>ユーザー管理</strong> の画面からこれらを変更できます。
           </p>
         </Callout>

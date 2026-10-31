@@ -18,7 +18,7 @@ const CARDS = [
   { name: "管理対象従業員数", desc: "現在「有効」になっている従業員の人数です。月額のID料金はこの人数で計算されます。" },
   { name: "先月総獲得ポイント", desc: "先月 1 か月に、従業員全員がミッションの報告で獲得したポイントの合計です。" },
   { name: "今月交換ポイント", desc: "今月、従業員がポイント交換の申請で使ったポイントの合計です。" },
-  { name: "企業保有ポイント", desc: "会社として保有しているポイントの残高です。従業員へのポイント付与の原資になります。" },
+  { name: "企業保有ポイント", desc: "会社として保有しているポイントの残高です。従業員へのポイント付与の原資になります。従業員が獲得しなかったポイントも毎月ここに戻ります。" },
 ];
 
 export default function DashboardDocPage() {
@@ -100,7 +100,8 @@ export default function DashboardDocPage() {
         </div>
         <Callout kind="info" title="企業保有ポイントについて">
           <p>
-            企業保有ポイントは、運用者が契約内容に応じて設定・補充します。残高の増減についてご不明な点は、<DocLink href="/docs/support">運用者にお問い合わせ</DocLink>ください。
+            企業保有ポイントは、運用者が契約内容に応じて設定・補充します。また、従業員がその月に獲得しなかったポイントが翌月 1 日に戻ります（
+            <DocLink href="/docs/billing#point-return">会社ポイントへの還元</DocLink>）。残高の増減についてご不明な点は、<DocLink href="/docs/support">運用者にお問い合わせ</DocLink>ください。
           </p>
         </Callout>
       </Section>
