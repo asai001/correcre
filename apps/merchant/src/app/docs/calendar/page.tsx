@@ -22,7 +22,7 @@ export default function CalendarDocPage() {
 
       <Section id="screen" title="画面の使い方">
         <p>
-          上部メニューの <Ui>休業日カレンダー</Ui> を押すと、次の画面が開きます。
+          上部メニューの <Ui>各種設定</Ui> を開き、<Ui>休業日カレンダー</Ui> を押すと、次の画面が開きます。
         </p>
         <Shot name="calendar" alt="休業日カレンダーの画面。番号1から5で操作箇所が示されている" />
         <ol className="space-y-4">

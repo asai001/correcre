@@ -76,7 +76,7 @@ export default function SettlementDocPage() {
         <Callout kind="info" title="お支払いについて">
           <p>
             売上が 0 円の月は送信できません。お支払いの時期・振込手数料などの条件は、「コレクレ アイテム提携企業向け規約」第8条をご確認ください。
-            振込先は <Ui>会社情報</Ui> の画面で確認・変更できます。
+            振込先は <Ui>各種設定</Ui> の <Ui>会社情報</Ui> の画面で確認・変更できます。
           </p>
         </Callout>
       </Section>

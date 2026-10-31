@@ -36,7 +36,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // ナビの管理者専用項目（収支・精算 / 会社情報 / ユーザー管理）の表示判定。
+  // ナビの管理者専用項目（収支・精算 / 会社情報 / ユーザー管理）とフッターの表示判定。
   // 未ログイン画面（ログイン・登録申請など）では、セッション Cookie が無ければ
   // DB 参照なしで即 false になる。
   const access = await getMerchantAccessStatus();
@@ -48,7 +48,7 @@ export default async function RootLayout({
         <AppRouterCacheProvider options={{ enableCssLayer: true }}>
           <Providers>
             <SessionExpiryGuard />
-            <MerchantViewerProvider isAdmin={isAdmin}>
+            <MerchantViewerProvider isSignedIn={access.allowed} isAdmin={isAdmin}>
               <LayoutShell>{children}</LayoutShell>
             </MerchantViewerProvider>
           </Providers>

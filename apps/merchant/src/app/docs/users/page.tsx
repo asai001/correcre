@@ -23,7 +23,7 @@ export default function UsersDocPage() {
       <Section id="invite" title="ユーザーを招待する">
         <Shot name="users" alt="ユーザー管理の画面。招待フォームと登録済みのユーザーの一覧" />
         <Steps>
-          <Step number={1} title={<>上部メニューの <Ui>ユーザー管理</Ui> を開きます</>}/>
+          <Step number={1} title={<>上部メニューの <Ui>各種設定</Ui> を開き、<Ui>ユーザー管理</Ui> を押します</>}/>
           <Step number={2} title={<><Mark>1</Mark> 招待する方のお名前とメールアドレスを入力します</>}>
             <p>
               <Ui>姓</Ui>・<Ui>名</Ui>・<Ui>メールアドレス</Ui> は必須です。メールアドレスがその方のログインID になります。カナ・電話番号は任意です。
