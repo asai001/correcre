@@ -108,6 +108,11 @@ export default function DashboardDocPage() {
             </tbody>
           </table>
         </div>
+        <p>
+          <Ui>各種設定</Ui> を押すと、次のように <Mark>1</Mark> <Ui>休業日カレンダー</Ui>・<Mark>2</Mark> <Ui>会社情報</Ui>・<Mark>3</Mark> <Ui>ユーザー管理</Ui> の 3 つの入口が表示されます。
+          開きたいものを押してください。
+        </p>
+        <Shot name="settings" alt="各種設定の画面。休業日カレンダー・会社情報・ユーザー管理の3つの入口" />
         <Callout kind="info" title="メニューの数が少ないときは">
           <p>
             <Ui>収支・精算</Ui> と、<Ui>各種設定</Ui> の中の <Ui>会社情報</Ui>・<Ui>ユーザー管理</Ui> は<strong>管理者</strong>にだけ表示されます。
@@ -117,6 +122,7 @@ export default function DashboardDocPage() {
         </Callout>
         <SubSection title="画面下部のメニュー">
           <p>どの画面でも、いちばん下に次のメニューがあります。</p>
+          <Shot name="footer" alt="画面下部のメニュー。問い合わせ・利用ガイド・利用規約" />
           <ul className="list-disc space-y-2 pl-6">
             {FOOTER_MENU.map((item) => (
               <li key={item.name}>
