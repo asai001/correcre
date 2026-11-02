@@ -90,7 +90,7 @@ export default function UsersDocPage() {
         <Callout kind="caution" title="仮パスワードの有効期限は 7 日間です">
           <p>
             招待メールの仮パスワードは、送信から <strong>7 日間</strong>で使えなくなります。期限が切れた従業員は、一覧に <StatusChip status="仮パスワード期限切れ" /> と表示されます。
-            下の「招待メールを再送する」の手順で、新しい仮パスワードを送ってください。
+            下の「招待メールを再送する」の手順で、新しい仮パスワードを送ってください。期限内でも、メールが見つからない場合などは再送できます。
           </p>
         </Callout>
       </Section>
@@ -111,7 +111,7 @@ export default function UsersDocPage() {
             <strong>ポイント</strong>：いま使えるポイント、翌月反映予定のポイント、今月の達成率。
           </li>
           <li>
-            <strong>操作</strong>：<Mark>1</Mark> 鉛筆のマークで編集（<DocLink href="/docs/user-edit">ユーザー情報の編集とポイント調整</DocLink>）。仮パスワード期限切れの人には <Mark>2</Mark> 紙飛行機のマーク（招待メールを再送）も表示されます。
+            <strong>操作</strong>：<Mark>1</Mark> 鉛筆のマークで編集（<DocLink href="/docs/user-edit">ユーザー情報の編集とポイント調整</DocLink>）。招待中の人には <Mark>2</Mark> 紙飛行機のマーク（招待メールを再送）も表示されます。
           </li>
         </ul>
         <SubSection title="状態のバッジの意味">
@@ -155,8 +155,11 @@ export default function UsersDocPage() {
 
       <Section id="resend" title="招待メールを再送する">
         <Steps>
-          <Step number={1} title={<>一覧で <StatusChip status="仮パスワード期限切れ" /> の人の行の、紙飛行機のマークを押します</>}>
-            <Shot name="users-row-expired" alt="仮パスワード期限切れのユーザーの行。操作列に再送アイコンがある" />
+          <Step number={1} title={<>一覧で <StatusChip status="招待中" /> の人の行の、紙飛行機のマークを押します</>}>
+            <Shot name="users-row-expired" alt="招待中（仮パスワード期限切れ）のユーザーの行。操作列に再送アイコンがある" />
+            <p>
+              仮パスワードの期限が切れた人だけでなく、期限内の招待中の人にも再送できます。
+            </p>
           </Step>
           <Step number={2} title={<>内容を確認して <Mark>1</Mark> <Ui>再送する</Ui> を押します</>}>
             <Shot name="users-resend" alt="招待メールを再送の確認ダイアログ" maxWidth={640} />
@@ -165,9 +168,10 @@ export default function UsersDocPage() {
             </p>
           </Step>
         </Steps>
-        <Callout kind="info" title="期限内なのにログインできないと言われたら">
+        <Callout kind="info" title="招待メールが届かない・ログインできないと言われたら">
           <p>
-            再送のボタンは、期限が切れた人にだけ表示されます。期限内の場合は、メールの迷惑メールフォルダの確認、仮パスワードの前後の空白、メールアドレスの入力ミスをまず確認してもらってください。
+            まず、迷惑メールフォルダ（送信元は「no-reply@correcre.jp」）、仮パスワードの前後の空白、メールアドレスの入力ミスを確認してもらってください。
+            迷惑メールに振り分けられていた場合は、再送しても同じように振り分けられることがあるため、送信元を受信許可に登録してもらってから再送すると確実です。
             それでも解決しない場合は、運用者にお問い合わせください。
           </p>
         </Callout>

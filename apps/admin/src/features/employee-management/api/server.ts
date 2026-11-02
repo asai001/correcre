@@ -814,13 +814,10 @@ export async function resendEmployeeInvitationInDynamo(
     throw new Error("Employee not found");
   }
 
-  // 招待中（初回パスワード未設定）のユーザーで、かつ仮パスワードが有効期限切れの場合のみ再送できる。
+  // 招待中（初回パスワード未設定）のユーザーなら、仮パスワードの有効期限内でも再送できる。
+  // 招待メールが迷惑メールに振り分けられて見つからない場合などに、期限切れを待たずに送り直すため。
   if (targetUser.status !== "INVITED") {
     throw new Error("招待中のユーザーのみ招待メールを再送できます");
-  }
-
-  if (!isInvitationExpired(targetUser)) {
-    throw new Error("仮パスワードの有効期限が切れていないため招待メールを再送できません");
   }
 
   // AdminCreateUser（MessageAction=RESEND）はユーザープールが email をユーザー名属性と

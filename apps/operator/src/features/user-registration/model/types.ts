@@ -34,7 +34,7 @@ export type EmployeeManagementEmployee = {
   departmentName?: string;
   roles: EmployeeManagementRole[];
   status: EmployeeManagementStatus;
-  // 招待中 (INVITED) かつ仮パスワードの有効期限が切れている場合に true。招待メール再送の可否判定に使う。
+  // 招待中 (INVITED) かつ仮パスワードの有効期限が切れている場合に true。「仮パスワード期限切れ」バッジの表示に使う。
   invitationExpired: boolean;
   authLinkStatus: EmployeeAuthLinkStatus;
   email: string;

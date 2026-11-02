@@ -288,7 +288,7 @@ function getEmployeeColumns(
       width: "10%",
       render: (row) => (
         <div className="flex items-center justify-center gap-1">
-          {row.status === "INVITED" && row.invitationExpired ? (
+          {row.status === "INVITED" ? (
             <IconButton
               size="small"
               aria-label={`${row.name}に招待メールを再送`}

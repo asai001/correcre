@@ -291,7 +291,7 @@ function getEmployeeColumns(
       align: "center",
       width: "8%",
       render: (row) => {
-        const canResendInvitation = row.status === "INVITED" && row.invitationExpired;
+        const canResendInvitation = row.status === "INVITED";
         // 運用者アカウントを削除すると運用者自身のセッションが壊れ操作不能になるため、削除不可。
         const canDelete = !row.roles.includes("OPERATOR");
 
