@@ -1,0 +1,150 @@
+"use client";
+
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faClockRotateLeft, faPenToSquare, faCalendarCheck } from "@fortawesome/free-solid-svg-icons";
+import { Button } from "@mui/material";
+
+import { resolveAnalysisThresholds } from "@correcre/lib/analysis-thresholds";
+import type { AnalysisThresholds } from "@correcre/types";
+import type { MissionSlotSummary } from "../model/types";
+
+type MissionCardProps = {
+  mission: MissionSlotSummary;
+  onEdit: () => void;
+  onHistory: () => void;
+  onCancelSchedule: () => void;
+  cancelingSchedule?: boolean;
+  // 企業の項目分析の既定閾値（未設定なら null）。個別設定が無いミッションの実効値表示に使う。
+  companyThresholds: AnalysisThresholds | null;
+  // 未設定スロットに表示する案内文。アプリ（運用者 / 管理者）ごとに言い回しを変えられるようにする。
+  emptySlotDescription?: string;
+};
+
+export const DEFAULT_EMPTY_SLOT_DESCRIPTION = "企業登録時には自動生成されません。「新規設定」から設定してください。";
+
+export default function MissionCard({
+  mission,
+  onEdit,
+  onHistory,
+  onCancelSchedule,
+  cancelingSchedule,
+  companyThresholds,
+  emptySlotDescription = DEFAULT_EMPTY_SLOT_DESCRIPTION,
+}: MissionCardProps) {
+  const actionLabel = mission.configured ? "編集" : "新規設定";
+  const pending = mission.pendingChange;
+  const effectiveThresholds = resolveAnalysisThresholds(mission.analysisThresholds, companyThresholds);
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-sm shadow-slate-200/50">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+            スロット {mission.slotIndex}
+          </span>
+          {mission.configured && !mission.enabled ? (
+            <span className="ml-2 inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600">
+              無効
+            </span>
+          ) : null}
+        </div>
+        <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500">
+          {mission.configured ? `v${mission.version}` : "未設定"}
+        </span>
+      </div>
+
+      {mission.configured ? (
+        <>
+          <h3 className="mt-3 text-lg font-bold text-slate-900">{mission.title}</h3>
+          <p className="mt-1 line-clamp-2 text-sm text-slate-500">{mission.description}</p>
+
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">{mission.category}</span>
+            <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">
+              月 {mission.monthlyCount} 回
+            </span>
+            <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">
+              {mission.score} pt
+            </span>
+            <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600">
+              {mission.fields.length} フィールド
+            </span>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500">
+            項目分析の閾値: 高 {effectiveThresholds.goodRate}% 以上 / 改善 {effectiveThresholds.improvementRate}% 以下
+            <span className="ml-1 text-slate-400">
+              {mission.analysisThresholds ? "（このミッションの個別設定）" : "（企業の既定値）"}
+            </span>
+          </div>
+
+          {pending ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+                <FontAwesomeIcon icon={faCalendarCheck} />
+                <span>{pending.effectiveYearMonth} の月初から反映予定</span>
+              </div>
+              <p className="mt-1 line-clamp-1 text-sm text-amber-900">
+                予約中の内容: {pending.title}
+              </p>
+              <Button
+                variant="text"
+                size="small"
+                onClick={onCancelSchedule}
+                disabled={cancelingSchedule}
+                sx={{
+                  mt: 0.5,
+                  px: 0,
+                  minWidth: 0,
+                  textTransform: "none",
+                  color: "#b45309",
+                  "&:hover": { backgroundColor: "transparent", textDecoration: "underline" },
+                }}
+              >
+                {cancelingSchedule ? "取り消し中..." : "予約を取り消す"}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5">
+          <h3 className="text-lg font-bold text-slate-900">このスロットは未設定です</h3>
+          <p className="mt-1 text-sm text-slate-500">{emptySlotDescription}</p>
+        </div>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<FontAwesomeIcon icon={faPenToSquare} />}
+          onClick={onEdit}
+          sx={{
+            borderRadius: "12px",
+            textTransform: "none",
+            backgroundColor: "#0f766e",
+            "&:hover": { backgroundColor: "#115e59" },
+          }}
+        >
+          {actionLabel}
+        </Button>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<FontAwesomeIcon icon={faClockRotateLeft} />}
+          onClick={onHistory}
+          disabled={!mission.configured}
+          sx={{
+            borderRadius: "12px",
+            textTransform: "none",
+            borderColor: "#cbd5e1",
+            color: "#475569",
+            "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+          }}
+        >
+          履歴
+        </Button>
+      </div>
+    </div>
+  );
+}

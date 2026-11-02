@@ -139,7 +139,7 @@ export default function CalendarPage({ initial, merchantName, merchantDisplayNam
         adminName={merchantName}
         merchantDisplayName={merchantDisplayName}
         subtitle="お届け候補日の自動生成から除外する日を登録します"
-        backHref="/dashboard"
+        backHref="/settings"
       />
 
       {error ? <Alert severity="error">{error}</Alert> : null}

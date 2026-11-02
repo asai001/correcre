@@ -76,7 +76,7 @@ CDK の定義は [`lib/dynamodb.ts`](./lib/dynamodb.ts) に集約し、[`lib/inf
 | --- | --- |
 | PK | `companyId = <companyId>` |
 | SK | なし |
-| 主な属性 | `name`, `status`, `plan`, `perEmployeeMonthlyFee`, `companyPointBalance`, `totalEmployees`, `activeEmployees`, `philosophy`, `createdAt`, `updatedAt` |
+| 主な属性 | `name`, `status`, `plan`, `perEmployeeMonthlyFee`, `companyPointBalance`, `totalEmployees`, `activeEmployees`, `billableEmployees`, `philosophy`, `createdAt`, `updatedAt` |
 | GSI | なし |
 
 `philosophy` には以下を保持します。

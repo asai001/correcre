@@ -6,15 +6,13 @@ import type { Route } from "next";
 
 import {
   faArrowLeft,
+  faBookOpen,
   faBoxesStacked,
-  faBuilding,
-  faCalendarDays,
   faFileInvoice,
   faGauge,
-  faHeadset,
+  faGear,
   faRightLeft,
   faUserShield,
-  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -28,23 +26,32 @@ type NavItem = {
   icon: IconDefinition;
   // 管理者ロール（MERCHANT_ADMIN）を持つユーザーにのみ表示する項目。
   adminOnly?: boolean;
+  // この項目を選択中として扱う、href 以外のパス（各種設定から開く画面など）。
+  activePaths?: string[];
 };
 
+// 休業日カレンダー・会社情報・ユーザー管理は「各種設定」（/settings）から開く。
+// 問い合わせ・利用規約はフッター（MerchantFooter）に置く。
 const NAV_ITEMS: NavItem[] = [
   { label: "ダッシュボード", href: "/dashboard" as Route, icon: faGauge },
   { label: "商品・サービス管理", href: "/merchandise" as Route, icon: faBoxesStacked },
   { label: "交換管理", href: "/exchanges" as Route, icon: faRightLeft },
-  { label: "休業日カレンダー", href: "/calendar" as Route, icon: faCalendarDays },
   { label: "収支・精算", href: "/settlement" as Route, icon: faFileInvoice, adminOnly: true },
-  { label: "会社情報", href: "/company-info" as Route, icon: faBuilding, adminOnly: true },
-  { label: "問い合わせ", href: "/support" as Route, icon: faHeadset },
-  { label: "ユーザー管理", href: "/users" as Route, icon: faUsers, adminOnly: true },
+  {
+    label: "各種設定",
+    href: "/settings" as Route,
+    icon: faGear,
+    activePaths: ["/calendar", "/company-info", "/users"],
+  },
 ];
 
-function isActiveNav(pathname: string | null, href: string): boolean {
+function matchesPath(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isActiveNav(pathname: string | null, item: NavItem): boolean {
   if (!pathname) return false;
-  if (pathname === href) return true;
-  return pathname.startsWith(`${href}/`);
+  return [item.href, ...(item.activePaths ?? [])].some((href) => matchesPath(pathname, href));
 }
 
 type AdminPageHeaderProps = {
@@ -102,7 +109,7 @@ export default function AdminPageHeader({
         <div className="container mx-auto flex flex-wrap items-center justify-between gap-4 px-6">
           <ul className="flex flex-wrap items-center gap-1">
             {navItems.map((item) => {
-              const active = isActiveNav(pathname, item.href);
+              const active = isActiveNav(pathname, item);
               return (
                 <li key={item.href}>
                   <Link
@@ -120,16 +127,20 @@ export default function AdminPageHeader({
                 </li>
               );
             })}
+            <li>
+              {/* 操作ガイドはログイン不要の公開ページ。作業中の画面を残せるよう別タブで開く。 */}
+              <Link
+                href={"/docs" as Route}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-white/75 transition hover:border-white/40 hover:text-white"
+              >
+                <FontAwesomeIcon icon={faBookOpen} className="text-xs" />
+                利用ガイド
+              </Link>
+            </li>
           </ul>
           <div className="flex items-center gap-2 py-2">
-            <Link
-              href={"/terms" as Route}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full px-4 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
-              利用規約
-            </Link>
             <form action={logout}>
               <button
                 type="submit"

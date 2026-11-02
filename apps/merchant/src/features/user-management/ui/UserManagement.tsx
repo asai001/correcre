@@ -98,6 +98,7 @@ export default function UserManagement({ initialUsers, merchantUserName, merchan
         adminName={merchantUserName}
         merchantDisplayName={merchantDisplayName}
         subtitle="自社のログインユーザーを招待・管理します"
+        backHref="/settings"
       />
 
       <section className="rounded-[28px] bg-white p-6 shadow-lg shadow-slate-200/70">

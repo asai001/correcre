@@ -11,6 +11,7 @@ import {
   upsertCompanyMonthlyBillingSnapshot,
 } from "./dynamodb/company";
 import { validateAnalysisThresholds } from "./analysis-thresholds";
+import { getCompanyBillableEmployees } from "./company-billing";
 import { readRequiredServerEnv } from "./env/server";
 
 import type { Company, CompanyPhilosophy } from "@correcre/types";
@@ -279,6 +280,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     month: toBillingSnapshotMonth(now),
     status: input.status,
     activeEmployees: 0,
+    billableEmployees: 0,
     monthlyBaseFee,
     perEmployeeMonthlyFee: input.perEmployeeMonthlyFee,
     capturedAt: now,
@@ -293,6 +295,7 @@ export async function createCompanyInDynamo(input: CreateCompanyInput): Promise<
     companyPointBalance: input.companyPointBalance,
     totalEmployees: 0,
     activeEmployees: 0,
+    billableEmployees: 0,
     monthlyBillingSnapshots: {
       [billingSnapshot.month]: billingSnapshot,
     },
@@ -381,6 +384,7 @@ export async function updateCompanyInDynamo(companyId: string, input: UpdateComp
     month: toBillingSnapshotMonth(updatedAt),
     status: effectiveStatus,
     activeEmployees: company.activeEmployees ?? 0,
+    billableEmployees: getCompanyBillableEmployees(company),
     monthlyBaseFee: effectiveMonthlyBaseFee,
     perEmployeeMonthlyFee: effectivePerEmployeeMonthlyFee,
     capturedAt: updatedAt,

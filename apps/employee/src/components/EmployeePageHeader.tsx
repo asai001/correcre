@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Route } from "next";
 
-import { faChartLine, faGauge, faGift, faReceipt } from "@fortawesome/free-solid-svg-icons";
+import { faBookOpen, faChartLine, faGauge, faGift, faReceipt } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -74,6 +74,18 @@ export default function EmployeePageHeader({ title, showPointExchangeLink, right
                 </li>
               );
             })}
+            <li>
+              {/* 操作ガイドはログイン不要の公開ページ。作業中の画面を残せるよう別タブで開く。 */}
+              <Link
+                href={"/docs" as Route}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border-b-2 border-transparent px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-white/40 hover:text-white"
+              >
+                <FontAwesomeIcon icon={faBookOpen} className="text-xs" />
+                利用ガイド
+              </Link>
+            </li>
           </ul>
           <form action={logout} className="py-2">
             <button

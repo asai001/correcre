@@ -107,9 +107,9 @@ function IncomeBreakdown({ rows }: { rows: CompanyIncomeRow[] }) {
             </div>
             <div className="flex justify-between gap-4">
               <dt>
-                ID料金（{formatYen(company.perEmployeeMonthlyFee)} × {company.activeEmployees.toLocaleString("ja-JP")}人）
+                ID料金（{formatYen(company.perEmployeeMonthlyFee)} × {company.billableEmployees.toLocaleString("ja-JP")}人）
               </dt>
-              <dd>{formatYen(company.perEmployeeMonthlyFee * company.activeEmployees)}</dd>
+              <dd>{formatYen(company.perEmployeeMonthlyFee * company.billableEmployees)}</dd>
             </div>
             <div className="flex justify-between gap-4 border-t border-slate-200 pt-1 font-semibold text-slate-800">
               <dt>合計</dt>
@@ -433,7 +433,7 @@ export default function FinanceDashboard({ data, operatorName }: Props) {
                   <tr key={company.companyId} className="border-b border-slate-100 last:border-b-0">
                     <td className="py-2 pr-4 font-semibold text-slate-700">{company.companyName}</td>
                     <td className="py-2 pr-4 text-right text-slate-700">
-                      {company.activeEmployees.toLocaleString("ja-JP")}名
+                      {company.billableEmployees.toLocaleString("ja-JP")}名
                     </td>
                     <td className="py-2 pr-4 text-right text-slate-700">{formatYen(company.monthlyBaseFee)}</td>
                     <td className="py-2 pr-4 text-right text-slate-700">{formatYen(company.perEmployeeMonthlyFee)}</td>

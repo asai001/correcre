@@ -1,14 +1,50 @@
-import type { Company } from "@correcre/types";
+import type { Company, DBUserRole, DBUserStatus } from "@correcre/types";
 
-import { toYYYYMM } from "./date/format";
+import { nowYYYYMMDD, toYYYYMM } from "./date/format";
 
 // 導入企業への月額利用料の請求（運用者 → 導入企業）に関する計算。
-// 金額 ＝ 月額基本料 + 利用人数（ACTIVE のユーザー数）× 月額単価（ID 料金）。無効（INACTIVE）の月は請求しない。
+// 金額 ＝ 月額基本料 + 利用人数（請求対象のユーザー数）× 月額単価（ID 料金）。無効（INACTIVE）の月は請求しない。
 // サーバー・クライアントのどちらからも使えるよう、DB アクセスは持たない純粋関数のみを置く。
 
 // 請求スケジュール。契約書の「月末締め・翌月 15 日払い」に合わせている。
 // 請求日（締め日）＝ 対象月の末日、支払期限 ＝ 翌月の PAYMENT_DUE_DAY 日。
 export const BILLING_PAYMENT_DUE_DAY = 15;
+
+// 月額請求の対象になるユーザーのステータス。招待された社員に登録を促すため、
+// 有効（ACTIVE）に加えて招待中（INVITED）も請求対象にする（2026-10-14 定例で合意、10-28 定例で維持）。
+const BILLABLE_USER_STATUSES: ReadonlySet<DBUserStatus> = new Set<DBUserStatus>(["ACTIVE", "INVITED"]);
+
+type CountableUser = { status: DBUserStatus; roles?: ReadonlyArray<DBUserRole>; joinedAt?: string };
+
+// 請求対象は「従業員」ロールを持ち、有効または招待中で、利用開始日（joinedAt）を迎えたユーザーだけ。
+// - 従業員ロールのない管理者・運用担当は請求人数に数えない（2026-10-28 定例で合意）。
+//   ロール未設定の古いレコードは、従業員管理画面と同じく従業員として扱う。
+// - 月の途中で登録しても利用開始日を翌月 1 日にしておけば、その日から数える（2026-10-28 定例で合意）。
+//   利用開始日を迎えた日に人数を数え直すのは運用者アプリの日次バッチ（/api/cron/company-daily）が担う。
+export function isBillableUser(user: CountableUser, asOfDate: string = nowYYYYMMDD()) {
+  if (!BILLABLE_USER_STATUSES.has(user.status) || !(user.roles ?? ["EMPLOYEE"]).includes("EMPLOYEE")) {
+    return false;
+  }
+  // YYYY-MM-DD は辞書順比較で日付の前後を判定できる。
+  return !user.joinedAt || user.joinedAt <= asOfDate;
+}
+
+// 新しく登録するユーザーの利用開始日の既定値。月の途中からは使い始めず翌月 1 日からとする
+// （2026-10-28 定例で合意）。今日が 1 日ならその日から。today は日本時間の YYYY-MM-DD。
+export function getDefaultUsageStartDate(today: string = nowYYYYMMDD()) {
+  return today.endsWith("-01") ? today : `${addMonths(today.slice(0, 7), 1)}-01`;
+}
+
+// 会社レコードに持たせる在籍者数（削除済みを除く総数・有効・請求対象）を数える。
+// asOfDate は日本時間の YYYY-MM-DD（既定は今日）。
+export function countCompanyEmployees(users: ReadonlyArray<CountableUser>, asOfDate: string = nowYYYYMMDD()) {
+  const currentUsers = users.filter((user) => user.status !== "DELETED");
+  return {
+    totalEmployees: currentUsers.length,
+    activeEmployees: currentUsers.filter((user) => user.status === "ACTIVE").length,
+    billableEmployees: currentUsers.filter((user) => isBillableUser(user, asOfDate)).length,
+  };
+}
 
 // 請求履歴として遡る最大月数（当月を含む）。
 export const BILLING_HISTORY_MAX_MONTHS = 24;
@@ -25,7 +61,7 @@ export type CompanyBillingSource = "live" | "snapshot" | "carried" | "estimated"
 export type CompanyBillingRow = {
   month: string; // 請求対象月 YYYY-MM
   status: CompanyBillingStatus;
-  activeEmployees: number;
+  billableEmployees: number; // 利用人数（請求対象のユーザー数）
   monthlyBaseFee: number;
   perEmployeeMonthlyFee: number;
   employeeFeeYen: number; // 利用人数 × 月額単価
@@ -43,6 +79,7 @@ type BillingCompany = Pick<
   | "monthlyBaseFee"
   | "perEmployeeMonthlyFee"
   | "activeEmployees"
+  | "billableEmployees"
   | "monthlyBillingSnapshots"
   | "contractStartsAt"
   | "createdAt"
@@ -90,18 +127,18 @@ export function getPaymentDueDate(month: string): string {
 
 export function calculateCompanyBillingAmount(params: {
   status: CompanyBillingStatus;
-  activeEmployees: number;
+  billableEmployees: number;
   monthlyBaseFee?: number;
   perEmployeeMonthlyFee: number;
 }) {
-  const activeEmployees = toNonNegativeInteger(params.activeEmployees);
+  const billableEmployees = toNonNegativeInteger(params.billableEmployees);
   const monthlyBaseFee = toNonNegativeInteger(params.monthlyBaseFee);
   const perEmployeeMonthlyFee = toNonNegativeInteger(params.perEmployeeMonthlyFee);
   const billable = params.status !== "INACTIVE";
-  const employeeFeeYen = billable ? activeEmployees * perEmployeeMonthlyFee : 0;
+  const employeeFeeYen = billable ? billableEmployees * perEmployeeMonthlyFee : 0;
 
   return {
-    activeEmployees,
+    billableEmployees,
     monthlyBaseFee,
     perEmployeeMonthlyFee,
     employeeFeeYen,
@@ -111,7 +148,7 @@ export function calculateCompanyBillingAmount(params: {
 }
 
 // 請求開始月（契約開始日、なければ企業作成日の月。日本時間）。
-export function getCompanyBillingStartMonth(company: BillingCompany): string | null {
+export function getCompanyBillingStartMonth(company: Pick<Company, "contractStartsAt" | "createdAt">): string | null {
   const source = company.contractStartsAt || company.createdAt;
   if (!source) {
     return null;
@@ -122,6 +159,11 @@ export function getCompanyBillingStartMonth(company: BillingCompany): string | n
   }
   const date = new Date(source);
   return Number.isNaN(date.getTime()) ? null : toYYYYMM(date);
+}
+
+// 会社レコードの請求対象人数。項目追加前のレコード（未集計）は有効ユーザー数で代用する。
+export function getCompanyBillableEmployees(company: Pick<Company, "activeEmployees" | "billableEmployees">) {
+  return company.billableEmployees ?? company.activeEmployees ?? 0;
 }
 
 function findLatestSnapshotBefore(company: BillingCompany, month: string) {
@@ -140,17 +182,17 @@ export function buildCompanyBillingRow(company: BillingCompany, month: string, c
   let source: CompanyBillingSource;
   let values: {
     status: CompanyBillingStatus;
-    activeEmployees: number;
+    billableEmployees: number;
     monthlyBaseFee?: number;
     perEmployeeMonthlyFee: number;
   };
 
   if (month >= currentMonth) {
-    // 当月（以降）は現在の設定・利用人数で算出する。会社レコードの activeEmployees はユーザー変更のたびに更新される。
+    // 当月（以降）は現在の設定・利用人数で算出する。会社レコードの人数はユーザー変更のたびに更新される。
     source = "live";
     values = {
       status: company.status,
-      activeEmployees: company.activeEmployees ?? 0,
+      billableEmployees: getCompanyBillableEmployees(company),
       monthlyBaseFee: company.monthlyBaseFee,
       perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
     };
@@ -165,7 +207,8 @@ export function buildCompanyBillingRow(company: BillingCompany, month: string, c
       source = snapshot ? "snapshot" : "carried";
       values = {
         status: base.status,
-        activeEmployees: base.activeEmployees,
+        // 請求対象人数の項目がない古いスナップショットは、当時の請求人数だった有効ユーザー数を使う。
+        billableEmployees: base.billableEmployees ?? base.activeEmployees,
         // 基本料導入前のスナップショットには monthlyBaseFee がない（＝基本料 0 円の時期）。
         monthlyBaseFee: base.monthlyBaseFee,
         perEmployeeMonthlyFee: base.perEmployeeMonthlyFee,
@@ -174,7 +217,7 @@ export function buildCompanyBillingRow(company: BillingCompany, month: string, c
       source = "estimated";
       values = {
         status: company.status,
-        activeEmployees: company.activeEmployees ?? 0,
+        billableEmployees: getCompanyBillableEmployees(company),
         monthlyBaseFee: company.monthlyBaseFee,
         perEmployeeMonthlyFee: company.perEmployeeMonthlyFee ?? 0,
       };

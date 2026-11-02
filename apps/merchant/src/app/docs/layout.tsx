@@ -31,11 +31,12 @@ export default function DocsLayout({ children }: DocsLayoutProps) {
               <span className="block truncate text-lg font-bold sm:text-xl">操作ガイド</span>
             </span>
           </Link>
+          {/* ログインしていなければ、ダッシュボードを開く時点でログイン画面に移る。 */}
           <Link
-            href={"/login" as Route}
+            href={"/dashboard" as Route}
             className="shrink-0 rounded-full border border-white/40 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
           >
-            ログイン画面へ
+            ダッシュボードに戻る
           </Link>
         </div>
       </header>

@@ -12,7 +12,7 @@ export type CompanyIncomeRow = {
   companyName: string;
   status: string;
   month: string;
-  activeEmployees: number;
+  billableEmployees: number; // 利用人数（請求対象のユーザー数）
   monthlyBaseFee: number;
   perEmployeeMonthlyFee: number;
   monthlyIncomeYen: number;

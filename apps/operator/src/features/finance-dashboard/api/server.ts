@@ -72,7 +72,7 @@ function buildCompanyIncomeRowForMonth(company: Company, month: string, currentM
     companyName: company.shortName || company.name,
     status: billing.status,
     month,
-    activeEmployees: billing.activeEmployees,
+    billableEmployees: billing.billableEmployees,
     monthlyBaseFee: billing.monthlyBaseFee,
     perEmployeeMonthlyFee: billing.perEmployeeMonthlyFee,
     monthlyIncomeYen: billing.amountYen,

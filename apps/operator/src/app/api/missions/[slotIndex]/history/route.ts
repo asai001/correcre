@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listMissionHistoryForSlot } from "@operator/features/mission-management/api/server";
+import { listMissionHistoryForSlot } from "@correcre/mission-management/server";
 import { getOperatorAccessStatus } from "@operator/lib/auth/operator";
 
 async function authorizeOperator() {

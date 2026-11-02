@@ -1,0 +1,119 @@
+import type {
+  AnalysisThresholds,
+  Mission,
+  MissionField,
+  MissionHistory,
+  ScheduledMissionChange,
+} from "@correcre/types";
+
+export const MISSION_SLOT_COUNT = 5;
+
+// ミッション保存の反映モード（即時 / 翌月月初から反映）
+export type MissionApplyMode = "immediate" | "scheduled";
+
+// 有効な全ミッションの「月間実施回数 × 点数」の合計の上限（点）。
+export const MISSION_TOTAL_POINTS_CAP = 100;
+
+// API レスポンス用のミッションサマリー
+export type MissionSlotSummary = {
+  missionId: string | null;
+  slotIndex: number;
+  version: number;
+  title: string;
+  description: string;
+  category: string;
+  monthlyCount: number;
+  score: number;
+  enabled: boolean;
+  fields: MissionField[];
+  // 項目分析の閾値のミッション個別設定。null = 企業既定値に従う。
+  analysisThresholds: AnalysisThresholds | null;
+  updatedAt: string | null;
+  configured: boolean;
+  // 「翌月月初から反映」予約（未反映のスケジュール変更）。無ければ null。
+  pendingChange: ScheduledMissionChange | null;
+};
+
+// ミッション編集 API の入力
+export type UpdateMissionInput = {
+  title: string;
+  description: string;
+  category: string;
+  monthlyCount: number;
+  score: number;
+  enabled: boolean;
+  fields: MissionField[];
+  // 項目分析の閾値。null = 企業既定値に従う。
+  analysisThresholds: AnalysisThresholds | null;
+};
+
+// ミッション履歴のレスポンス
+export type MissionHistoryItem = {
+  version: number;
+  title: string;
+  description: string;
+  category: string;
+  monthlyCount: number;
+  score: number;
+  fields: MissionField[];
+  analysisThresholds: AnalysisThresholds | null;
+  validFrom: string;
+  validTo: string | null;
+  changedByUserId: string;
+  createdAt: string;
+};
+
+export function createEmptyMissionSummary(slotIndex: number): MissionSlotSummary {
+  return {
+    missionId: null,
+    slotIndex,
+    version: 0,
+    title: "",
+    description: "",
+    category: "",
+    monthlyCount: 1,
+    score: 1,
+    enabled: true,
+    fields: [],
+    analysisThresholds: null,
+    updatedAt: null,
+    configured: false,
+    pendingChange: null,
+  };
+}
+
+export function toMissionSummary(mission: Mission): MissionSlotSummary {
+  return {
+    missionId: mission.missionId,
+    slotIndex: mission.slotIndex,
+    version: mission.version,
+    title: mission.title,
+    description: mission.description,
+    category: mission.category,
+    monthlyCount: mission.monthlyCount,
+    score: mission.score,
+    enabled: mission.enabled,
+    fields: mission.fields,
+    analysisThresholds: mission.analysisThresholds ?? null,
+    updatedAt: mission.updatedAt,
+    configured: true,
+    pendingChange: mission.pendingChange ?? null,
+  };
+}
+
+export function toHistoryItem(history: MissionHistory): MissionHistoryItem {
+  return {
+    version: history.version,
+    title: history.title,
+    description: history.description,
+    category: history.category,
+    monthlyCount: history.monthlyCount,
+    score: history.score,
+    fields: history.fields,
+    analysisThresholds: history.analysisThresholds ?? null,
+    validFrom: history.validFrom,
+    validTo: history.validTo,
+    changedByUserId: history.changedByUserId,
+    createdAt: history.createdAt,
+  };
+}

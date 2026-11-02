@@ -44,7 +44,7 @@ export default function EmployeeResendInvitationDialog({
       <DialogTitle sx={{ pb: 1 }}>
         <div className="text-2xl font-bold text-slate-900">招待メールを再送</div>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          仮パスワードの有効期限が切れた招待中ユーザーへ、新しい仮パスワードを記載した招待メールを再送します。
+          招待中（初回ログイン前）のユーザーへ、新しい仮パスワードを記載した招待メールを再送します。仮パスワードの有効期限内でも再送できます。
         </Typography>
       </DialogTitle>
 

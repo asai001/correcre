@@ -135,7 +135,7 @@ export default function CompanyInfoForm({ initialData, merchantUserName, merchan
         adminName={merchantUserName}
         merchantDisplayName={headerDisplayName}
         subtitle="提携企業の会社情報を確認・編集します。"
-        backHref="/dashboard"
+        backHref="/settings"
       />
 
       {notice ? <Alert severity="success">{notice}</Alert> : null}

@@ -1,12 +1,12 @@
 // 操作ガイドに載せるスクリーンショットの表示サイズ（撮影時の 1.5 倍解像度を CSS ピクセルに換算した値）。
 // 画像を差し替えたら、ここの幅・高さも合わせて更新すること（ずれると表示がゆがむ）。
 export const SCREENSHOTS = {
-  "calendar": { width: 1280, height: 1153 },
-  "company-info": { width: 1280, height: 1260 },
-  "dashboard-header-general": { width: 1280, height: 159 },
-  "dashboard-header": { width: 1280, height: 325 },
+  "calendar": { width: 1280, height: 1059 },
+  "company-info": { width: 1280, height: 1140 },
+  "dashboard-header-general": { width: 1280, height: 51 },
+  "dashboard-header": { width: 1280, height: 207 },
   "dashboard-todo": { width: 1272, height: 1425 },
-  "dashboard": { width: 1280, height: 2778 },
+  "dashboard": { width: 1280, height: 2825 },
   "email-accepted": { width: 680, height: 503 },
   "email-invite": { width: 680, height: 695 },
   "email-reset": { width: 680, height: 407 },
@@ -25,6 +25,7 @@ export const SCREENSHOTS = {
   "exchange-reservation-head": { width: 1272, height: 506 },
   "exchange-reservation": { width: 1280, height: 1378 },
   "exchanges-list": { width: 1280, height: 1661 },
+  "footer": { width: 1280, height: 69 },
   "forgot-request": { width: 1280, height: 860 },
   "forgot-reset": { width: 1280, height: 1127 },
   "login-filled": { width: 1280, height: 860 },
@@ -61,9 +62,10 @@ export const SCREENSHOTS = {
   "schedule-proposal": { width: 1280, height: 779 },
   "schedule-response": { width: 1280, height: 667 },
   "schedule-selection": { width: 1272, height: 476 },
+  "settings": { width: 1280, height: 483 },
   "settlement": { width: 1280, height: 959 },
-  "support": { width: 1280, height: 860 },
-  "users": { width: 1280, height: 1117 },
+  "support": { width: 1280, height: 665 },
+  "users": { width: 1280, height: 1023 },
 } as const;
 
 export type ScreenshotName = keyof typeof SCREENSHOTS;
